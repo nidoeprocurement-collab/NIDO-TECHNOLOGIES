@@ -58,20 +58,21 @@ const LIVE_MODULES_BY_TYPE: Record<ReportEntityType, Set<string>> = {
     "Credit Notes", "Credit Note Items", "Renewals", "Services Request Register", "AMC Requests",
     "Repair Requests", "Rental Requests", "Recycle and Disposal Requests", "Regular Purchase Requests",
     "Support Parent Tickets", "Support Child Tickets", "Ticket Conversations and Attachments",
+    "Dashboard and Client Activity Summary",
   ]),
   vendor: new Set([
     "Vendor Orders", "Vendor Order Items", "Vendor PO Notes", "Vendor PO Documents", "Purchase Orders",
     "Purchase Order Items", "Bills", "Bill Items", "Payments Made", "Payment Made Allocations",
     "Vendor Credits", "Vendor Credit Items", "Vendor Master and Onboarding", "Vendor Categories",
-    "Vendor Services", "Vendor Payments Overview", "Vendor Catalog", "Vendor SLA Policies",
-    "Procurement SLA Stages", "Vendor Performance", "Procurement Three Way Match",
+    "Vendor Payments Overview", "Vendor Catalog", "Vendor SLA Policies",
+    "Procurement SLA Stages", "Vendor Performance",
   ]),
   internal: new Set([
-    "Nido Users", "Nido Roles", "Role Permissions", "Departments and Hierarchy", "User Invitations",
+    "Nido Users", "Nido Roles", "Role Permissions", "Departments and Hierarchy",
     "User Login History", "User Notes", "User Documents", "Automatic Assignment Rules", "Master Catalog",
     "Product Specifications", "Product Variants", "Vendor Catalog", "Client Catalog", "Product Commercial Terms",
     "Price Engine and Vendor Comparison", "Client Pricing and Margins", "Pricing Slabs and Rules",
-    "Vendor Pricing Charges", "Inventory Balances", "Stock Movements", "Goods Receipts",
+    "Vendor Pricing Charges", "Inventory Balances", "Stock Movements",
     "Returns and Cancellations", "Renewals", "Services Request Register", "AMC Requests", "Repair Requests",
     "Rental Requests", "Recycle and Disposal Requests", "Regular Purchase Requests", "AMC Visit Schedule",
     "Regular Purchase Items", "Service Appointments and Assignments", "Support Parent Tickets",
@@ -80,11 +81,11 @@ const LIVE_MODULES_BY_TYPE: Record<ReportEntityType, Set<string>> = {
     "Approval Decisions and History", "Vendor SLA Policies", "Client SLA Tiers", "Procurement SLA Stages",
     "Service SLA Policies", "Approval SLA Policies", "SLA Escalation Rules", "SLA Business Calendar",
     "SLA Audit History", "SLA Outcomes and Breaches", "Client and Vendor Spend", "Sales Revenue and Profit",
-    "AR and AP Ageing", "Vendor Performance", "Dashboard and Client Activity Summary",
+    "AR and AP Ageing", "Vendor Performance",
     "Organization and General Settings", "Order Status Configuration", "Tax Audit",
     "Tax Transaction Reconciliation", "Audit and Impersonation", "Report Definitions", "Scheduled Reports",
     "Report Download and Email History", "Product Categories Brands and Tags", "Expenses",
-    "Transactions Ledger", "Procurement Three Way Match",
+    "Transactions Ledger",
   ]),
 };
 
@@ -354,10 +355,19 @@ function recordsFrom(value: unknown): ReportRecord[] {
 
 function childRecords(records: ReportRecord[], childKeys: string[]): ReportRecord[] {
   return records.flatMap((record) => {
-    const childKey = childKeys.find((key) => Array.isArray(record[key]));
+    const payload = record.payload && typeof record.payload === "object" && !Array.isArray(record.payload)
+      ? record.payload as ReportRecord
+      : {};
+    const details = record.details && typeof record.details === "object" && !Array.isArray(record.details)
+      ? record.details as ReportRecord
+      : {};
+    const childKey = childKeys.find((key) =>
+      Array.isArray(record[key]) || Array.isArray(payload[key]) || Array.isArray(details[key]),
+    );
     if (!childKey) return [];
     const parentId = String(record.id ?? record.number ?? record.poNumber ?? record.invoiceNumber ?? "");
-    return (record[childKey] as unknown[]).flatMap((child, index) => {
+    const children = (record[childKey] ?? payload[childKey] ?? details[childKey]) as unknown[];
+    return children.flatMap((child, index) => {
       if (!child || typeof child !== "object" || Array.isArray(child)) return [];
       return [{
         ...record,
@@ -365,17 +375,107 @@ function childRecords(records: ReportRecord[], childKeys: string[]): ReportRecor
         id: String((child as ReportRecord).id ?? `${parentId}:${childKey}:${index + 1}`),
         parentRecordId: parentId,
         parentRecordType: childKey,
+        childIndex: index + 1,
       }];
     });
   });
 }
 
-function mapClientMasterRecords(): ReportRecord[] {
-  return toRecords(getClients()).map((client) => ({
-    ...client,
-    clientId: client.clientId ?? client.id,
-    clientName: client.clientName ?? client.name,
+function mapVendorCategories(): ReportRecord[] {
+  const vendors = getVendors();
+  const countByCategory = new Map<string, number>();
+  vendors.forEach((vendor) => {
+    const category = String(vendor.category ?? "").trim();
+    if (category) countByCategory.set(category.toLowerCase(), (countByCategory.get(category.toLowerCase()) ?? 0) + 1);
+  });
+  return vendors.filter((vendor) => String(vendor.category ?? "").trim()).map((vendor) => ({
+    ...vendor,
+    vendorId: vendor.vendorId ?? vendor.id,
+    vendorName: vendor.vendorName ?? vendor.name,
+    categoryId: vendor.categoryId ?? `category-${String(vendor.category).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    categoryName: vendor.category,
+    parentCategoryId: vendor.parentCategoryId ?? "",
+    description: vendor.categoryDescription ?? "",
+    vendorCount: countByCategory.get(String(vendor.category).toLowerCase()) ?? 0,
   }));
+}
+
+function mapVendorPerformance(): ReportRecord[] {
+  const purchaseOrders = mapPurchaseOrders();
+  const slaEvents = toRecords(getSLAAuditLog());
+  const currency = getConfig().localization.currency;
+  return toRecords(getVendors()).map((vendor) => {
+    const vendorId = String(vendor.vendorId ?? vendor.id);
+    const vendorName = String(vendor.vendorName ?? vendor.name ?? vendorId);
+    const orders = purchaseOrders.filter((order) =>
+      String(order.vendorId ?? "") === vendorId ||
+      String(order.vendorName ?? "").toLowerCase() === vendorName.toLowerCase(),
+    );
+    const cancelledOrders = orders.filter((order) => /cancel/i.test(String(order.status ?? "")));
+    const acceptedOrders = orders.filter((order) => /accept|process|deliver|complete/i.test(String(order.status ?? "")));
+    const deliveredOrders = orders.filter((order) => /deliver|complete/i.test(String(order.status ?? "")));
+    const items = orders.flatMap((order) => Array.isArray(order.items) ? order.items as ReportRecord[] : []);
+    const quantityOf = (item: ReportRecord) => Number(item.qty ?? item.quantity ?? 0);
+    const itemsOrdered = items.reduce((total, item) => total + quantityOf(item), 0)
+      || orders.reduce((total, order) => total + Number(order.qty ?? 0), 0);
+    const itemsDelivered = items.reduce((total, item) =>
+      total + (/deliver|complete|received/i.test(String(item.status ?? "")) ? quantityOf(item) : 0), 0,
+    ) || deliveredOrders.reduce((total, order) => total + Number(order.qty ?? 0), 0);
+    const datedDeliveries = deliveredOrders.flatMap((order) => {
+      const expected = order.requestedDelivery ?? order.expectedDeliveryDate;
+      const actual = order.deliveredAt ?? order.actualDeliveryDate ?? order.deliveryDate;
+      const expectedTime = expected ? new Date(String(expected)).getTime() : Number.NaN;
+      const actualTime = actual ? new Date(String(actual)).getTime() : Number.NaN;
+      return Number.isFinite(expectedTime) && Number.isFinite(actualTime) ? [{
+        onTime: actualTime <= expectedTime,
+      }] : [];
+    });
+    const matchingSlaEvents = slaEvents.filter((event) =>
+      (String(event.vendorId ?? "") === vendorId ||
+        String(event.vendorName ?? "").toLowerCase() === vendorName.toLowerCase()) &&
+      /breach|missed|penalty/i.test(String(event.status ?? event.outcome ?? event.event ?? "")),
+    );
+    const poSpend = orders.reduce((total, order) => total + Number(order.grandTotal ?? order.totalAmount ?? 0), 0);
+    const totalSpend = Number(vendor.totalSpend ?? 0) || poSpend;
+    return {
+      ...vendor,
+      vendorId,
+      vendorName,
+      ordersReceived: orders.length,
+      ordersAccepted: acceptedOrders.length,
+      ordersCancelled: cancelledOrders.length,
+      itemsOrdered,
+      itemsDelivered,
+      onTimeDeliveries: datedDeliveries.filter((delivery) => delivery.onTime).length,
+      lateDeliveries: datedDeliveries.filter((delivery) => !delivery.onTime).length,
+      onTimeDeliveryPercent: datedDeliveries.length
+        ? datedDeliveries.filter((delivery) => delivery.onTime).length / datedDeliveries.length * 100
+        : undefined,
+      fulfillmentPercent: itemsOrdered ? itemsDelivered / itemsOrdered * 100 : undefined,
+      averageResponseHours: vendor.averageResponseHours ?? vendor.responseHours,
+      averageLeadTimeDays: vendor.averageLeadTimeDays ?? vendor.leadTimeDays,
+      qualityScore: vendor.performanceQuality ?? vendor.rating,
+      complianceScore: vendor.performanceCompliance,
+      complaintCount: vendor.complianceIssues,
+      slaBreachCount: matchingSlaEvents.length,
+      penaltyAmount: matchingSlaEvents.reduce((total, event) => total + Number(event.penaltyAmount ?? 0), 0) || undefined,
+      currency: vendor.currency ?? currency,
+      totalSpend,
+      performanceRating: vendor.rating ?? vendor.score,
+    };
+  });
+}
+
+function mapClientMasterRecords(): ReportRecord[] {
+  return toRecords(getClients()).map((client) => {
+    const onboarding = client.onboardingFormData ?? client.lastUpdatedFormData ?? {};
+    return {
+      ...client,
+      clientId: client.clientId ?? client.id,
+      clientName: client.clientName ?? client.name,
+      onboarding: onboarding as ReportRecord,
+    };
+  });
 }
 
 function mapClientContracts(): ReportRecord[] {
@@ -439,6 +539,19 @@ function mapUserNotesAndDocuments(kind: "notes" | "documents"): ReportRecord[] {
   });
 }
 
+function mapUserLoginHistory(): ReportRecord[] {
+  return toRecords(getUsers()).flatMap((user) => {
+    const history = Array.isArray(user.loginHistory) ? user.loginHistory as ReportRecord[] : [];
+    return history.map((login) => ({
+      ...user,
+      loginHistory: login,
+      login,
+      userId: user.id,
+      userName: user.name,
+    }));
+  });
+}
+
 function mapRolePermissions(): ReportRecord[] {
   return Object.entries(getAllRolePermissions()).flatMap(([roleName, modules]) =>
     Object.entries(modules).map(([module, actions]) => ({
@@ -450,16 +563,30 @@ function mapRolePermissions(): ReportRecord[] {
 }
 
 function mapClientRolePermissions(): ReportRecord[] {
+  const users = getPortalUsers();
   return mapPortalRoleRecords().flatMap((role) => {
     const permissions = Array.isArray(role.permissions) ? role.permissions : [];
-    return permissions.filter((permission): permission is ReportRecord =>
-      Boolean(permission) && typeof permission === "object" && !Array.isArray(permission),
-    ).map((permission) => ({ ...role, ...permission }));
+    const assignedUserCount = users.filter((user) =>
+      String(user.clientId) === String(role.clientId) && user.role === role.name,
+    ).length;
+    const rows = permissions.length ? permissions : [{}];
+    return rows.map((permission) => ({
+      ...role,
+      permission,
+      ...permission,
+      permissions,
+      assignedUserCount,
+    }));
   });
 }
 
 function mapServiceRequests(module?: string): ReportRecord[] {
-  const requests = toRecords(getServiceRequests());
+  const requests = toRecords(getServiceRequests()).map((request) => {
+    const payload = request.payload && typeof request.payload === "object" && !Array.isArray(request.payload)
+      ? request.payload as ReportRecord
+      : {};
+    return { ...payload, ...request, payload };
+  });
   if (!module) return requests;
   const query = module.toLowerCase();
   const terms: Record<string, string[]> = {
@@ -483,6 +610,110 @@ function mapPurchaseOrders(): ReportRecord[] {
 
 function mapInvoiceRecords(): ReportRecord[] {
   return toRecords(getInvoices()).map((record) => ({ ...record, documentType: "Invoice" }));
+}
+
+function mapInvoicePaymentAndActivityRecords(): ReportRecord[] {
+  return mapInvoiceRecords().flatMap((invoice) => {
+    const payments = Array.isArray(invoice.payments) ? invoice.payments as ReportRecord[] : [];
+    const activities = Array.isArray(invoice.activity) ? invoice.activity as ReportRecord[] : [];
+    return [
+      ...payments.map((payment) => ({
+        ...invoice,
+        payment,
+        eventType: "Payment",
+        recordedAt: payment.date ?? payment.createdAt,
+      })),
+      ...activities.map((activity) => ({
+        ...invoice,
+        activity,
+        eventType: "Activity",
+        recordedAt: activity.date ?? activity.createdAt,
+      })),
+    ];
+  });
+}
+
+function mapReceiptAllocationRecords(): ReportRecord[] {
+  const invoicesByNumber = new Map(
+    getInvoices().map((invoice) => [String(invoice.invoiceNumber), invoice]),
+  );
+  return toRecords(getReceipts()).map((receipt) => {
+    const invoice = invoicesByNumber.get(String(receipt.invoiceNumber));
+    const amount = receipt.amountReceived;
+    return {
+      ...receipt,
+      receiptId: receipt.id,
+      clientId: invoice?.clientId,
+      invoiceId: invoice?.id,
+      allocationDate: receipt.paymentDate,
+      allocatedAmount: amount,
+      allocatedBy: receipt.createdBy,
+      reversalReference: receipt.reference,
+      allocation: {
+        invoiceNumber: receipt.invoiceNumber,
+        amount,
+        date: receipt.paymentDate,
+        status: receipt.status,
+      },
+    };
+  });
+}
+
+function linkedChildRecords(
+  records: ReportRecord[],
+  childKeys: string[],
+  relation: "clientOrder" | "quote" | "salesOrder" | "invoice" | "receipt" | "creditNote" | "purchaseOrder" | "bill" | "payment" | "vendorCredit" | "ticket" | "serviceRequest" | "product",
+): ReportRecord[] {
+  return childRecords(records, childKeys).map((child) => {
+    const parentId = String(child.parentRecordId ?? "");
+    const clientId = child.clientId ?? getClients().find(
+      (client) => String(client.name).toLowerCase() === String(child.clientName ?? child.customerName ?? "").toLowerCase(),
+    )?.id;
+    const links: Record<typeof relation, ReportRecord> = {
+      clientOrder: { clientOrderId: parentId, orderId: parentId },
+      quote: { quoteId: parentId, quoteNumber: child.quoteNumber },
+      salesOrder: { salesOrderId: parentId, orderId: parentId, clientId },
+      invoice: { invoiceId: parentId, clientId },
+      receipt: { receiptId: parentId },
+      creditNote: { creditNoteId: parentId },
+      purchaseOrder: { purchaseOrderId: parentId, poNumber: child.poNumber },
+      bill: { billId: parentId },
+      payment: { paymentId: parentId },
+      vendorCredit: { vendorCreditId: parentId },
+      ticket: { ticketId: parentId },
+      serviceRequest: { serviceRequestId: parentId },
+      product: { masterProductId: parentId, productId: parentId },
+    };
+    const linked = { ...child, ...links[relation], ...(clientId ? { clientId } : {}) };
+    const quantity = Number(linked.qty ?? linked.quantity);
+    const rate = Number(linked.rate ?? linked.unitPrice ?? linked.price);
+    const discount = Number(linked.discount ?? 0);
+    const taxPercent = Number(linked.taxPercent ?? linked.gstPct ?? 0);
+    const hasLineAmountInputs =
+      (linked.qty !== undefined || linked.quantity !== undefined) &&
+      (linked.rate !== undefined || linked.unitPrice !== undefined || linked.price !== undefined) &&
+      Number.isFinite(quantity) && Number.isFinite(rate);
+    const taxableAmount = Number(linked.lineTaxableAmount ?? linked.lineSubtotal ?? linked.taxableAmount);
+    const effectiveTaxable = Number.isFinite(taxableAmount)
+      ? taxableAmount
+      : hasLineAmountInputs
+        ? Math.max(0, quantity * rate - (Number.isFinite(discount) ? discount : 0))
+        : undefined;
+    const lineTaxAmount = Number(linked.lineTaxAmount ?? linked.taxAmount);
+    const effectiveTax = Number.isFinite(lineTaxAmount)
+      ? lineTaxAmount
+      : effectiveTaxable !== undefined && Number.isFinite(taxPercent)
+        ? effectiveTaxable * taxPercent / 100
+        : undefined;
+    return {
+      ...linked,
+      ...(effectiveTaxable !== undefined ? { lineTaxableAmount: effectiveTaxable } : {}),
+      ...(effectiveTax !== undefined ? { lineTaxAmount: effectiveTax } : {}),
+      ...(effectiveTaxable !== undefined && effectiveTax !== undefined
+        ? { lineTotal: Number(linked.lineTotal ?? effectiveTaxable + effectiveTax) }
+        : {}),
+    };
+  });
 }
 
 function mapPaymentMadeRecords(): ReportRecord[] {
@@ -533,22 +764,106 @@ function mapTaxReconciliationRecords(): ReportRecord[] {
 function mapClientDashboardRecords(): ReportRecord[] {
   const clients = mapClientMasterRecords();
   const orders = mapClientOrderRecords();
+  const salesOrders = toRecords(getOrders());
   const services = mapClientServiceRecords();
   const tickets = toRecords(getSupportTickets());
+  const invoices = mapInvoiceRecords();
+  const purchaseOrders = mapPurchaseOrders();
+  const vendors = getVendors();
+  const allApprovals = getApprovalRecords();
+  const renewals = mapRenewals();
+  const activeClients = clients.filter((client) => !/inactive|archived/i.test(String(client.status ?? "")));
+  const activeVendors = vendors.filter((vendor) => !/inactive|archived/i.test(String(vendor.status ?? "")));
+  const now = new Date();
+  const recentOrderCutoff = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+  const currency = getConfig().localization.currency;
   return clients.map((client) => {
     const clientId = String(client.clientId ?? client.id);
     const clientName = String(client.clientName ?? client.name ?? clientId);
     const belongsToClient = (record: ReportRecord) =>
       String(record.clientId ?? record.customerId ?? record.clientName ?? record.customerName ?? "") === clientId ||
       String(record.clientName ?? record.customerName ?? "") === clientName;
+    const clientOrders = [...orders, ...salesOrders].filter(belongsToClient);
+    const distinctOrders = [...new Map(clientOrders.map((order, index) => [
+      `${order.id ?? order.orderNumber ?? index}`,
+      order,
+    ])).values()];
+    const clientTickets = tickets.filter(belongsToClient);
+    const clientInvoices = invoices.filter(belongsToClient);
+    const clientPurchaseOrders = purchaseOrders.filter((order) => {
+      const sourceOrder = salesOrders.find((salesOrder) =>
+        String(salesOrder.id) === String(order.orderId),
+      );
+      return sourceOrder ? belongsToClient(sourceOrder) : false;
+    });
+    const isOpen = (status: unknown) => !/closed|resolved|cancelled|complete|paid/i.test(String(status ?? ""));
+    const revenueRecords = clientInvoices.length
+      ? clientInvoices
+      : orders.filter(belongsToClient);
+    const salesRevenue = revenueRecords.reduce(
+      (total, record) => total + Number(record.grandTotal ?? record.totalAmount ?? record.amountNum ?? record.amount ?? 0),
+      0,
+    );
+    const procurementSpend = clientPurchaseOrders.reduce(
+      (total, record) => total + Number(record.grandTotal ?? record.totalAmount ?? 0),
+      0,
+    );
+    const dueSoon = now.getTime() + 30 * 24 * 60 * 60 * 1000;
     return {
       ...client,
       clientId,
       clientName,
-      orderCount: orders.filter(belongsToClient).length,
+      vendorId: undefined,
+      activeClientCount: activeClients.length,
+      activeVendorCount: activeVendors.length,
+      newOrderCount: distinctOrders.filter((order) => {
+        const rawDate = order.orderDate ?? order.date ?? order.createdAt;
+        const dateTime = rawDate ? new Date(String(rawDate)).getTime() : Number.NaN;
+        return Number.isFinite(dateTime) && dateTime >= recentOrderCutoff;
+      }).length,
+      pendingOrderCount: distinctOrders.filter((order) => isOpen(order.status)).length,
+      deliveredOrderCount: distinctOrders.filter((order) => /deliver|complete/i.test(String(order.status ?? ""))).length,
+      openTicketCount: clientTickets.filter((ticket) => isOpen(ticket.status)).length,
+      overdueInvoiceCount: clientInvoices.filter((invoice) =>
+        isOpen(invoice.status) && invoice.dueDate && new Date(String(invoice.dueDate)).getTime() < now.getTime(),
+      ).length,
+      salesRevenue,
+      procurementSpend,
+      grossMarginPercent: salesRevenue > 0
+        ? ((salesRevenue - procurementSpend) / salesRevenue) * 100
+        : undefined,
+      pendingApprovalCount: allApprovals.filter((approval) =>
+        belongsToClient(approval) && /pending|review|submitted/i.test(String(approval.status ?? "")),
+      ).length,
+      upcomingRenewalCount: renewals.filter((renewal) => {
+        if (!belongsToClient(renewal)) return false;
+        const rawDate = renewal.renewalDate ?? renewal.nextRenewalDate ?? renewal.endDate;
+        const renewalTime = rawDate ? new Date(String(rawDate)).getTime() : Number.NaN;
+        return Number.isFinite(renewalTime) && renewalTime >= now.getTime() && renewalTime <= dueSoon;
+      }).length,
+      currency,
+      orderCount: distinctOrders.length,
       serviceRequestCount: services.filter(belongsToClient).length,
-      supportTicketCount: tickets.filter(belongsToClient).length,
+      supportTicketCount: clientTickets.length,
     };
+  });
+}
+
+function mapServiceAppointmentRecords(): ReportRecord[] {
+  return mapServiceRequests().flatMap((request) => {
+    const assignment = request.assignment && typeof request.assignment === "object"
+      ? request.assignment as ReportRecord
+      : {};
+    const appointments = [
+      ...(Array.isArray(request.appointments) ? request.appointments as ReportRecord[] : []),
+      ...(Array.isArray(request.visitSchedule) ? request.visitSchedule as ReportRecord[] : []),
+      ...(Array.isArray(request.visits) ? request.visits as ReportRecord[] : []),
+      ...(Array.isArray(request.payload) ? request.payload as ReportRecord[] : []),
+    ];
+    if (!appointments.length && !Object.keys(assignment).length) return [];
+    return appointments.length
+      ? appointments.map((appointment) => ({ ...request, assignment, appointment }))
+      : [{ ...request, assignment, appointment: {} }];
   });
 }
 
@@ -568,27 +883,27 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "Client Documents":
       return mapClientDocumentRecords();
     case "Client Order Items":
-      return childRecords(mapClientOrderRecords(), ["productDetails", "items", "cartItems"]);
+      return linkedChildRecords(mapClientOrderRecords(), ["productDetails", "items", "cartItems"], "clientOrder");
     case "Sales Quotes":
       return toRecords(getQuotes());
     case "Sales Quote Items":
-      return childRecords(toRecords(getQuotes()), ["lineItems", "items", "products"]);
+      return linkedChildRecords(toRecords(getQuotes()), ["lineItems", "items", "products"], "quote");
     case "Sales Orders":
       return toRecords(getOrders());
     case "Sales Order Items":
-      return childRecords(toRecords(getOrders()), ["lineItems", "items", "cartItems"]);
+      return linkedChildRecords(toRecords(getOrders()), ["lineItems", "items", "cartItems"], "salesOrder");
     case "Invoices and Proforma Invoices":
       return mapInvoiceRecords();
     case "Invoice Items":
-      return childRecords(mapInvoiceRecords(), ["lineItems", "items"]);
+      return linkedChildRecords(mapInvoiceRecords(), ["lineItems", "items"], "invoice");
     case "Invoice Payments and Activity":
-      return childRecords(mapInvoiceRecords(), ["payments", "activity", "activities"]);
+      return mapInvoicePaymentAndActivityRecords();
     case "Recurring Invoices":
       return toRecords(getAllRecurring());
     case "Payment Receipts":
       return toRecords(getReceipts()).map((record) => ({ ...record, paymentType: "Client receipt" }));
     case "Receipt Allocations":
-      return childRecords(toRecords(getReceipts()), ["allocations", "applications", "invoiceAllocations"]);
+      return mapReceiptAllocationRecords();
     case "Credit Notes":
       return mapCreditNotes();
     case "Credit Note Items":
@@ -608,9 +923,9 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "AMC Visit Schedule":
       return childRecords(mapServiceRequests("AMC Requests"), ["visits", "visitSchedule", "appointments"]);
     case "Regular Purchase Items":
-      return childRecords(mapServiceRequests("Regular Purchase Requests"), ["items", "lineItems", "products"]);
+      return linkedChildRecords(mapServiceRequests("Regular Purchase Requests"), ["items", "lineItems", "products"], "serviceRequest");
     case "Service Appointments and Assignments":
-      return mapServiceRequests();
+      return mapServiceAppointmentRecords();
     case "Support Parent Tickets":
       return toRecords(getSupportTickets());
     case "Support Child Tickets":
@@ -619,11 +934,10 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
       return childRecords(toRecords(getSupportTickets()), ["conversations", "messages", "attachments", "replies"]);
     case "Vendor Orders":
     case "Purchase Orders":
-    case "Procurement Three Way Match":
       return mapPurchaseOrders();
     case "Vendor Order Items":
     case "Purchase Order Items":
-      return childRecords(mapPurchaseOrders(), ["lineItems", "items", "products", "subOrders"]);
+      return linkedChildRecords(mapPurchaseOrders(), ["lineItems", "items", "products", "subOrders"], "purchaseOrder");
     case "Vendor PO Notes":
       return childRecords(mapPurchaseOrders(), ["notes", "activity", "activities"]);
     case "Vendor PO Documents":
@@ -631,32 +945,31 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "Bills":
       return getBills();
     case "Bill Items":
-      return childRecords(getBills(), ["lineItems", "items", "products"]);
+      return linkedChildRecords(getBills(), ["lineItems", "items", "products"], "bill");
     case "Payments Made":
       return getPaymentsMade();
     case "Payment Made Allocations":
-      return childRecords(getPaymentsMade(), ["allocations", "applications", "billAllocations"]);
+      return linkedChildRecords(getPaymentsMade(), ["allocations", "applications", "billAllocations"], "payment");
     case "Vendor Credits":
       return getVendorCredits();
     case "Vendor Credit Items":
-      return childRecords(getVendorCredits(), ["lineItems", "items", "products"]);
+      return linkedChildRecords(getVendorCredits(), ["lineItems", "items", "products"], "vendorCredit");
     case "Vendor Master and Onboarding":
-    case "Vendor Categories":
       return toRecords(getVendors()).map((record) => ({
         ...record,
         vendorId: record.vendorId ?? record.id,
         vendorName: record.vendorName ?? record.name,
       }));
-    case "Vendor Services":
-      return mapServiceRequests();
+    case "Vendor Categories":
+      return mapVendorCategories();
     case "Vendor Payments Overview":
       return [...getBills(), ...getPaymentsMade()];
     case "Vendor Catalog":
       return entityType === "client" ? mapClientCatalogRecords() : mapVendorProducts();
     case "Nido Users":
-    case "User Invitations":
-    case "User Login History":
       return toRecords(getUsers());
+    case "User Login History":
+      return mapUserLoginHistory();
     case "Nido Roles":
       return toRecords(getRoles());
     case "Role Permissions":
@@ -675,7 +988,7 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "Product Categories Brands and Tags":
       return toRecords(getCatalogProducts());
     case "Product Variants":
-      return childRecords(toRecords(getCatalogProducts()), ["variants", "variations", "options"]);
+      return linkedChildRecords(toRecords(getCatalogProducts()), ["variants", "variations", "options"], "product");
     case "Price Engine and Vendor Comparison":
     case "Vendor Pricing Charges":
       return toRecords(getAllProductPricing());
@@ -696,8 +1009,6 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
       }));
     case "Stock Movements":
       return toRecords(getStockHistory());
-    case "Goods Receipts":
-      return childRecords(mapPurchaseOrders(), ["goodsReceipts", "receipts", "receivedItems"]);
     case "Returns and Cancellations": {
       const candidates = [
         ...toRecords(getOrders()).map((record) => ({ ...record, transactionType: "Sales order" })),
@@ -740,14 +1051,7 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "AR and AP Ageing":
       return [...mapInvoiceRecords(), ...getBills()];
     case "Vendor Performance":
-      return [
-        ...toRecords(getVendors()).map((record) => ({
-          ...record,
-          vendorId: record.vendorId ?? record.id,
-          vendorName: record.vendorName ?? record.name,
-        })),
-        ...mapPurchaseOrders(),
-      ];
+      return mapVendorPerformance();
     case "Dashboard and Client Activity Summary":
       return mapClientDashboardRecords();
     case "Organization and General Settings":
