@@ -95,12 +95,13 @@ const FIELD_ALIASES: Record<string, string[]> = {
   id: ["id", "employeeId", "clientId", "vendorId", "productId", "requestId", "number", "orderNumber", "poNumber"],
   createdon: ["createdAt", "createdOn", "createdOnDisplay", "created", "createdDate", "lastRunDate", "onboardedDate", "requestDate", "orderDate", "invoiceDate", "date", "timestamp", "created_at"],
   createdat: ["createdAt", "createdOn", "created", "lastRunDate", "requestDate", "orderDate", "invoiceDate", "date", "timestamp", "created_at"],
-  createdby: ["createdByName", "createdBy", "createdByEmail", "requestedBy", "assignedTo"],
+  createdby: ["createdByName", "createdBy", "createdByEmail", "requestedBy"],
   clientname: ["clientName", "client", "customerName"],
   clientid: ["clientId", "customerId"],
   clientemail: ["email", "clientEmail"],
   clientphone: ["phone", "mobile", "clientPhone"],
   clientcity: ["city", "billingCity", "shippingCity"],
+  contactperson: ["contactPerson", "rep", "primaryContact"],
   clientstatus: ["clientStatus", "status"],
   clienttier: ["tier", "clientTier"],
   contractstart: ["contractStartDate", "contractStart"],
@@ -171,8 +172,9 @@ function lookup(record: ReportRecord, keys: string[]): unknown {
 export function getReportFieldValue(record: ReportRecord, column: string): string {
   const fieldKey = normalized(column);
   const module = String(record.__module ?? "");
-  const orderClientName = fieldKey === "clientname" && module === "Orders";
+  const orderClientName = ["client", "clientname"].includes(fieldKey) && module === "Orders";
   const requestClientName = fieldKey === "clientname" && ["Services", "Support Tickets"].includes(module);
+  const isMasterOrderRow = module === "Orders" && record["Master Order ID"] !== undefined;
   if (
     fieldKey.startsWith("client")
     && module
@@ -196,10 +198,32 @@ export function getReportFieldValue(record: ReportRecord, column: string): strin
         : fieldKey === "vendorname" && module === "Vendors"
           ? ["vendorName", "name", ...aliases]
           : aliases;
-  const raw = lookup(record, moduleAliases);
+  const orderRawValues: Record<string, unknown> = module === "Orders"
+    ? {
+        id: isMasterOrderRow ? record["Master Order ID"] : record.orderNumber ?? record.id,
+        orderid: isMasterOrderRow ? record["Master Order ID"] : record.orderNumber ?? record.id,
+        createdon: isMasterOrderRow ? record["Created At"] : record.createdAt ?? record.createdOn,
+        createdat: isMasterOrderRow ? record["Created At"] : record.createdAt ?? record.createdOn,
+        orderdate: isMasterOrderRow ? record["Order Date"] : record.orderDate ?? record.createdAt,
+        createdby: isMasterOrderRow
+          ? record["Created By"]
+          : record.createdBy ?? record.createdByName,
+        client: isMasterOrderRow ? record.Client : record.clientName ?? record.client,
+        clientname: isMasterOrderRow ? record.Client : record.clientName ?? record.client,
+        orderstatus: isMasterOrderRow ? record["Current Order Status"] : record.status ?? record.currentOrderStatus,
+        currentorderstatus: isMasterOrderRow ? record["Current Order Status"] : record.status ?? record.currentOrderStatus,
+        amount: isMasterOrderRow ? record["Order Total"] : record.subtotal,
+        tax: isMasterOrderRow ? record.Tax : record.totalTax ?? record.taxAmount,
+        total: isMasterOrderRow ? record["Order Total"] : record.grandTotal ?? record.totalAmount,
+        ordertotal: isMasterOrderRow ? record["Order Total"] : record.grandTotal ?? record.totalAmount,
+      }
+    : {};
+  const raw = Object.prototype.hasOwnProperty.call(orderRawValues, fieldKey)
+    ? orderRawValues[fieldKey]
+    : lookup(record, moduleAliases);
   if (raw === undefined || raw === null || raw === "") return "—";
 
-  if (["amount", "tax", "total", "price", "lineamount", "unitprice"].includes(fieldKey)) {
+  if (["amount", "tax", "total", "ordertotal", "price", "lineamount", "unitprice"].includes(fieldKey)) {
     const amount = Number(raw);
     return Number.isFinite(amount) ? formatCurrency(amount) : String(raw);
   }

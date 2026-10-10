@@ -21,6 +21,7 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import {
   getMasterOrderReportValue,
   isMasterOrderReport as hasMasterOrderColumns,
+  normalizeReportColumns,
   readMasterReportOrders,
 } from "@/lib/customReportOrderData";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -60,15 +61,18 @@ function getOrderValue(order: StoredSalesOrder, column: string): string {
     case "Order ID":
       return order.orderNumber || order.id;
     case "Created On":
+    case "Created At":
+      return formatDate(order.createdAt);
     case "Order Date":
-      return formatDate(order.orderDate || order.createdAt);
+      return formatDate(order.orderDate);
     case "Created By":
-      return order.assignedTo || "—";
+      return order.createdBy || "—";
     case "Client Name":
       return order.clientName || "—";
     case "Vendor Name":
       return "—";
     case "Order Status":
+    case "Current Order Status":
     case "Status":
       return order.status;
     case "Amount":
@@ -76,6 +80,7 @@ function getOrderValue(order: StoredSalesOrder, column: string): string {
     case "Tax":
       return formatCurrency(order.totalTax);
     case "Total":
+    case "Order Total":
       return formatCurrency(order.grandTotal);
     default:
       return "—";
@@ -550,9 +555,10 @@ export default function CustomReportDetailPage() {
     );
   }
 
-  const columns = report.selectedColumns.length > 0
-    ? report.selectedColumns
-    : ["ID", "Created On", "Status"];
+  const columns = normalizeReportColumns(
+    report.module,
+    report.selectedColumns.length > 0 ? report.selectedColumns : ["ID", "Created On", "Status"],
+  );
   const isOrderReport = report.module === "Orders";
   const savedFilters = "reportType" in report ? report.filters : [];
   const filterRecords = isMasterOrderReport

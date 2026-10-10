@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_REPORT_FILTERS } from "@/contexts/ReportControlsContext";
+import { normalizeReportColumns } from "@/lib/customReportOrderData";
 import { applyReportFilters, getReportFieldValue } from "@/lib/reportData";
 
 describe("report date and field filters", () => {
@@ -8,6 +9,10 @@ describe("report date and field filters", () => {
       { __module: "Clients", id: "client-1", name: "Acme Ltd", email: "ops@acme.test" },
       "Client Name",
     )).toBe("Acme Ltd");
+    expect(getReportFieldValue(
+      { __module: "Clients", id: "client-1", rep: "Jordan Lee" },
+      "Contact Person",
+    )).toBe("Jordan Lee");
     expect(getReportFieldValue(
       { __module: "Vendors", id: "vendor-1", name: "North Supply", category: "Hardware" },
       "Vendor Name",
@@ -24,6 +29,46 @@ describe("report date and field filters", () => {
       { __module: "Users", id: "user-1", name: "Jordan Lee", department: "Operations" },
       "User Name",
     )).toBe("Jordan Lee");
+  });
+
+  it("uses distinct sales-order dates and totals in report output", () => {
+    const order = {
+      __module: "Orders",
+      id: "internal-1",
+      orderNumber: "SO-00001",
+      createdAt: "2026-10-08",
+      orderDate: "2026-10-09",
+      subtotal: 100,
+      totalTax: 18,
+      grandTotal: 118,
+      assignedTo: "Jordan Lee",
+    };
+
+    expect(getReportFieldValue(order, "ID")).toBe("SO-00001");
+    expect(getReportFieldValue(order, "Order ID")).toBe("SO-00001");
+    expect(getReportFieldValue(order, "Created On")).not.toBe(getReportFieldValue(order, "Order Date"));
+    expect(getReportFieldValue(order, "Amount")).not.toBe(getReportFieldValue(order, "Total"));
+    expect(getReportFieldValue(order, "Created By")).toBe("—");
+  });
+
+  it("removes unavailable fields and collapses duplicate report labels", () => {
+    expect(normalizeReportColumns("Catalog", ["ID", "Created On", "Item Name", "Stock", "Unit"]))
+      .toEqual(["ID", "Item Name"]);
+    expect(normalizeReportColumns("Services", ["ID", "Created On", "Request Date"]))
+      .toEqual(["ID", "Request Date"]);
+    expect(normalizeReportColumns("Support Tickets", ["Ticket ID", "Resolution Date", "Subject"]))
+      .toEqual(["Ticket ID", "Subject"]);
+    expect(normalizeReportColumns("Clients", ["Created On", "Created By", "Client Name", "Contact Person"]))
+      .toEqual(["Client Name", "Contact Person"]);
+    expect(normalizeReportColumns("Users", ["ID", "Created By", "User Name"]))
+      .toEqual(["ID", "User Name"]);
+    expect(normalizeReportColumns("Orders", ["ID", "Order ID", "Amount", "Total"]))
+      .toEqual(["Order ID", "Amount", "Total"]);
+    expect(normalizeReportColumns("Orders", [
+      "Master Order ID", "Order ID", "Client", "Client Name", "Order Status",
+      "Current Order Status", "Amount", "Order Total", "Total", "Selected Vendor",
+      "Vendor Name", "Order Notes", "Checkout Note",
+    ])).toEqual(["Master Order ID", "Client", "Order Status", "Total", "Selected Vendor", "Order Notes"]);
   });
 
   it("filters an inclusive custom date range", () => {

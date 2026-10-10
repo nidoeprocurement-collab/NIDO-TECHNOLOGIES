@@ -23,6 +23,7 @@ import { buildOrderReportRows, type OrderReportRow } from "@/lib/orderCsvExport"
 import {
   getMasterOrderReportValue,
   isMasterOrderReport,
+  normalizeReportColumns,
   readMasterReportOrders,
 } from "@/lib/customReportOrderData";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
@@ -80,16 +81,16 @@ const MODULES = [
 const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = {
   "All Modules": [
     { group: "COMMON",  fields: ["ID", "Created On", "Created By"] },
-    { group: "CLIENTS", fields: ["Client Name", "Client Email", "Client Phone", "Client City", "Client Status"] },
+    { group: "CLIENTS", fields: ["Client Name", "Contact Person", "Client Email", "Client Phone", "Client City", "Client Status"] },
     { group: "USERS",   fields: ["User Name", "User Email", "User Role", "User Department", "User Status"] },
     { group: "VENDORS", fields: ["Vendor Name", "Vendor Email", "Vendor Category"] },
-    { group: "ORDERS",  fields: ["Order ID", "Order Date", "Order Status", "Amount"] },
+    { group: "ORDERS",  fields: ["Order Date", "Order Status", "Amount"] },
     { group: "CATALOG", fields: ["Item Name", "SKU", "Category", "Price"] },
     { group: "SERVICES",fields: ["Service Name", "Request Date", "Status"] },
-    { group: "SUPPORT", fields: ["Ticket ID", "Subject", "Priority", "Resolution Date"] },
+    { group: "SUPPORT", fields: ["Ticket ID", "Subject", "Priority"] },
   ],
   Clients: [
-    { group: "CLIENTS", fields: ["ID", "Created On", "Created By", "Client Name", "Client Email", "Client Phone", "Client City", "Client Status", "Client Tier", "Contract Start", "Contract End"] },
+    { group: "CLIENTS", fields: ["ID", "Client Name", "Contact Person", "Client Email", "Client Phone", "Client City", "Client Status", "Client Tier", "Contract Start", "Contract End"] },
   ],
   Users: [
     { group: "USERS", fields: ["ID", "Created On", "User Name", "User Email", "User Role", "User Department", "User Status", "Job Title", "Date Joined", "Last Login"] },
@@ -98,14 +99,14 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
     { group: "VENDORS", fields: ["ID", "Created On", "Created By", "Vendor Name", "Vendor Email", "Vendor Phone", "Vendor Category", "Vendor Status", "Rating"] },
   ],
   Catalog: [
-    { group: "CATALOG", fields: ["ID", "Created On", "Item Name", "SKU", "Category", "Price", "Stock", "Unit"] },
+    { group: "CATALOG", fields: ["ID", "Item Name", "SKU", "Category", "Price"] },
   ],
   Orders: [
     {
       group: "ORDER DETAILS",
       fields: [
-        "ID", "Master Order ID", "Sub Order ID", "Order ID", "PO Reference",
-        "Created By", "Created On", "Created At", "Order Date", "Order Time",
+        "Master Order ID", "Sub Order ID", "Order ID", "PO Reference",
+        "Created By", "Created On", "Order Date", "Order Time",
       ],
     },
     {
@@ -118,7 +119,7 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
     {
       group: "STATUS, APPROVAL & SLA",
       fields: [
-        "Order Status", "Current Order Status", "Approval Status", "Approval Workflow",
+        "Order Status", "Approval Status", "Approval Workflow",
         "Approval Requested By", "Approval Date", "Approved By", "Updated By",
         "Last Updated By", "Last Updated At", "Updated At", "Update Count",
         "SLA Time", "SLA Alert",
@@ -127,10 +128,9 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
     {
       group: "PAYMENT & DELIVERY",
       fields: [
-        "Amount", "Tax", "Total", "Order Total", "Payment Method", "Payment Terms",
+        "Amount", "Tax", "Total", "Payment Method", "Payment Terms",
         "Delivery Attention", "Delivery Address", "City", "State", "Country",
-        "ZIP Code", "Delivery Phone", "Delivery Notes", "Checkout Note",
-        "Order Notes", "Cancel Reason",
+        "ZIP Code", "Delivery Phone", "Delivery Notes", "Order Notes", "Cancel Reason",
       ],
     },
     {
@@ -143,14 +143,14 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
     },
     {
       group: "VENDOR PURCHASE ORDERS",
-      fields: ["Vendor Name", "Vendor PO Numbers", "PO Created At", "Vendor PO Statuses", "Last Comment"],
+      fields: ["Vendor PO Numbers", "PO Created At", "Vendor PO Statuses", "Last Comment"],
     },
   ],
   Services: [
-    { group: "SERVICES", fields: ["ID", "Created On", "Service Name", "Request Date", "Client Name", "Status", "Priority", "Assigned To"] },
+    { group: "SERVICES", fields: ["ID", "Service Name", "Request Date", "Client Name", "Status", "Priority", "Assigned To"] },
   ],
   "Support Tickets": [
-    { group: "SUPPORT", fields: ["ID", "Created On", "Ticket ID", "Subject", "Client Name", "Priority", "Status", "Resolution Date", "Agent"] },
+    { group: "SUPPORT", fields: ["ID", "Created On", "Ticket ID", "Subject", "Client Name", "Priority", "Status", "Agent"] },
   ],
 };
 
@@ -509,7 +509,7 @@ export default function CreateReportPage() {
       setDescription(existing.description);
       setReportType(existing.reportType);
       setModule(existing.module);
-      setSelectedColumns(existing.selectedColumns);
+      setSelectedColumns(normalizeReportColumns(existing.module, existing.selectedColumns));
       setFilters(existing.filters);
       setFrequency(existing.frequency);
       setStartDate(existing.startDate);
@@ -535,7 +535,7 @@ export default function CreateReportPage() {
       setDescription(source.description);
       setReportType("Detailed Report");
       setModule(source.module);
-      setSelectedColumns(source.selectedColumns);
+      setSelectedColumns(normalizeReportColumns(source.module, source.selectedColumns));
       setFilters([]);
       setFrequency("Daily");
       setStartDate(new Date().toISOString().slice(0, 10));
@@ -554,7 +554,17 @@ export default function CreateReportPage() {
   const activeModule  = module || "All Modules";
   const fieldGroups   = FIELDS_BY_MODULE[activeModule] ?? FIELDS_BY_MODULE["All Modules"];
   const allFields     = fieldGroups.flatMap(g => g.fields);
-  const usesMasterOrderRows = isMasterOrderReport(activeModule, selectedColumns);
+  const reportColumns = normalizeReportColumns(activeModule, selectedColumns);
+  const usesMasterOrderRows = isMasterOrderReport(activeModule, reportColumns);
+
+  useEffect(() => {
+    if (
+      reportColumns.length !== selectedColumns.length
+      || reportColumns.some((column, index) => column !== selectedColumns[index])
+    ) {
+      setSelectedColumns(reportColumns);
+    }
+  }, [activeModule, reportColumns, selectedColumns]);
 
   useEffect(() => {
     if (!usesMasterOrderRows) return;
@@ -572,7 +582,7 @@ export default function CreateReportPage() {
 
   const livePreview = useMemo(() => {
     void reportRevision;
-    if (!selectedColumns.length) return { rows: [] as string[][], count: 0 };
+    if (!reportColumns.length) return { rows: [] as string[][], count: 0 };
 
     if (usesMasterOrderRows) {
       const filtered = buildOrderReportRows(masterOrders, { approvalRequests }).filter((row) => {
@@ -582,7 +592,7 @@ export default function CreateReportPage() {
       return {
         count: filtered.length,
         rows: filtered.slice(0, 8).map((row) =>
-          selectedColumns.map((column) => getMasterOrderReportValue(row, column))
+          reportColumns.map((column) => getMasterOrderReportValue(row, column))
         ),
       };
     }
@@ -591,7 +601,7 @@ export default function CreateReportPage() {
     return {
       count: filtered.length,
       rows: filtered.slice(0, 8).map((record) =>
-        selectedColumns.map((column) => getReportFieldValue(record, column))
+        reportColumns.map((column) => getReportFieldValue(record, column))
       ),
     };
   }, [
@@ -600,7 +610,7 @@ export default function CreateReportPage() {
     filters,
     masterOrders,
     reportRevision,
-    selectedColumns,
+    reportColumns,
     usesMasterOrderRows,
   ]);
 
@@ -665,7 +675,7 @@ export default function CreateReportPage() {
       description: description.trim(),
       reportType,
       module: activeModule,
-      selectedColumns,
+      selectedColumns: reportColumns,
       filters,
       frequency,
       startDate,
@@ -1026,7 +1036,7 @@ export default function CreateReportPage() {
           </span>
         </div>
 
-        {selectedColumns.length === 0 ? (
+        {reportColumns.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
             Select one or more columns to preview live report data.
           </div>
@@ -1040,7 +1050,7 @@ export default function CreateReportPage() {
               <table className="min-w-full text-left text-xs">
                 <thead className="bg-gray-50">
                   <tr>
-                    {selectedColumns.map((column) => (
+                    {reportColumns.map((column) => (
                       <th key={column} className="whitespace-nowrap px-3 py-2.5 font-semibold text-gray-600">
                         {column}
                       </th>

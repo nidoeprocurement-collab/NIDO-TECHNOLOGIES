@@ -3,7 +3,7 @@ import type { OrderReportRow } from "@/lib/orderCsvExport";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 
 export const MASTER_ORDER_REPORT_FIELDS = new Set([
-  "Master Order ID", "Sub Order ID", "PO Reference", "Client", "Client ID", "Created At",
+  "Master Order ID", "Sub Order ID", "PO Reference", "Client", "Client ID", "Created By", "Created At",
   "Requester", "Requester Role", "Ordered For", "Assigned To", "Assigned Role", "Order Time",
   "Current Order Status", "Approval Status", "Approval Workflow", "Approval Requested By",
   "Approval Date", "Approved By", "Updated By", "Last Updated By", "Last Updated At",
@@ -18,6 +18,54 @@ export const MASTER_ORDER_REPORT_FIELDS = new Set([
 
 export function isMasterOrderReport(module: string, columns: string[]): boolean {
   return module === "Orders" && columns.some((column) => MASTER_ORDER_REPORT_FIELDS.has(column));
+}
+
+const UNAVAILABLE_REPORT_COLUMNS: Record<string, Set<string>> = {
+  Clients: new Set(["Created On", "Created By"]),
+  Catalog: new Set(["Created On", "Stock", "Unit"]),
+  Services: new Set(["Created On"]),
+  "Support Tickets": new Set(["Resolution Date"]),
+  Users: new Set(["Created By"]),
+};
+
+const SALES_ORDER_COLUMN_ALIASES: Record<string, string> = {
+  ID: "Order ID",
+  "Created At": "Created On",
+  "Current Order Status": "Order Status",
+  "Order Total": "Total",
+};
+
+const MASTER_ORDER_COLUMN_ALIASES: Record<string, string> = {
+  ID: "Master Order ID",
+  "Order ID": "Master Order ID",
+  "Created At": "Created On",
+  "Client Name": "Client",
+  "Current Order Status": "Order Status",
+  Amount: "Total",
+  "Order Total": "Total",
+  "Vendor Name": "Selected Vendor",
+  "Checkout Note": "Order Notes",
+};
+
+/** Drop unavailable columns and collapse labels that read the same source value. */
+export function normalizeReportColumns(module: string, columns: string[]): string[] {
+  const masterOrderSource = isMasterOrderReport(module, columns);
+  const unavailable = UNAVAILABLE_REPORT_COLUMNS[module];
+  const aliases = module === "Orders"
+    ? masterOrderSource ? MASTER_ORDER_COLUMN_ALIASES : SALES_ORDER_COLUMN_ALIASES
+    : {};
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const column of columns) {
+    if (unavailable?.has(column)) continue;
+    if (module === "All Modules" && column === "Order ID" && columns.includes("ID")) continue;
+    const canonical = aliases[column] || column;
+    if (seen.has(canonical)) continue;
+    seen.add(canonical);
+    normalized.push(canonical);
+  }
+  return normalized;
 }
 
 export function readMasterReportOrders(): MyOrder[] {
