@@ -34,11 +34,47 @@ vi.mock("@/lib/clientDataStore", () => ({
 vi.mock("@/lib/salesOrderStore", () => ({
   getOrders: () => [{ id: "internal-order-1", orderNumber: "SO-1" }],
 }));
+vi.mock("@/lib/serviceRequestsStore", () => ({
+  getServiceRequests: () => [{
+    id: "service-request-1",
+    clientId: "client-1",
+    status: "Scheduled",
+    createdAt: "2026-10-04",
+    payload: {
+      serviceName: "AMC maintenance",
+      requestDate: "2026-10-03",
+      assignment: { assignedVendor: "Service Partner" },
+      appointments: [{ date: "2026-10-05", timeFrom: "09:00", timeTo: "10:00" }],
+    },
+  }],
+}));
+vi.mock("@/lib/invoiceStore", () => ({
+  getInvoices: () => [{
+    id: "invoice-1",
+    invoiceNumber: "INV-1",
+    clientId: "client-1",
+    payments: [{ id: "payment-1", amount: 400, date: "2026-10-02", method: "Bank transfer" }],
+    activity: [{ id: "activity-1", title: "Invoice sent", date: "2026-10-01" }],
+  }],
+}));
+vi.mock("@/lib/paymentReceiptStore", () => ({
+  getReceipts: () => [{
+    id: "receipt-1",
+    receiptNumber: "RCPT-1",
+    clientId: "client-1",
+    invoiceNumber: "INV-1",
+    amountReceived: 400,
+    paymentDate: "2026-10-02",
+    status: "Reconciled",
+  }],
+}));
 
 import {
   filterReportCenterRecords,
   getReportCenterRecords,
   getReportCenterDefaultColumns,
+  getReportCenterPreview,
+  getReportCenterRows,
   loadReportCenterRecords,
   orderReportCenterColumns,
   REPORT_CENTER_COLUMNS,
@@ -94,6 +130,58 @@ describe("report center live data sources", () => {
     expect(getReportCenterRecords("Orders", "internal")).toEqual([
       { id: "internal-order-1", orderNumber: "SO-1" },
     ]);
+  });
+
+  it("uses nested platform service-request payloads in both preview and export rows", () => {
+    const records = getReportCenterRecords("Services Request Register", "client");
+    const columns = ["Service Name", "Request Date", "Status", "Assignment / Assigned Vendor"];
+
+    expect(records[0]).toMatchObject({
+      id: "service-request-1",
+      serviceName: "AMC maintenance",
+      requestDate: "2026-10-03",
+    });
+    expect(getReportCenterPreview(records, columns)[0].values).toEqual(getReportCenterRows(records, columns)[0]);
+    expect(getReportCenterPreview(records, columns)[0].values).toMatchObject({
+      "Service Name": "AMC maintenance",
+      "Request Date": expect.stringContaining("2026"),
+      Status: "Scheduled",
+      "Assignment / Assigned Vendor": "Service Partner",
+    });
+  });
+
+  it("keeps invoice payments and activities as separate live report rows", () => {
+    const records = getReportCenterRecords("Invoice Payments and Activity", "client");
+    const columns = ["Invoice Number", "Event Type", "Payment / ID", "Activity / Title"];
+    const rows = getReportCenterRows(records, columns);
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      "Invoice Number": "INV-1",
+      "Event Type": "Payment",
+      "Payment / ID": "payment-1",
+    });
+    expect(rows[1]).toMatchObject({
+      "Invoice Number": "INV-1",
+      "Event Type": "Activity",
+      "Activity / Title": "Invoice sent",
+    });
+  });
+
+  it("maps a receipt to its invoice allocation for the report preview and export", () => {
+    const records = getReportCenterRecords("Receipt Allocations", "client");
+    const columns = ["Receipt ID", "Invoice ID", "Invoice Number", "Allocation Date", "Allocated Amount"];
+    const preview = getReportCenterPreview(records, columns);
+    const rows = getReportCenterRows(records, columns);
+
+    expect(preview).toHaveLength(1);
+    expect(preview[0].values).toEqual(rows[0]);
+    expect(rows[0]).toMatchObject({
+      "Receipt ID": "receipt-1",
+      "Invoice ID": "invoice-1",
+      "Invoice Number": "INV-1",
+      "Allocated Amount": expect.stringContaining("400"),
+    });
   });
 
   it("uses the workbook's exact column order for supported modules and report exports", () => {

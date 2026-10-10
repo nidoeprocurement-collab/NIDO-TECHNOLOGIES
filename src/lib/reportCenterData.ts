@@ -362,11 +362,20 @@ function childRecords(records: ReportRecord[], childKeys: string[]): ReportRecor
       ? record.details as ReportRecord
       : {};
     const childKey = childKeys.find((key) =>
+      [record[key], payload[key], details[key]].some((value) => Array.isArray(value) && value.length > 0),
+    ) ?? childKeys.find((key) =>
       Array.isArray(record[key]) || Array.isArray(payload[key]) || Array.isArray(details[key]),
     );
     if (!childKey) return [];
     const parentId = String(record.id ?? record.number ?? record.poNumber ?? record.invoiceNumber ?? "");
-    const children = (record[childKey] ?? payload[childKey] ?? details[childKey]) as unknown[];
+    const children = [
+      record[childKey],
+      payload[childKey],
+      details[childKey],
+    ].find((value) => Array.isArray(value) && value.length > 0)
+      ?? record[childKey]
+      ?? payload[childKey]
+      ?? details[childKey] as unknown[];
     return children.flatMap((child, index) => {
       if (!child || typeof child !== "object" || Array.isArray(child)) return [];
       return [{
@@ -615,7 +624,10 @@ function mapInvoiceRecords(): ReportRecord[] {
 function mapInvoicePaymentAndActivityRecords(): ReportRecord[] {
   return mapInvoiceRecords().flatMap((invoice) => {
     const payments = Array.isArray(invoice.payments) ? invoice.payments as ReportRecord[] : [];
-    const activities = Array.isArray(invoice.activity) ? invoice.activity as ReportRecord[] : [];
+    const activities = [
+      ...(Array.isArray(invoice.activity) ? invoice.activity as ReportRecord[] : []),
+      ...(Array.isArray(invoice.activities) ? invoice.activities as ReportRecord[] : []),
+    ];
     return [
       ...payments.map((payment) => ({
         ...invoice,
@@ -813,7 +825,6 @@ function mapClientDashboardRecords(): ReportRecord[] {
       ...client,
       clientId,
       clientName,
-      vendorId: undefined,
       activeClientCount: activeClients.length,
       activeVendorCount: activeVendors.length,
       newOrderCount: distinctOrders.filter((order) => {
@@ -1236,15 +1247,34 @@ const VALUE_ALIASES: Record<string, string[]> = {
   "Vendor Name": ["vendorName", "supplierName"],
   "Product Name": ["productName", "itemName", "item", "name"],
   "Item Name": ["productName", "itemName", "item", "name"],
+  "Client Email": ["clientEmail", "customerEmail", "email"],
+  "Vendor Email": ["vendorEmail", "supplierEmail", "email"],
+  "Client Phone": ["clientPhone", "customerPhone", "phone", "mobile"],
+  "Vendor Phone": ["vendorPhone", "supplierPhone", "phone", "mobile"],
   SKU: ["sku", "masterProductCode", "itemCode"],
   "Product Code": ["productCode", "masterProductCode"],
   "Unit Price": ["unitPrice", "unitCost", "price", "rate"],
+  "Unit Cost": ["unitCost", "costPrice", "rate", "price"],
   Price: ["price", "unitPrice", "sellingPrice"],
   Stock: ["stock", "currentStock", "physicalStock", "quantity", "qty", "onHand"],
   "Reserved Stock": ["reservedStock", "reserved"],
   "Incoming Stock": ["incomingStock", "incoming"],
   MOQ: ["moq", "minimumOrderQuantity"],
   "Lead Time": ["leadTime", "leadTimeDays"],
+  Quantity: ["quantity", "qty", "units"],
+  Qty: ["qty", "quantity", "units"],
+  Rate: ["rate", "unitPrice", "price", "unitCost"],
+  "Tax Percent": ["taxPercent", "gstPct", "taxRate"],
+  "Line Taxable Amount": ["lineTaxableAmount", "lineSubtotal", "taxableAmount"],
+  "Line Tax Amount": ["lineTaxAmount", "taxAmount"],
+  "Line Total": ["lineTotal", "lineAmount", "totalAmount"],
+  "Sales Order ID": ["salesOrderId", "orderId", "parentRecordId"],
+  "Purchase Order ID": ["purchaseOrderId", "poId", "parentRecordId"],
+  "Invoice ID": ["invoiceId"],
+  "Receipt ID": ["receiptId", "paymentReceiptId", "id"],
+  "Payment ID": ["paymentId", "id"],
+  "Credit Note ID": ["creditNoteId", "id"],
+  "Ticket ID": ["ticketId", "number", "id"],
   "Client Name": ["clientName", "customerName", "client", "customer"],
   "Order ID": ["orderNumber", "orderId", "id"],
   "Order Date": ["orderDate", "date", "createdAt"],
@@ -1253,13 +1283,30 @@ const VALUE_ALIASES: Record<string, string[]> = {
   "PO Number": ["poNumber", "purchaseOrderNumber"],
   "Invoice / Bill Number": ["invoiceNumber", "billNumber", "number"],
   "Document Number": ["invoiceNumber", "billNumber", "orderNumber", "poNumber", "number"],
-  "Payment Number": ["paymentNumber", "receiptNumber", "reference", "id"],
+  "Payment Number": ["paymentNumber", "receiptNumber", "number", "reference", "id"],
   "Payment Date": ["paymentDate", "receiptDate", "date", "createdAt"],
+  "Allocation Date": ["allocationDate", "paymentDate", "date", "createdAt"],
+  "Allocated Amount": ["allocatedAmount", "amountAllocated", "amount"],
+  "Allocated By": ["allocatedBy", "createdBy", "recordedBy"],
+  "Reversal Reference": ["reversalReference", "reversalRef"],
+  "Category ID": ["categoryId", "id"],
+  "Category Name": ["categoryName", "category"],
+  "Vendor Count": ["vendorCount"],
+  "Assigned User Count": ["assignedUserCount"],
+  "Permission / Module": ["module", "moduleName", "permissionModule"],
+  "Permission / View": ["view"],
+  "Permission / Create": ["create"],
+  "Permission / Edit": ["edit"],
+  "Permission / Delete": ["delete"],
+  "Permission / Approve": ["approve"],
+  "Permission / Export": ["export"],
+  "Permission / Import": ["import"],
+  "Permission / Manage": ["manage"],
+  "Permission / Configure": ["configure"],
   "Credit Number": ["creditNoteNumber", "creditNumber", "number"],
   "Associated Bill": ["associatedBillNumber", "billNumber"],
   "Request Date": ["requestDate", "createdAt", "date"],
   "Service Name": ["serviceName", "requestType", "name"],
-  "Ticket ID": ["ticketId", "number", "id"],
   "Assigned To": ["assignedTo", "agent", "owner"],
   "Created On": ["createdAt", "createdOn", "createdDate", "date", "timestamp"],
   "Created date": ["createdAt", "createdOn", "createdDate", "date", "timestamp"],
@@ -1279,6 +1326,34 @@ const VALUE_ALIASES: Record<string, string[]> = {
   Timestamp: ["timestamp", "createdAt", "date"],
 };
 
+const PATH_SEGMENT_ALIASES: Record<string, string[]> = {
+  onboarding: ["onboarding", "onboardingFormData", "lastUpdatedFormData"],
+  permission: ["permission"],
+  payment: ["payment"],
+  activity: ["activity"],
+  assignment: ["assignment", "assignmentDetails"],
+  appointment: ["appointment", "appointmentDetails"],
+  loginhistory: ["loginHistory", "login"],
+  data: ["data", "payload"],
+};
+
+function findNestedValue(value: unknown, aliases: string[], seen = new WeakSet<object>(), depth = 0): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value) || depth > 6 || seen.has(value)) return undefined;
+  seen.add(value);
+  const object = value as Record<string, unknown>;
+  for (const alias of aliases) {
+    const key = Object.keys(object).find((candidate) => normalize(candidate) === normalize(alias));
+    const candidate = key ? object[key] : undefined;
+    if (candidate !== null && candidate !== undefined && candidate !== "") return candidate;
+  }
+  for (const nested of Object.values(object)) {
+    if (!nested || typeof nested !== "object" || Array.isArray(nested)) continue;
+    const match = findNestedValue(nested, aliases, seen, depth + 1);
+    if (match !== undefined && match !== null && match !== "") return match;
+  }
+  return undefined;
+}
+
 function findValue(record: ReportRecord, column: string): unknown {
   const aliases = VALUE_ALIASES[column] ?? [column];
   for (const alias of aliases) {
@@ -1293,11 +1368,16 @@ function findValue(record: ReportRecord, column: string): unknown {
         current = undefined;
         break;
       }
-      const key = Object.keys(current).find((candidate) => normalize(candidate) === normalize(segment));
+      const candidates = PATH_SEGMENT_ALIASES[normalize(segment)] ?? [segment];
+      const key = Object.keys(current).find((candidate) =>
+        candidates.some((candidateAlias) => normalize(candidate) === normalize(candidateAlias)),
+      );
       current = key ? (current as Record<string, unknown>)[key] : undefined;
     }
     if (current !== null && current !== undefined && current !== "") return current;
   }
+  const nested = findNestedValue(record, aliases);
+  if (nested !== undefined) return nested;
   const fallback = getReportFieldValue(record, column);
   return fallback === "—" ? undefined : fallback;
 }

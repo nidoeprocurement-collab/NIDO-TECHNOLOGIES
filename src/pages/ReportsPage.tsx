@@ -68,8 +68,18 @@ const LIVE_DATA_EVENTS = [
   "vendorProductsUpdated",
   "clientCatalogUpdated",
   "nidoPaymentReceiptsUpdated",
+  "recurringInvoicesUpdated",
   "stockHistoryUpdated",
+  "stockThresholdsUpdated",
   "nidoPurchasePaymentsUpdated",
+  "nidoPortalRolesUpdated",
+  "nidoPortalUsersUpdated",
+  "nidoUserNotesUpdated",
+  "nidoUserDocumentsUpdated",
+  "nidoAutoAssignmentUpdated",
+  "nidoOrderStatusConfigUpdated",
+  "nidoPermissionsUpdated",
+  "nidoCustomModulesUpdated",
   "nidoUsersUpdated",
   "nidoRolesUpdated",
   "nidoCustomReportsUpdated",
@@ -540,7 +550,13 @@ export default function ReportsPage() {
           saved.draft,
           entitiesByType,
         );
-        rows = getReportCenterRows(current, saved.draft.selectedColumns);
+        const reportColumns = saved.columns.map((column) => column.key);
+        rows = getReportCenterRows(
+          withReportRunMetadata(current, saved.draft),
+          reportColumns.length
+            ? reportColumns
+            : orderReportCenterColumns(saved.draft.module, saved.draft.selectedColumns),
+        );
       }
       downloadReportExport(saved.format, saved.name, columns, rows);
       toast({ title: "Report downloaded", description: `${rows.length.toLocaleString()} rows exported from the saved report snapshot.` });
