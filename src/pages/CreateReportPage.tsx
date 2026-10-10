@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { nanoid } from "nanoid";
@@ -11,6 +11,21 @@ import {
   type ReportFrequency,
 } from "@/lib/reportStore";
 import { toast } from "@/hooks/use-toast";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import {
+  applyStoredReportFilters,
+  getReportFieldValue,
+  getReportRecords,
+  type ReportRecord,
+} from "@/lib/reportData";
+import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
+import { buildOrderReportRows, type OrderReportRow } from "@/lib/orderCsvExport";
+import {
+  getMasterOrderReportValue,
+  isMasterOrderReport,
+  readMasterReportOrders,
+} from "@/lib/customReportOrderData";
+import type { MyOrder } from "@/contexts/MyOrdersContext";
 import {
   ChevronDown,
   ChevronUp,
@@ -54,6 +69,7 @@ const REPORT_TYPES = [
 const MODULES = [
   { value: "All Modules",    desc: "Include data from all modules",       icon: <Layers className="w-4 h-4 text-blue-500" /> },
   { value: "Clients",        desc: "Client and related data",             icon: <Users className="w-4 h-4 text-emerald-500" /> },
+  { value: "Users",          desc: "Internal platform users",             icon: <Users className="w-4 h-4 text-blue-500" /> },
   { value: "Vendors",        desc: "Vendor and related data",             icon: <Building2 className="w-4 h-4 text-purple-500" /> },
   { value: "Catalog",        desc: "All catalog data",                    icon: <Package className="w-4 h-4 text-orange-500" /> },
   { value: "Orders",         desc: "Order and related data",              icon: <ShoppingCart className="w-4 h-4 text-blue-600" /> },
@@ -65,6 +81,7 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
   "All Modules": [
     { group: "COMMON",  fields: ["ID", "Created On", "Created By"] },
     { group: "CLIENTS", fields: ["Client Name", "Client Email", "Client Phone", "Client City", "Client Status"] },
+    { group: "USERS",   fields: ["User Name", "User Email", "User Role", "User Department", "User Status"] },
     { group: "VENDORS", fields: ["Vendor Name", "Vendor Email", "Vendor Category"] },
     { group: "ORDERS",  fields: ["Order ID", "Order Date", "Order Status", "Amount"] },
     { group: "CATALOG", fields: ["Item Name", "SKU", "Category", "Price"] },
@@ -73,6 +90,9 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
   ],
   Clients: [
     { group: "CLIENTS", fields: ["ID", "Created On", "Created By", "Client Name", "Client Email", "Client Phone", "Client City", "Client Status", "Client Tier", "Contract Start", "Contract End"] },
+  ],
+  Users: [
+    { group: "USERS", fields: ["ID", "Created On", "User Name", "User Email", "User Role", "User Department", "User Status", "Job Title", "Date Joined", "Last Login"] },
   ],
   Vendors: [
     { group: "VENDORS", fields: ["ID", "Created On", "Created By", "Vendor Name", "Vendor Email", "Vendor Phone", "Vendor Category", "Vendor Status", "Rating"] },
@@ -446,6 +466,7 @@ function SelectColumnsPanel({
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function CreateReportPage() {
+  const reportRevision = useLiveReportRevision();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("edit");
   const cloningId = searchParams.get("clone");
@@ -473,6 +494,8 @@ export default function CreateReportPage() {
   const [format,           setFormat]            = useState<ReportFormat>("Excel");
   const [includeCharts,    setIncludeCharts]     = useState(true);
   const [includeSummary,   setIncludeSummary]    = useState(true);
+  const [masterOrders, setMasterOrders] = useState<MyOrder[]>(() => readMasterReportOrders());
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
 
   useEffect(() => {
     if (editingId) {
@@ -531,6 +554,55 @@ export default function CreateReportPage() {
   const activeModule  = module || "All Modules";
   const fieldGroups   = FIELDS_BY_MODULE[activeModule] ?? FIELDS_BY_MODULE["All Modules"];
   const allFields     = fieldGroups.flatMap(g => g.fields);
+  const usesMasterOrderRows = isMasterOrderReport(activeModule, selectedColumns);
+
+  useEffect(() => {
+    if (!usesMasterOrderRows) return;
+    let active = true;
+    setMasterOrders(readMasterReportOrders());
+    loadApprovalBootstrap()
+      .then((bootstrap) => {
+        if (active) setApprovalRequests(bootstrap.requests);
+      })
+      .catch(() => {
+        if (active) setApprovalRequests([]);
+      });
+    return () => { active = false; };
+  }, [usesMasterOrderRows, reportRevision]);
+
+  const livePreview = useMemo(() => {
+    void reportRevision;
+    if (!selectedColumns.length) return { rows: [] as string[][], count: 0 };
+
+    if (usesMasterOrderRows) {
+      const filtered = buildOrderReportRows(masterOrders, { approvalRequests }).filter((row) => {
+        const filterRecord = { ...row.order, ...row.fields, __module: "Orders" } as ReportRecord;
+        return applyStoredReportFilters([filterRecord], filters).length > 0;
+      });
+      return {
+        count: filtered.length,
+        rows: filtered.slice(0, 8).map((row) =>
+          selectedColumns.map((column) => getMasterOrderReportValue(row, column))
+        ),
+      };
+    }
+
+    const filtered = applyStoredReportFilters(getReportRecords(activeModule), filters);
+    return {
+      count: filtered.length,
+      rows: filtered.slice(0, 8).map((record) =>
+        selectedColumns.map((column) => getReportFieldValue(record, column))
+      ),
+    };
+  }, [
+    activeModule,
+    approvalRequests,
+    filters,
+    masterOrders,
+    reportRevision,
+    selectedColumns,
+    usesMasterOrderRows,
+  ]);
 
   const visibleGroups = fieldGroups.map(g => ({
     ...g,
@@ -937,6 +1009,64 @@ export default function CreateReportPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ── Live data preview ────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Live Data Preview</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Values come from the selected platform module and update when its records change.
+              The same fields and filters are used when this report is opened or exported.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+            {livePreview.count} {livePreview.count === 1 ? "record" : "records"}
+          </span>
+        </div>
+
+        {selectedColumns.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+            Select one or more columns to preview live report data.
+          </div>
+        ) : livePreview.count === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+            No live records match this module and its current filters.
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {selectedColumns.map((column) => (
+                      <th key={column} className="whitespace-nowrap px-3 py-2.5 font-semibold text-gray-600">
+                        {column}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {livePreview.rows.map((row, rowIndex) => (
+                    <tr key={`preview-${rowIndex}`} className="hover:bg-gray-50/70">
+                      {row.map((value, columnIndex) => (
+                        <td key={`${rowIndex}-${columnIndex}`} className="max-w-[280px] truncate whitespace-nowrap px-3 py-2.5 text-gray-700">
+                          {value}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {livePreview.count > livePreview.rows.length && (
+              <p className="mt-2 text-right text-xs text-gray-400">
+                Showing the first {livePreview.rows.length} of {livePreview.count} matching records.
+              </p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

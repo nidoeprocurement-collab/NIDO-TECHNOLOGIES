@@ -31,6 +31,33 @@ function tagged<T extends object>(module: string, rows: T[]): ReportRecord[] {
   return rows.map((row) => ({ ...row, __module: module }));
 }
 
+function addLinkedClientNames(records: ReportRecord[]): ReportRecord[] {
+  const clientNames = new Map<string, string>();
+  for (const client of getClients()) {
+    const row = client as ReportRecord;
+    const name = String(row.name ?? row.clientName ?? row.companyName ?? "").trim();
+    if (!name) continue;
+    for (const key of [row.id, row.clientId]) {
+      if (key !== undefined && key !== null && String(key).trim()) {
+        clientNames.set(String(key), name);
+      }
+    }
+  }
+  return records.map((record) => {
+    const payload = record.payload && typeof record.payload === "object"
+      ? record.payload as ReportRecord
+      : {};
+    const clientId = record.clientId ?? payload.clientId;
+    const linkedName = clientId === undefined || clientId === null
+      ? undefined
+      : clientNames.get(String(clientId));
+    return {
+      ...record,
+      clientName: record.clientName ?? record.client ?? payload.clientName ?? linkedName,
+    };
+  });
+}
+
 export function getReportRecords(module: string): ReportRecord[] {
   switch (module) {
     case "Clients":
@@ -43,10 +70,10 @@ export function getReportRecords(module: string): ReportRecord[] {
       return tagged("Orders", getOrders());
     case "Services":
     case "Service Requests":
-      return tagged("Services", getServiceRequests());
+      return addLinkedClientNames(tagged("Services", getServiceRequests()));
     case "Support":
     case "Support Tickets":
-      return tagged("Support Tickets", getSupportTickets());
+      return addLinkedClientNames(tagged("Support Tickets", getSupportTickets()));
     case "Users":
       return tagged("Users", getUsers());
     case "All Modules":
@@ -55,8 +82,8 @@ export function getReportRecords(module: string): ReportRecord[] {
         ...tagged("Vendors", getVendors()),
         ...tagged("Catalog", getCatalogProducts()),
         ...tagged("Orders", getOrders()),
-        ...tagged("Services", getServiceRequests()),
-        ...tagged("Support Tickets", getSupportTickets()),
+        ...addLinkedClientNames(tagged("Services", getServiceRequests())),
+        ...addLinkedClientNames(tagged("Support Tickets", getSupportTickets())),
         ...tagged("Users", getUsers()),
       ];
     default:
@@ -65,29 +92,30 @@ export function getReportRecords(module: string): ReportRecord[] {
 }
 
 const FIELD_ALIASES: Record<string, string[]> = {
-  id: ["id", "clientId", "vendorId", "productId", "requestId", "number", "orderNumber", "poNumber"],
+  id: ["id", "employeeId", "clientId", "vendorId", "productId", "requestId", "number", "orderNumber", "poNumber"],
   createdon: ["createdAt", "createdOn", "createdOnDisplay", "created", "createdDate", "lastRunDate", "onboardedDate", "requestDate", "orderDate", "invoiceDate", "date", "timestamp", "created_at"],
   createdat: ["createdAt", "createdOn", "created", "lastRunDate", "requestDate", "orderDate", "invoiceDate", "date", "timestamp", "created_at"],
-  createdby: ["createdByName", "createdBy", "requestedBy", "assignedTo"],
-  clientname: ["clientName", "client", "name"],
+  createdby: ["createdByName", "createdBy", "createdByEmail", "requestedBy", "assignedTo"],
+  clientname: ["clientName", "client", "customerName"],
+  clientid: ["clientId", "customerId"],
   clientemail: ["email", "clientEmail"],
   clientphone: ["phone", "mobile", "clientPhone"],
   clientcity: ["city", "billingCity", "shippingCity"],
-  clientstatus: ["status"],
-  clienttier: ["tier"],
+  clientstatus: ["clientStatus", "status"],
+  clienttier: ["tier", "clientTier"],
   contractstart: ["contractStartDate", "contractStart"],
   contractend: ["contractEndDate", "contractEnd"],
-  vendorname: ["vendorName", "name"],
+  vendorname: ["vendorName", "selectedVendorName"],
   vendoremail: ["email", "vendorEmail"],
   vendorphone: ["phone", "vendorPhone"],
   vendorcategory: ["category"],
-  vendorstatus: ["status"],
+  vendorstatus: ["vendorStatus", "status"],
   rating: ["rating"],
   itemname: ["productName", "itemName", "item", "itemAsset", "name"],
-  sku: ["sku", "productCode", "masterProductCode", "itemCode"],
+  sku: ["sku", "skuCode", "productCode", "masterProductCode", "itemCode"],
   category: ["category", "requestType"],
   price: ["price", "unitPrice", "unitCost", "sellingPrice"],
-  stock: ["stock", "quantity", "qty", "onHand"],
+  stock: ["stock", "quantity", "qty", "onHand", "availableStock"],
   unit: ["unit", "uom"],
   orderid: ["orderNumber", "id", "orderId"],
   orderdate: ["orderDate", "createdAt", "createdOn"],
@@ -97,13 +125,21 @@ const FIELD_ALIASES: Record<string, string[]> = {
   total: ["grandTotal", "totalAmount", "total", "amount"],
   servicename: ["requestType", "serviceName", "name"],
   requestdate: ["requestDate", "createdAt", "createdOn"],
-  status: ["status"],
+  status: ["status", "currentOrderStatus"],
   priority: ["priority"],
   assignedto: ["assignedTo", "agent", "owner"],
   ticketid: ["number", "ticketId", "id"],
   subject: ["subject", "title"],
   resolutiondate: ["resolvedAt", "resolutionDate", "closedAt"],
   agent: ["assignedTo", "agent"],
+  username: ["name", "userName"],
+  useremail: ["email", "userEmail"],
+  userrole: ["role", "userRole"],
+  userdepartment: ["department", "userDepartment"],
+  userstatus: ["status", "userStatus"],
+  jobtitle: ["jobTitle", "designation"],
+  datejoined: ["dateOfJoining", "joinedAt"],
+  lastlogin: ["lastLogin"],
 };
 
 function normalized(value: string): string {
@@ -135,21 +171,39 @@ function lookup(record: ReportRecord, keys: string[]): unknown {
 export function getReportFieldValue(record: ReportRecord, column: string): string {
   const fieldKey = normalized(column);
   const module = String(record.__module ?? "");
-  if (fieldKey.startsWith("client") && module && module !== "Clients") return "—";
+  const orderClientName = fieldKey === "clientname" && module === "Orders";
+  const requestClientName = fieldKey === "clientname" && ["Services", "Support Tickets"].includes(module);
+  if (
+    fieldKey.startsWith("client")
+    && module
+    && module !== "Clients"
+    && !orderClientName
+    && !requestClientName
+  ) return "—";
   if (fieldKey.startsWith("vendor") && module && module !== "Vendors") return "—";
   if (["orderid", "orderdate", "orderstatus"].includes(fieldKey) && module && module !== "Orders") return "—";
   if (["itemname", "sku", "stock", "unit"].includes(fieldKey) && module && module !== "Catalog") return "—";
   if (["servicename", "requestdate"].includes(fieldKey) && module && module !== "Services") return "—";
   if (["ticketid", "subject", "resolutiondate", "agent", "priority"].includes(fieldKey) && module && module !== "Support Tickets") return "—";
+  if (fieldKey.startsWith("user") && module && module !== "Users") return "—";
   const aliases = FIELD_ALIASES[fieldKey] ?? [column];
-  const raw = lookup(record, aliases);
+  const moduleAliases = fieldKey === "clientname" && module === "Clients"
+    ? ["clientName", "name", ...aliases]
+    : fieldKey === "clientname" && module === "Orders"
+      ? ["clientName", "client", ...aliases]
+      : fieldKey === "clientname" && module === "Services"
+        ? ["clientName", "client", ...aliases]
+        : fieldKey === "vendorname" && module === "Vendors"
+          ? ["vendorName", "name", ...aliases]
+          : aliases;
+  const raw = lookup(record, moduleAliases);
   if (raw === undefined || raw === null || raw === "") return "—";
 
   if (["amount", "tax", "total", "price", "lineamount", "unitprice"].includes(fieldKey)) {
     const amount = Number(raw);
     return Number.isFinite(amount) ? formatCurrency(amount) : String(raw);
   }
-  if (["createdon", "createdat", "orderdate", "requestdate", "resolutiondate", "contractstart", "contractend"].includes(fieldKey)) {
+  if (["createdon", "createdat", "orderdate", "requestdate", "resolutiondate", "contractstart", "contractend", "datejoined", "lastlogin"].includes(fieldKey)) {
     return formatDate(String(raw));
   }
   if (typeof raw === "boolean") return raw ? "Yes" : "No";

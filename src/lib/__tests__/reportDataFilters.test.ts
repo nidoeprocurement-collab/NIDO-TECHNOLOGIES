@@ -1,8 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_REPORT_FILTERS } from "@/contexts/ReportControlsContext";
-import { applyReportFilters } from "@/lib/reportData";
+import { applyReportFilters, getReportFieldValue } from "@/lib/reportData";
 
 describe("report date and field filters", () => {
+  it("maps selected columns to live records from their platform modules", () => {
+    expect(getReportFieldValue(
+      { __module: "Clients", id: "client-1", name: "Acme Ltd", email: "ops@acme.test" },
+      "Client Name",
+    )).toBe("Acme Ltd");
+    expect(getReportFieldValue(
+      { __module: "Vendors", id: "vendor-1", name: "North Supply", category: "Hardware" },
+      "Vendor Name",
+    )).toBe("North Supply");
+    expect(getReportFieldValue(
+      { __module: "Catalog", id: "product-1", productName: "Monitor", skuCode: "MON-01" },
+      "SKU",
+    )).toBe("MON-01");
+    expect(getReportFieldValue(
+      { __module: "Orders", id: "order-1", orderNumber: "SO-00001", clientName: "Acme Ltd" },
+      "Client Name",
+    )).toBe("Acme Ltd");
+    expect(getReportFieldValue(
+      { __module: "Users", id: "user-1", name: "Jordan Lee", department: "Operations" },
+      "User Name",
+    )).toBe("Jordan Lee");
+  });
+
   it("filters an inclusive custom date range", () => {
     const records = [
       { id: "before", createdAt: "2026-10-07", status: "Paid" },

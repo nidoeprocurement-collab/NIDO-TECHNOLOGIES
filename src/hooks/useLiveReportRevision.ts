@@ -18,6 +18,8 @@ const REPORT_DATA_EVENTS = [
   "clientCatalogUpdated",
   "poCreated",
   "poActivityUpdated",
+  "orderFulfillmentStatusUpdated",
+  "orderNotesUpdated",
   "orderSubItemsUpdated",
   "stockHistoryUpdated",
   "stockThresholdsUpdated",
