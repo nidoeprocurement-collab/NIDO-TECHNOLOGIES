@@ -54,7 +54,7 @@
 .rc-search { padding-left: 25px; min-height: 28px; }
 .rc-entity-list { height: 116px; overflow-y: auto; border: 1px solid #e4e7eb; border-radius: 8px; margin-top: 6px; padding: 3px 8px; }
 .rc-check-label { display: flex; align-items: center; gap: 6px; min-height: 24px; color: #515966; cursor: pointer; font-size: 10px; }
-.rc-module-pills { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 7px; }
+.rc-module-pills { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 7px; max-height: 104px; overflow-y: auto; align-content: flex-start; }
 .rc-chip { border: 1px solid #e1e5ea; background: #fff; color: #5c6470; border-radius: 9px; padding: 6px 9px; font-size: 9px; cursor: pointer; }
 .rc-chip:hover { border-color: #9db7e6; }
 .rc-chip.active { border-color: var(--rc-blue); background: var(--rc-blue); color: #fff; }

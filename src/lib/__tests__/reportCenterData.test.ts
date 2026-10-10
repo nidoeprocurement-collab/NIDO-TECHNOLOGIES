@@ -38,7 +38,11 @@ vi.mock("@/lib/salesOrderStore", () => ({
 import {
   filterReportCenterRecords,
   getReportCenterRecords,
+  getReportCenterDefaultColumns,
   loadReportCenterRecords,
+  orderReportCenterColumns,
+  REPORT_CENTER_COLUMNS,
+  REPORT_CENTER_MODULES,
 } from "@/lib/reportCenterData";
 
 describe("report center live data sources", () => {
@@ -90,5 +94,32 @@ describe("report center live data sources", () => {
     expect(getReportCenterRecords("Orders", "internal")).toEqual([
       { id: "internal-order-1", orderNumber: "SO-1" },
     ]);
+  });
+
+  it("uses the workbook's exact column order for supported modules and report exports", () => {
+    const columns = getReportCenterDefaultColumns("Client Orders");
+    const reversedSelection = [...columns].reverse();
+    const moduleOptions = REPORT_CENTER_MODULES.client;
+    const workbookColumns = REPORT_CENTER_COLUMNS["Client Orders"].flatMap((group) => group.columns);
+
+    expect(columns).toEqual([
+      "Report Date From",
+      "Report Date To",
+      "Report Date Basis",
+      "Report Generated At",
+      "Report Timezone",
+      "ID",
+    ]);
+    expect(moduleOptions).toContain("Client Orders");
+    expect(moduleOptions).not.toContain("Order Documents");
+    expect(orderReportCenterColumns("Client Orders", reversedSelection)).toEqual(columns);
+    const selectedWithName = ["Client Name", ...reversedSelection];
+    const selectedSet = new Set(selectedWithName);
+    const workbookSet = new Set(workbookColumns);
+    expect(orderReportCenterColumns("Client Orders", selectedWithName)).toEqual([
+      ...workbookColumns.filter((column) => selectedSet.has(column)),
+      ...selectedWithName.filter((column) => !workbookSet.has(column)),
+    ]);
+    expect(workbookColumns.slice(0, columns.length)).toEqual(columns);
   });
 });

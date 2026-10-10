@@ -278,30 +278,43 @@ function CreateReportView({
   const modules = modulesByType[draft.entityType] ?? DEFAULT_MODULES[draft.entityType];
   const effectiveModule = modules.includes(draft.module) ? draft.module : modules[0] ?? "";
   const groups = columnsByModule[effectiveModule] ?? DEFAULT_COLUMNS[effectiveModule] ?? [];
+  const canonicalColumns = groups.flatMap((group) => group.columns);
+  const orderSelectedColumns = (columns: string[]) => {
+    const selected = new Set(columns);
+    const canonical = new Set(canonicalColumns);
+    return [
+      ...canonicalColumns.filter((column) => selected.has(column)),
+      ...columns.filter((column) => !canonical.has(column)),
+    ];
+  };
+  const selectedColumns = orderSelectedColumns(draft.selectedColumns);
   const filteredEntities = entities.filter((entity) => entity.name.toLowerCase().includes(entitySearch.toLowerCase()));
   const filteredColumns = groups.map((group) => ({
     ...group,
     columns: group.columns.filter((column) => column.toLowerCase().includes(columnSearch.toLowerCase())),
   })).filter((group) => group.columns.length > 0);
   const selectedEntities = draft.allEntities ? entities.length : draft.entityIds.length;
-  const fieldCount = draft.selectedColumns.length;
-  const moneyColumns = draft.selectedColumns.some((column) => /price|amount|total|cost/i.test(column));
+  const fieldCount = selectedColumns.length;
+  const moneyColumns = selectedColumns.some((column) => /price|amount|total|cost/i.test(column));
   const toggleColumn = (column: string) => {
-    updateDraft({ selectedColumns: draft.selectedColumns.includes(column) ? draft.selectedColumns.filter((item) => item !== column) : [...draft.selectedColumns, column] });
+    const next = selectedColumns.includes(column)
+      ? selectedColumns.filter((item) => item !== column)
+      : [...selectedColumns, column];
+    updateDraft({ selectedColumns: orderSelectedColumns(next) });
   };
   const toggleEntity = (id: string) => {
     const next = draft.entityIds.includes(id) ? draft.entityIds.filter((entityId) => entityId !== id) : [...draft.entityIds, id];
     updateDraft({ entityIds: next });
   };
   const submitDownload = () => {
-    const downloadDraft = { ...draft, delivery: "download" as const };
+    const downloadDraft = { ...draft, selectedColumns, delivery: "download" as const };
     updateDraft({ delivery: "download" });
     if (onDownloadReport) onDownloadReport(downloadDraft);
     else notify("Report download requested.");
   };
   const submitEmail = () => {
     if (!draft.recipients.trim()) { notify("Add at least one email recipient."); return; }
-    const emailDraft = { ...draft, delivery: "email" as const };
+    const emailDraft = { ...draft, selectedColumns, delivery: "email" as const };
     updateDraft({ delivery: "email" });
     if (onSendReportEmail) onSendReportEmail(emailDraft);
     else notify("Report email requested.");
@@ -309,12 +322,15 @@ function CreateReportView({
   const showPreview = () => {
     setPreviewRequested(true);
     setPreviewVisible((visible) => !visible);
-    onPreview?.(draft);
+    onPreview?.({ ...draft, selectedColumns });
   };
   const toggleAllColumns = () => {
     const displayed = filteredColumns.flatMap((group) => group.columns);
-    const everySelected = displayed.length > 0 && displayed.every((column) => draft.selectedColumns.includes(column));
-    updateDraft({ selectedColumns: everySelected ? draft.selectedColumns.filter((column) => !displayed.includes(column)) : [...new Set([...draft.selectedColumns, ...displayed])] });
+    const everySelected = displayed.length > 0 && displayed.every((column) => selectedColumns.includes(column));
+    const next = everySelected
+      ? selectedColumns.filter((column) => !displayed.includes(column))
+      : [...new Set([...selectedColumns, ...displayed])];
+    updateDraft({ selectedColumns: orderSelectedColumns(next) });
   };
   return (
     <>
@@ -358,11 +374,11 @@ function CreateReportView({
         <div className="rc-section-title">4. Choose columns</div>
         <div className="rc-columns-head">
           <div className="rc-search-wrap"><Search /><input className="rc-search" aria-label="Search columns" value={columnSearch} onChange={(event) => setColumnSearch(event.target.value)} placeholder="Search columns..." /></div>
-          <button type="button" className="rc-button" onClick={toggleAllColumns}>{filteredColumns.flatMap((group) => group.columns).every((column) => draft.selectedColumns.includes(column)) ? "Deselect all" : "Select all"}</button>
+          <button type="button" className="rc-button" onClick={toggleAllColumns}>{filteredColumns.flatMap((group) => group.columns).every((column) => selectedColumns.includes(column)) ? "Deselect all" : "Select all"}</button>
           <button type="button" className="rc-button" onClick={() => updateDraft({ selectedColumns: [] })}>Clear</button>
         </div>
         <div className="rc-columns-grid">
-          {filteredColumns.length ? filteredColumns.flatMap((group) => group.columns).map((column) => <label key={column} className="rc-column-label"><input type="checkbox" checked={draft.selectedColumns.includes(column)} onChange={() => toggleColumn(column)} />{column}</label>) : <span className="rc-help">No columns match your search.</span>}
+          {filteredColumns.length ? filteredColumns.flatMap((group) => group.columns).map((column) => <label key={column} className="rc-column-label"><input type="checkbox" checked={selectedColumns.includes(column)} onChange={() => toggleColumn(column)} />{column}</label>) : <span className="rc-help">No columns match your search.</span>}
         </div>
       </section>
       <div className="rc-bottom-grid">
@@ -391,8 +407,8 @@ function CreateReportView({
       {previewVisible && <section className="rc-card rc-section">
         <div className="rc-section-title"><span>Report preview <span style={{ color: "#9299a3", fontWeight: 400 }}>· Selected columns only</span></span><span style={{ color: "#9299a3", fontSize: 9 }}>Showing {Math.min(previewRecords.length, 5)} of {previewCount ?? previewRecords.length} rows</span></div>
         {previewRequested && !previewRecords.length && <span className="rc-help">Preview refreshed from the current selection.</span>}
-        <div className="rc-preview-table"><table><thead><tr>{draft.selectedColumns.map((column) => <th key={column}>{column}{/price|amount|total/i.test(column) ? ` (${previewCurrency})` : ""}</th>)}</tr></thead>
-          <tbody>{previewRecords.length && draft.selectedColumns.length ? previewRecords.slice(0, 5).map((record) => <tr key={record.id}>{draft.selectedColumns.map((column) => <td key={column}>{record.values[column] ?? "—"}</td>)}</tr>) : <tr><td className="rc-empty" colSpan={Math.max(draft.selectedColumns.length, 1)}>{previewError || "No stored records match this selection. Try another entity or date range."}</td></tr>}</tbody>
+        <div className="rc-preview-table"><table><thead><tr>{selectedColumns.map((column) => <th key={column}>{column}{/price|amount|total/i.test(column) ? ` (${previewCurrency})` : ""}</th>)}</tr></thead>
+          <tbody>{previewRecords.length && selectedColumns.length ? previewRecords.slice(0, 5).map((record) => <tr key={record.id}>{selectedColumns.map((column) => <td key={column}>{record.values[column] ?? "—"}</td>)}</tr>) : <tr><td className="rc-empty" colSpan={Math.max(selectedColumns.length, 1)}>{previewError || "No stored records match this selection. Try another entity or date range."}</td></tr>}</tbody>
         </table></div>
       </section>}
       <div className="rc-sticky-preview" style={{ bottom: 0, top: "auto", marginTop: 8, marginBottom: 0 }}>

@@ -18,6 +18,9 @@ import {
   getReportCenterPreview,
   getReportCenterRows,
   loadReportCenterRecords,
+  getReportCenterDefaultColumns,
+  orderReportCenterColumns,
+  withReportRunMetadata,
 } from "@/lib/reportCenterData";
 import {
   deleteReportCenterSchedule,
@@ -40,7 +43,7 @@ const INITIAL_DRAFT: ReportCreateDraft = {
   entityIds: [],
   allEntities: false,
   module: REPORT_CENTER_MODULES.vendor[0],
-  selectedColumns: ["Vendor Name", "Product Name", "SKU", "Category", "Unit Price", "Stock"],
+  selectedColumns: getReportCenterDefaultColumns(REPORT_CENTER_MODULES.vendor[0]),
   dateBasis: "Created date",
   dateFrom: "",
   dateTo: "",
@@ -196,14 +199,17 @@ function reportDraftForSchedule(
 ): ReportCreateDraft {
   const type = reportTypeKey(schedule.reportType);
   const sameSelection = currentDraft.entityType === type && currentDraft.module === schedule.module;
-  const defaultColumns = REPORT_CENTER_COLUMNS[schedule.module]?.flatMap((item) => item.columns).slice(0, 6) ?? [];
+  const defaultColumns = getReportCenterDefaultColumns(schedule.module);
   return {
     ...currentDraft,
     entityType: type,
     entityIds: schedule.entityIds,
     allEntities: schedule.allEntities,
     module: schedule.module,
-    selectedColumns: sameSelection && currentDraft.selectedColumns.length ? currentDraft.selectedColumns : defaultColumns,
+     selectedColumns: orderReportCenterColumns(
+       schedule.module,
+       sameSelection && currentDraft.selectedColumns.length ? currentDraft.selectedColumns : defaultColumns,
+     ),
     dateFrom: schedule.dateRange === "Saved per schedule" && sameSelection ? currentDraft.dateFrom : "",
     dateTo: schedule.dateRange === "Saved per schedule" && sameSelection ? currentDraft.dateTo : "",
     format: sameSelection ? currentDraft.format : "Excel",
@@ -280,8 +286,11 @@ export default function ReportsPage() {
     [sourceRecords, draft, entitiesByType],
   );
   const previewRecords = useMemo(
-    () => getReportCenterPreview(filteredRecords, draft.selectedColumns),
-    [filteredRecords, draft.selectedColumns],
+    () => getReportCenterPreview(
+      withReportRunMetadata(filteredRecords, draft),
+      orderReportCenterColumns(draft.module, draft.selectedColumns),
+    ),
+    [filteredRecords, draft.selectedColumns, draft.module, draft.dateFrom, draft.dateTo, draft.dateBasis],
   );
   const scheduleItems = useMemo(() => scheduleRows(storedSchedules), [storedSchedules]);
   const recentDeliveries = useMemo(
@@ -359,8 +368,10 @@ export default function ReportsPage() {
       const entities = getReportCenterEntities();
       const records = await loadReportCenterRecords(reportDraft.module, reportDraft.entityType);
       const selectedRecords = filterReportCenterRecords(records, reportDraft, entities);
-      columns = getReportCenterExportData(selectedRecords, reportDraft.selectedColumns);
-      rows = getReportCenterRows(selectedRecords, reportDraft.selectedColumns);
+      const orderedColumns = orderReportCenterColumns(reportDraft.module, reportDraft.selectedColumns);
+      const reportRecords = withReportRunMetadata(selectedRecords, reportDraft);
+      columns = getReportCenterExportData(reportRecords, orderedColumns);
+      rows = getReportCenterRows(reportRecords, orderedColumns);
       const title = `${reportDraft.module} Report`;
 
       if (delivery === "Download") {
