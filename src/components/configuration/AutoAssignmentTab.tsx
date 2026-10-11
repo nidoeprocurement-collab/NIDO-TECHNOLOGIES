@@ -40,7 +40,6 @@ type HistoryFilters = {
 };
 
 const TIER_NAMES: AssignmentTierName[] = ["Premium", "Medium", "Standard"];
-const EDIT_ROLES = new Set(["System Owner", "System Admin", "Procurement Manager", "Operations Manager", "Team Lead"]);
 const EMPTY_FILTERS: HistoryFilters = {
   tier: "",
   employeeId: "",
@@ -116,7 +115,7 @@ function formatTimestamp(value: string): string {
 export default function AutoAssignmentTab() {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const canManage = Boolean(user?.role && EDIT_ROLES.has(user.role) && hasPermission("configuration", "edit"));
+  const canManage = Boolean(user?.userType === "nido_admin" && hasPermission("configuration", "edit"));
   const [panel, setPanel] = useState<Panel>("rules");
   const [config, setConfig] = useState<AssignmentConfig | null>(null);
   const [preview, setPreview] = useState<AssignmentPreview[]>([]);

@@ -14,10 +14,7 @@ import {
   Boxes,
   UserCheck,
 } from "lucide-react";
-import { lazy, Suspense } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-
-const AutoAssignmentTab = lazy(() => import("@/components/configuration/AutoAssignmentTab"));
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 
 const menuItems = [
   {
@@ -79,7 +76,7 @@ const menuItems = [
     title: "Auto Assignment",
     description: "Configure tier-based order assignment and round-robin sequences",
     icon: Zap,
-    href: "/configuration?tab=auto-assignment",
+    href: "/configuration/auto-assignment",
   },
   {
     title: "Price Engine",
@@ -108,15 +105,11 @@ const menuItems = [
 ];
 
 export default function ConfigurationHubPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") === "auto-assignment" ? "auto-assignment" : "overview";
+  const [searchParams] = useSearchParams();
 
-  const selectTab = (tab: "overview" | "auto-assignment") => {
-    const next = new URLSearchParams(searchParams);
-    if (tab === "overview") next.delete("tab");
-    else next.set("tab", tab);
-    setSearchParams(next);
-  };
+  if (searchParams.get("tab") === "auto-assignment") {
+    return <Navigate to="/configuration/auto-assignment" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -125,55 +118,28 @@ export default function ConfigurationHubPage() {
           Configuration
         </h1>
 
-        <div className="mb-6 flex gap-2 border-b border-slate-200" role="tablist" aria-label="Configuration sections">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "overview"}
-            onClick={() => selectTab("overview")}
-            className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === "overview" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-          >
-            Configuration modules
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "auto-assignment"}
-            onClick={() => selectTab("auto-assignment")}
-            className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === "auto-assignment" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-          >
-            Auto Assignment
-          </button>
-        </div>
-
-        {activeTab === "auto-assignment" ? (
-          <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Loading Auto Assignment…</div>}>
-            <AutoAssignmentTab />
-          </Suspense>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link key={item.title} to={item.href} className="block">
-                  <div className="h-full cursor-pointer rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition-all duration-300 hover:border-blue-300 hover:shadow-md">
-                    <div className="mb-5 flex justify-center">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
-                        <Icon className="h-7 w-7 text-blue-600" />
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <h3 className="flex items-center justify-center gap-1 text-lg font-semibold text-slate-800">
-                        {item.title}<span className="text-slate-400">›</span>
-                      </h3>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-500">{item.description}</p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.title} to={item.href} className="block">
+                <div className="h-full cursor-pointer rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition-all duration-300 hover:border-blue-300 hover:shadow-md">
+                  <div className="mb-5 flex justify-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
+                      <Icon className="h-7 w-7 text-blue-600" />
                     </div>
                   </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+                  <div className="text-center">
+                    <h3 className="flex items-center justify-center gap-1 text-lg font-semibold text-slate-800">
+                      {item.title}<span className="text-slate-400">›</span>
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-500">{item.description}</p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

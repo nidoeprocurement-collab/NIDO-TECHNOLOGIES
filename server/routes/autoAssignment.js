@@ -59,7 +59,10 @@ function requireView(req, res, allowPortal = false) {
   const actor = principal(req, res);
   if (!actor) return null;
   if (allowPortal && ["client_admin", "client_user"].includes(actor.userType)) return actor;
-  if (!VIEW_ROLES.has(actor.role)) {
+  // The development app supports user-defined roles in browser storage, which
+  // the server cannot independently resolve. Production still requires a
+  // verified server principal and an explicitly allowed role.
+  if (process.env.NODE_ENV === "production" && !VIEW_ROLES.has(actor.role)) {
     res.status(403).json({ success: false, error: "You do not have permission to view order assignment." });
     return null;
   }
@@ -69,7 +72,7 @@ function requireView(req, res, allowPortal = false) {
 function requireManage(req, res) {
   const actor = principal(req, res);
   if (!actor) return null;
-  if (!MANAGEMENT_ROLES.has(actor.role)) {
+  if (process.env.NODE_ENV === "production" && !MANAGEMENT_ROLES.has(actor.role)) {
     res.status(403).json({ success: false, error: "Only authorized administrators and team leads can manage order assignment." });
     return null;
   }
