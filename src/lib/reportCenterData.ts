@@ -258,11 +258,13 @@ function mapClientOrderRecords(): ReportRecord[] {
     const clientName = clientsById.get(clientId) ?? clientId;
     return getClientOrders(clientId, clientName).map((order) => {
       const sourceOrder = sourceOrdersById.get(String(order.id)) ?? {};
-      const itemRecords = (Array.isArray(sourceOrder.cartItems)
-        ? sourceOrder.cartItems
-        : Array.isArray(order.productDetails)
-          ? order.productDetails
-          : []) as ReportRecord[];
+      const itemRecords = (
+        [
+          sourceOrder.cartItems,
+          order.productDetails,
+          order.cartItems,
+        ].find((items) => Array.isArray(items) && items.length > 0) ?? []
+      ) as ReportRecord[];
       const totalQuantity = itemRecords.reduce(
         (sum, item) => sum + Number(item.quantity ?? item.qty ?? 0),
         0,
@@ -1434,6 +1436,23 @@ export function getReportCenterCellValue(record: ReportRecord, column: string): 
   const value = findValue(record, column);
   if (value === undefined || value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (column === "Cart Items") {
+    const items = Array.isArray(value) ? value : [value];
+    const names = items.flatMap((item) => {
+      if (typeof item === "string") return item.trim() ? [item.trim()] : [];
+      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+
+      const cartItem = item as ReportRecord;
+      const product = cartItem.product && typeof cartItem.product === "object" && !Array.isArray(cartItem.product)
+        ? cartItem.product as ReportRecord
+        : {};
+      const name = cartItem.productName ?? cartItem.name ?? cartItem.itemName ?? cartItem.title ?? product.name;
+      return name === null || name === undefined || String(name).trim() === ""
+        ? []
+        : [String(name).trim()];
+    });
+    return names.length ? names.join(", ") : "—";
+  }
   if (typeof value === "object") return JSON.stringify(value);
   if (/(amount|price|total|spend|cost)$/i.test(column)) {
     const amount = Number(value);

@@ -18,6 +18,10 @@ vi.mock("@/lib/clientDataStore", () => ({
     amount: "₹500",
     client: "Acme",
     status: "Processing",
+    cartItems: [
+      { name: "Acme Keyboard", productCode: "KB-1", quantity: 2, priceNum: 1500 },
+      { name: "Nido Monitor", productCode: "MN-2", quantity: 1, priceNum: 7200 },
+    ],
     orderNotes: "Call before delivery",
     deliveryAddress: "12 Market Road, Pune",
     deliveryDetails: {
@@ -154,6 +158,16 @@ describe("report center live data sources", () => {
       "Delivery Details / Phone": "9876543210",
       "Delivery Details / Instructions": "Use the rear entrance",
     });
+  });
+
+  it("shows only product names in the Client Orders Cart Items column", () => {
+    const records = getReportCenterRecords("Client Orders", "client");
+    const columns = ["Cart Items"];
+    const preview = getReportCenterPreview(records, columns);
+    const rows = getReportCenterRows(records, columns);
+
+    expect(preview[0].values["Cart Items"]).toBe("Acme Keyboard, Nido Monitor");
+    expect(rows[0]["Cart Items"]).toBe("Acme Keyboard, Nido Monitor");
   });
 
   it("loads client services and includes their start date in date filtering", () => {
