@@ -1,20 +1,11 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  Building2,
-  Check,
-  ChevronDown,
-  Info,
-  Plus,
-  Save,
-  Trash2,
-  UsersRound,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Clock3, Eye, Loader2, Plus, RefreshCw, Save, ShieldAlert, Users, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { toast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -23,754 +14,709 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  AUTO_ASSIGNMENT_EVENT,
-  createAutoAssignmentRule,
-  getAutoAssignmentSettings,
-  saveAutoAssignmentSettings,
-  type AutoAssignmentRule,
-} from "@/lib/autoAssignmentStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
+import ServiceTicketAssignmentRules from "./ServiceTicketAssignmentRules";
 import {
-  getUsers,
-  getRoles,
-  NIDO_ROLES_EVENT,
-  NIDO_USERS_EVENT,
-  type NidoRole,
-  type NidoUser,
-} from "@/lib/nidoUsersStore";
+  autoAssignmentApi,
+  type AssignmentConfig,
+  type AssignmentEmployee,
+  type AssignmentHistoryItem,
+  type AssignmentPreview,
+  type AssignmentRosterEmployee,
+  type AssignmentTierConfig,
+  type AssignmentTierName,
+  type UnassignedOrder,
+} from "@/lib/autoAssignmentApi";
+import { getRoles, getUsers, NIDO_ROLES_EVENT, NIDO_USERS_EVENT, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore";
 
-const FALLBACK_ROLES = ["Analyst", "Senior Analyst", "Lead Analyst"];
-const DEPARTMENTS_PER_PAGE = 10;
-const tableCellClass = "px-4 py-3 align-top";
-
-type RuleGroup = {
-  department: string;
-  rules: AutoAssignmentRule[];
+type Panel = "rules" | "preview" | "history" | "service";
+type HistoryFilters = {
+  tier: string;
+  employeeId: string;
+  method: string;
+  status: string;
+  startDate: string;
+  endDate: string;
 };
 
-function assignmentSnapshot(enabled: boolean, rules: AutoAssignmentRule[]): string {
-  return JSON.stringify({ enabled, rules });
-}
+const TIER_NAMES: AssignmentTierName[] = ["Premium", "Medium", "Standard"];
+const EDIT_ROLES = new Set(["System Owner", "System Admin", "Procurement Manager", "Operations Manager", "Team Lead"]);
+const EMPTY_FILTERS: HistoryFilters = {
+  tier: "",
+  employeeId: "",
+  method: "",
+  status: "",
+  startDate: "",
+  endDate: "",
+};
 
-function ruleKey(department: string, role: string): string {
-  return `${department.trim().toLowerCase()}::${role.trim().toLowerCase()}`;
-}
-
-function buildLiveRules(users: NidoUser[], roles: NidoRole[]): AutoAssignmentRule[] {
-  const activeUsers = users.filter((user) => user.status === "Active");
-  const configuredRoles = roles.filter((role) => role.status === "Active" && role.name.trim());
-  const liveRoleKeys = new Set<string>();
-  const liveRules: AutoAssignmentRule[] = [];
-
-  configuredRoles.forEach((role) => {
-    const department = role.department.trim() || "Unassigned Department";
-    const roleName = role.name.trim();
-    const key = ruleKey(department, roleName);
-    if (liveRoleKeys.has(key)) return;
-    liveRoleKeys.add(key);
-
-    const matchingUsers = activeUsers.filter(
-      (user) => user.department.trim() === department && user.role.trim() === roleName,
-    );
-    liveRules.push({
-      id: `live-rule-${key.replace(/[^a-z0-9]+/gi, "-")}`,
-      department,
-      role: roleName,
-      assignedUserIds: matchingUsers.length > 0 ? [matchingUsers[0].id] : [],
-      clientIds: [],
-    });
-  });
-
-  // Keep users with a custom role/department visible until an administrator
-  // adds that role to User Roles, rather than silently dropping live data.
-  activeUsers.forEach((user) => {
-    const department = user.department.trim() || "Unassigned Department";
-    const role = user.role.trim() || "Unassigned Role";
-    const key = ruleKey(department, role);
-    if (liveRoleKeys.has(key)) return;
-    liveRoleKeys.add(key);
-    liveRules.push({
-      id: `live-user-rule-${user.id}`,
-      department,
-      role,
-      assignedUserIds: [user.id],
-      clientIds: [],
-    });
-  });
-
-  return liveRules.sort((left, right) =>
-    ruleKey(left.department, left.role).localeCompare(ruleKey(right.department, right.role)),
-  );
-}
-
-function reconcileRules(
-  savedRules: AutoAssignmentRule[],
-  users: NidoUser[],
-  roles: NidoRole[],
-  clients: StoredClient[],
-): AutoAssignmentRule[] {
-  const availableUserIds = new Set(
-    users.filter((user) => user.status === "Active").map((user) => user.id),
-  );
-  const availableClientIds = new Set(clients.map((client) => client.id));
-  const cleanedRules = savedRules.map((rule) => ({
-    ...rule,
-    assignedUserIds: rule.assignedUserIds.filter((id) => availableUserIds.has(id)),
-    clientIds: rule.clientIds.filter((id) => availableClientIds.has(id)),
-  }));
-  const existingKeys = new Set(cleanedRules.map((rule) => ruleKey(rule.department, rule.role)));
-
-  return [
-    ...cleanedRules,
-    ...buildLiveRules(users, roles).filter((rule) => !existingKeys.has(ruleKey(rule.department, rule.role))),
-  ];
-}
-
-function getUserLabel(user: NidoUser): string {
-  return user.name || user.email || user.employeeId || "Unnamed user";
-}
-
-function ClientMultiSelect({
-  clients,
-  selectedIds,
-  open,
-  onOpenChange,
-  onToggle,
-}: {
-  clients: StoredClient[];
-  selectedIds: string[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onToggle: (clientId: string) => void;
-}) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const selectedClients = selectedIds
-    .map((id) => clients.find((client) => client.id === id))
-    .filter((client): client is StoredClient => Boolean(client));
-
-  useEffect(() => {
-    if (!open) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) onOpenChange(false);
+function getRoster(users: NidoUser[], roles: NidoRole[]): AssignmentRosterEmployee[] {
+  return users.map((user) => {
+    const role = roles.find((candidate) => candidate.name === user.role);
+    return {
+      id: user.id,
+      name: user.name || user.email || user.employeeId || "Unnamed employee",
+      role: user.role || "",
+      department: user.department || "",
+      active: user.status === "Active",
+      roleActive: !user.role || role?.status === "Active",
     };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open, onOpenChange]);
-
-  return (
-    <div ref={rootRef} className="relative min-w-[260px]">
-      <div
-        className="flex min-h-10 w-full items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-sm hover:border-primary/50"
-        onClick={() => onOpenChange(!open)}
-      >
-        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-          {selectedClients.length === 0 ? (
-            <span className="px-0.5 py-1 text-muted-foreground">Select clients</span>
-          ) : (
-            selectedClients.map((client) => (
-              <span
-                key={client.id}
-                className="inline-flex max-w-[190px] items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-              >
-                <span className="truncate">{client.name}</span>
-                <button
-                  type="button"
-                  className="rounded-full p-0.5 hover:bg-primary/20"
-                  aria-label={`Remove ${client.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggle(client.id);
-                  }}
-                >
-                  ×
-                </button>
-              </span>
-            ))
-          )}
-        </div>
-        <button
-          type="button"
-          className="shrink-0 rounded p-1 hover:bg-muted"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenChange(!open);
-          }}
-          aria-expanded={open}
-          aria-label="Select clients"
-        >
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </button>
-      </div>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-full min-w-[280px] overflow-y-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl">
-          <div className="mb-1 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Select clients
-          </div>
-          {clients.length === 0 ? (
-            <p className="px-2 py-4 text-sm text-muted-foreground">No clients are available.</p>
-          ) : (
-            clients.map((client) => {
-              const checked = selectedIds.includes(client.id);
-              return (
-                <label
-                  key={client.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"
-                >
-                  <Checkbox checked={checked} onCheckedChange={() => onToggle(client.id)} />
-                  <span className="min-w-0 flex-1 truncate">{client.name}</span>
-                  {checked && <Check className="h-4 w-4 text-primary" />}
-                </label>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
+  });
 }
 
-function UserMultiSelect({
-  users,
-  selectedIds,
-  open,
-  onOpenChange,
-  onToggle,
-}: {
-  users: NidoUser[];
-  selectedIds: string[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onToggle: (userId: string) => void;
-}) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const selectedUsers = selectedIds
-    .map((id) => users.find((user) => user.id === id))
-    .filter((user): user is NidoUser => Boolean(user));
+function getEmployeeFromRoster(id: string, roster: AssignmentRosterEmployee[]): AssignmentEmployee | null {
+  const employee = roster.find((candidate) => candidate.id === id);
+  if (!employee) return null;
+  return {
+    id: employee.id,
+    name: employee.name,
+    role: employee.role,
+    department: employee.department,
+    active: employee.active && employee.roleActive,
+    sequence: 1,
+  };
+}
 
-  useEffect(() => {
-    if (!open) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) onOpenChange(false);
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open, onOpenChange]);
+function canonicalTier(value: unknown): string {
+  const tier = String(value || "").trim().toLowerCase();
+  if (tier === "premium" || tier === "premium clients") return "Premium";
+  if (tier === "medium" || tier === "medium clients") return "Medium";
+  if (tier === "standard" || tier === "standard clients") return "Standard";
+  return "";
+}
 
-  return (
-    <div ref={rootRef} className="relative min-w-[230px]">
-      <div
-        className="flex min-h-10 w-full items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-sm hover:border-primary/50"
-        onClick={() => onOpenChange(!open)}
-      >
-        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-          {selectedUsers.length === 0 ? (
-            <span className="px-0.5 py-1 text-muted-foreground">Select users</span>
-          ) : (
-            selectedUsers.map((user) => (
-              <span
-                key={user.id}
-                className="inline-flex max-w-[190px] items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-              >
-                <span className="truncate">{getUserLabel(user)}</span>
-                <button
-                  type="button"
-                  className="rounded-full p-0.5 hover:bg-primary/20"
-                  aria-label={`Remove ${getUserLabel(user)}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggle(user.id);
-                  }}
-                >
-                  ×
-                </button>
-              </span>
-            ))
-          )}
-        </div>
-        <button
-          type="button"
-          className="shrink-0 rounded p-1 hover:bg-muted"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenChange(!open);
-          }}
-          aria-expanded={open}
-          aria-label="Select assigned users"
-        >
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </button>
-      </div>
+function clientTier(client: StoredClient): string {
+  return String(client.client_tier || client.tier || "");
+}
 
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-full min-w-[260px] overflow-y-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl">
-          <div className="mb-1 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Select assigned users
-          </div>
-          {users.length === 0 ? (
-            <p className="px-2 py-4 text-sm text-muted-foreground">No active users are available.</p>
-          ) : (
-            users.map((user) => {
-              const checked = selectedIds.includes(user.id);
-              return (
-                <label
-                  key={user.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"
-                >
-                  <Checkbox checked={checked} onCheckedChange={() => onToggle(user.id)} />
-                  <span className="min-w-0 flex-1 truncate">{getUserLabel(user)}</span>
-                  {checked && <Check className="h-4 w-4 text-primary" />}
-                </label>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
+function resequence(employees: AssignmentEmployee[]): AssignmentEmployee[] {
+  return employees.map((employee, index) => ({ ...employee, sequence: index + 1 }));
+}
+
+function moveEmployee(tier: AssignmentTierConfig, index: number, direction: -1 | 1): AssignmentTierConfig {
+  const next = [...tier.employees].sort((a, b) => a.sequence - b.sequence);
+  const target = index + direction;
+  if (target < 0 || target >= next.length) return tier;
+  [next[index], next[target]] = [next[target], next[index]];
+  return { ...tier, employees: resequence(next) };
+}
+
+function statusLabel(status: AssignmentHistoryItem["status"]): string {
+  if (status === "reassigned") return "Reassigned";
+  if (status === "assigned") return "Assigned";
+  if (status === "disabled") return "Auto assignment off";
+  return "Unassigned";
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 export default function AutoAssignmentTab() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [enabled, setEnabled] = useState(true);
+  const { user } = useAuth();
+  const { hasPermission } = usePermissions();
+  const canManage = Boolean(user?.role && EDIT_ROLES.has(user.role) && hasPermission("configuration", "edit"));
+  const [panel, setPanel] = useState<Panel>("rules");
+  const [config, setConfig] = useState<AssignmentConfig | null>(null);
+  const [preview, setPreview] = useState<AssignmentPreview[]>([]);
+  const [history, setHistory] = useState<AssignmentHistoryItem[]>([]);
+  const [unassigned, setUnassigned] = useState<UnassignedOrder[]>([]);
   const [users, setUsers] = useState<NidoUser[]>([]);
   const [roles, setRoles] = useState<NidoRole[]>([]);
   const [clients, setClients] = useState<StoredClient[]>([]);
-  const [rules, setRules] = useState<AutoAssignmentRule[]>([]);
-  const [openClientRuleId, setOpenClientRuleId] = useState<string | null>(null);
-  const [openUserRuleId, setOpenUserRuleId] = useState<string | null>(null);
-  const [departmentPage, setDepartmentPage] = useState(1);
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
-  const savedSnapshotRef = useRef("");
-  const currentPathRef = useRef(
-    `${location.pathname}${location.search}${location.hash}`,
-  );
-  const bypassNavigationRef = useRef(false);
-  const dirtyRef = useRef(false);
+  const [filters, setFilters] = useState<HistoryFilters>(EMPTY_FILTERS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<AssignmentHistoryItem | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [reassignmentReason, setReassignmentReason] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
-  const loadLiveSettings = () => {
-    const nextUsers = getUsers();
-    const nextRoles = getRoles();
-    const nextClients = getClients();
-    const settings = getAutoAssignmentSettings();
-    const nextRules = reconcileRules(settings.rules, nextUsers, nextRoles, nextClients);
-    setUsers(nextUsers);
-    setRoles(nextRoles);
-    setClients(nextClients);
-    setEnabled(settings.enabled);
-    setRules(nextRules);
-    savedSnapshotRef.current = assignmentSnapshot(settings.enabled, nextRules);
+  const roster = useMemo(() => getRoster(users, roles), [users, roles]);
+  const activeRoster = useMemo(
+    () => roster.filter((employee) => employee.active && employee.roleActive),
+    [roster],
+  );
+  const tierCoverage = useMemo(
+    () => clients.reduce<Record<string, number>>((counts, client) => {
+      const tier = canonicalTier(clientTier(client));
+      counts[tier || "Unmapped"] = (counts[tier || "Unmapped"] || 0) + 1;
+      return counts;
+    }, {}),
+    [clients],
+  );
+
+  const refreshUsersAndClients = () => {
+    setUsers(getUsers());
+    setRoles(getRoles());
+    setClients(getClients());
+  };
+
+  const refreshActivity = async (nextFilters = filters) => {
+    const [nextPreview, nextHistory] = await Promise.all([
+      autoAssignmentApi.preview(),
+      autoAssignmentApi.history(nextFilters),
+    ]);
+    setPreview(nextPreview);
+    setHistory(nextHistory.history);
+    setUnassigned(nextHistory.unassigned);
+  };
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    refreshUsersAndClients();
+    try {
+      const [nextConfig, nextPreview, nextHistory] = await Promise.all([
+        autoAssignmentApi.getConfig(),
+        autoAssignmentApi.preview(),
+        autoAssignmentApi.history(EMPTY_FILTERS),
+      ]);
+      setConfig(nextConfig);
+      setPreview(nextPreview);
+      setHistory(nextHistory.history);
+      setUnassigned(nextHistory.unassigned);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load assignment settings.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadLiveSettings();
-    const handleUpdate = () => {
-      if (!dirtyRef.current) loadLiveSettings();
-    };
-    window.addEventListener(AUTO_ASSIGNMENT_EVENT, handleUpdate);
-    window.addEventListener(NIDO_USERS_EVENT, handleUpdate);
-    window.addEventListener(NIDO_ROLES_EVENT, handleUpdate);
-    window.addEventListener("nidoClientsUpdated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
+    void load();
+    const refresh = () => refreshUsersAndClients();
+    window.addEventListener(NIDO_USERS_EVENT, refresh);
+    window.addEventListener(NIDO_ROLES_EVENT, refresh);
+    window.addEventListener("nidoClientsUpdated", refresh);
+    window.addEventListener("storage", refresh);
     return () => {
-      window.removeEventListener(AUTO_ASSIGNMENT_EVENT, handleUpdate);
-      window.removeEventListener(NIDO_USERS_EVENT, handleUpdate);
-      window.removeEventListener(NIDO_ROLES_EVENT, handleUpdate);
-      window.removeEventListener("nidoClientsUpdated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener(NIDO_USERS_EVENT, refresh);
+      window.removeEventListener(NIDO_ROLES_EVENT, refresh);
+      window.removeEventListener("nidoClientsUpdated", refresh);
+      window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  const hasUnsavedChanges = useMemo(
-    () => assignmentSnapshot(enabled, rules) !== savedSnapshotRef.current,
-    [enabled, rules],
-  );
-  dirtyRef.current = hasUnsavedChanges;
-
-  useEffect(() => {
-    const currentPath = `${location.pathname}${location.search}${location.hash}`;
-    const previousPath = currentPathRef.current;
-
-    if (bypassNavigationRef.current) {
-      bypassNavigationRef.current = false;
-      currentPathRef.current = currentPath;
-      return;
-    }
-
-    if (hasUnsavedChanges && currentPath !== previousPath) {
-      setPendingNavigation(currentPath);
-      navigate(previousPath, { replace: true });
-      return;
-    }
-
-    currentPathRef.current = currentPath;
-  }, [hasUnsavedChanges, location.hash, location.pathname, location.search, navigate]);
-
-  useEffect(() => {
-    if (!hasUnsavedChanges) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    const handleAnchorClick = (event: MouseEvent) => {
-      if (
-        event.defaultPrevented
-        || event.button !== 0
-        || event.metaKey
-        || event.ctrlKey
-        || event.shiftKey
-        || event.altKey
-      ) {
-        return;
-      }
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const anchor = target.closest("a");
-      if (!anchor || anchor.hasAttribute("download") || anchor.target === "_blank") return;
-
-      const href = anchor.getAttribute("href");
-      if (!href || href.startsWith("#")) return;
-      const nextUrl = new URL(href, window.location.href);
-      if (nextUrl.origin !== window.location.origin) return;
-
-      const nextPath = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
-      if (nextPath === currentPathRef.current) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      setPendingNavigation(nextPath);
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("click", handleAnchorClick, true);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("click", handleAnchorClick, true);
-    };
-  }, [hasUnsavedChanges]);
-
-  const roleOptions = useMemo(() => {
-    const names = [
-      ...roles.filter((role) => role.status === "Active").map((role) => role.name.trim()),
-      ...users.map((user) => user.role.trim()),
-    ].filter(Boolean);
-    return Array.from(new Set([...FALLBACK_ROLES, ...names]));
-  }, [roles, users]);
-
-  const departmentOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(users.map((user) => user.department.trim()).filter(Boolean)),
-      ).concat(
-        roles.map((role) => role.department.trim()).filter(Boolean),
-      ).filter((department, index, departments) => departments.indexOf(department) === index)
-        .sort((left, right) => left.localeCompare(right)),
-    [roles, users],
-  );
-
-  const groupedRules = useMemo<RuleGroup[]>(() => {
-    const groups = new Map<string, AutoAssignmentRule[]>();
-    rules.forEach((rule) => {
-      groups.set(rule.department, [...(groups.get(rule.department) ?? []), rule]);
-    });
-    return Array.from(groups.entries()).map(([department, groupRules]) => ({
-      department,
-      rules: groupRules,
-    }));
-  }, [rules]);
-
-  const totalDepartmentPages = Math.max(
-    1,
-    Math.ceil(groupedRules.length / DEPARTMENTS_PER_PAGE),
-  );
-  const visibleGroups = useMemo(
-    () =>
-      groupedRules.slice(
-        (departmentPage - 1) * DEPARTMENTS_PER_PAGE,
-        departmentPage * DEPARTMENTS_PER_PAGE,
-      ),
-    [departmentPage, groupedRules],
-  );
-
-  useEffect(() => {
-    setDepartmentPage((currentPage) => Math.min(currentPage, totalDepartmentPages));
-  }, [totalDepartmentPages]);
-
-  const usersForRule = (rule: AutoAssignmentRule) => {
-    const departmentUsers = users.filter(
-      (user) => user.status === "Active" && user.department === rule.department,
-    );
-    const roleUsers = departmentUsers.filter((user) => user.role === rule.role);
-    const activeUsers = users.filter((user) => user.status === "Active");
-    return roleUsers.length > 0 ? roleUsers : departmentUsers.length > 0 ? departmentUsers : activeUsers;
-  };
-
-  const updateRule = (ruleId: string, updates: Partial<AutoAssignmentRule>) => {
-    setRules((current) =>
-      current.map((rule) => (rule.id === ruleId ? { ...rule, ...updates } : rule)),
-    );
-  };
-
-  const handleAddRole = (department: string) => {
-    const role = roleOptions[0] || "Analyst";
-    const availableUsers = users.filter(
-      (user) => user.status === "Active" && user.department === department,
-    );
-    setRules((current) => [
+  const updateTier = (tierName: AssignmentTierName, update: Partial<AssignmentTierConfig>) => {
+    setConfig((current) => current ? {
       ...current,
-      createAutoAssignmentRule({
-        department,
-        role,
-        assignedUserIds: availableUsers.length > 0 ? [availableUsers[0].id] : [],
-        clientIds: [],
-      }),
-    ]);
+      tiers: current.tiers.map((tier) => tier.tier === tierName ? { ...tier, ...update } : tier),
+    } : current);
   };
 
-  const handleSave = () => {
-    saveAutoAssignmentSettings({ enabled, rules });
-    savedSnapshotRef.current = assignmentSnapshot(enabled, rules);
-    toast({ title: "Saved", description: "Auto assignment rules have been saved." });
+  const addEmployee = (tierName: AssignmentTierName, employeeId: string) => {
+    if (!employeeId || !config) return;
+    const tier = config.tiers.find((entry) => entry.tier === tierName);
+    if (!tier || tier.employees.some((employee) => employee.id === employeeId)) return;
+    const employee = getEmployeeFromRoster(employeeId, roster);
+    if (!employee) return;
+    updateTier(tierName, { employees: resequence([...tier.employees, employee]) });
   };
 
-  const handleLeaveWithoutSaving = () => {
-    if (!pendingNavigation) return;
-    const target = pendingNavigation;
-    setPendingNavigation(null);
-    bypassNavigationRef.current = true;
-    currentPathRef.current = target;
-    navigate(target);
+  const save = async () => {
+    if (!config || !canManage) return;
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await autoAssignmentApi.saveConfig({
+        enabled: config.enabled,
+        tiers: config.tiers,
+        employees: roster,
+      });
+      setConfig(saved);
+      await refreshActivity();
+      toast({ title: "Saved", description: "Tier assignment rules and rotation settings were saved." });
+    } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : "Could not save assignment settings.";
+      setError(message);
+      toast({ title: "Save failed", description: message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const applyFilters = async () => {
+    try {
+      const result = await autoAssignmentApi.history(filters);
+      setHistory(result.history);
+      setUnassigned(result.unassigned);
+    } catch (filterError) {
+      const message = filterError instanceof Error ? filterError.message : "Could not load assignment history.";
+      setError(message);
+    }
+  };
+
+  const openManualAssignment = (entry: AssignmentHistoryItem) => {
+    setSelectedOrder(entry);
+    setSelectedEmployeeId("");
+    setReassignmentReason("");
+  };
+
+  const saveManualAssignment = async () => {
+    if (!selectedOrder || !selectedEmployeeId) return;
+    setAssigning(true);
+    try {
+      await autoAssignmentApi.manuallyAssign(selectedOrder.assignment_id, selectedEmployeeId, reassignmentReason);
+      toast({ title: "Order assigned", description: `${selectedOrder.order_id} was manually assigned.` });
+      setSelectedOrder(null);
+      await refreshActivity(filters);
+    } catch (assignmentError) {
+      const message = assignmentError instanceof Error ? assignmentError.message : "Could not assign this order.";
+      toast({ title: "Assignment failed", description: message, variant: "destructive" });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-64 items-center justify-center text-muted-foreground" role="status">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading order assignment…
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="space-y-4">
+        {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        <Button onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" /> Retry</Button>
+      </div>
+    );
+  }
 
   return (
-    <>
-    <div className="min-h-screen bg-background">
-      <div className="w-full space-y-5 px-3 py-4 sm:px-5 md:px-6 md:py-6">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Auto Assignment</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configure automatic assignment rules for orders, tickets and requests using live departments and roles from User Roles and live users from Add / Manage Users.
+          <p className="text-sm text-muted-foreground">
+            Configure independent Premium, Medium, and Standard client queues. Assignment sequence positions persist in PostgreSQL.
           </p>
         </div>
+        <Button variant="outline" onClick={() => void load()}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+        </Button>
+      </div>
 
-        <Card className="overflow-visible">
-          <CardContent className="p-0">
-            <div className="flex flex-col gap-4 border-b border-border bg-blue-50/50 px-4 py-4 dark:bg-blue-950/20 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div className="flex items-center gap-3">
-                <Switch checked={enabled} onCheckedChange={setEnabled} />
-                <div>
-                  <Label className="font-semibold">Enable Auto Assignment</Label>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    New orders and tickets will be assigned using the rules below.
+      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+
+      <div className="flex flex-wrap gap-2 border-b border-border" role="tablist" aria-label="Auto assignment sections">
+        {([
+          ["rules", "Tier rules"],
+          ["preview", "Preview"],
+          ["history", "Assignment history"],
+          ["service", "Service & ticket rules"],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={panel === value}
+            onClick={() => setPanel(value)}
+            className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              panel === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {panel === "service" && <ServiceTicketAssignmentRules canManage={canManage} />}
+
+      {panel === "rules" && (
+        <div className="space-y-5">
+          <Card>
+            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-semibold">Automatic order assignment</h2>
+                <p className="mt-1 text-sm text-muted-foreground">When off, new orders stay in the unassigned queue.</p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  checked={config.enabled}
+                  disabled={!canManage}
+                  onChange={(event) => setConfig((current) => current ? { ...current, enabled: event.target.checked } : current)}
+                />
+                {config.enabled ? "Enabled" : "Disabled"}
+              </label>
+            </CardContent>
+          </Card>
+
+          {TIER_NAMES.map((tierName) => {
+            const tier = config.tiers.find((entry) => entry.tier === tierName);
+            if (!tier) return null;
+            const usedIds = new Set(tier.employees.map((employee) => employee.id));
+            const addable = activeRoster.filter((employee) => !usedIds.has(employee.id));
+            const ordered = [...tier.employees].sort((a, b) => a.sequence - b.sequence);
+            const fallbackOptions = activeRoster;
+            return (
+              <Card key={tierName} className="overflow-visible">
+                <CardHeader className="flex flex-col gap-3 border-b sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle>{tierName} clients</CardTitle>
+                    <CardDescription>Independent round-robin order and rotation cursor.</CardDescription>
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={tier.enabled}
+                      disabled={!canManage || (!tier.enabled && ordered.filter((entry) => entry.active).length === 0)}
+                      onChange={(event) => updateTier(tierName, { enabled: event.target.checked })}
+                    />
+                    {tier.enabled ? "Tier active" : "Tier inactive"}
+                  </label>
+                </CardHeader>
+                <CardContent className="space-y-4 p-4 sm:p-5">
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full min-w-[620px]">
+                      <thead className="bg-muted/50">
+                        <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="px-3 py-2.5">Sequence</th>
+                          <th className="px-3 py-2.5">Employee</th>
+                          <th className="px-3 py-2.5">Role / department</th>
+                          <th className="px-3 py-2.5">Availability</th>
+                          <th className="px-3 py-2.5 text-right">Order</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ordered.length === 0 ? (
+                          <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No employees in this tier sequence yet.</td></tr>
+                        ) : ordered.map((employee, index) => (
+                          <tr key={employee.id} className="border-b border-border last:border-0">
+                            <td className="px-3 py-3 text-sm font-medium">{index + 1}</td>
+                            <td className="px-3 py-3 text-sm">{employee.name}</td>
+                            <td className="px-3 py-3 text-sm text-muted-foreground">
+                              {[employee.role, employee.department].filter(Boolean).join(" · ") || "—"}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`rounded-full px-2 py-1 text-xs font-medium ${employee.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                                {employee.active ? "Active" : "Unavailable"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`Move ${employee.name} up`}
+                                  disabled={!canManage || index === 0}
+                                  onClick={() => updateTier(tierName, moveEmployee(tier, index, -1))}
+                                ><ArrowUp className="h-4 w-4" /></Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`Move ${employee.name} down`}
+                                  disabled={!canManage || index === ordered.length - 1}
+                                  onClick={() => updateTier(tierName, moveEmployee(tier, index, 1))}
+                                ><ArrowDown className="h-4 w-4" /></Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label={`Remove ${employee.name} from ${tierName}`}
+                                  disabled={!canManage}
+                                  onClick={() => updateTier(tierName, { employees: resequence(ordered.filter((entry) => entry.id !== employee.id)) })}
+                                ><X className="h-4 w-4" /></Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {canManage && (
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <select
+                        aria-label={`Add employee to ${tierName}`}
+                        value=""
+                        disabled={addable.length === 0}
+                        onChange={(event) => addEmployee(tierName, event.target.value)}
+                        className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                      >
+                        <option value="">{addable.length ? "Choose an active employee to add" : "No eligible employees available"}</option>
+                        {addable.map((employee) => (
+                          <option key={employee.id} value={employee.id}>
+                            {employee.name}{employee.role ? ` — ${employee.role}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="inline-flex items-center gap-1 self-center text-xs text-muted-foreground">
+                        <Plus className="h-3.5 w-3.5" /> Employees can be used in more than one tier.
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`fallback-${tierName}`} className="mb-1.5 block text-sm font-medium">When no sequence employee is available</label>
+                      <select
+                        id={`fallback-${tierName}`}
+                        value={tier.fallbackBehavior}
+                        disabled={!canManage}
+                        onChange={(event) => updateTier(tierName, {
+                          fallbackBehavior: event.target.value as AssignmentTierConfig["fallbackBehavior"],
+                        })}
+                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      >
+                        <option value="unassigned_notify">Keep unassigned and notify the assignment team</option>
+                        <option value="fallback_employee">Use a designated fallback employee</option>
+                      </select>
+                    </div>
+                    {tier.fallbackBehavior === "fallback_employee" && (
+                      <div>
+                        <label htmlFor={`fallback-employee-${tierName}`} className="mb-1.5 block text-sm font-medium">Fallback employee</label>
+                        <select
+                          id={`fallback-employee-${tierName}`}
+                          value={tier.fallbackEmployeeId || ""}
+                          disabled={!canManage}
+                          onChange={(event) => updateTier(tierName, { fallbackEmployeeId: event.target.value || null })}
+                          className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                        >
+                          <option value="">Choose an active employee</option>
+                          {fallbackOptions.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Current rotation starts at {tier.employees.find((employee) => employee.id === tier.nextEmployeeId)?.name || ordered[0]?.name || "the first sequence employee"}.
+                    Previewing does not advance it.
                   </p>
-                </div>
-              </div>
-              <div className="flex max-w-md items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
-                <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                <span><strong>Priority Order</strong><br />Rules are evaluated in the order shown below. The first matching rule will be applied.</span>
-              </div>
-            </div>
+                </CardContent>
+              </Card>
+            );
+          })}
 
-            <div className="border-b border-border px-4 pt-3 sm:px-5">
-              <div className="inline-flex items-center gap-2 border-b-2 border-primary px-4 pb-3 text-sm font-semibold text-primary">
-                <Building2 className="h-4 w-4" /> By Department
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Client tier coverage</CardTitle>
+              <CardDescription>Assignments use the tier already set on each client. Unknown or blank tiers are left unassigned; they are never guessed.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2 text-sm">
+                {TIER_NAMES.map((tier) => (
+                  <span key={tier} className="rounded-full bg-muted px-3 py-1.5">{tier}: {tierCoverage[tier] || 0}</span>
+                ))}
+                {(tierCoverage.Unmapped || 0) > 0 && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-800">Needs tier mapping: {tierCoverage.Unmapped}</span>
+                )}
               </div>
-            </div>
+              <Link className="text-sm font-medium text-primary hover:underline" to="/clients">
+                Review client tiers
+              </Link>
+            </CardContent>
+          </Card>
 
-            <div className="p-4 sm:p-5">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 className="text-base font-semibold">Department-wise Auto Assignment Rules</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Assign orders and tickets to the right user based on the live department, role and selected client rules.
-                  </p>
-                </div>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {activeRoster.length} active employees available · Rotation pointers are saved server-side.
+            </p>
+            {canManage ? (
+              <Button onClick={() => void save()} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Configuration
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">You have view-only access to these settings.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {panel === "preview" && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {preview.map((tierPreview) => (
+            <Card key={tierPreview.tier}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-base">
+                  {tierPreview.tier}
+                  <span className={`rounded-full px-2 py-1 text-xs ${tierPreview.enabled ? "bg-green-50 text-green-700" : "bg-muted text-muted-foreground"}`}>
+                    {tierPreview.enabled ? "Active" : "Inactive"}
+                  </span>
+                </CardTitle>
+                <CardDescription>Next five assignments · no rotation changes</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {tierPreview.assignments.map((item) => (
+                  <div key={item.order} className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Order {item.order}</span>
+                    <span className="text-right font-medium">{item.employeeName}{item.fallback ? " (fallback)" : ""}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {panel === "history" && (
+        <div className="space-y-4">
+          {unassigned.length > 0 && (
+            <Card className="border-amber-300">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base text-amber-900">
+                  <ShieldAlert className="h-4 w-4" /> Unassigned order queue ({unassigned.length})
+                </CardTitle>
+                <CardDescription>These orders need an eligible employee or a corrected client tier.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {unassigned.map((item) => (
+                  <div key={item.assignment_id} className="flex flex-col gap-2 rounded-md border border-amber-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{item.order_id} · {item.client_name || item.client_id}</p>
+                      <p className="text-xs text-muted-foreground">{item.client_tier || "Tier not set"} · {item.message}</p>
+                    </div>
+                    <Button size="sm" variant="outline" disabled={!canManage} onClick={() => {
+                      const entry = history.find((record) => record.assignment_id === item.assignment_id);
+                      openManualAssignment(entry || {
+                        id: 0,
+                        assignment_id: item.assignment_id,
+                        order_id: item.order_id,
+                        client_id: item.client_id,
+                        client_name: item.client_name,
+                        client_tier: item.client_tier,
+                        previous_employee_id: null,
+                        previous_employee_name: null,
+                        new_employee_id: null,
+                        new_employee_name: null,
+                        current_employee_id: item.assigned_employee_id,
+                        current_employee_name: item.assigned_employee_name,
+                        assignment_method: "Automatic",
+                        sequence_position: null,
+                        status: "unassigned",
+                        reason: item.message,
+                        actor_name: "Auto Assignment",
+                        actor_role: "",
+                        created_at: item.created_at,
+                      });
+                    }}>
+                      <Users className="mr-2 h-4 w-4" /> Assign
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Assignment history</CardTitle>
+              <CardDescription>Each automatic assignment, manual assignment, and reassignment is retained as an audit event.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+                <select aria-label="Filter by client tier" value={filters.tier} onChange={(e) => setFilters({ ...filters, tier: e.target.value })} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+                  <option value="">All tiers</option>{TIER_NAMES.map((tier) => <option key={tier}>{tier}</option>)}
+                </select>
+                <select aria-label="Filter by employee" value={filters.employeeId} onChange={(e) => setFilters({ ...filters, employeeId: e.target.value })} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+                  <option value="">All employees</option>{users.map((employee) => <option key={employee.id} value={employee.id}>{employee.name || employee.email}</option>)}
+                </select>
+                <select aria-label="Filter by assignment method" value={filters.method} onChange={(e) => setFilters({ ...filters, method: e.target.value })} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+                  <option value="">All methods</option><option>Automatic</option><option>Manual</option>
+                </select>
+                <select aria-label="Filter by status" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} className="h-9 rounded-md border border-border bg-background px-2 text-sm">
+                  <option value="">All statuses</option><option value="assigned">Assigned</option><option value="unassigned">Unassigned</option><option value="disabled">Auto assignment off</option><option value="reassigned">Reassigned</option>
+                </select>
+                <input aria-label="Start date" type="date" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
+                <input aria-label="End date" type="date" value={filters.endDate} onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
               </div>
-
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={() => void applyFilters()}><Eye className="mr-2 h-4 w-4" /> Apply filters</Button>
+              </div>
               <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full min-w-[1100px]">
+                <table className="w-full min-w-[1000px]">
                   <thead className="bg-muted/50">
-                    <tr className="border-b border-border">
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Department</th>
-                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assigned User(s)</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clients</th>
-                      <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="px-3 py-2.5">Order / date</th><th className="px-3 py-2.5">Client / tier</th>
+                      <th className="px-3 py-2.5">Previous → new employee</th><th className="px-3 py-2.5">Method / status</th>
+                      <th className="px-3 py-2.5">Reason / actor</th><th className="px-3 py-2.5 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedRules.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">
-                          Add active NIDO users to create live department assignment rules.
+                    {history.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No assignment history matches these filters.</td></tr>
+                    ) : history.map((entry) => (
+                      <tr key={entry.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-3 text-sm"><div className="font-medium">{entry.order_id}</div><div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="h-3 w-3" />{formatTimestamp(entry.created_at)}</div></td>
+                        <td className="px-3 py-3 text-sm"><div>{entry.client_name || entry.client_id}</div><div className="mt-1 text-xs text-muted-foreground">{entry.client_tier || "Tier not set"}</div></td>
+                        <td className="px-3 py-3 text-sm">{entry.previous_employee_name || "—"} <span className="text-muted-foreground">→</span> {entry.new_employee_name || "Unassigned"}</td>
+                        <td className="px-3 py-3 text-sm"><div>{entry.assignment_method}</div><div className={`mt-1 text-xs ${entry.status === "unassigned" ? "text-amber-700" : "text-muted-foreground"}`}>{statusLabel(entry.status)}</div></td>
+                        <td className="max-w-xs px-3 py-3 text-xs text-muted-foreground"><div>{entry.reason || (entry.sequence_position ? `Sequence position ${entry.sequence_position}` : "—")}</div><div className="mt-1">{entry.actor_name} · {entry.actor_role}</div></td>
+                        <td className="px-3 py-3 text-right">
+                          {canManage && (
+                            <Button size="sm" variant="outline" onClick={() => openManualAssignment(entry)}>
+                              {entry.current_employee_id ? "Reassign" : "Assign"}
+                            </Button>
+                          )}
                         </td>
                       </tr>
-                    ) : (
-                       visibleGroups.map((group) => (
-                        <Fragment key={group.department}>
-                          {group.rules.map((rule, ruleIndex) => {
-                            const availableUsers = usersForRule(rule);
-                            return (
-                              <tr key={rule.id} className="border-b border-border last:border-b-0 hover:bg-muted/20">
-                                {ruleIndex === 0 && (
-                                   <td rowSpan={group.rules.length + 1} className={`${tableCellClass} w-52 border-r border-border`}>
-                                    <div className="flex items-start gap-2">
-                                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                        <UsersRound className="h-4 w-4" />
-                                      </div>
-                                      <div>
-                                        <div className="font-semibold text-foreground">{group.department}</div>
-                                        <div className="mt-1 text-xs text-muted-foreground">{group.rules.length} rule{group.rules.length === 1 ? "" : "s"}</div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                )}
-                                <td className={tableCellClass}>
-                                   <select
-                                     value={rule.role}
-                                     onChange={(event) => updateRule(rule.id, { role: event.target.value })}
-                                     className="h-9 min-w-[150px] rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                                   >
-                                     {!roleOptions.includes(rule.role) && <option value={rule.role}>{rule.role}</option>}
-                                     {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                                   </select>
-                                </td>
-                                <td className={tableCellClass}>
-                                   <UserMultiSelect
-                                     users={availableUsers}
-                                     selectedIds={rule.assignedUserIds}
-                                     open={openUserRuleId === rule.id}
-                                     onOpenChange={(open) => setOpenUserRuleId(open ? rule.id : null)}
-                                     onToggle={(userId) => {
-                                       const nextAssignedUserIds = rule.assignedUserIds.includes(userId)
-                                         ? rule.assignedUserIds.filter((id) => id !== userId)
-                                         : [...rule.assignedUserIds, userId];
-                                       updateRule(rule.id, { assignedUserIds: nextAssignedUserIds });
-                                     }}
-                                   />
-                                </td>
-                                <td className={tableCellClass}>
-                                  <ClientMultiSelect
-                                    clients={clients}
-                                    selectedIds={rule.clientIds}
-                                    open={openClientRuleId === rule.id}
-                                    onOpenChange={(open) => setOpenClientRuleId(open ? rule.id : null)}
-                                    onToggle={(clientId) => {
-                                      const nextClientIds = rule.clientIds.includes(clientId)
-                                        ? rule.clientIds.filter((id) => id !== clientId)
-                                        : [...rule.clientIds, clientId];
-                                      updateRule(rule.id, { clientIds: nextClientIds });
-                                    }}
-                                  />
-                                </td>
-                                <td className={`${tableCellClass} text-center`}>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    title="Remove rule"
-                                    aria-label={`Remove ${rule.department} ${rule.role} rule`}
-                                    onClick={() => setRules((current) => current.filter((item) => item.id !== rule.id))}
-                                  >
-                                   <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                           <tr className="border-b border-border">
-                             <td className={tableCellClass}>
-                               <Button
-                                 type="button"
-                                 variant="ghost"
-                                 size="sm"
-                                 className="h-8 px-2 text-xs normal-case text-primary hover:text-primary"
-                                 onClick={() => handleAddRole(group.department)}
-                               >
-                                 <Plus className="mr-1 h-3.5 w-3.5" /> Add Role
-                               </Button>
-                             </td>
-                             <td colSpan={3} className={tableCellClass} />
-                           </tr>
-                        </Fragment>
-                      ))
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
+              <p className="text-xs text-muted-foreground">Showing up to 500 matching events.</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-              {groupedRules.length > 0 && (
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Showing departments {(departmentPage - 1) * DEPARTMENTS_PER_PAGE + 1}–
-                    {Math.min(departmentPage * DEPARTMENTS_PER_PAGE, groupedRules.length)} of{" "}
-                    {groupedRules.length}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={departmentPage === 1}
-                      onClick={() => setDepartmentPage((currentPage) => Math.max(1, currentPage - 1))}
-                    >
-                      Previous
-                    </Button>
-                    <span className="min-w-20 text-center text-xs text-muted-foreground">
-                      Page {departmentPage} of {totalDepartmentPages}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={departmentPage === totalDepartmentPages}
-                      onClick={() => setDepartmentPage((currentPage) => Math.min(totalDepartmentPages, currentPage + 1))}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-muted-foreground">
-                  {rules.length} live rule{rules.length === 1 ? "" : "s"} · {clients.length} client{clients.length === 1 ? "" : "s"} available
-                </p>
-                <Button onClick={handleSave}>
-                  <Save className="mr-2 h-4 w-4" /> Save Changes
-                </Button>
-              </div>
+      <Dialog open={Boolean(selectedOrder)} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedOrder?.current_employee_id ? "Reassign order" : "Manually assign order"}</DialogTitle>
+            <DialogDescription>
+              {selectedOrder?.order_id} · {selectedOrder?.client_name || selectedOrder?.client_id} · {selectedOrder?.client_tier}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="manual-assignment-employee" className="mb-1.5 block text-sm font-medium">Active eligible employee</label>
+              <select
+                id="manual-assignment-employee"
+                value={selectedEmployeeId}
+                onChange={(event) => setSelectedEmployeeId(event.target.value)}
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="">Choose employee</option>
+                {(config.tiers.find((tier) => tier.tier === canonicalTier(selectedOrder?.client_tier))?.employees || [])
+                  .filter((employee) => employee.active)
+                  .map((employee) => <option key={employee.id} value={employee.id}>{employee.name} — {employee.role || employee.department || "Active employee"}</option>)}
+              </select>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            {selectedOrder?.current_employee_id && (
+              <div>
+                <label htmlFor="manual-assignment-reason" className="mb-1.5 block text-sm font-medium">Reason for reassignment <span className="text-red-600">*</span></label>
+                <textarea
+                  id="manual-assignment-reason"
+                  value={reassignmentReason}
+                  onChange={(event) => setReassignmentReason(event.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full rounded-md border border-border bg-background p-3 text-sm"
+                  placeholder="Explain why the current assignee is changing"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedOrder(null)}>Cancel</Button>
+            <Button
+              disabled={assigning || !selectedEmployeeId || Boolean(selectedOrder?.current_employee_id && !reassignmentReason.trim())}
+              onClick={() => void saveManualAssignment()}
+            >
+              {assigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save assignment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-    <Dialog
-      open={Boolean(pendingNavigation)}
-      onOpenChange={(open) => !open && setPendingNavigation(null)}
-    >
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Unsaved Auto Assignment changes</DialogTitle>
-          <DialogDescription>
-            You have changes on this page that have not been saved. Leave without saving them?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setPendingNavigation(null)}>
-            Stay on page
-          </Button>
-          <Button variant="destructive" onClick={handleLeaveWithoutSaving}>
-            Leave without saving
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    </>
   );
 }

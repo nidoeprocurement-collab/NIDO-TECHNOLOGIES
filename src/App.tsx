@@ -238,7 +238,6 @@ const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
 const ConfigurationHubPage = lazy(() => import("@/pages/ConfigurationHubPage"));
-const AutoAssignmentTab = lazy(() => import("@/components/configuration/AutoAssignmentTab"));
 const EmailConfigurationPage = lazy(() => import("@/pages/EmailConfigurationPage"));
 const EmailTemplatesPage = lazy(() => import("@/pages/EmailTemplatesPage"));
 const EmailLogsPage = lazy(() => import("@/pages/EmailLogsPage"));
@@ -623,7 +622,7 @@ function AppRoutes() {
             }
           />
           <Route path="configuration" element={<ConfigurationHubPage />} />
-          <Route path="configuration/auto-assignment" element={<AutoAssignmentTab />} />
+          <Route path="configuration/auto-assignment" element={<Navigate to="/configuration?tab=auto-assignment" replace />} />
           <Route
             path="configuration/general"
             element={<Navigate to="/configuration" replace />}
