@@ -160,4 +160,11 @@ router.put("/orders/:assignmentId/assignment", handle(async (req, res) => {
   res.json({ success: true, data });
 }));
 
+router.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `No Auto Assignment API route matches ${req.method} ${req.path}.`,
+  });
+});
+
 export default router;

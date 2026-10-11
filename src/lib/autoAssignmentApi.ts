@@ -119,7 +119,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success !== true) {
-    throw new Error(payload?.error || `Assignment request failed (${response.status}).`);
+    const detail = payload?.error || response.statusText || "Unknown API error";
+    throw new Error(`${detail} [${init.method || "GET"} ${path}, HTTP ${response.status}]`);
   }
   return payload.data as T;
 }

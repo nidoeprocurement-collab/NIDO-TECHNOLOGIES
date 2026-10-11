@@ -168,15 +168,22 @@ export default function AutoAssignmentTab() {
     setError("");
     refreshUsersAndClients();
     try {
-      const [nextConfig, nextPreview, nextHistory] = await Promise.all([
-        autoAssignmentApi.getConfig(),
+      const nextConfig = await autoAssignmentApi.getConfig();
+      setConfig(nextConfig);
+      const [previewResult, historyResult] = await Promise.allSettled([
         autoAssignmentApi.preview(),
         autoAssignmentApi.history(EMPTY_FILTERS),
       ]);
-      setConfig(nextConfig);
-      setPreview(nextPreview);
-      setHistory(nextHistory.history);
-      setUnassigned(nextHistory.unassigned);
+      const failures: string[] = [];
+      if (previewResult.status === "fulfilled") setPreview(previewResult.value);
+      else failures.push(previewResult.reason instanceof Error ? previewResult.reason.message : "Preview request failed.");
+      if (historyResult.status === "fulfilled") {
+        setHistory(historyResult.value.history);
+        setUnassigned(historyResult.value.unassigned);
+      } else {
+        failures.push(historyResult.reason instanceof Error ? historyResult.reason.message : "History request failed.");
+      }
+      if (failures.length) setError(`Settings loaded, but some assignment panels could not load: ${failures.join("; ")}`);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load assignment settings.");
     } finally {
