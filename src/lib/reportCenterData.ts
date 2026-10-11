@@ -10,6 +10,8 @@ import {
   getClientServices,
 } from "@/lib/clientDataStore";
 import { getReportRecords, getReportFieldValue, type ReportRecord } from "@/lib/reportData";
+import { buildOrderReportRows } from "@/lib/orderCsvExport";
+import type { MyOrder } from "@/contexts/MyOrdersContext";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getOrders } from "@/lib/salesOrderStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
@@ -127,12 +129,30 @@ const LEGACY_REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = {
   "Custom Reports": [group("SAVED REPORTS", "Name", "Report Type", "Module", "Frequency", "Last Run Status", "Created date")],
 };
 
+const CLIENT_ORDER_SUPPORTED_COLUMNS = new Set([
+  "Report Date From", "Report Date To", "Report Date Basis", "Report Generated At", "Report Timezone",
+  "ID", "Created By", "Requester ID", "Requester Email", "Created At", "Updated By", "Updated At",
+  "Update Count", "Client ID", "Client", "PO Number", "Requester", "Ordered For", "Defer Purchase Orders",
+  "Requester Role", "Assigned", "Assigned Role", "Order Date", "Order Time", "Status", "SLA Time",
+  "SLA Alert", "Total Amount", "Cart Items", "Total Amount Num", "Payment Method", "Payment Detail",
+  "Payment Terms", "Order Notes", "Delivery Address", "Delivery Details / Label",
+  "Delivery Details / Attention Name", "Delivery Details / Line1", "Delivery Details / Line2",
+  "Delivery Details / City", "Delivery Details / State", "Delivery Details / Country",
+  "Delivery Details / Zip", "Delivery Details / Phone", "Delivery Details / Instructions", "Cancel Reason",
+  "Approved By", "Approved Date", "Approval Status", "Ordered Item Count", "Total Quantity", "Last Comment",
+]);
+
 export const REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = {
   ...LEGACY_REPORT_CENTER_COLUMNS,
   ...Object.fromEntries(
     [...new Set(Object.values(REPORT_CENTER_MODULES).flat())].map((module) => [
       module,
-      [group("WORKBOOK COLUMN ORDER", ...(REPORT_WORKBOOK_COLUMNS[module] ?? []))],
+      [group(
+        "WORKBOOK COLUMN ORDER",
+        ...(REPORT_WORKBOOK_COLUMNS[module] ?? []).filter((column) =>
+          module !== "Client Orders" || CLIENT_ORDER_SUPPORTED_COLUMNS.has(column),
+        ),
+      )],
     ]),
   ),
 };
@@ -142,6 +162,7 @@ export function orderReportCenterColumns(module: string, selectedColumns: string
   const canonical = REPORT_CENTER_COLUMNS[module]?.flatMap((columnGroup) => columnGroup.columns) ?? [];
   const ordered = canonical.filter((column) => selected.has(column));
   const canonicalSet = new Set(canonical);
+  if (module === "Client Orders") return ordered;
   return [...ordered, ...selectedColumns.filter((column) => !canonicalSet.has(column))];
 }
 
@@ -225,17 +246,43 @@ function mapClientCatalogRecords(): ReportRecord[] {
 function mapClientOrderRecords(): ReportRecord[] {
   const clients = getClients();
   const clientsById = new Map(clients.map((client) => [String(client.id), String(client.name ?? client.id)]));
+  const sourceOrders = readLocalArray("nido_my_orders");
+  const sourceOrdersById = new Map(sourceOrders.map((order) => [String(order.id ?? ""), order]));
+  const orderFieldsById = new Map<string, ReportRecord>();
+  for (const row of buildOrderReportRows(sourceOrders as unknown as MyOrder[])) {
+    if (!orderFieldsById.has(row.order.id)) orderFieldsById.set(row.order.id, row.fields);
+  }
+
   return clients.flatMap((client) => {
     const clientId = String(client.id);
     const clientName = clientsById.get(clientId) ?? clientId;
-    return getClientOrders(clientId, clientName).map((order) => ({
-      ...(order as unknown as ReportRecord),
-      clientId,
-      clientName: order.client && order.client !== clientId ? order.client : clientName,
-      orderDate: order.date,
-      amount: order.amountNum,
-      totalAmount: order.amountNum,
-    }));
+    return getClientOrders(clientId, clientName).map((order) => {
+      const sourceOrder = sourceOrdersById.get(String(order.id)) ?? {};
+      const itemRecords = (Array.isArray(sourceOrder.cartItems)
+        ? sourceOrder.cartItems
+        : Array.isArray(order.productDetails)
+          ? order.productDetails
+          : []) as ReportRecord[];
+      const totalQuantity = itemRecords.reduce(
+        (sum, item) => sum + Number(item.quantity ?? item.qty ?? 0),
+        0,
+      );
+
+      return {
+        ...sourceOrder,
+        ...(order as unknown as ReportRecord),
+        ...(orderFieldsById.get(String(order.id)) ?? {}),
+        clientId,
+        clientName: order.client && order.client !== clientId ? order.client : clientName,
+        orderDate: order.date || sourceOrder.orderDate || "",
+        amount: order.amountNum,
+        totalAmount: sourceOrder.totalAmountNum ?? order.amountNum,
+        totalAmountNum: sourceOrder.totalAmountNum ?? order.amountNum,
+        cartItems: itemRecords,
+        orderedItemCount: itemRecords.length,
+        totalQuantity: totalQuantity || Number(order.items) || 0,
+      };
+    });
   });
 }
 
@@ -1310,6 +1357,7 @@ const VALUE_ALIASES: Record<string, string[]> = {
   "Assigned To": ["assignedTo", "agent", "owner"],
   "Created On": ["createdAt", "createdOn", "createdDate", "date", "timestamp"],
   "Created date": ["createdAt", "createdOn", "createdDate", "date", "timestamp"],
+  "Approved Date": ["approvalDate", "approvedDate", "approvedAt"],
   "Due Date": ["dueDate", "paymentDueDate"],
   "Delivery Date": ["deliveryDate", "expectedDeliveryDate"],
   "Department": ["department", "departmentName"],

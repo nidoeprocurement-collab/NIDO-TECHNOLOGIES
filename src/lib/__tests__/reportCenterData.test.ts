@@ -18,6 +18,20 @@ vi.mock("@/lib/clientDataStore", () => ({
     amount: "₹500",
     client: "Acme",
     status: "Processing",
+    orderNotes: "Call before delivery",
+    deliveryAddress: "12 Market Road, Pune",
+    deliveryDetails: {
+      label: "Office",
+      attentionName: "Asha",
+      line1: "12 Market Road",
+      line2: "Suite 4",
+      city: "Pune",
+      state: "Maharashtra",
+      country: "India",
+      zip: "411001",
+      phone: "9876543210",
+      instructions: "Use the rear entrance",
+    },
   }],
   getClientServices: (clientId: string) => [{
     id: "client-service-1",
@@ -106,6 +120,42 @@ describe("report center live data sources", () => {
     });
   });
 
+  it("maps checkout notes and delivery details into client order previews and exports", () => {
+    const records = getReportCenterRecords("Client Orders", "client");
+    const columns = [
+      "Order Notes",
+      "Delivery Address",
+      "Delivery Details / Label",
+      "Delivery Details / Attention Name",
+      "Delivery Details / Line1",
+      "Delivery Details / Line2",
+      "Delivery Details / City",
+      "Delivery Details / State",
+      "Delivery Details / Country",
+      "Delivery Details / Zip",
+      "Delivery Details / Phone",
+      "Delivery Details / Instructions",
+    ];
+    const preview = getReportCenterPreview(records, columns);
+    const rows = getReportCenterRows(records, columns);
+
+    expect(preview[0].values).toEqual(rows[0]);
+    expect(rows[0]).toEqual({
+      "Order Notes": "Call before delivery",
+      "Delivery Address": "12 Market Road, Pune",
+      "Delivery Details / Label": "Office",
+      "Delivery Details / Attention Name": "Asha",
+      "Delivery Details / Line1": "12 Market Road",
+      "Delivery Details / Line2": "Suite 4",
+      "Delivery Details / City": "Pune",
+      "Delivery Details / State": "Maharashtra",
+      "Delivery Details / Country": "India",
+      "Delivery Details / Zip": "411001",
+      "Delivery Details / Phone": "9876543210",
+      "Delivery Details / Instructions": "Use the rear entrance",
+    });
+  });
+
   it("loads client services and includes their start date in date filtering", () => {
     const records = getReportCenterRecords("Services", "client");
     const filtered = filterReportCenterRecords(records, {
@@ -189,6 +239,10 @@ describe("report center live data sources", () => {
     const reversedSelection = [...columns].reverse();
     const moduleOptions = REPORT_CENTER_MODULES.client;
     const workbookColumns = REPORT_CENTER_COLUMNS["Client Orders"].flatMap((group) => group.columns);
+    expect(workbookColumns).toContain("Order Notes");
+    expect(workbookColumns).toContain("Delivery Details / Instructions");
+    expect(workbookColumns).not.toContain("Billing Address Line 1");
+    expect(workbookColumns).not.toContain("Delivery Date");
 
     expect(columns).toEqual([
       "Report Date From",
@@ -203,10 +257,8 @@ describe("report center live data sources", () => {
     expect(orderReportCenterColumns("Client Orders", reversedSelection)).toEqual(columns);
     const selectedWithName = ["Client Name", ...reversedSelection];
     const selectedSet = new Set(selectedWithName);
-    const workbookSet = new Set(workbookColumns);
     expect(orderReportCenterColumns("Client Orders", selectedWithName)).toEqual([
       ...workbookColumns.filter((column) => selectedSet.has(column)),
-      ...selectedWithName.filter((column) => !workbookSet.has(column)),
     ]);
     expect(workbookColumns.slice(0, columns.length)).toEqual(columns);
   });

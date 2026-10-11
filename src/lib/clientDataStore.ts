@@ -20,19 +20,49 @@ interface SharedOrderCartItem {
 interface SharedOrderRecord {
   id: string;
   cartItems?: SharedOrderCartItem[];
+  createdBy?: string;
   client?: string;
   orderDate?: string;
   createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  updateCount?: number;
   totalAmount?: string;
   totalAmountNum?: number | string;
   status?: string;
+  orderedFor?: string;
+  deferPurchaseOrders?: boolean;
   requester?: string;
   requestedBy?: string;
   requesterId?: string;
   requestedById?: string;
   requesterEmail?: string;
   requestedByEmail?: string;
+  requesterRole?: string;
+  assigned?: string;
+  assignedRole?: string;
+  orderTime?: string;
+  slaTime?: string | null;
+  slaAlert?: boolean;
   poNumber?: string;
+  paymentMethod?: string;
+  paymentDetail?: string;
+  paymentTerms?: string;
+  orderNotes?: string;
+  deliveryAddress?: string;
+  deliveryDetails?: {
+    label?: string;
+    attentionName?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    zip?: string;
+    phone?: string;
+    instructions?: string;
+  };
+  cancelReason?: string;
 }
 
 export interface ClientOrderRecord {
@@ -44,6 +74,29 @@ export interface ClientOrderRecord {
   amountNum: number;
   client: string;
   status: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  updateCount?: number;
+  totalAmountNum?: number;
+  cartItems?: SharedOrderCartItem[];
+  orderedFor?: string;
+  deferPurchaseOrders?: boolean;
+  requester?: string;
+  requesterRole?: string;
+  assigned?: string;
+  assignedRole?: string;
+  orderTime?: string;
+  slaTime?: string | null;
+  slaAlert?: boolean;
+  paymentMethod?: string;
+  paymentDetail?: string;
+  paymentTerms?: string;
+  orderNotes?: string;
+  deliveryAddress?: string;
+  deliveryDetails?: SharedOrderRecord["deliveryDetails"];
+  cancelReason?: string;
   notes?: string;
   requestedBy?: string;
   requestedById?: string;
@@ -147,6 +200,7 @@ export function getClientOrders(clientId: string, clientName?: string): ClientOr
         (clientName && order.client === clientName)
       )
       .map((order) => ({
+        ...(order as unknown as Partial<ClientOrderRecord>),
         id: order.id,
         clientId,
         date: order.orderDate || "",
