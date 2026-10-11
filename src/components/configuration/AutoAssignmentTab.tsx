@@ -41,6 +41,7 @@ import {
   type NidoRole,
   type NidoUser,
 } from "@/lib/nidoUsersStore";
+import TierBasedAutoAssignmentPanel from "@/components/configuration/TierBasedAutoAssignmentPanel";
 
 const FALLBACK_ROLES = ["Analyst", "Senior Analyst", "Lead Analyst"];
 const DEPARTMENTS_PER_PAGE = 10;
@@ -336,6 +337,7 @@ function UserMultiSelect({
 export default function AutoAssignmentTab() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [configurationView, setConfigurationView] = useState<"tiers" | "existing">("tiers");
   const [enabled, setEnabled] = useState(true);
   const [users, setUsers] = useState<NidoUser[]>([]);
   const [roles, setRoles] = useState<NidoRole[]>([]);
@@ -549,6 +551,30 @@ export default function AutoAssignmentTab() {
 
   return (
     <>
+    <div className="w-full px-3 pt-4 sm:px-5 md:px-6">
+      <div className="inline-flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={configurationView === "tiers" ? "default" : "ghost"}
+          onClick={() => setConfigurationView("tiers")}
+        >
+          Tier-Based Configuration
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={configurationView === "existing" ? "default" : "ghost"}
+          onClick={() => setConfigurationView("existing")}
+        >
+          Existing Department / Role Rules
+        </Button>
+      </div>
+    </div>
+    {configurationView === "tiers" ? (
+      <TierBasedAutoAssignmentPanel />
+    ) : (
+      <>
     <div className="min-h-screen bg-background">
       <div className="w-full space-y-5 px-3 py-4 sm:px-5 md:px-6 md:py-6">
         <div>
@@ -771,6 +797,8 @@ export default function AutoAssignmentTab() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+      </>
+    )}
     </>
   );
 }

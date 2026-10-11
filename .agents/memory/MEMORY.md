@@ -22,3 +22,4 @@
 - [Order export filters](order-export-filters.md) — date, status, and client selections narrow the current result set; blank filters include all and date bounds are inclusive.
 - [AMC equipment options](amc-equipment-options.md) — inline-added category, brand, and model values are stored separately from shared tax/SAC configuration.
 - [Order pricing and cancellation](order-pricing-cancellation.md) — use checkout snapshots for customer totals/invoices; recalculate grouped PO totals from active vendor-cost lines while retaining cancelled lines.
+- [Tier auto-assignment UI boundary](tier-auto-assignment-ui.md) — keep tier configuration drafts browser-local and isolated from order assignment until backend support is authorized.
