@@ -800,7 +800,15 @@ export default function MyOrderPage() {
                           <Avatar initial={order.assignedInitial} color={order.assignedColor} size={28} />
                           <div>
                             <div style={{ fontWeight: 500, color: "hsl(var(--foreground))" }}>{order.assigned}</div>
-                            <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>{order.assignedRole}</div>
+                            <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>
+                              {order.autoAssignmentStatus === "pending"
+                                ? "Assignment pending"
+                                : order.autoAssignmentStatus === "unassigned"
+                                  ? "Needs assignment"
+                                  : order.autoAssignmentStatus === "disabled"
+                                    ? "Auto assignment disabled"
+                                    : order.assignedRole || "Auto-assigned"}
+                            </div>
                           </div>
                         </div>
                       </td>

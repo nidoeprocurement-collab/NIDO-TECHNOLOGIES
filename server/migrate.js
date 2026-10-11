@@ -240,6 +240,110 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS approval_requests_workflow_idx ON approval_requests (workflow_id);
     CREATE INDEX IF NOT EXISTS approval_requests_client_idx ON approval_requests (client_id);
     CREATE INDEX IF NOT EXISTS approval_actions_request_idx ON approval_actions (request_id, created_at);
+
+    -- Tier-based round-robin order assignment.
+    CREATE TABLE IF NOT EXISTS auto_assignment_settings (
+      id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      enabled BOOLEAN NOT NULL DEFAULT true,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_by TEXT NOT NULL DEFAULT 'system'
+    );
+    INSERT INTO auto_assignment_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS auto_assignment_tiers (
+      tier TEXT PRIMARY KEY CHECK (tier IN ('Premium','Medium','Standard')),
+      enabled BOOLEAN NOT NULL DEFAULT false,
+      next_employee_id TEXT,
+      fallback_behavior TEXT NOT NULL DEFAULT 'unassigned_notify'
+        CHECK (fallback_behavior IN ('unassigned_notify','fallback_employee')),
+      fallback_employee_id TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_by TEXT NOT NULL DEFAULT 'system'
+    );
+    INSERT INTO auto_assignment_tiers (tier) VALUES ('Premium'), ('Medium'), ('Standard')
+      ON CONFLICT (tier) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS auto_assignment_employees (
+      employee_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT '',
+      department TEXT NOT NULL DEFAULT '',
+      active BOOLEAN NOT NULL DEFAULT true,
+      role_active BOOLEAN NOT NULL DEFAULT true,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS auto_assignment_tier_employees (
+      tier TEXT NOT NULL REFERENCES auto_assignment_tiers(tier) ON DELETE CASCADE,
+      employee_id TEXT NOT NULL REFERENCES auto_assignment_employees(employee_id),
+      sequence_position INT NOT NULL CHECK (sequence_position > 0),
+      PRIMARY KEY (tier, employee_id),
+      UNIQUE (tier, sequence_position)
+    );
+
+    CREATE TABLE IF NOT EXISTS auto_assignment_orders (
+      order_id TEXT PRIMARY KEY,
+      display_order_id TEXT NOT NULL DEFAULT '',
+      client_id TEXT NOT NULL DEFAULT '',
+      client_name TEXT NOT NULL DEFAULT '',
+      client_tier TEXT NOT NULL DEFAULT '',
+      assigned_employee_id TEXT,
+      assigned_employee_name TEXT,
+      assignment_method TEXT NOT NULL DEFAULT 'Automatic'
+        CHECK (assignment_method IN ('Automatic','Manual')),
+      configuration_snapshot JSONB NOT NULL DEFAULT '{}',
+      sequence_position INT,
+      status TEXT NOT NULL DEFAULT 'unassigned'
+        CHECK (status IN ('assigned','unassigned','disabled')),
+      assigned_at TIMESTAMPTZ,
+      previous_employee_id TEXT,
+      previous_employee_name TEXT,
+      reassignment_reason TEXT NOT NULL DEFAULT '',
+      created_by TEXT NOT NULL DEFAULT 'system',
+      created_by_name TEXT NOT NULL DEFAULT 'System',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    ALTER TABLE auto_assignment_orders
+      ADD COLUMN IF NOT EXISTS display_order_id TEXT NOT NULL DEFAULT '';
+    UPDATE auto_assignment_orders
+      SET display_order_id=order_id WHERE display_order_id='';
+
+    CREATE TABLE IF NOT EXISTS auto_assignment_history (
+      id BIGSERIAL PRIMARY KEY,
+      order_id TEXT NOT NULL REFERENCES auto_assignment_orders(order_id) ON DELETE CASCADE,
+      client_id TEXT NOT NULL DEFAULT '',
+      client_name TEXT NOT NULL DEFAULT '',
+      client_tier TEXT NOT NULL DEFAULT '',
+      previous_employee_id TEXT,
+      previous_employee_name TEXT,
+      new_employee_id TEXT,
+      new_employee_name TEXT,
+      assignment_method TEXT NOT NULL CHECK (assignment_method IN ('Automatic','Manual')),
+      sequence_position INT,
+      status TEXT NOT NULL CHECK (status IN ('assigned','unassigned','disabled','reassigned')),
+      reason TEXT NOT NULL DEFAULT '',
+      actor_id TEXT NOT NULL DEFAULT 'system',
+      actor_name TEXT NOT NULL DEFAULT 'System',
+      actor_role TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS auto_assignment_history_created_idx
+      ON auto_assignment_history (created_at DESC);
+    CREATE INDEX IF NOT EXISTS auto_assignment_history_tier_idx
+      ON auto_assignment_history (client_tier);
+    CREATE INDEX IF NOT EXISTS auto_assignment_history_employee_idx
+      ON auto_assignment_history (new_employee_id);
+
+    CREATE TABLE IF NOT EXISTS auto_assignment_notifications (
+      id BIGSERIAL PRIMARY KEY,
+      order_id TEXT NOT NULL UNIQUE REFERENCES auto_assignment_orders(order_id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','resolved')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      resolved_at TIMESTAMPTZ,
+      resolved_by TEXT
+    );
   `);
 
   await pool.query(

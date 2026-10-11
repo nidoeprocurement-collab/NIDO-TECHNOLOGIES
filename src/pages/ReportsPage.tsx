@@ -18,6 +18,9 @@ import {
   getReportCenterPreview,
   getReportCenterRows,
   loadReportCenterRecords,
+  getReportCenterDefaultColumns,
+  orderReportCenterColumns,
+  withReportRunMetadata,
 } from "@/lib/reportCenterData";
 import {
   deleteReportCenterSchedule,
@@ -40,7 +43,7 @@ const INITIAL_DRAFT: ReportCreateDraft = {
   entityIds: [],
   allEntities: false,
   module: REPORT_CENTER_MODULES.vendor[0],
-  selectedColumns: ["Vendor Name", "Product Name", "SKU", "Category", "Unit Price", "Stock"],
+  selectedColumns: getReportCenterDefaultColumns(REPORT_CENTER_MODULES.vendor[0]),
   dateBasis: "Created date",
   dateFrom: "",
   dateTo: "",
@@ -57,6 +60,7 @@ const LIVE_DATA_EVENTS = [
   "priceEngineSettingsUpdated",
   "slaEngineUpdated",
   "nidoClientsUpdated",
+  "nidoClientDataUpdated",
   "serviceRequestsUpdated",
   "nidoInvoicesUpdated",
   "nidoSalesOrdersUpdated",
@@ -64,8 +68,18 @@ const LIVE_DATA_EVENTS = [
   "vendorProductsUpdated",
   "clientCatalogUpdated",
   "nidoPaymentReceiptsUpdated",
+  "recurringInvoicesUpdated",
   "stockHistoryUpdated",
+  "stockThresholdsUpdated",
   "nidoPurchasePaymentsUpdated",
+  "nidoPortalRolesUpdated",
+  "nidoPortalUsersUpdated",
+  "nidoUserNotesUpdated",
+  "nidoUserDocumentsUpdated",
+  "nidoAutoAssignmentUpdated",
+  "nidoOrderStatusConfigUpdated",
+  "nidoPermissionsUpdated",
+  "nidoCustomModulesUpdated",
   "nidoUsersUpdated",
   "nidoRolesUpdated",
   "nidoCustomReportsUpdated",
@@ -73,38 +87,10 @@ const LIVE_DATA_EVENTS = [
   "poCancelled",
   "poActivityUpdated",
   "orderSubItemsUpdated",
+  "nidoMyOrdersUpdated",
+  "orderFulfillmentStatusUpdated",
+  "approvalStoreUpdated",
 ];
-
-const REPORT_ROUTES: Record<string, string> = {
-  "Client Orders": "/reports/sales",
-  Catalog: "/reports/inventory",
-  Services: "/reports/clients",
-  "Invoices / Bills": "/reports/finance",
-  Payments: "/reports/finance",
-  Support: "/reports/support",
-  "Client Reports": "/reports/clients",
-  "External Stakeholders": "/reports/domain/external",
-  "Products / Catalog": "/reports/vendors",
-  "Vendor Orders": "/reports/vendors",
-  "Purchase Orders": "/reports/procurement",
-  RFQs: "/reports/procurement",
-  "Vendor Credits": "/reports/finance",
-  SLA: "/reports/sla",
-  Users: "/reports/domain/internal",
-  Departments: "/reports/domain/internal",
-  Orders: "/reports/sales",
-  Approvals: "/reports/approvals",
-  Finance: "/reports/finance",
-  "Audit Trail": "/reports/audit",
-  Inventory: "/reports/inventory",
-  Tax: "/reports/tax",
-  "Sales Reports": "/reports/sales",
-  "Procurement Reports": "/reports/procurement",
-  "Vendor Performance": "/reports/vendors",
-  "Internal Stakeholders": "/reports/domain/internal",
-  "Executive Dashboard": "/reports/executive",
-  "Custom Reports": "/reports/create",
-};
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const IST_OFFSET_MS = 330 * 60 * 1000;
@@ -223,14 +209,17 @@ function reportDraftForSchedule(
 ): ReportCreateDraft {
   const type = reportTypeKey(schedule.reportType);
   const sameSelection = currentDraft.entityType === type && currentDraft.module === schedule.module;
-  const defaultColumns = REPORT_CENTER_COLUMNS[schedule.module]?.flatMap((item) => item.columns).slice(0, 6) ?? [];
+  const defaultColumns = getReportCenterDefaultColumns(schedule.module);
   return {
     ...currentDraft,
     entityType: type,
     entityIds: schedule.entityIds,
     allEntities: schedule.allEntities,
     module: schedule.module,
-    selectedColumns: sameSelection && currentDraft.selectedColumns.length ? currentDraft.selectedColumns : defaultColumns,
+     selectedColumns: orderReportCenterColumns(
+       schedule.module,
+       sameSelection && currentDraft.selectedColumns.length ? currentDraft.selectedColumns : defaultColumns,
+     ),
     dateFrom: schedule.dateRange === "Saved per schedule" && sameSelection ? currentDraft.dateFrom : "",
     dateTo: schedule.dateRange === "Saved per schedule" && sameSelection ? currentDraft.dateTo : "",
     format: sameSelection ? currentDraft.format : "Excel",
@@ -286,7 +275,7 @@ export default function ReportsPage() {
     let active = true;
     setSourceLoading(true);
     setSourceError("");
-    loadReportCenterRecords(draft.module)
+    loadReportCenterRecords(draft.module, draft.entityType)
       .then((records) => {
         if (active) setSourceRecords(records);
       })
@@ -300,15 +289,18 @@ export default function ReportsPage() {
         if (active) setSourceLoading(false);
       });
     return () => { active = false; };
-  }, [draft.module, reloadToken]);
+  }, [draft.module, draft.entityType, reloadToken]);
 
   const filteredRecords = useMemo(
     () => filterReportCenterRecords(sourceRecords, draft, entitiesByType),
     [sourceRecords, draft, entitiesByType],
   );
   const previewRecords = useMemo(
-    () => getReportCenterPreview(filteredRecords, draft.selectedColumns),
-    [filteredRecords, draft.selectedColumns],
+    () => getReportCenterPreview(
+      withReportRunMetadata(filteredRecords, draft),
+      orderReportCenterColumns(draft.module, draft.selectedColumns),
+    ),
+    [filteredRecords, draft.selectedColumns, draft.module, draft.dateFrom, draft.dateTo, draft.dateBasis],
   );
   const scheduleItems = useMemo(() => scheduleRows(storedSchedules), [storedSchedules]);
   const recentDeliveries = useMemo(
@@ -384,10 +376,12 @@ export default function ReportsPage() {
         throw new Error("Choose at least one report column.");
       }
       const entities = getReportCenterEntities();
-      const records = await loadReportCenterRecords(reportDraft.module);
+      const records = await loadReportCenterRecords(reportDraft.module, reportDraft.entityType);
       const selectedRecords = filterReportCenterRecords(records, reportDraft, entities);
-      columns = getReportCenterExportData(selectedRecords, reportDraft.selectedColumns);
-      rows = getReportCenterRows(selectedRecords, reportDraft.selectedColumns);
+      const orderedColumns = orderReportCenterColumns(reportDraft.module, reportDraft.selectedColumns);
+      const reportRecords = withReportRunMetadata(selectedRecords, reportDraft);
+      columns = getReportCenterExportData(reportRecords, orderedColumns);
+      rows = getReportCenterRows(reportRecords, orderedColumns);
       const title = `${reportDraft.module} Report`;
 
       if (delivery === "Download") {
@@ -540,11 +534,7 @@ export default function ReportsPage() {
     }
   };
 
-  const onViewHistoryRecord = (record: ReportHistoryRecord) => {
-    navigate(REPORT_ROUTES[record.module ?? ""] ?? "/reports");
-  };
-
-  const onDownloadHistoryRecord = (record: ReportHistoryRecord) => {
+  const onDownloadHistoryRecord = async (record: ReportHistoryRecord) => {
     const saved = getReportCenterHistory().find((item) => item.id === record.id);
     if (!saved) {
       toast({ title: "Report snapshot not found", description: "Refresh history and try again." });
@@ -554,12 +544,19 @@ export default function ReportsPage() {
       const columns = saved.columns;
       let rows = saved.rows;
       if (!rows.length && saved.rowCount > 0 && saved.draft) {
+        const currentModuleRecords = await loadReportCenterRecords(saved.draft.module, saved.draft.entityType);
         const current = filterReportCenterRecords(
-          sourceRecords,
+          currentModuleRecords,
           saved.draft,
           entitiesByType,
         );
-        rows = getReportCenterRows(current, saved.draft.selectedColumns);
+        const reportColumns = saved.columns.map((column) => column.key);
+        rows = getReportCenterRows(
+          withReportRunMetadata(current, saved.draft),
+          reportColumns.length
+            ? reportColumns
+            : orderReportCenterColumns(saved.draft.module, saved.draft.selectedColumns),
+        );
       }
       downloadReportExport(saved.format, saved.name, columns, rows);
       toast({ title: "Report downloaded", description: `${rows.length.toLocaleString()} rows exported from the saved report snapshot.` });
@@ -625,7 +622,6 @@ export default function ReportsPage() {
         setStoredHistory(getReportCenterHistory());
         setStoredSchedules(getReportCenterSchedules());
       }}
-      onViewHistoryRecord={onViewHistoryRecord}
       onDownloadHistoryRecord={onDownloadHistoryRecord}
     />
   );

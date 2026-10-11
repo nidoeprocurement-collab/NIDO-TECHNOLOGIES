@@ -14,7 +14,7 @@ import {
   Boxes,
   UserCheck,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 
 const menuItems = [
   {
@@ -74,7 +74,7 @@ const menuItems = [
   },
   {
     title: "Auto Assignment",
-    description: "Smart analyst auto-routing rules",
+    description: "Configure tier-based order assignment and round-robin sequences",
     icon: Zap,
     href: "/configuration/auto-assignment",
   },
@@ -105,6 +105,12 @@ const menuItems = [
 ];
 
 export default function ConfigurationHubPage() {
+  const [searchParams] = useSearchParams();
+
+  if (searchParams.get("tab") === "auto-assignment") {
+    return <Navigate to="/configuration/auto-assignment" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <div className="w-full px-2 sm:px-4 md:px-6 py-2 md:py-6">
@@ -112,32 +118,22 @@ export default function ConfigurationHubPage() {
           Configuration
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
-
             return (
-              <Link
-                key={item.title}
-                to={item.href}
-                className="block"
-              >
-                <div className="bg-white border border-slate-200 rounded-xl p-2 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-300 cursor-pointer h-full">
-                  <div className="flex justify-center mb-5">
-                    <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center">
-                      <Icon className="w-7 h-7 text-blue-600" />
+              <Link key={item.title} to={item.href} className="block">
+                <div className="h-full cursor-pointer rounded-xl border border-slate-200 bg-white p-2 shadow-sm transition-all duration-300 hover:border-blue-300 hover:shadow-md">
+                  <div className="mb-5 flex justify-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
+                      <Icon className="h-7 w-7 text-blue-600" />
                     </div>
                   </div>
-
                   <div className="text-center">
-                    <h3 className="font-semibold text-slate-800 text-lg flex items-center justify-center gap-1">
-                      {item.title}
-                      <span className="text-slate-400">›</span>
+                    <h3 className="flex items-center justify-center gap-1 text-lg font-semibold text-slate-800">
+                      {item.title}<span className="text-slate-400">›</span>
                     </h3>
-
-                    <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                      {item.description}
-                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-500">{item.description}</p>
                   </div>
                 </div>
               </Link>

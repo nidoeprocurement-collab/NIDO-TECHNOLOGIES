@@ -216,22 +216,7 @@ const MyOrderPage = lazy(() => import("@/pages/MyOrderPage"));
 const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
 const VendorOrderDetailPage = lazy(() => import("@/pages/VendorOrderDetailPage"));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
-const AuditTrailPage = lazy(() => import("@/pages/AuditTrailPage"));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
-const CreateReportPage = lazy(() => import("@/pages/CreateReportPage"));
-const ExecutiveDashboardPage = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
-const SalesReportPage = lazy(() => import("@/pages/reports/SalesReportPage"));
-const ProcurementReportPage = lazy(() => import("@/pages/reports/ProcurementReportPage"));
-const VendorPerformancePage = lazy(() => import("@/pages/reports/VendorPerformancePage"));
-const ClientReportPage = lazy(() => import("@/pages/reports/ClientReportPage"));
-const InventoryReportPage = lazy(() => import("@/pages/reports/InventoryReportPage"));
-const FinanceReportPage = lazy(() => import("@/pages/reports/FinanceReportPage"));
-const SupportReportPage = lazy(() => import("@/pages/reports/SupportReportPage"));
-const SlaReportPage = lazy(() => import("@/pages/reports/SlaReportPage"));
-const ApprovalReportPage = lazy(() => import("@/pages/reports/ApprovalReportPage"));
-const TaxReportPage = lazy(() => import("@/pages/reports/TaxReportPage"));
-const StakeholderReportsPage = lazy(() => import("@/pages/reports/StakeholderReportsPage"));
-const CustomReportDetailPage = lazy(() => import("@/pages/reports/CustomReportDetailPage"));
 const OrderStatusesPage = lazy(() => import("@/pages/OrderStatusesPage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const ApprovalWorkflowsPage = lazy(
@@ -253,7 +238,7 @@ const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
 const ConfigurationHubPage = lazy(() => import("@/pages/ConfigurationHubPage"));
-const AutoAssignmentTab = lazy(() => import("@/components/configuration/AutoAssignmentTab"));
+const AutoAssignmentPage = lazy(() => import("@/pages/AutoAssignmentPage"));
 const EmailConfigurationPage = lazy(() => import("@/pages/EmailConfigurationPage"));
 const EmailTemplatesPage = lazy(() => import("@/pages/EmailTemplatesPage"));
 const EmailLogsPage = lazy(() => import("@/pages/EmailLogsPage"));
@@ -638,7 +623,17 @@ function AppRoutes() {
             }
           />
           <Route path="configuration" element={<ConfigurationHubPage />} />
-          <Route path="configuration/auto-assignment" element={<AutoAssignmentTab />} />
+          <Route
+            path="configuration/auto-assignment"
+            element={
+              <PageErrorBoundary
+                title="Auto Assignment failed to load"
+                resetKey={location.pathname}
+              >
+                <AutoAssignmentPage />
+              </PageErrorBoundary>
+            }
+          />
           <Route
             path="configuration/general"
             element={<Navigate to="/configuration" replace />}
@@ -706,7 +701,6 @@ function AppRoutes() {
             element={<AddMasterCatalogueItemWrapper />}
           />
           <Route path="integrations" element={<IntegrationsPage />} />
-          <Route path="reports/audit" element={<AuditTrailPage />} />
           <Route
             path="shop"
             element={
@@ -1073,21 +1067,7 @@ function AppRoutes() {
           <Route path="eway-bills" element={<EWayBillsPage />} />
           <Route path="invoices" element={<InvoicePage />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route path="reports/create" element={<CreateReportPage />} />
-          <Route path="reports/custom/:id" element={<CustomReportDetailPage />} />
-          <Route path="reports/executive" element={<ExecutiveDashboardPage />} />
-          <Route path="reports/domain/:kind" element={<StakeholderReportsPage />} />
-          <Route path="reports/sales" element={<SalesReportPage />} />
-          <Route path="reports/procurement" element={<ProcurementReportPage />} />
-          <Route path="reports/vendors" element={<VendorPerformancePage />} />
-          <Route path="reports/clients" element={<ClientReportPage />} />
-          <Route path="reports/inventory" element={<InventoryReportPage />} />
-          <Route path="reports/finance" element={<FinanceReportPage />} />
-          <Route path="reports/support" element={<SupportReportPage />} />
-          <Route path="reports/sla" element={<SlaReportPage />} />
-          <Route path="reports/approvals" element={<ApprovalReportPage />} />
-          <Route path="reports/tax" element={<TaxReportPage />} />
-          <Route path="reports/audit" element={<AuditTrailPage />} />
+          <Route path="reports/*" element={<Navigate to="/reports" replace />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
           {/* Portal dashboard is the same live Client Overview used by admins,

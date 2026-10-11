@@ -8,6 +8,7 @@ import type {
 
 const SCHEDULES_KEY = "nido_reports_center_schedules_v1";
 const HISTORY_KEY = "nido_reports_center_history_v1";
+const LEGACY_REPORT_DATA_PURGED_KEY = "nido_reports_legacy_data_purged_v1";
 const REPORT_CENTER_UPDATED_EVENT = "nidoReportCenterUpdated";
 const MAX_HISTORY_ITEMS = 50;
 const MAX_HISTORY_STORAGE_CHARS = 3_000_000;
@@ -64,6 +65,16 @@ function notifyUpdated(): void {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(REPORT_CENTER_UPDATED_EVENT));
 }
 
+function purgeLegacyReportDataOnce(): void {
+  if (typeof window === "undefined") return;
+  const storage = window.localStorage;
+  if (storage.getItem(LEGACY_REPORT_DATA_PURGED_KEY) === "1") return;
+  storage.removeItem(HISTORY_KEY);
+  storage.removeItem(SCHEDULES_KEY);
+  storage.setItem(LEGACY_REPORT_DATA_PURGED_KEY, "1");
+  notifyUpdated();
+}
+
 function writeList<T>(key: string, records: T[]): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(key, JSON.stringify(records));
@@ -76,6 +87,7 @@ function createId(): string {
 }
 
 export function getReportCenterSchedules(): StoredReportCenterSchedule[] {
+  purgeLegacyReportDataOnce();
   return safeRead<StoredReportCenterSchedule>(SCHEDULES_KEY)
     .filter((record) => Boolean(record?.id && record.name && record.module));
 }
@@ -113,6 +125,7 @@ export function deleteReportCenterSchedule(id: string): void {
 }
 
 export function getReportCenterHistory(): StoredReportCenterHistory[] {
+  purgeLegacyReportDataOnce();
   return safeRead<StoredReportCenterHistory>(HISTORY_KEY)
     .filter((record) => Boolean(record?.id && record.name && record.generatedAtIso))
     .sort((left, right) => right.generatedAtIso.localeCompare(left.generatedAtIso));

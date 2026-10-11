@@ -1,5 +1,5 @@
 - [Config Engine Architecture](config-engine.md) — centralized config system: configService → ConfigContext → ThemeContext/I18nProvider/OrganizationContext; useI18n() for currency/dates; useOrgConfig() for org info.
-- [Vendor Selection at Shop Flow](vendor-selection-flow.md) — physical listings must meet vendor MOQ to be selectable/recommended; digital-only listings are exempt, and chosen terms are snapshotted pre-cart.
+- [Vendor Selection at Shop Flow](vendor-selection-flow.md) — client locks vendor on Shop page pre-cart; CartItem carries vendor snapshot; autoCreateDraftPOs() fires in addOrder(); OrderDetailsPage "Draft Purchase Orders" tab for Confirm/Reject.
 - [Purchase Order Flow Architecture](po-flow-architecture.md) — full PO creation flow: price-engine vendor selection, PDF via jsPDF, shared localStorage store, VendorOrdersPage merge strategy.
 - [Nido Tech design system](nido-design-system.md) — brand spec lives in STYLE_GUIDE.md; avoid duplicate Tailwind color keys, theme via CSS vars instead.
 - [Transaction page shell style](transactions-page-style.md) — canonical Orders-page-matching shell/card pattern for Transactions pages; avoid slate-*/dark: classes.
@@ -12,14 +12,3 @@
 - [Approval engine adapter](approval-engine-local-mode.md) — approval UI/service contracts support local persistence now and a future backend switch via one environment flag.
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
-- [Catalog bulk-import classification](catalog-bulk-import.md) — classify duplicates against both stored products and earlier rows before reporting mixed import results.
-- [Confirmation guard dialogs](confirmation-guard.md) — confirmation dialog action buttons must bypass the global guard or confirmed mutations can be intercepted again.
-- [Catalog edit identity](catalog-edit-identity.md) — edit and duplicate checks must compare catalog IDs safely across legacy string/number records.
-- [Invoice import behavior](invoice-import-behavior.md) — order imports must exclude return-workflow items, resolve category codes, and preserve all invoice email recipients.
-- [Proforma eligibility source](proforma-eligibility-source.md) — eligibility must use original product metadata; missing or conflicting type data must fail closed, never default to physical.
-- [Digital document headers](digital-document-headers.md) — digital-only documents use Users / Licenses, Tenure / Billing, and Provisioning Time while physical layouts remain unchanged.
-- [Vendor detail data scoping](vendor-detail-data-scoping.md) — scoped tabs must match explicit vendor ID/name references and never fall back to unrelated demo records.
-- [Order export filters](order-export-filters.md) — date, status, and client selections narrow the current result set; blank filters include all and date bounds are inclusive.
-- [AMC equipment options](amc-equipment-options.md) — inline-added category, brand, and model values are stored separately from shared tax/SAC configuration.
-- [Order pricing and cancellation](order-pricing-cancellation.md) — use checkout snapshots for customer totals/invoices; recalculate grouped PO totals from active vendor-cost lines while retaining cancelled lines.
-- [Tier auto-assignment UI boundary](tier-auto-assignment-ui.md) — keep tier configuration drafts browser-local and isolated from order assignment until backend support is authorized.

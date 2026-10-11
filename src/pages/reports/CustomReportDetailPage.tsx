@@ -16,8 +16,14 @@ import {
 import { getOrders, type StoredSalesOrder } from "@/lib/salesOrderStore";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
 import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
-import { buildOrderReportRows, type OrderReportRow } from "@/lib/orderCsvExport";
+import { buildOrderReportRows } from "@/lib/orderCsvExport";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import {
+  getMasterOrderReportValue,
+  isMasterOrderReport as hasMasterOrderColumns,
+  normalizeReportColumns,
+  readMasterReportOrders,
+} from "@/lib/customReportOrderData";
 import { useI18n } from "@/i18n/I18nProvider";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -49,35 +55,24 @@ function dateKey(value: string): string {
   return `${year}-${month}-${day}`;
 }
 
-const MASTER_ORDER_REPORT_FIELDS = new Set([
-  "Master Order ID", "Sub Order ID", "PO Reference", "Client", "Client ID", "Created At",
-  "Requester", "Requester Role", "Ordered For", "Assigned To", "Assigned Role", "Order Time",
-  "Current Order Status", "Approval Status", "Approval Workflow", "Approval Requested By",
-  "Approval Date", "Approved By", "Updated By", "Last Updated By", "Last Updated At",
-  "Updated At", "Update Count", "SLA Time", "SLA Alert", "Order Total", "Payment Method",
-  "Payment Terms", "Delivery Attention", "Delivery Address", "City", "State", "Country",
-  "ZIP Code", "Delivery Phone", "Delivery Notes", "Checkout Note", "Order Notes", "Cancel Reason",
-  "Item Name", "SKU / Product Code", "Category", "Quantity", "Unit Price", "Line Amount",
-  "Item Status", "Reference Number", "Serial Number", "Tracking Number", "Tracking Carrier",
-  "Tracking Note", "Selected Vendor", "Vendor PO Numbers", "PO Created At",
-  "Vendor PO Statuses", "Last Comment",
-]);
-
 function getOrderValue(order: StoredSalesOrder, column: string): string {
   switch (column) {
     case "ID":
     case "Order ID":
       return order.orderNumber || order.id;
     case "Created On":
+    case "Created At":
+      return formatDate(order.createdAt);
     case "Order Date":
-      return formatDate(order.orderDate || order.createdAt);
+      return formatDate(order.orderDate);
     case "Created By":
-      return order.assignedTo || "—";
+      return order.createdBy || "—";
     case "Client Name":
       return order.clientName || "—";
     case "Vendor Name":
       return "—";
     case "Order Status":
+    case "Current Order Status":
     case "Status":
       return order.status;
     case "Amount":
@@ -85,18 +80,10 @@ function getOrderValue(order: StoredSalesOrder, column: string): string {
     case "Tax":
       return formatCurrency(order.totalTax);
     case "Total":
+    case "Order Total":
       return formatCurrency(order.grandTotal);
     default:
       return "—";
-  }
-}
-
-function readMyOrders(): MyOrder[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem("nido_my_orders") || "[]");
-    return Array.isArray(parsed) ? parsed as MyOrder[] : [];
-  } catch {
-    return [];
   }
 }
 
@@ -105,48 +92,6 @@ function getMyOrderTotal(order: MyOrder): number {
   if (Number.isFinite(total)) return total;
   const parsed = Number(String(order.totalAmount || "").replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function getMyOrderTax(order: MyOrder): number | undefined {
-  const items = order.cartItems || [];
-  if (!items.length || items.some((item) =>
-    item.clientSellingPriceExclGst == null || item.gstSnapshot == null
-  )) return undefined;
-  return items.reduce((sum, item) => {
-    const taxable = Number(item.clientSellingPriceExclGst) * Number(item.quantity);
-    return sum + taxable * Number(item.gstSnapshot) / 100;
-  }, 0);
-}
-
-function getMyOrderReportValue(row: OrderReportRow, column: string): string {
-  const aliases: Record<string, string> = {
-    ID: "Master Order ID",
-    "Order ID": "Master Order ID",
-    "PO Reference": "Client PO Reference",
-    "Client Name": "Client",
-    "Vendor Name": "Selected Vendor",
-    "Order Status": "Current Order Status",
-    Status: "Current Order Status",
-    "Created On": "Created At",
-    "Updated At": "Item Status Updated At",
-    "Last Updated By": "Last Updated BY",
-    "PO Created At": "PO Created AT",
-    Total: "Order Total",
-    Amount: "Order Total",
-  };
-  let value = row.fields[aliases[column] || column];
-
-  if (column === "Tax") value = getMyOrderTax(row.order);
-  if (value === undefined || value === null || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (["Amount", "Tax", "Total", "Order Total", "Unit Price", "Line Amount"].includes(column)) {
-    const amount = Number(value);
-    return Number.isFinite(amount) ? formatCurrency(amount) : String(value);
-  }
-  if (column === "Created On" || column === "Order Date") {
-    return formatDate(String(value));
-  }
-  return String(value);
 }
 
 const REPORT_FREQUENCIES: ReportFrequency[] = ["One Time", "Daily", "Weekly", "Monthly", "Quarterly"];
@@ -481,18 +426,24 @@ export default function CustomReportDetailPage() {
   const reportRevision = useLiveReportRevision();
 
   const report: CustomReport | BuiltinReportView | undefined = useMemo(
-    () => (id ? getCustomReports().find((r) => r.id === id) ?? getBuiltinReportView(id) : undefined),
+    () => {
+      void reportRevision;
+      return id ? getCustomReports().find((r) => r.id === id) ?? getBuiltinReportView(id) : undefined;
+    },
     [id, reportRevision],
   );
   const liveReportRecords = useMemo(
-    () => report ? getReportRecords(report.module) : [],
-    [report?.module, reportRevision],
+    () => {
+      void reportRevision;
+      return report ? getReportRecords(report.module) : [];
+    },
+    [report, reportRevision],
   );
 
   usePageMeta({ title: report?.name ?? "Report Detail" });
 
   const [orders, setOrders] = useState<StoredSalesOrder[]>(() => getOrders());
-  const [masterOrders, setMasterOrders] = useState<MyOrder[]>(() => readMyOrders());
+  const [masterOrders, setMasterOrders] = useState<MyOrder[]>(() => readMasterReportOrders());
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [approvalLoadError, setApprovalLoadError] = useState("");
   const [masterDataRevision, setMasterDataRevision] = useState(0);
@@ -509,7 +460,7 @@ export default function CustomReportDetailPage() {
     report
     && report.module === "Orders"
     && "reportType" in report
-    && report.selectedColumns.some((column) => MASTER_ORDER_REPORT_FIELDS.has(column)),
+    && hasMasterOrderColumns(report.module, report.selectedColumns),
   );
 
   useEffect(() => {
@@ -521,7 +472,7 @@ export default function CustomReportDetailPage() {
   useEffect(() => {
     if (!isMasterOrderReport) return;
     let disposed = false;
-    const refreshOrders = () => setMasterOrders(readMyOrders());
+    const refreshOrders = () => setMasterOrders(readMasterReportOrders());
     const refreshRelatedData = () => setMasterDataRevision((revision) => revision + 1);
     const refreshApprovals = async () => {
       try {
@@ -604,9 +555,10 @@ export default function CustomReportDetailPage() {
     );
   }
 
-  const columns = report.selectedColumns.length > 0
-    ? report.selectedColumns
-    : ["ID", "Created On", "Status"];
+  const columns = normalizeReportColumns(
+    report.module,
+    report.selectedColumns.length > 0 ? report.selectedColumns : ["ID", "Created On", "Status"],
+  );
   const isOrderReport = report.module === "Orders";
   const savedFilters = "reportType" in report ? report.filters : [];
   const filterRecords = isMasterOrderReport
@@ -689,7 +641,7 @@ export default function CustomReportDetailPage() {
         rowKey: `master:${row.order.id}:${row.itemIndex}`,
         masterOrderId: row.order.id,
         orderDisplayId: row.order.id,
-        values: columns.map((column) => getMyOrderReportValue(row, column)),
+        values: columns.map((column) => getMasterOrderReportValue(row, column)),
       }))
     : isOrderReport
     ? pageOrders.map((order, index) => ({
@@ -714,7 +666,7 @@ export default function CustomReportDetailPage() {
   const kpis = getLiveKpis(kpiRecords);
   const genStr = `${formatDate(new Date())} ${new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
   const exportRows = isMasterOrderReport
-    ? filteredMasterRows.map((row) => columns.map((column) => getMyOrderReportValue(row, column)))
+    ? filteredMasterRows.map((row) => columns.map((column) => getMasterOrderReportValue(row, column)))
     : isOrderReport
     ? filteredOrders.map((order) => columns.map((column) => getOrderValue(order, column)))
     : filteredReportRecords.map((record) => columns.map((column) => getReportFieldValue(record, column)));

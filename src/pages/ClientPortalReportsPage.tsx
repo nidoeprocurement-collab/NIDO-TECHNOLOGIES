@@ -1,19 +1,49 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { FileText, ShoppingBag, Wrench, Receipt } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientOrders, getClientServices } from "@/lib/clientDataStore";
 import { getInvoices } from "@/lib/invoiceStore";
 
+interface ClientReportCounts {
+  orders: ReturnType<typeof getClientOrders>;
+  services: ReturnType<typeof getClientServices>;
+  invoices: ReturnType<typeof getInvoices>;
+}
+
+function loadClientReportCounts(clientId: string, clientName: string): ClientReportCounts {
+  return {
+    orders: clientId ? getClientOrders(clientId, clientName) : [],
+    services: clientId ? getClientServices(clientId) : [],
+    invoices: getInvoices().filter(invoice =>
+      invoice.clientName === clientName ||
+      (invoice as typeof invoice & { clientId?: string }).clientId === clientId
+    ),
+  };
+}
+
 export default function ClientPortalReportsPage() {
   const { user } = useAuth();
   const clientId = user?.clientId ?? "";
   const clientName = user?.clientName ?? "";
-  const orders = useMemo(() => clientId ? getClientOrders(clientId, clientName) : [], [clientId, clientName]);
-  const services = useMemo(() => clientId ? getClientServices(clientId) : [], [clientId]);
-  const invoices = useMemo(() => getInvoices().filter(invoice =>
-    invoice.clientName === clientName ||
-    (invoice as typeof invoice & { clientId?: string }).clientId === clientId
-  ), [clientId, clientName]);
+  const [reportData, setReportData] = useState(() => loadClientReportCounts(clientId, clientName));
+
+  useEffect(() => {
+    const refresh = () => setReportData(loadClientReportCounts(clientId, clientName));
+    const events = ["nidoClientDataUpdated", "nidoMyOrdersUpdated", "nidoInvoicesUpdated"];
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    events.forEach((eventName) => window.addEventListener(eventName, refresh));
+    refresh();
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      events.forEach((eventName) => window.removeEventListener(eventName, refresh));
+    };
+  }, [clientId, clientName]);
+
+  const { orders, services, invoices } = reportData;
   const cards = [
     { label: "My Orders", value: orders.length, icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50" },
     { label: "My Services", value: services.length, icon: Wrench, color: "text-purple-600", bg: "bg-purple-50" },

@@ -1,12 +1,13 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
 import { cancelDraftPOsForOrder, getAllPOs, isPOConfirmed } from "../lib/purchaseOrderStore";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
 import { createDraftPOsForOrder } from "../lib/orderPurchaseOrderService";
-import { resolveAutoAssignment } from "../lib/autoAssignmentStore";
-import { getUsers } from "../lib/nidoUsersStore";
+import { autoAssignmentApi, type AutoAssignmentOrderResult } from "../lib/autoAssignmentApi";
+import { getRoles, getUsers } from "../lib/nidoUsersStore";
+import { getClientForPortal, getClients } from "../lib/clientStore";
 import { appendOrderActivityOnce, getActivityActor } from "../lib/orderActivityStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,6 +75,10 @@ export interface MyOrder {
   updateCount?: number;
   /** Client tenant that owns this order. */
   clientId?: string;
+  /** Stable key used to make assignment retries idempotent across browsers with overlapping order numbers. */
+  assignmentId?: string;
+  /** Server-side tier assignment status; pending items retry after reload/connection recovery. */
+  autoAssignmentStatus?: "pending" | "assigned" | "unassigned" | "disabled";
   client: string;
   clientColor: string;
   clientInitial: string;
@@ -143,6 +148,9 @@ const MyOrdersContext = createContext<MyOrdersContextType | undefined>(undefined
 
 const ORDERS_KEY = "nido_my_orders";
 const SEQ_KEY = "nido_order_seq";
+const PENDING_ASSIGNMENTS_KEY = "nido_pending_order_assignments_v1";
+type PendingAssignment = { assignmentId: string; orderId: string; clientId: string; clientName: string; clientTier: string };
+const assignmentRequestsInFlight = new Set<string>();
 // Sub-order-level state (per master order) mirrors the keys OrderDetailsPage
 // reads/writes, so status cascades stay consistent no matter which screen
 // (order list or order detail) triggered the change.
@@ -201,30 +209,99 @@ function nextOrderId(): string {
   return `${getPrefix("order") || "ORD-"}${String(seq).padStart(6, "0")}`;
 }
 
-function getUserLabel(user: { name: string; email: string; employeeId: string }): string {
-  return user.name || user.email || user.employeeId || "Unassigned";
+function createAssignmentId(): string {
+  return globalThis.crypto?.randomUUID?.()
+    || `assignment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function resolveOrderAssignee(order: Omit<MyOrder, "id"> & { id?: string }) {
-  const requester = getUsers().find((user) => {
-    const requesterValue = String(order.requester || "").trim().toLowerCase();
-    return (
-      user.name.trim().toLowerCase() === requesterValue
-      || user.email.trim().toLowerCase() === requesterValue
+function readPendingAssignments(): PendingAssignment[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PENDING_ASSIGNMENTS_KEY) || "[]");
+    if (!Array.isArray(stored)) return [];
+    let changed = false;
+    const pending = stored.filter((item) => item?.orderId && item?.clientId).map((item) => {
+      if (item.assignmentId) return item as PendingAssignment;
+      changed = true;
+      return { ...item, assignmentId: createAssignmentId() } as PendingAssignment;
+    });
+    if (changed) savePendingAssignments(pending);
+    return pending;
+  } catch {
+    return [];
+  }
+}
+
+function savePendingAssignments(items: PendingAssignment[]) {
+  try {
+    localStorage.setItem(PENDING_ASSIGNMENTS_KEY, JSON.stringify(items));
+  } catch {
+    // The order itself remains saved even if the retry queue cannot be written.
+  }
+}
+
+function getAssignmentRoster() {
+  const activeRoles = new Map(getRoles().map((role) => [role.name, role.status === "Active"]));
+  return getUsers().map((user) => ({
+    id: user.id,
+    name: user.name || user.email || user.employeeId || "Unnamed employee",
+    role: user.role || "",
+    department: user.department || "",
+    active: user.status === "Active",
+    roleActive: !user.role || activeRoles.get(user.role) === true,
+  }));
+}
+
+function queuePendingAssignment(item: PendingAssignment) {
+  const pending = readPendingAssignments();
+  if (!pending.some((entry) => entry.assignmentId === item.assignmentId)) {
+    pending.push(item);
+    savePendingAssignments(pending);
+  }
+}
+
+async function sendPendingAssignment(
+  item: PendingAssignment,
+  updateOrders: Dispatch<SetStateAction<MyOrder[]>>,
+) {
+  if (assignmentRequestsInFlight.has(item.assignmentId)) return;
+  assignmentRequestsInFlight.add(item.assignmentId);
+  try {
+    const result = await autoAssignmentApi.assignOrder({
+      assignmentId: item.assignmentId,
+      orderId: item.orderId,
+      clientId: item.clientId,
+      clientName: item.clientName,
+      clientTier: item.clientTier,
+      employees: getAssignmentRoster(),
+    });
+    const currentUser = result.assigned_employee_id
+      ? getUsers().find((entry) => entry.id === result.assigned_employee_id)
+      : undefined;
+    const status = result.status === "assigned" ? "assigned" : result.status === "disabled" ? "disabled" : "unassigned";
+    updateOrders((current) => current.map((order) => order.id === item.orderId ? {
+      ...order,
+      assigned: result.assigned_employee_name || "Unassigned",
+      assignedRole: currentUser?.role || "",
+      assignedInitial: (result.assigned_employee_name || "U").charAt(0).toUpperCase(),
+      autoAssignmentStatus: status,
+    } : order));
+    savePendingAssignments(readPendingAssignments().filter((entry) => entry.assignmentId !== item.assignmentId));
+    appendOrderActivityOnce(
+      item.orderId,
+      `activity_assignment_${item.orderId}_${status}`,
+      status === "assigned"
+        ? `Order ${item.orderId} was assigned to ${result.assigned_employee_name}.`
+        : status === "disabled"
+          ? `Order ${item.orderId} was left unassigned because automatic assignment is disabled.`
+          : `Order ${item.orderId} was added to the unassigned assignment queue.`,
+      { actor: "Auto Assignment", eventType: "activity" },
     );
-  });
-  const role = requester?.role || order.requesterRole;
-  const resolution =
-    resolveAutoAssignment({
-      department: requester?.department,
-      role,
-      clientId: order.clientId,
-    })
-    ?? resolveAutoAssignment({ role, clientId: order.clientId })
-    ?? resolveAutoAssignment({ clientId: order.clientId });
-  return resolution?.users[0]
-    ? { user: resolution.users[0], rule: resolution.rule }
-    : null;
+    window.dispatchEvent(new CustomEvent("nidoOrderAssignmentUpdated", { detail: { orderId: item.orderId } }));
+  } catch {
+    // Keep this item in the local retry queue; an unavailable API must not drop the order.
+  } finally {
+    assignmentRequestsInFlight.delete(item.assignmentId);
+  }
 }
 
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
@@ -239,6 +316,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // Persist every change to localStorage so orders survive page refresh
   useEffect(() => {
     localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+    window.dispatchEvent(new Event("nidoMyOrdersUpdated"));
   }, [orders]);
 
   // Cross-tab / cross-session sync: if another tab (e.g. the owner platform or
@@ -275,8 +353,24 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("orderFulfillmentStatusUpdated", onFulfillmentStatusUpdated);
   }, []);
 
+  useEffect(() => {
+    const retryPending = () => {
+      readPendingAssignments().forEach((item) => void sendPendingAssignment(item, setOrders));
+    };
+    retryPending();
+    const interval = window.setInterval(retryPending, 30_000);
+    window.addEventListener("online", retryPending);
+    window.addEventListener("focus", retryPending);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("online", retryPending);
+      window.removeEventListener("focus", retryPending);
+    };
+  }, []);
+
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
     const id = nextOrderId();
+    const assignmentId = order.assignmentId || createAssignmentId();
     const createdAt = order.createdAt || new Date().toISOString();
     const createdBy = order.createdBy || getActivityActor(order.requester || "System");
     const cartItems = order.cartItems?.map((item, index) => ({
@@ -284,7 +378,6 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       subOrderId: item.subOrderId
         || `${getPrefix("salesOrder") || "SO-"}${id}-${String(index + 1).padStart(3, "0")}`,
     }));
-    const autoAssignee = resolveOrderAssignee(order);
     const normalizedOrder = {
       ...order,
       createdBy,
@@ -292,17 +385,29 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       updatedBy: order.updatedBy || createdBy,
       updatedAt: order.updatedAt || createdAt,
       updateCount: order.updateCount || 0,
-      ...(autoAssignee
-        ? {
-            assigned: getUserLabel(autoAssignee.user),
-            assignedRole: autoAssignee.user.role || autoAssignee.rule.role,
-            assignedInitial: getUserLabel(autoAssignee.user).charAt(0).toUpperCase(),
-          }
-        : {}),
+      assignmentId,
+      assigned: "Unassigned",
+      assignedRole: "",
+      assignedInitial: "U",
+      autoAssignmentStatus: order.clientId ? "pending" : "unassigned",
       id,
       cartItems,
     } as MyOrder;
     setOrders((prev) => [normalizedOrder, ...prev]);
+    if (order.clientId) {
+      const client = getClientForPortal(order.clientId)
+        || getClients().find((entry) => entry.id === order.clientId);
+      const tier = String(client?.client_tier || client?.tier || "");
+      const assignment: PendingAssignment = {
+        assignmentId,
+        orderId: id,
+        clientId: order.clientId,
+        clientName: client?.name || order.client,
+        clientTier: tier,
+      };
+      queuePendingAssignment(assignment);
+      void sendPendingAssignment(assignment, setOrders);
+    }
     appendOrderActivityOnce(
       id,
       `activity_order_placed_${id}`,
