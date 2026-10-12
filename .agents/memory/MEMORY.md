@@ -1,5 +1,6 @@
 - [Config Engine Architecture](config-engine.md) — centralized config system: configService → ConfigContext → ThemeContext/I18nProvider/OrganizationContext; useI18n() for currency/dates; useOrgConfig() for org info.
 - [Vendor Selection at Shop Flow](vendor-selection-flow.md) — client locks vendor on Shop page pre-cart; CartItem carries vendor snapshot; autoCreateDraftPOs() fires in addOrder(); OrderDetailsPage "Draft Purchase Orders" tab for Confirm/Reject.
+- [Live auto-assignment configuration](live-auto-assignment-config.md) — tier rules for real orders persist server-side; mock assignment history and test runs stay isolated in the browser.
 - [Purchase Order Flow Architecture](po-flow-architecture.md) — full PO creation flow: price-engine vendor selection, PDF via jsPDF, shared localStorage store, VendorOrdersPage merge strategy.
 - [Nido Tech design system](nido-design-system.md) — brand spec lives in STYLE_GUIDE.md; avoid duplicate Tailwind color keys, theme via CSS vars instead.
 - [Transaction page shell style](transactions-page-style.md) — canonical Orders-page-matching shell/card pattern for Transactions pages; avoid slate-*/dark: classes.

@@ -136,17 +136,14 @@ export async function saveAutoAssignmentConfig(input, actor) {
       for (let index = 0; index < orderedEmployees.length; index += 1) {
         const employeeId = String(orderedEmployees[index].id || "");
         const employee = rosterById.get(employeeId);
-        if (!employee || !employee.active || !employee.roleActive) {
-          throw new Error(`${tierName} contains an inactive or unavailable employee.`);
+        if (!employee) {
+          throw new Error(`${tierName} contains an unavailable employee.`);
         }
         if (seen.has(employeeId)) throw new Error(`${tierName} contains a duplicate employee.`);
         seen.add(employeeId);
         if (Number(orderedEmployees[index].sequence) !== index + 1) {
           throw new Error(`${tierName} sequence numbers must be consecutive, starting at 1.`);
         }
-      }
-      if (setting.enabled && orderedEmployees.length === 0) {
-        throw new Error(`${tierName} must have at least one active employee before it can be enabled.`);
       }
 
       const fallbackBehavior = setting.fallbackBehavior === "fallback_employee"
@@ -157,9 +154,9 @@ export async function saveAutoAssignmentConfig(input, actor) {
         : null;
       if (
         fallbackBehavior === "fallback_employee"
-        && (!rosterById.get(fallbackEmployeeId)?.active || !rosterById.get(fallbackEmployeeId)?.roleActive)
+        && !rosterById.has(fallbackEmployeeId)
       ) {
-        throw new Error(`${tierName} fallback must be an active employee.`);
+        throw new Error(`${tierName} fallback employee is unavailable.`);
       }
 
       await client.query(
@@ -177,19 +174,16 @@ export async function saveAutoAssignmentConfig(input, actor) {
           [tierName, String(orderedEmployees[index].id), index + 1],
         );
       }
-      const currentPointer = await client.query(
-        "SELECT next_employee_id FROM auto_assignment_tiers WHERE tier=$1",
-        [tierName],
+      const requestedNextEmployeeId = setting.nextEmployeeId
+        ? String(setting.nextEmployeeId)
+        : null;
+      const nextEmployeeId = requestedNextEmployeeId && seen.has(requestedNextEmployeeId)
+        ? requestedNextEmployeeId
+        : orderedEmployees[0]?.id || null;
+      await client.query(
+        "UPDATE auto_assignment_tiers SET next_employee_id=$2 WHERE tier=$1",
+        [tierName, nextEmployeeId],
       );
-      if (
-        currentPointer.rows[0]?.next_employee_id
-        && !seen.has(currentPointer.rows[0].next_employee_id)
-      ) {
-        await client.query(
-          "UPDATE auto_assignment_tiers SET next_employee_id=$2 WHERE tier=$1",
-          [tierName, orderedEmployees[0]?.id || null],
-        );
-      }
     }
     await client.query("COMMIT");
     return await loadConfig();

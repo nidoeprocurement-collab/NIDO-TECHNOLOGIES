@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, Check, CircleHelp, RotateCcw, Save, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,14 +24,12 @@ import {
   type TierConfig,
 } from "./model";
 import { getNidoAssignmentEmployees, NIDO_ROLES_EVENT, NIDO_USERS_EVENT } from "./platformEmployees";
-
-function sameTierRules(left: TierConfig, right: TierConfig) {
-  return left.enabled === right.enabled
-    && left.tier === right.tier
-    && left.fallback === right.fallback
-    && JSON.stringify(left.eligibleEmployeeIds) === JSON.stringify(right.eligibleEmployeeIds)
-    && JSON.stringify(left.sequence) === JSON.stringify(right.sequence);
-}
+import {
+  autoAssignmentApi,
+  type AssignmentConfig,
+  type AssignmentRosterEmployee,
+  type AssignmentTierConfig,
+} from "@/lib/autoAssignmentApi";
 
 function statusMessageFor(error: unknown) {
   return error instanceof Error && error.name === "QuotaExceededError"
@@ -39,10 +37,105 @@ function statusMessageFor(error: unknown) {
     : "Browser storage is unavailable. This update is visible in this tab only; it was not saved.";
 }
 
+function toServerRoster(employees: Employee[]): AssignmentRosterEmployee[] {
+  return employees.map((employee) => ({
+    id: employee.id,
+    name: employee.name,
+    role: employee.role,
+    department: employee.department,
+    active: employee.status === "Active",
+    roleActive: employee.status === "Active",
+  }));
+}
+
+function toServerConfig(
+  enabled: boolean,
+  tiers: Record<ClientTier, TierConfig>,
+  employees: Employee[],
+): { enabled: boolean; tiers: AssignmentTierConfig[]; employees: AssignmentRosterEmployee[] } {
+  return {
+    enabled,
+    employees: toServerRoster(employees),
+    tiers: CLIENT_TIERS.map((tier) => {
+      const config = tiers[tier];
+      const sequenceIds = config.sequence
+        .filter((employeeId) => config.eligibleEmployeeIds.includes(employeeId))
+        .filter((employeeId) => Boolean(getEmployee(employeeId, employees)));
+      const sequence = sequenceIds.map((employeeId, index) => {
+        const employee = getEmployee(employeeId, employees)!;
+        return {
+          id: employee.id,
+          name: employee.name,
+          role: employee.role,
+          department: employee.department,
+          active: employee.status === "Active",
+          sequence: index + 1,
+        };
+      });
+      const nextEmployeeId = sequence[
+        Math.min(config.rotationPosition, Math.max(sequence.length - 1, 0))
+      ]?.id ?? null;
+      const fallbackEmployeeId = config.fallback && getEmployee(config.fallback, employees)
+        ? config.fallback
+        : null;
+
+      return {
+        tier,
+        enabled: config.enabled,
+        nextEmployeeId,
+        fallbackBehavior: fallbackEmployeeId ? "fallback_employee" : "unassigned_notify",
+        fallbackEmployeeId,
+        employees: sequence,
+      };
+    }),
+  };
+}
+
+function fromServerConfig(
+  config: AssignmentConfig,
+  employees: Employee[],
+  history: DemoState["history"],
+): DemoState {
+  const knownEmployeeIds = new Set(employees.map((employee) => employee.id));
+  const tiers = {} as Record<ClientTier, TierConfig>;
+  for (const tier of CLIENT_TIERS) {
+    const savedTier = config.tiers.find((entry) => entry.tier === tier);
+    const sequence = [...(savedTier?.employees || [])]
+      .sort((left, right) => left.sequence - right.sequence)
+      .map((employee) => employee.id)
+      .filter((employeeId) => knownEmployeeIds.has(employeeId));
+    const savedPosition = sequence.indexOf(savedTier?.nextEmployeeId || "");
+    tiers[tier] = {
+      tier,
+      enabled: savedTier?.enabled === true,
+      eligibleEmployeeIds: sequence,
+      sequence,
+      rotationPosition: savedPosition >= 0 ? savedPosition : 0,
+      fallback: savedTier?.fallbackEmployeeId && knownEmployeeIds.has(savedTier.fallbackEmployeeId)
+        ? savedTier.fallbackEmployeeId
+        : null,
+    };
+  }
+  return {
+    enabled: config.enabled,
+    tiers,
+    history,
+  };
+}
+
+function hasSavedServerConfig(config: AssignmentConfig): boolean {
+  return config.updatedBy !== "system" || config.tiers.some((tier) =>
+    tier.enabled || tier.employees.length > 0 || Boolean(tier.fallbackEmployeeId),
+  );
+}
+
 export default function AutoAssignmentDemo() {
   const [employees, setEmployees] = useState<Employee[]>(() => getNidoAssignmentEmployees());
   const [boot] = useState(() => loadDemoState(employees));
+  const employeesRef = useRef(employees);
+  const initialHistoryRef = useRef(boot.state.history);
   const [state, setState] = useState<DemoState>(boot.state);
+  const [simulationState, setSimulationState] = useState<DemoState>(boot.state);
   const [draft, setDraft] = useState(() => ({
     enabled: boot.state.enabled,
     tiers: { ...boot.state.tiers },
@@ -50,15 +143,22 @@ export default function AutoAssignmentDemo() {
   const [notice, setNotice] = useState(boot.error);
   const [noticeKind, setNoticeKind] = useState<"error" | "success" | "warning">(boot.error ? "error" : "success");
   const [needsPersistence, setNeedsPersistence] = useState(Boolean(boot.error));
+  const [configLoading, setConfigLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [selectedTier, setSelectedTier] = useState<ClientTier>("Premium");
   const [selectedClientId, setSelectedClientId] = useState(MOCK_CLIENTS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
+
+  useEffect(() => {
+    employeesRef.current = employees;
+  }, [employees]);
 
   useEffect(() => {
     const refreshRoster = () => {
       const nextEmployees = getNidoAssignmentEmployees();
       setEmployees(nextEmployees);
       setState((current) => reconcileDemoState(current, nextEmployees));
+      setSimulationState((current) => reconcileDemoState(current, nextEmployees));
       setDraft((current) => {
         const normalized = reconcileDemoState({
           enabled: current.enabled,
@@ -82,10 +182,45 @@ export default function AutoAssignmentDemo() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    autoAssignmentApi.getConfig()
+      .then((config) => {
+        if (!active) return;
+        if (!hasSavedServerConfig(config)) {
+          setNeedsPersistence(true);
+          setNotice("No live assignment rules have been saved yet. Review the tiers and save to apply them to new client orders.");
+          setNoticeKind("warning");
+          return;
+        }
+        setState((current) => fromServerConfig(config, employeesRef.current, current.history));
+        setDraft(() => {
+          const live = fromServerConfig(config, employeesRef.current, initialHistoryRef.current);
+          return { enabled: live.enabled, tiers: { ...live.tiers } };
+        });
+        setSimulationState((current) => fromServerConfig(config, employeesRef.current, current.history));
+        setNeedsPersistence(false);
+        setNotice("Live order-assignment rules loaded from the server.");
+        setNoticeKind("success");
+      })
+      .catch((error) => {
+        if (!active) return;
+        setNeedsPersistence(true);
+        setNotice(error instanceof Error
+          ? `Could not load live assignment rules: ${error.message}`
+          : "Could not load live assignment rules. Check the connection and retry.");
+        setNoticeKind("error");
+      })
+      .finally(() => {
+        if (active) setConfigLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
+
   const configDirty = draft.enabled !== state.enabled || CLIENT_TIERS.some((tier) =>
     JSON.stringify(draft.tiers[tier]) !== JSON.stringify(state.tiers[tier]),
   );
-  const canSave = configDirty || needsPersistence;
+  const canSave = !configLoading && !saving && (configDirty || needsPersistence);
   const availableClients = useMemo(
     () => MOCK_CLIENTS.filter((client) => client.tier === selectedTier),
     [selectedTier],
@@ -96,19 +231,17 @@ export default function AutoAssignmentDemo() {
       ? state.tiers[tier].eligibleEmployeeIds.filter((employeeId) => getEmployee(employeeId, employees)?.status === "Active")
       : [],
   ));
-  const assignedCount = state.history.filter((item) => !!item.assignedEmployeeId).length;
-  const unassignedCount = state.history.filter((item) => !item.assignedEmployeeId).length;
+  const assignedCount = simulationState.history.filter((item) => !!item.assignedEmployeeId).length;
+  const unassignedCount = simulationState.history.filter((item) => !item.assignedEmployeeId).length;
   const configuredCount = CLIENT_TIERS.filter((tier) => state.tiers[tier].enabled).length;
 
-  const commit = (next: DemoState, success: string) => {
-    setState(next);
+  const commitSimulation = (next: DemoState, success: string) => {
+    setSimulationState(next);
     try {
       persistDemoState(next);
-      setNeedsPersistence(false);
       setNotice(success);
       setNoticeKind("success");
     } catch (error) {
-      setNeedsPersistence(true);
       setNotice(statusMessageFor(error));
       setNoticeKind("error");
     }
@@ -118,28 +251,28 @@ export default function AutoAssignmentDemo() {
     setDraft((current) => ({ ...current, tiers: { ...current.tiers, [tier]: config } }));
   };
 
-  const saveConfiguration = () => {
-    const next: DemoState = {
-      ...state,
-      enabled: draft.enabled,
-      tiers: { ...draft.tiers },
-    };
-    const hasEmptyEnabledTier = next.enabled && CLIENT_TIERS.some((tier) =>
-      next.tiers[tier].enabled && !next.tiers[tier].sequence.some((id) => getEmployee(id, employees)?.status === "Active"),
-    );
-    setState(next);
-    setDraft({ enabled: next.enabled, tiers: { ...next.tiers } });
+  const saveConfiguration = async () => {
+    setSaving(true);
     try {
-      persistDemoState(next);
+      const saved = await autoAssignmentApi.saveConfig(
+        toServerConfig(draft.enabled, draft.tiers, employees),
+      );
+      const next = fromServerConfig(saved, employees, simulationState.history);
+      const nextDraft = { enabled: next.enabled, tiers: { ...next.tiers } };
+      setState(next);
+      setDraft(nextDraft);
+      setSimulationState((current) => ({ ...current, enabled: next.enabled, tiers: next.tiers }));
       setNeedsPersistence(false);
-      setNotice(hasEmptyEnabledTier
-        ? "Configuration saved in this browser. One or more enabled tiers have no active employee; fallback or unassigned handling will apply."
-        : "Configuration saved in this browser only. No backend was changed.");
-      setNoticeKind(hasEmptyEnabledTier ? "warning" : "success");
+      setNotice("Live assignment rules saved. Newly placed client orders will use these tier settings.");
+      setNoticeKind("success");
     } catch (error) {
       setNeedsPersistence(true);
-      setNotice(statusMessageFor(error));
+      setNotice(error instanceof Error
+        ? `Live assignment rules could not be saved: ${error.message}`
+        : "Live assignment rules could not be saved. Check the connection and try again.");
       setNoticeKind("error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -151,27 +284,22 @@ export default function AutoAssignmentDemo() {
 
   const runSimulation = () => {
     if (!selectedClient) return;
-    const { nextState, message } = simulateNext(state, selectedClient, employees);
-    setDraft((current) => {
-      const previousConfig = state.tiers[selectedClient.tier];
-      const draftConfig = current.tiers[selectedClient.tier];
-      return sameTierRules(draftConfig, previousConfig)
-        ? { ...current, tiers: { ...current.tiers, [selectedClient.tier]: nextState.tiers[selectedClient.tier] } }
-        : current;
-    });
-    commit(nextState, message);
+    const { nextState, message } = simulateNext(simulationState, selectedClient, employees);
+    commitSimulation(nextState, message);
   };
 
   const manualReassign = (orderId: string, employeeId: string, reason: string) => {
-    const next = createReassignment(state, orderId, employeeId, reason, employees);
-    commit(next, `Demo reassignment recorded for ${orderId}.`);
+    const next = createReassignment(simulationState, orderId, employeeId, reason, employees);
+    commitSimulation(next, `Demo reassignment recorded for ${orderId}.`);
   };
 
   const resetDemo = () => {
     const defaults = createDefaultDemoState(employees);
-    setDraft({ enabled: defaults.enabled, tiers: { ...defaults.tiers } });
     setResetOpen(false);
-    commit(defaults, "Demo data reset in this browser.");
+    commitSimulation(
+      { ...simulationState, history: defaults.history },
+      "Local demo history reset. Live assignment rules were not changed.",
+    );
   };
 
   const formatEmployee = (id: string | null) => getEmployee(id, employees)?.name ?? "Unassigned";
@@ -184,30 +312,32 @@ export default function AutoAssignmentDemo() {
           <div className="max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/25 bg-sky-300/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-200">
-                <Sparkles className="h-3 w-3" /> Demo environment
+                <Sparkles className="h-3 w-3" /> Live order rules
               </span>
               <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-slate-400">Administration / Order Assignment / Auto Assignment Configuration</span>
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Order assignment control</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
-              Configure tier-specific rotation, then test mock clients with employees from the NIDO platform directory.
+              Configure tier-specific rotation for real client orders, with a separate local test bench for simulations.
             </p>
             <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200/20 bg-amber-200/[0.08] px-3 py-2 text-xs leading-relaxed text-amber-100">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
-              <span><strong className="font-semibold">Demo Mode — Assignment settings and history stay in this browser.</strong> Employees come from NIDO Users; no operational orders or backend assignment settings are changed.</span>
+              <span><strong className="font-semibold">These saved rules control assignment for new client orders.</strong> The mock-order test bench and its history remain local to this browser.</span>
             </div>
           </div>
           <div className="flex shrink-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-4 sm:min-w-[265px] sm:flex-row sm:items-center lg:flex-col lg:items-stretch">
             <div className="flex flex-1 items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-white">Auto Assignment</p>
-                <p className="mt-0.5 text-[11px] text-slate-400">{draft.enabled ? "Master rule enabled" : "Master rule paused"}</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  {configLoading ? "Loading live rules…" : draft.enabled ? "Master rule enabled" : "Master rule paused"}
+                </p>
               </div>
               <Switch checked={draft.enabled} onCheckedChange={(checked) => setDraft((current) => ({ ...current, enabled: checked }))} aria-label="Enable master auto assignment rule" />
             </div>
             <div className="flex gap-2 border-t border-white/10 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0 lg:border-l-0 lg:border-t lg:pl-0 lg:pt-3">
               <Button type="button" onClick={saveConfiguration} disabled={!canSave} className="h-9 flex-1 bg-sky-600 text-xs text-white hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-400">
-                <Save className="mr-2 h-3.5 w-3.5" /> Save changes
+                <Save className="mr-2 h-3.5 w-3.5" /> {saving ? "Saving…" : "Save changes"}
               </Button>
               <Button type="button" onClick={cancelConfiguration} disabled={!configDirty} variant="outline" className="h-9 border-white/15 bg-transparent px-3 text-xs text-slate-200 hover:bg-white/10 hover:text-white disabled:opacity-40">
                 Cancel
@@ -378,9 +508,9 @@ export default function AutoAssignmentDemo() {
         </div>
         <div className="flex flex-col justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50/70 p-5">
           <div>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-800">Local demo data</p>
-            <h2 className="mt-1 text-base font-semibold text-amber-950">Reset this workspace</h2>
-            <p className="mt-1 text-xs leading-relaxed text-amber-900/75">Restore sample rules and history in this browser. This does not affect NIDO’s operational order or service assignment settings.</p>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-800">Local demo history</p>
+            <h2 className="mt-1 text-base font-semibold text-amber-950">Reset demo history</h2>
+            <p className="mt-1 text-xs leading-relaxed text-amber-900/75">Clear simulated orders and demo reassignments in this browser. Live assignment rules are not changed.</p>
           </div>
           <Button type="button" variant="outline" onClick={() => setResetOpen(true)} className="h-9 self-start border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100">
             <RotateCcw className="mr-2 h-3.5 w-3.5" /> Reset demo data
@@ -388,14 +518,14 @@ export default function AutoAssignmentDemo() {
         </div>
       </section>
 
-      <AssignmentHistory history={state.history} employees={employees} onReassign={manualReassign} />
+      <AssignmentHistory history={simulationState.history} employees={employees} onReassign={manualReassign} />
 
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reset demo assignment data?</DialogTitle>
+            <DialogTitle>Reset local demo history?</DialogTitle>
             <DialogDescription>
-              This restores the sample tier rules and mock history, and removes simulated orders and reassignments from this browser’s demo workspace. Operational order and service assignment data is not touched.
+              This removes simulated orders and reassignments from this browser’s demo history. Saved live tier rules and real order assignments are not changed.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">

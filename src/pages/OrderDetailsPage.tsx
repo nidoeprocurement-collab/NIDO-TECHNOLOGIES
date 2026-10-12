@@ -3635,8 +3635,8 @@ export default function MyOrderPage() {
   const [pickupScheduledTarget, setPickupScheduledTarget] = useState<string | null>(null);
   const [pickupDoneTarget, setPickupDoneTarget] = useState<string | null>(null);
   const [assignment, setAssignment] = useState({
-    assignedTo: order?.assigned || "Admin",
-    role: order?.assignedRole || "Admin",
+    assignedTo: order?.assigned || "Unassigned",
+    role: order?.assignedRole || "—",
     assignedOn: order ? `${order.orderDate} ${order.orderTime}` : "—",
     notes: "Oversees end-to-end execution and vendor coordination for this order.",
   });
@@ -3649,15 +3649,25 @@ export default function MyOrderPage() {
         ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
         : []
     );
-    setAssignment({
-      assignedTo: order.assigned,
-      role: order.assignedRole,
-      assignedOn: `${order.orderDate} ${order.orderTime}`,
-      notes: "Oversees end-to-end execution and vendor coordination for this order.",
-    });
     // Run whenever orderId changes (navigation between orders) or order first resolves
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, order?.id]);
+
+  // Auto-assignment completes asynchronously after checkout. Keep this panel
+  // synchronized when MyOrdersContext receives the server assignment result.
+  useEffect(() => {
+    if (!order) return;
+    setAssignment({
+      assignedTo: order.assigned && order.assigned !== "Unassigned"
+        ? order.assigned
+        : order.autoAssignmentStatus === "pending"
+          ? "Assignment pending"
+          : "Unassigned",
+      role: order.assignedRole || "—",
+      assignedOn: `${order.orderDate} ${order.orderTime}`,
+      notes: "Oversees end-to-end execution and vendor coordination for this order.",
+    });
+  }, [order?.id, order?.assigned, order?.assignedRole, order?.autoAssignmentStatus, order?.orderDate, order?.orderTime]);
 
 
   // Persist customer-facing status/tracking changes for Order Details and the
