@@ -11,6 +11,7 @@ import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngin
 import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
 import { formatCurrency } from "@/lib/formatters";
+import { normalizeOrdersForList } from "@/lib/orderListData";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -408,14 +409,15 @@ export default function MyOrderPage() {
   const { orders, updateOrdersStatus } = useMyOrders();
   const { user, isImpersonating, isClientPortalUser } = useAuth();
   const isViewOnly = isImpersonating;
+  const orderListData = useMemo(() => normalizeOrdersForList(orders), [orders]);
   const visibleOrders = useMemo(() => {
-    if (!isClientPortalUser || !user?.clientId) return orders;
-    return orders.filter(o =>
+    if (!isClientPortalUser || !user?.clientId) return orderListData.orders;
+    return orderListData.orders.filter(o =>
       o.clientId === user.clientId ||
       o.cartItems?.some(item => item.clientId === user.clientId) ||
       o.client === user.clientName
     );
-  }, [orders, isClientPortalUser, user?.clientId, user?.clientName]);
+  }, [orderListData, isClientPortalUser, user?.clientId, user?.clientName]);
   const exportStatusOptions = useMemo<OrderExportOption[]>(() =>
     [...new Set(visibleOrders.map(order => order.status))]
       .sort((a, b) => a.localeCompare(b))
@@ -546,6 +548,10 @@ export default function MyOrderPage() {
       showToast("This action is disabled while using client-user impersonation.");
       return;
     }
+    if (orderListData.invalidCount > 0) {
+      showToast("Some saved order records are invalid. Status updates are paused to avoid changing the wrong order.");
+      return;
+    }
     if (status === "Cancelled") {
       // Cancelling is a terminal, hard-to-undo action — confirm first.
       setPendingBulkCancel(true);
@@ -561,13 +567,19 @@ export default function MyOrderPage() {
       setShowBulkStatus(false);
       return;
     }
+    if (orderListData.invalidCount > 0) {
+      showToast("Some saved order records are invalid. Status updates are paused to avoid changing the wrong order.");
+      setPendingBulkCancel(false);
+      setShowBulkStatus(false);
+      return;
+    }
     // Cascades to sub-orders (and clears vendor selection) when moving to
     // Cancelled/Draft, and stays in sync with the order detail page since
     // both read/write the same shared order + sub-order state. Orders that
     // are already Cancelled or have a confirmed/issued PO are skipped by the
     // context itself, so they cannot be cancelled or processed further.
     const ids = [...selected];
-    const alreadyCancelledIds = ids.filter(id => orders.find(o => o.id === id)?.status === "Cancelled");
+     const alreadyCancelledIds = ids.filter(id => orderListData.orders.find(o => o.id === id)?.status === "Cancelled");
     const poLockedIds = status === "Cancelled"
       ? ids.filter(id => getAllPOs().some(po => po.orderId === id && isPOConfirmed(po)))
       : [];
@@ -683,6 +695,24 @@ export default function MyOrderPage() {
             )}
           </div>
         </div>
+
+        {orderListData.invalidCount > 0 && (
+          <div
+            role="status"
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              border: "1px solid #fcd34d",
+              borderRadius: 8,
+              background: "#fffbeb",
+              color: "#92400e",
+              fontSize: 13,
+            }}
+          >
+            {orderListData.invalidCount} saved order record{orderListData.invalidCount === 1 ? "" : "s"} could not be displayed.
+            The original saved data has not been changed.
+          </div>
+        )}
 
         {/* Search + Filter */}
         <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
