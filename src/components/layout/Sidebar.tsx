@@ -87,24 +87,6 @@ const adminNavigationItems: NavItem[] = [
       },
     ],
   },
-  {
-    label: 'Administration',
-    icon: <Settings size={20} />,
-    children: [
-      {
-        label: 'Order Assignment',
-        icon: <Zap size={16} />,
-        children: [
-          {
-            label: 'Auto Assignment Configuration',
-            icon: <Zap size={16} />,
-            path: '/configuration/auto-assignment',
-            moduleKey: 'configuration',
-          },
-        ],
-      },
-    ],
-  },
   { label: 'Configuration', icon: <Settings size={20} />, path: '/configuration', moduleKey: 'configuration' },
 ];
 
