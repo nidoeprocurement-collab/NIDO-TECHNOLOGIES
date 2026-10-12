@@ -25,6 +25,10 @@ function getAssignableCatalogRoles(clientId: string): string[] {
   return getPortalRoleNames(clientId);
 }
 
+function normalizeMasterProductCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
 /** Returns a numeric sort key for a preference string.
  *  "Preference 1" → 1, "Preference 2" → 2, custom names → large number (alphabetical tiebreak),
  *  empty/undefined → Infinity (always last).
@@ -750,6 +754,7 @@ function AddNewProductModal({
   onAdd: (entries: CatalogEntry[]) => void;
 }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [assignedProductCodes, setAssignedProductCodes] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<SelectedRow[]>([]);
@@ -757,6 +762,16 @@ function AddNewProductModal({
   const [roles, setRoles] = useState<string[]>(() => getAssignableCatalogRoles(clientId));
 
   useEffect(() => {
+    const loadAssignedProductCodes = () => {
+      setAssignedProductCodes(
+        new Set(
+          getClientCatalog(clientId)
+            .map((entry) => normalizeMasterProductCode(entry.productCode))
+            .filter(Boolean)
+        )
+      );
+    };
+
     // Only products that at least one vendor has actually added (and marked
     // Active) should be assignable to a client. If the same master product
     // has been added by multiple vendors, it must still appear only once.
@@ -765,44 +780,58 @@ function AddNewProductModal({
       const activeMasterCodes = new Set<string>();
       for (const products of Object.values(vendorProductStore)) {
         for (const p of products) {
-          if (p.status === "Active") activeMasterCodes.add(p.masterProductCode);
+          if (p.status === "Active") {
+            activeMasterCodes.add(normalizeMasterProductCode(p.masterProductCode));
+          }
         }
       }
       const published = getCatalogProducts().filter((p) => p.publishStatus === "published");
       const seen = new Set<string>();
       const deduped = published.filter((p) => {
-        if (!activeMasterCodes.has(p.masterProductCode)) return false;
-        if (seen.has(p.masterProductCode)) return false;
-        seen.add(p.masterProductCode);
+        const code = normalizeMasterProductCode(p.masterProductCode);
+        if (!activeMasterCodes.has(code)) return false;
+        if (seen.has(code)) return false;
+        seen.add(code);
         return true;
       });
       setCatalog(deduped);
+      loadAssignedProductCodes();
     };
     loadAssignable();
     window.addEventListener("catalogUpdated", loadAssignable);
     window.addEventListener("vendorProductsUpdated", loadAssignable);
+    window.addEventListener("clientCatalogUpdated", loadAssignedProductCodes);
     const refreshRoles = () => setRoles(getAssignableCatalogRoles(clientId));
     window.addEventListener("nidoPortalRolesUpdated", refreshRoles);
     return () => {
       window.removeEventListener("catalogUpdated", loadAssignable);
       window.removeEventListener("vendorProductsUpdated", loadAssignable);
+      window.removeEventListener("clientCatalogUpdated", loadAssignedProductCodes);
       window.removeEventListener("nidoPortalRolesUpdated", refreshRoles);
     };
   }, [clientId]);
 
+  const availableCatalog = useMemo(
+    () => catalog.filter((product) =>
+      !assignedProductCodes.has(normalizeMasterProductCode(product.masterProductCode))
+    ),
+    [catalog, assignedProductCodes]
+  );
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return catalog;
-    return catalog.filter(
+    if (!q) return availableCatalog;
+    return availableCatalog.filter(
       (p) =>
         p.productName.toLowerCase().includes(q) ||
         p.masterProductCode.toLowerCase().includes(q) ||
         p.category.toLowerCase().includes(q) ||
         p.brand.toLowerCase().includes(q)
     );
-  }, [catalog, query]);
+  }, [availableCatalog, query]);
 
   const toggleSelect = (product: CatalogProduct) => {
+    if (assignedProductCodes.has(normalizeMasterProductCode(product.masterProductCode))) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(product.id)) {
@@ -861,12 +890,23 @@ function AddNewProductModal({
   const [validationErrors, setValidationErrors] = useState<MissingField[]>([]);
 
   const handleAddProducts = () => {
-    if (rows.length === 0) return;
+    const currentlyAssigned = new Set(
+      getClientCatalog(clientId)
+        .map((entry) => normalizeMasterProductCode(entry.productCode))
+        .filter(Boolean)
+    );
+    const rowsToAdd = rows.filter(
+      (row) => !currentlyAssigned.has(normalizeMasterProductCode(row.product.masterProductCode))
+    );
+    if (rowsToAdd.length === 0) {
+      onClose();
+      return;
+    }
 
     // Require a role and a preference to be set for every selected product
     // before it can be added to the client catalog.
     const errors: MissingField[] = [];
-    for (const row of rows) {
+    for (const row of rowsToAdd) {
       const missing: string[] = [];
       if (!row.roles || row.roles.length === 0) missing.push("Role");
       if (!row.preference || row.preference.trim() === "") missing.push("Preference");
@@ -879,8 +919,8 @@ function AddNewProductModal({
 
     // Reserve sequential CPC codes for every product being added RIGHT NOW,
     // only at the moment the user confirms. Cancelling the modal wastes nothing.
-    const cpcs = reserveClientProductCodes(rows.length);
-    const entries: CatalogEntry[] = rows.map((row, i) => ({
+    const cpcs = reserveClientProductCodes(rowsToAdd.length);
+    const entries: CatalogEntry[] = rowsToAdd.map((row, i) => ({
       productCode: row.product.masterProductCode,
       sku: row.product.skuCode,
       name: row.product.productName,
@@ -985,6 +1025,10 @@ function AddNewProductModal({
               {catalog.length === 0 ? (
                 <div className="px-8 py-16 text-center text-gray-400 text-sm">
                   No products in master catalog yet. Add products via Master Catalog first.
+                </div>
+              ) : availableCatalog.length === 0 ? (
+                <div className="px-8 py-16 text-center text-gray-400 text-sm">
+                  All available products are already added to this client&apos;s catalog.
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="px-8 py-12 text-center text-gray-400 text-sm">
@@ -1276,8 +1320,10 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   // Merge new entries, persist, run price engine, then reload synced prices into state.
   // Side effects are kept outside the state updater so they run exactly once.
   const handleAddProducts = (entries: CatalogEntry[]) => {
-    const existing = new Set(products.map((p) => p.productCode));
-    const toAdd = entries.filter((e) => !existing.has(e.productCode));
+    const existing = new Set(products.map((p) => normalizeMasterProductCode(p.productCode)));
+    const toAdd = entries.filter(
+      (entry) => !existing.has(normalizeMasterProductCode(entry.productCode))
+    );
     if (toAdd.length === 0) return;
     const merged = [...products, ...toAdd];
     saveClientCatalog(clientId, merged);
