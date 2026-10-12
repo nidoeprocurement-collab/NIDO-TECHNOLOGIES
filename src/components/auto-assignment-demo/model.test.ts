@@ -87,4 +87,33 @@ describe("auto-assignment demo model", () => {
       reason: "Balance the workload",
     });
   });
+
+  it("uses the supplied NIDO roster for tier defaults and demo assignments", () => {
+    const nidoEmployees = [
+      {
+        id: "nido-user-1",
+        employeeId: "EMP-00041",
+        name: "Asha Rao",
+        department: "Operations",
+        role: "Order Specialist",
+        status: "Active" as const,
+      },
+      {
+        id: "nido-user-2",
+        employeeId: "EMP-00042",
+        name: "Ravi Shah",
+        department: "Operations",
+        role: "Order Specialist",
+        status: "Inactive" as const,
+      },
+    ];
+    const state = createDefaultDemoState(nidoEmployees);
+    const client = { id: "client-meridian", name: "Meridian Works", tier: "Medium" as const };
+
+    expect(state.tiers.Medium.eligibleEmployeeIds).toEqual(["nido-user-1"]);
+    expect(getNextAssignments(state.tiers.Medium, 2, nidoEmployees).map((item) => item.employeeId))
+      .toEqual(["nido-user-1", "nido-user-1"]);
+    expect(simulateNext(state, client, nidoEmployees).item.assignedEmployeeId).toBe("nido-user-1");
+    expect(state.history[0].assignedEmployeeId).toBe("nido-user-1");
+  });
 });

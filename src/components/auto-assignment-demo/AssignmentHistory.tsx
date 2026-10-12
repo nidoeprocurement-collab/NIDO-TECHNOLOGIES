@@ -6,12 +6,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  CLIENT_TIERS, EMPLOYEES, getEmployee,
-  type AssignmentMethod, type AssignmentStatus, type ClientTier, type HistoryItem,
+  CLIENT_TIERS, getEmployee,
+  type AssignmentMethod, type AssignmentStatus, type ClientTier, type Employee, type HistoryItem,
 } from "./model";
 
 interface AssignmentHistoryProps {
   history: HistoryItem[];
+  employees: Employee[];
   onReassign: (orderId: string, employeeId: string, reason: string) => void;
 }
 
@@ -31,7 +32,7 @@ function formatDate(value: string) {
     : date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export default function AssignmentHistory({ history, onReassign }: AssignmentHistoryProps) {
+export default function AssignmentHistory({ history, employees, onReassign }: AssignmentHistoryProps) {
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
   const [employeeFilter, setEmployeeFilter] = useState("all");
@@ -47,7 +48,7 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return history.filter((item) => {
-      const employeeName = getEmployee(item.assignedEmployeeId)?.name ?? "";
+      const employeeName = getEmployee(item.assignedEmployeeId, employees)?.name ?? "";
       return (!needle || [item.orderId, item.clientName, employeeName].some((value) => value.toLowerCase().includes(needle)))
         && (tierFilter === "all" || item.tier === tierFilter)
         && (employeeFilter === "all" || item.assignedEmployeeId === employeeFilter)
@@ -57,7 +58,7 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
       const dateDiff = new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime();
       return sortOrder === "newest" ? -dateDiff : dateDiff;
     });
-  }, [employeeFilter, history, methodFilter, query, sortOrder, statusFilter, tierFilter]);
+  }, [employeeFilter, employees, history, methodFilter, query, sortOrder, statusFilter, tierFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -128,7 +129,7 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
             </select>
             <select aria-label="Filter by employee" value={employeeFilter} onChange={(event) => { setEmployeeFilter(event.target.value); setPage(0); }} className="h-9 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600">
               <option value="all">All employees</option>
-              {EMPLOYEES.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
+              {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
             </select>
             <select aria-label="Filter by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }} className="h-9 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600">
               <option value="all">All statuses</option>
@@ -167,7 +168,7 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
                   <span className="mt-1 block text-[10px] text-slate-400">Mock client</span>
                 </TableCell>
                 <TableCell><Badge variant="outline" className="border-slate-200 font-normal text-slate-600">{item.tier}</Badge></TableCell>
-                <TableCell className="whitespace-nowrap text-xs text-slate-600">{getEmployee(item.assignedEmployeeId)?.name ?? <span className="text-slate-400">Not assigned</span>}</TableCell>
+                <TableCell className="whitespace-nowrap text-xs text-slate-600">{getEmployee(item.assignedEmployeeId, employees)?.name ?? <span className="text-slate-400">Not assigned</span>}</TableCell>
                 <TableCell className="whitespace-nowrap text-[11px] text-slate-500">{item.method}</TableCell>
                 <TableCell><Badge variant="outline" className={`whitespace-nowrap font-medium ${statusClass(item.status)}`}>{item.status}</Badge></TableCell>
                 <TableCell className="pr-5 text-right">
@@ -217,7 +218,7 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
               <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-4">
                 <div><p className="text-[10px] uppercase tracking-wide text-slate-400">Client</p><p className="mt-1 text-xs font-medium text-slate-800">{selectedOrder.clientName}</p></div>
                 <div><p className="text-[10px] uppercase tracking-wide text-slate-400">Tier</p><p className="mt-1 text-xs font-medium text-slate-800">{selectedOrder.tier}</p></div>
-                <div><p className="text-[10px] uppercase tracking-wide text-slate-400">Assigned to</p><p className="mt-1 text-xs font-medium text-slate-800">{getEmployee(selectedOrder.assignedEmployeeId)?.name ?? "Unassigned"}</p></div>
+                 <div><p className="text-[10px] uppercase tracking-wide text-slate-400">Assigned to</p><p className="mt-1 text-xs font-medium text-slate-800">{getEmployee(selectedOrder.assignedEmployeeId, employees)?.name ?? "Unassigned"}</p></div>
                 <div><p className="text-[10px] uppercase tracking-wide text-slate-400">Method</p><p className="mt-1 text-xs font-medium text-slate-800">{selectedOrder.method}</p></div>
                 <div className="col-span-2 sm:col-span-4"><p className="text-[10px] uppercase tracking-wide text-slate-400">Recorded</p><p className="mt-1 text-xs text-slate-700">{formatDate(selectedOrder.assignedAt)}</p></div>
               </div>
@@ -228,7 +229,7 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
                     {selectedOrder.reassignments.map((entry, index) => (
                       <li key={`${entry.reassignedAt}-${index}`} className="rounded-lg border border-slate-200 p-3">
                         <p className="text-xs font-medium text-slate-800">
-                          {getEmployee(entry.previousEmployeeId)?.name ?? "Unassigned"} <span className="px-1 text-slate-400">→</span> {getEmployee(entry.newEmployeeId)?.name ?? "Employee"}
+                          {getEmployee(entry.previousEmployeeId, employees)?.name ?? "Unassigned"} <span className="px-1 text-slate-400">→</span> {getEmployee(entry.newEmployeeId, employees)?.name ?? "Employee"}
                         </p>
                         <p className="mt-1 text-xs text-slate-600">{entry.reason}</p>
                         <p className="mt-1 font-mono text-[10px] text-slate-400">{formatDate(entry.reassignedAt)}</p>
@@ -242,14 +243,14 @@ export default function AssignmentHistory({ history, onReassign }: AssignmentHis
               <form onSubmit={submitReassignment} className="space-y-3 border-t border-slate-100 pt-4">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">Manual reassignment</h3>
-                  <p className="mt-1 text-xs text-slate-500">Only active mock employees are available. A reason is added to this order’s demo history.</p>
+                   <p className="mt-1 text-xs text-slate-500">Only active NIDO platform employees are available. A reason is added to this order’s demo history.</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="reassign-employee" className="mb-1.5 block text-xs font-medium text-slate-700">New employee <span className="text-rose-600">*</span></label>
                     <select id="reassign-employee" value={selectedEmployee} onChange={(event) => { setSelectedEmployee(event.target.value); setFormError(""); }} className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700">
                       <option value="">Choose an active employee</option>
-                      {EMPLOYEES.filter((employee) => employee.status === "Active").map((employee) => <option key={employee.id} value={employee.id}>{employee.name} · {employee.employeeId}</option>)}
+                      {employees.filter((employee) => employee.status === "Active").map((employee) => <option key={employee.id} value={employee.id}>{employee.name} · {employee.employeeId}</option>)}
                     </select>
                   </div>
                   <div>

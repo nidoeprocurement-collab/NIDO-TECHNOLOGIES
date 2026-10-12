@@ -88,33 +88,80 @@ const initialHistory: HistoryItem[] = [
   { orderId: "AA-DEMO-01031", clientId: "client-meridian", clientName: "Meridian Works", tier: "Medium", assignedEmployeeId: "employee-b", method: "Round Robin", assignedAt: ago(525), status: "Assigned", reassignments: [] },
 ];
 
-export function createDefaultDemoState(): DemoState {
-  const tiers = {
-    Premium: {
-      tier: "Premium" as const, enabled: true,
-      eligibleEmployeeIds: ["employee-a", "employee-b", "employee-c"],
-      sequence: ["employee-a", "employee-b", "employee-c"], rotationPosition: 1, fallback: "employee-b",
-    },
-    Medium: {
-      tier: "Medium" as const, enabled: true,
-      eligibleEmployeeIds: ["employee-b", "employee-c", "employee-d"],
-      sequence: ["employee-b", "employee-c", "employee-d"], rotationPosition: 0, fallback: "employee-c",
-    },
-    Standard: {
-      tier: "Standard" as const, enabled: true,
-      eligibleEmployeeIds: ["employee-a", "employee-c", "employee-d"],
-      sequence: ["employee-a", "employee-c", "employee-d"], rotationPosition: 2, fallback: null,
-    },
-  };
-  return { enabled: true, tiers, history: initialHistory.map((item) => ({ ...item, reassignments: [...item.reassignments] })) };
+function mapSeedEmployeeId(employeeId: string | null, employees: Employee[]): string | null {
+  if (!employeeId) return null;
+  if (employees.some((employee) => employee.id === employeeId)) return employeeId;
+  const seedIndex = EMPLOYEES.findIndex((employee) => employee.id === employeeId);
+  const activeEmployees = employees.filter((employee) => employee.status === "Active");
+  return seedIndex >= 0 && activeEmployees.length
+    ? activeEmployees[seedIndex % activeEmployees.length].id
+    : null;
 }
 
-function normalizeTier(raw: Partial<TierConfig> | undefined, tier: ClientTier, fallback: TierConfig): TierConfig {
+function resolveStoredEmployeeId(employeeId: unknown, employees: Employee[]): string | null {
+  if (typeof employeeId !== "string") return null;
+  return employees.some((employee) => employee.id === employeeId)
+    ? employeeId
+    : mapSeedEmployeeId(employeeId, employees);
+}
+
+export function createDefaultDemoState(employees: Employee[] = EMPLOYEES): DemoState {
+  const makeTier = (
+    tier: ClientTier,
+    employeeIds: string[],
+    rotationPosition: number,
+    fallback: string | null,
+  ): TierConfig => {
+    const sequence = [...new Set(employeeIds
+      .map((employeeId) => mapSeedEmployeeId(employeeId, employees))
+      .filter((employeeId): employeeId is string => employeeId !== null))];
+    return {
+      tier,
+      enabled: true,
+      eligibleEmployeeIds: [...sequence],
+      sequence,
+      rotationPosition: sequence.length ? rotationPosition % sequence.length : 0,
+      fallback: mapSeedEmployeeId(fallback, employees),
+    };
+  };
+  const tiers = {
+    Premium: makeTier("Premium", ["employee-a", "employee-b", "employee-c"], 1, "employee-b"),
+    Medium: makeTier("Medium", ["employee-b", "employee-c", "employee-d"], 0, "employee-c"),
+    Standard: makeTier("Standard", ["employee-a", "employee-c", "employee-d"], 2, null),
+  };
+  const history = initialHistory.map((item) => {
+    const assignedEmployeeId = mapSeedEmployeeId(item.assignedEmployeeId, employees);
+    return {
+      ...item,
+      assignedEmployeeId,
+      method: assignedEmployeeId ? item.method : "Unassigned" as const,
+      status: assignedEmployeeId ? item.status : "Unassigned" as const,
+      reassignments: item.reassignments.flatMap((entry) => {
+        const newEmployeeId = mapSeedEmployeeId(entry.newEmployeeId, employees);
+        return newEmployeeId
+          ? [{ ...entry, previousEmployeeId: mapSeedEmployeeId(entry.previousEmployeeId, employees), newEmployeeId }]
+          : [];
+      }),
+    };
+  });
+  return { enabled: true, tiers, history };
+}
+
+function normalizeTier(
+  raw: Partial<TierConfig> | undefined,
+  tier: ClientTier,
+  fallback: TierConfig,
+  employees: Employee[],
+): TierConfig {
   const eligible = Array.isArray(raw?.eligibleEmployeeIds)
-    ? [...new Set(raw.eligibleEmployeeIds.filter((id): id is string => EMPLOYEES.some((employee) => employee.id === id)))]
+    ? [...new Set(raw.eligibleEmployeeIds
+      .map((id) => resolveStoredEmployeeId(id, employees))
+      .filter((id): id is string => id !== null))]
     : [...fallback.eligibleEmployeeIds];
   const proposedSequence = Array.isArray(raw?.sequence) ? raw.sequence : fallback.sequence;
-  const sequence = [...new Set(proposedSequence.filter((id): id is string => eligible.includes(id)))];
+  const sequence = [...new Set(proposedSequence
+    .map((id) => resolveStoredEmployeeId(id, employees))
+    .filter((id): id is string => id !== null && eligible.includes(id)))];
   eligible.forEach((id) => { if (!sequence.includes(id)) sequence.push(id); });
   const position = Number.isFinite(raw?.rotationPosition) ? Number(raw?.rotationPosition) : fallback.rotationPosition;
   return {
@@ -123,43 +170,52 @@ function normalizeTier(raw: Partial<TierConfig> | undefined, tier: ClientTier, f
     eligibleEmployeeIds: eligible,
     sequence,
     rotationPosition: sequence.length ? ((position % sequence.length) + sequence.length) % sequence.length : 0,
-    fallback: typeof raw?.fallback === "string" && EMPLOYEES.some((employee) => employee.id === raw.fallback) ? raw.fallback : null,
+    fallback: resolveStoredEmployeeId(raw?.fallback, employees),
   };
 }
 
-function normalizeHistory(raw: unknown, defaults: HistoryItem[]): HistoryItem[] {
+function normalizeHistory(raw: unknown, defaults: HistoryItem[], employees: Employee[]): HistoryItem[] {
   if (!Array.isArray(raw)) return defaults;
   const validStatuses: AssignmentStatus[] = ["Assigned", "In Progress", "Completed", "Unassigned"];
   const validMethods: AssignmentMethod[] = ["Round Robin", "Fallback", "Manual reassignment", "Unassigned"];
-  return raw.filter((item): item is HistoryItem => !!item && typeof item.orderId === "string").map((item) => ({
-    orderId: String(item.orderId),
-    clientId: String(item.clientId || ""),
-    clientName: String(item.clientName || "Demo client"),
-    tier: CLIENT_TIERS.includes(item.tier) ? item.tier : "Standard",
-    assignedEmployeeId: EMPLOYEES.some((employee) => employee.id === item.assignedEmployeeId) ? item.assignedEmployeeId : null,
-    method: validMethods.includes(item.method) ? item.method : "Unassigned",
-    assignedAt: typeof item.assignedAt === "string" ? item.assignedAt : new Date().toISOString(),
-    status: validStatuses.includes(item.status) ? item.status : "Unassigned",
-    reassignments: Array.isArray(item.reassignments) ? item.reassignments.filter((entry: Reassignment) =>
-      entry && typeof entry.reason === "string" && typeof entry.newEmployeeId === "string",
-    ) : [],
-  }));
+  return raw.filter((item): item is HistoryItem => !!item && typeof item.orderId === "string").map((item) => {
+    const assignedEmployeeId = resolveStoredEmployeeId(item.assignedEmployeeId, employees);
+    const reassignments = Array.isArray(item.reassignments)
+      ? item.reassignments.flatMap((entry: Reassignment) => {
+        const newEmployeeId = resolveStoredEmployeeId(entry?.newEmployeeId, employees);
+        if (!entry || typeof entry.reason !== "string" || !newEmployeeId) return [];
+        const previousEmployeeId = resolveStoredEmployeeId(entry.previousEmployeeId, employees);
+        return [{ ...entry, previousEmployeeId, newEmployeeId }];
+      })
+      : [];
+    return {
+      orderId: String(item.orderId),
+      clientId: String(item.clientId || ""),
+      clientName: String(item.clientName || "Demo client"),
+      tier: CLIENT_TIERS.includes(item.tier) ? item.tier : "Standard",
+      assignedEmployeeId,
+      method: assignedEmployeeId && validMethods.includes(item.method) ? item.method : "Unassigned",
+      assignedAt: typeof item.assignedAt === "string" ? item.assignedAt : new Date().toISOString(),
+      status: assignedEmployeeId && validStatuses.includes(item.status) ? item.status : "Unassigned",
+      reassignments,
+    };
+  });
 }
 
-export function loadDemoState(): { state: DemoState; error: string | null } {
-  const defaults = createDefaultDemoState();
+export function loadDemoState(employees: Employee[] = EMPLOYEES): { state: DemoState; error: string | null } {
+  const defaults = createDefaultDemoState(employees);
   if (typeof window === "undefined") return { state: defaults, error: null };
   try {
     const stored = window.localStorage.getItem(DEMO_STORAGE_KEY);
     if (!stored) return { state: defaults, error: null };
     const raw = JSON.parse(stored) as Partial<DemoState>;
     const tiers = {} as Record<ClientTier, TierConfig>;
-    CLIENT_TIERS.forEach((tier) => { tiers[tier] = normalizeTier(raw.tiers?.[tier], tier, defaults.tiers[tier]); });
+    CLIENT_TIERS.forEach((tier) => { tiers[tier] = normalizeTier(raw.tiers?.[tier], tier, defaults.tiers[tier], employees); });
     return {
       state: {
         enabled: raw.enabled !== false,
         tiers,
-        history: normalizeHistory(raw.history, defaults.history),
+        history: normalizeHistory(raw.history, defaults.history, employees),
       },
       error: null,
     };
@@ -168,15 +224,28 @@ export function loadDemoState(): { state: DemoState; error: string | null } {
   }
 }
 
+export function reconcileDemoState(state: DemoState, employees: Employee[]): DemoState {
+  const defaults = createDefaultDemoState(employees);
+  const tiers = {} as Record<ClientTier, TierConfig>;
+  CLIENT_TIERS.forEach((tier) => {
+    tiers[tier] = normalizeTier(state.tiers[tier], tier, defaults.tiers[tier], employees);
+  });
+  return {
+    enabled: state.enabled,
+    tiers,
+    history: normalizeHistory(state.history, defaults.history, employees),
+  };
+}
+
 export function persistDemoState(state: DemoState): void {
   window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(state));
 }
 
-export function getEmployee(employeeId: string | null | undefined): Employee | undefined {
-  return EMPLOYEES.find((employee) => employee.id === employeeId);
+export function getEmployee(employeeId: string | null | undefined, employees: Employee[] = EMPLOYEES): Employee | undefined {
+  return employees.find((employee) => employee.id === employeeId);
 }
 
-export function getNextAssignments(config: TierConfig, count = 5): AssignmentPreview[] {
+export function getNextAssignments(config: TierConfig, count = 5, employees: Employee[] = EMPLOYEES): AssignmentPreview[] {
   const rows: AssignmentPreview[] = [];
   const sequence = config.sequence.filter((id) => config.eligibleEmployeeIds.includes(id));
   let cursor = sequence.length ? config.rotationPosition % sequence.length : 0;
@@ -185,7 +254,7 @@ export function getNextAssignments(config: TierConfig, count = 5): AssignmentPre
     if (sequence.length) {
       for (let offset = 0; offset < sequence.length; offset += 1) {
         const candidateIndex = (cursor + offset) % sequence.length;
-        const employee = getEmployee(sequence[candidateIndex]);
+        const employee = getEmployee(sequence[candidateIndex], employees);
         if (employee?.status === "Active") {
           selectedIndex = candidateIndex;
           break;
@@ -195,7 +264,7 @@ export function getNextAssignments(config: TierConfig, count = 5): AssignmentPre
     if (selectedIndex >= 0) {
       rows.push({ sequence: index + 1, employeeId: sequence[selectedIndex], method: "Round Robin" });
       cursor = (selectedIndex + 1) % sequence.length;
-    } else if (getEmployee(config.fallback)?.status === "Active") {
+    } else if (getEmployee(config.fallback, employees)?.status === "Active") {
       rows.push({ sequence: index + 1, employeeId: config.fallback, method: "Fallback" });
     } else {
       rows.push({ sequence: index + 1, employeeId: null, method: "Unassigned" });
@@ -207,6 +276,7 @@ export function getNextAssignments(config: TierConfig, count = 5): AssignmentPre
 export function simulateNext(
   state: DemoState,
   client: MockClient,
+  employees: Employee[] = EMPLOYEES,
 ): { nextState: DemoState; item: HistoryItem; message: string } {
   const config = state.tiers[client.tier];
   const orderNumber = state.history.reduce((highest, item) => {
@@ -214,7 +284,7 @@ export function simulateNext(
     return match ? Math.max(highest, Number(match[1])) : highest;
   }, 1030) + 1;
   const active = state.enabled && config.enabled
-    ? getNextAssignments(config, 1)[0]
+    ? getNextAssignments(config, 1, employees)[0]
     : { sequence: 1, employeeId: null, method: "Unassigned" as const };
   const assignedEmployeeId = active.employeeId;
   const item: HistoryItem = {
@@ -239,7 +309,7 @@ export function simulateNext(
     history: [item, ...state.history],
   };
   const message = assignedEmployeeId
-    ? `${item.orderId} assigned to ${getEmployee(assignedEmployeeId)?.name} for ${client.tier} (${active.method.toLowerCase()}).`
+    ? `${item.orderId} assigned to ${getEmployee(assignedEmployeeId, employees)?.name} for ${client.tier} (${active.method.toLowerCase()}).`
     : `${item.orderId} was not assigned. Auto assignment is disabled or no active eligible employee is available; the rotation did not advance.`;
   return { nextState, item, message };
 }
@@ -249,7 +319,9 @@ export function createReassignment(
   orderId: string,
   employeeId: string,
   reason: string,
+  employees: Employee[] = EMPLOYEES,
 ): DemoState {
+  if (getEmployee(employeeId, employees)?.status !== "Active") return state;
   const item = state.history.find((entry) => entry.orderId === orderId);
   if (!item) return state;
   const now = new Date().toISOString();

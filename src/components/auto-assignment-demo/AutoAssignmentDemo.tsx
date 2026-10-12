@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Check, CircleHelp, RotateCcw, Save, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import AssignmentHistory from "./AssignmentHistory";
 import TierConfiguration from "./TierConfiguration";
 import {
   CLIENT_TIERS,
-  EMPLOYEES,
   MOCK_CLIENTS,
   createDefaultDemoState,
   createReassignment,
@@ -17,11 +16,14 @@ import {
   getNextAssignments,
   loadDemoState,
   persistDemoState,
+  reconcileDemoState,
   simulateNext,
   type ClientTier,
   type DemoState,
+  type Employee,
   type TierConfig,
 } from "./model";
+import { getNidoAssignmentEmployees, NIDO_ROLES_EVENT, NIDO_USERS_EVENT } from "./platformEmployees";
 
 function sameTierRules(left: TierConfig, right: TierConfig) {
   return left.enabled === right.enabled
@@ -38,7 +40,8 @@ function statusMessageFor(error: unknown) {
 }
 
 export default function AutoAssignmentDemo() {
-  const [boot] = useState(() => loadDemoState());
+  const [employees, setEmployees] = useState<Employee[]>(() => getNidoAssignmentEmployees());
+  const [boot] = useState(() => loadDemoState(employees));
   const [state, setState] = useState<DemoState>(boot.state);
   const [draft, setDraft] = useState(() => ({
     enabled: boot.state.enabled,
@@ -51,6 +54,34 @@ export default function AutoAssignmentDemo() {
   const [selectedClientId, setSelectedClientId] = useState(MOCK_CLIENTS[0].id);
   const [resetOpen, setResetOpen] = useState(false);
 
+  useEffect(() => {
+    const refreshRoster = () => {
+      const nextEmployees = getNidoAssignmentEmployees();
+      setEmployees(nextEmployees);
+      setState((current) => reconcileDemoState(current, nextEmployees));
+      setDraft((current) => {
+        const normalized = reconcileDemoState({
+          enabled: current.enabled,
+          tiers: current.tiers,
+          history: [],
+        }, nextEmployees);
+        return { enabled: current.enabled, tiers: normalized.tiers };
+      });
+    };
+    const refreshFromStorage = (event: StorageEvent) => {
+      if (!event.key || event.key.startsWith("nido_config_")) refreshRoster();
+    };
+
+    window.addEventListener(NIDO_USERS_EVENT, refreshRoster);
+    window.addEventListener(NIDO_ROLES_EVENT, refreshRoster);
+    window.addEventListener("storage", refreshFromStorage);
+    return () => {
+      window.removeEventListener(NIDO_USERS_EVENT, refreshRoster);
+      window.removeEventListener(NIDO_ROLES_EVENT, refreshRoster);
+      window.removeEventListener("storage", refreshFromStorage);
+    };
+  }, []);
+
   const configDirty = draft.enabled !== state.enabled || CLIENT_TIERS.some((tier) =>
     JSON.stringify(draft.tiers[tier]) !== JSON.stringify(state.tiers[tier]),
   );
@@ -62,7 +93,7 @@ export default function AutoAssignmentDemo() {
   const selectedClient = availableClients.find((client) => client.id === selectedClientId) ?? availableClients[0];
   const activeEligibleIds = new Set(CLIENT_TIERS.flatMap((tier) =>
     state.tiers[tier].enabled
-      ? state.tiers[tier].eligibleEmployeeIds.filter((employeeId) => getEmployee(employeeId)?.status === "Active")
+      ? state.tiers[tier].eligibleEmployeeIds.filter((employeeId) => getEmployee(employeeId, employees)?.status === "Active")
       : [],
   ));
   const assignedCount = state.history.filter((item) => !!item.assignedEmployeeId).length;
@@ -94,7 +125,7 @@ export default function AutoAssignmentDemo() {
       tiers: { ...draft.tiers },
     };
     const hasEmptyEnabledTier = next.enabled && CLIENT_TIERS.some((tier) =>
-      next.tiers[tier].enabled && !next.tiers[tier].sequence.some((id) => getEmployee(id)?.status === "Active"),
+      next.tiers[tier].enabled && !next.tiers[tier].sequence.some((id) => getEmployee(id, employees)?.status === "Active"),
     );
     setState(next);
     setDraft({ enabled: next.enabled, tiers: { ...next.tiers } });
@@ -120,7 +151,7 @@ export default function AutoAssignmentDemo() {
 
   const runSimulation = () => {
     if (!selectedClient) return;
-    const { nextState, message } = simulateNext(state, selectedClient);
+    const { nextState, message } = simulateNext(state, selectedClient, employees);
     setDraft((current) => {
       const previousConfig = state.tiers[selectedClient.tier];
       const draftConfig = current.tiers[selectedClient.tier];
@@ -132,18 +163,18 @@ export default function AutoAssignmentDemo() {
   };
 
   const manualReassign = (orderId: string, employeeId: string, reason: string) => {
-    const next = createReassignment(state, orderId, employeeId, reason);
+    const next = createReassignment(state, orderId, employeeId, reason, employees);
     commit(next, `Demo reassignment recorded for ${orderId}.`);
   };
 
   const resetDemo = () => {
-    const defaults = createDefaultDemoState();
+    const defaults = createDefaultDemoState(employees);
     setDraft({ enabled: defaults.enabled, tiers: { ...defaults.tiers } });
     setResetOpen(false);
     commit(defaults, "Demo data reset in this browser.");
   };
 
-  const formatEmployee = (id: string | null) => getEmployee(id)?.name ?? "Unassigned";
+  const formatEmployee = (id: string | null) => getEmployee(id, employees)?.name ?? "Unassigned";
 
   return (
     <div className="space-y-5 pb-8">
@@ -159,11 +190,11 @@ export default function AutoAssignmentDemo() {
             </div>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Order assignment control</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
-              Configure tier-specific rotation, then test the next assignment against mock clients and employees.
+              Configure tier-specific rotation, then test mock clients with employees from the NIDO platform directory.
             </p>
             <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200/20 bg-amber-200/[0.08] px-3 py-2 text-xs leading-relaxed text-amber-100">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
-              <span><strong className="font-semibold">Demo Mode — Changes are not saved to a backend.</strong> Data is mock-only and may be reset at any time.</span>
+              <span><strong className="font-semibold">Demo Mode — Assignment settings and history stay in this browser.</strong> Employees come from NIDO Users; no operational orders or backend assignment settings are changed.</span>
             </div>
           </div>
           <div className="flex shrink-0 flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-4 sm:min-w-[265px] sm:flex-row sm:items-center lg:flex-col lg:items-stretch">
@@ -235,7 +266,7 @@ export default function AutoAssignmentDemo() {
         </div>
         <div className="grid gap-4 xl:grid-cols-3">
           {CLIENT_TIERS.map((tier) => (
-            <TierConfiguration key={tier} config={draft.tiers[tier]} employees={EMPLOYEES} onChange={(config) => updateDraftTier(tier, config)} />
+              <TierConfiguration key={tier} config={draft.tiers[tier]} employees={employees} onChange={(config) => updateDraftTier(tier, config)} />
           ))}
         </div>
       </section>
@@ -251,7 +282,7 @@ export default function AutoAssignmentDemo() {
             {CLIENT_TIERS.map((tier) => {
               const config = state.tiers[tier];
               const preview = state.enabled && config.enabled
-                ? getNextAssignments(config, 5)
+                ? getNextAssignments(config, 5, employees)
                 : Array.from({ length: 5 }, (_, index) => ({ sequence: index + 1, employeeId: null, method: "Unassigned" as const }));
               return (
                 <div key={tier} className="overflow-hidden rounded-lg border border-slate-200">
@@ -357,7 +388,7 @@ export default function AutoAssignmentDemo() {
         </div>
       </section>
 
-      <AssignmentHistory history={state.history} onReassign={manualReassign} />
+      <AssignmentHistory history={state.history} employees={employees} onReassign={manualReassign} />
 
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
         <DialogContent className="sm:max-w-md">
