@@ -73,8 +73,8 @@ const menuItems = [
     href: "/integrations",
   },
   {
-    title: "Auto Assignment",
-    description: "Configure tier-based order assignment and round-robin sequences",
+    title: "Auto Assignment Configuration",
+    description: "Configure and safely test tier-based order assignment",
     icon: Zap,
     href: "/configuration/auto-assignment",
   },

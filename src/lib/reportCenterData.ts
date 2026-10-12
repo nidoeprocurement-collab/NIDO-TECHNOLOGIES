@@ -450,7 +450,7 @@ function mapVendorCategories(): ReportRecord[] {
     ...vendor,
     vendorId: vendor.vendorId ?? vendor.id,
     vendorName: vendor.vendorName ?? vendor.name,
-    categoryId: vendor.categoryId ?? `category-${String(vendor.category).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    categoryId: vendor.categoryId,
     categoryName: vendor.category,
     parentCategoryId: vendor.parentCategoryId ?? "",
     description: vendor.categoryDescription ?? "",
@@ -481,7 +481,7 @@ function mapVendorPerformance(): ReportRecord[] {
     ) || deliveredOrders.reduce((total, order) => total + Number(order.qty ?? 0), 0);
     const datedDeliveries = deliveredOrders.flatMap((order) => {
       const expected = order.requestedDelivery ?? order.expectedDeliveryDate;
-      const actual = order.deliveredAt ?? order.actualDeliveryDate ?? order.deliveryDate;
+      const actual = order.deliveredAt ?? order.actualDeliveryDate;
       const expectedTime = expected ? new Date(String(expected)).getTime() : Number.NaN;
       const actualTime = actual ? new Date(String(actual)).getTime() : Number.NaN;
       return Number.isFinite(expectedTime) && Number.isFinite(actualTime) ? [{
@@ -631,7 +631,6 @@ function mapClientRolePermissions(): ReportRecord[] {
     return rows.map((permission) => ({
       ...role,
       permission,
-      ...permission,
       permissions,
       assignedUserCount,
     }));
@@ -704,8 +703,8 @@ function mapReceiptAllocationRecords(): ReportRecord[] {
     return {
       ...receipt,
       receiptId: receipt.id,
-      clientId: invoice?.clientId,
-      invoiceId: invoice?.id,
+      clientId: invoice?.clientId ?? receipt.clientId,
+      invoiceId: invoice?.id ?? receipt.invoiceId,
       allocationDate: receipt.paymentDate,
       allocatedAmount: amount,
       allocatedBy: receipt.createdBy,
@@ -889,7 +888,7 @@ function mapClientDashboardRecords(): ReportRecord[] {
       ).length,
       salesRevenue,
       procurementSpend,
-      grossMarginPercent: salesRevenue > 0
+      grossMarginPercent: salesRevenue > 0 && clientPurchaseOrders.length > 0
         ? ((salesRevenue - procurementSpend) / salesRevenue) * 100
         : undefined,
       pendingApprovalCount: allApprovals.filter((approval) =>

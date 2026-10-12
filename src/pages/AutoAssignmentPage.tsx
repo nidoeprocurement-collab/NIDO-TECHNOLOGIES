@@ -1,6 +1,6 @@
 import { ArrowLeft, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
-import AutoAssignmentTab from "@/components/configuration/AutoAssignmentTab";
+import AutoAssignmentDemo from "@/components/auto-assignment-demo/AutoAssignmentDemo";
 
 export default function AutoAssignmentPage() {
   return (
@@ -19,14 +19,14 @@ export default function AutoAssignmentPage() {
             <Zap className="h-5 w-5 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Auto Assignment</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Auto Assignment Configuration</h1>
             <p className="text-sm text-muted-foreground">
-              Configure tier-based order rotation, previews, history, and service assignment rules.
+              Configure and test tier-based order rotation using isolated demo data.
             </p>
           </div>
         </div>
 
-        <AutoAssignmentTab />
+        <AutoAssignmentDemo />
       </div>
     </div>
   );
