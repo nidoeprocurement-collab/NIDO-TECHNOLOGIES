@@ -477,23 +477,27 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
                       </tr>
                     </thead>
                     <tbody>
-                      {cart.map((item) => (
+                      {cart.map((item, index) => {
+                        const unitPrice =
+                          cartPricing.lines[index]?.checkoutUnitPriceInclusive ?? item.priceNum;
+                        return (
                         <tr key={item.id} className="border-b border-gray-50 last:border-0">
                           <td className="py-4 px-6">
                             <div className="flex items-start gap-3">
                               <img src={item.image} alt={item.name} className="w-14 h-14 object-cover rounded-lg border border-gray-100 shrink-0" />
                               <div>
                                 <p className="font-medium text-sm text-gray-900 mb-1">{item.name}</p>
-                                <p className="text-xs text-gray-400">{item.specs.join(" • ")}</p>
+                                <p className="text-xs text-gray-400">{Array.isArray(item.specs) ? item.specs.join(" • ") : ""}</p>
                                 <p className="text-xs text-gray-400 mt-1">MOQ: {item.moq}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">{formatPrice(getEffectivePrice(item))}</td>
+                          <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">{formatPrice(unitPrice)}</td>
                           <td className="py-4 pr-4 align-top text-sm text-gray-700">{item.quantity}</td>
-                          <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(getEffectivePrice(item) * item.quantity)}</td>
+                          <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(unitPrice * item.quantity)}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
