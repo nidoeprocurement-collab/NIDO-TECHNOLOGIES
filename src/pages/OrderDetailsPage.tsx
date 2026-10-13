@@ -23,7 +23,11 @@ import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
 import { createApprovalRequest, cancelApprovalRequestsForReference, loadApprovalBootstrap } from "@/lib/approvalEngine";
-import { syncMasterOrderFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
+import {
+  deriveMasterOrderFulfillmentStatus,
+  syncMasterOrderFulfillmentStatus,
+  type FulfillmentStatus,
+} from "@/lib/orderFulfillmentStatus";
 import {
   getAvailabilityLabel,
   getProductCommercialTerms,
@@ -2881,15 +2885,6 @@ export default function MyOrderPage() {
     ? ["Sub Orders / Items"]
     : ["Sub Orders / Items", "Draft Purchase Orders"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
-  // Master status lives on the shared order record itself (single source of
-  // truth) so a change made on the owner platform is visible immediately on
-  // the client portal, and vice versa, without any separate local copy.
-  const masterStatus = order?.status || "Processing";
-  const isOrderInactive = masterStatus === "Cancelled" || masterStatus === "Draft";
-  // Once an order is Cancelled it is a terminal state — no further status
-  // changes or processing are allowed on it.
-  const isOrderCancelled = masterStatus === "Cancelled";
-  const isOrderDelivered = masterStatus === "Delivered";
   // Incremented whenever a PO is created, updated, or has a line removed so
   // derived PO status/lock state refreshes immediately in this page.
   const [poRefreshKey, setPoRefreshKey] = useState(0);
@@ -2968,6 +2963,26 @@ export default function MyOrderPage() {
       ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
       : []
   );
+  const storedMasterStatus = String(order?.status || "Processing");
+  // Reflect the current item statuses immediately instead of waiting for the
+  // localStorage → context synchronization round-trip. The same derived status
+  // is persisted below, keeping the shared order record and this page aligned.
+  const masterStatus = useMemo(() => {
+    if (storedMasterStatus === "Cancelled" || storedMasterStatus === "Draft") {
+      return storedMasterStatus;
+    }
+    const itemCount = order?.cartItems?.length || 0;
+    if (!itemCount || subOrders.length !== itemCount) return storedMasterStatus;
+    return deriveMasterOrderFulfillmentStatus(
+      subOrders.map(subOrder => subOrder.itemStatus),
+      storedMasterStatus as FulfillmentStatus,
+    );
+  }, [order?.cartItems?.length, storedMasterStatus, subOrders]);
+  const isOrderInactive = masterStatus === "Cancelled" || masterStatus === "Draft";
+  // Once an order is Cancelled it is a terminal state — no further status
+  // changes or processing are allowed on it.
+  const isOrderCancelled = masterStatus === "Cancelled";
+  const isOrderDelivered = masterStatus === "Delivered";
   // Keep the 72-hour return action current even if the page stays open past
   // the deadline without another order/status update.
   const [, setReturnWindowTick] = useState(0);

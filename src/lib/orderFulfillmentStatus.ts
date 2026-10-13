@@ -63,6 +63,19 @@ export function deriveFulfillmentStatus(
   return "Processing";
 }
 
+export function deriveMasterOrderFulfillmentStatus(
+  statuses: unknown[],
+  fallback: FulfillmentStatus = "Processing",
+): FulfillmentStatus {
+  const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
+  const hasShipmentProgress = statuses.some(status =>
+    isShipped(status) || isDeliveryComplete(status),
+  );
+  return hasPendingShipping && !hasShipmentProgress
+    ? "Pending Shipping"
+    : deriveFulfillmentStatus(statuses, fallback);
+}
+
 function readJson<T>(key: string, fallback: T): T {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) || "");
@@ -105,16 +118,10 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
     return storedStatus || "Processing";
   });
 
-  // Pending Shipping is the master status while items are waiting for
-  // shipment. Existing shipment and delivery precedence remains unchanged.
-  const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
-  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDeliveryComplete(status));
-  const nextStatus = hasPendingShipping && !hasShipmentProgress
-    ? "Pending Shipping"
-    : deriveFulfillmentStatus(
-        statuses,
-        (order.status as FulfillmentStatus) || "Processing",
-      );
+  const nextStatus = deriveMasterOrderFulfillmentStatus(
+    statuses,
+    (order.status as FulfillmentStatus) || "Processing",
+  );
   if (order.status !== nextStatus) {
     const updatedOrders = orders.map(candidate =>
       candidate?.id === orderId ? { ...candidate, status: nextStatus } : candidate,
