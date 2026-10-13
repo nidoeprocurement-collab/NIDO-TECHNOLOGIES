@@ -41,6 +41,7 @@ import { createReportExportAttachment, downloadReportExport } from "@/lib/report
 import { sendEmail } from "@/lib/emailApi";
 import { loadConfig } from "@/lib/configService";
 import { toast } from "@/hooks/use-toast";
+import { reportCenterDisplayColumn } from "@/lib/reportHeaderUtils";
 
 const INITIAL_DRAFT: ReportCreateDraft = {
   entityType: "vendor",
@@ -174,6 +175,45 @@ function selectedScope(
   const names = (entities[type] ?? []).filter((entity) => entityIds.includes(entity.id)).map((entity) => entity.name);
   if (names.length <= 2) return names.join(", ") || `Selected ${noun}`;
   return `${names.length} selected ${noun}`;
+}
+
+function reportScopeHeaderLines(
+  draft: ReportCreateDraft,
+  entities: Record<ReportEntityType, ReportEntity[]>,
+): string[] {
+  const label = draft.entityType === "client" ? "Client" : draft.entityType === "vendor" ? "Vendor" : "Department";
+  const noun = draft.entityType === "internal" ? "departments" : `${draft.entityType}s`;
+  const selectedNames = draft.allEntities
+    ? `All ${noun}`
+    : draft.entityIds
+      .map((id) => entities[draft.entityType].find((entity) => entity.id === id)?.name)
+      .filter((name): name is string => Boolean(name))
+      .join(", ") || `Selected ${noun}`;
+  return [`${label}: ${selectedNames}`];
+}
+
+function reportHistoryName(
+  draft: ReportCreateDraft,
+  entities: Record<ReportEntityType, ReportEntity[]>,
+): string {
+  return `${draft.module} Report — ${selectedScope(draft.entityType, draft.entityIds, draft.allEntities, entities)}`;
+}
+
+function displayReportColumns(
+  columns: { key: string; label: string }[],
+  draft: ReportCreateDraft,
+  entities: Record<ReportEntityType, ReportEntity[]>,
+  scopeHeader?: string,
+): { key: string; label: string }[] {
+  const savedClientName = scopeHeader?.match(/^Client:\s*(.+)$/i)?.[1]?.trim();
+  const isSavedClientName = savedClientName && !/^(all clients|selected clients)$/i.test(savedClientName);
+  const selectedClientName = draft.entityType === "client" && !draft.allEntities && draft.entityIds.length === 1
+    ? isSavedClientName || entities.client.find((entity) => entity.id === draft.entityIds[0])?.name
+    : undefined;
+  return columns.map((column) => ({
+    ...column,
+    label: reportCenterDisplayColumn(column.label, draft.entityType, selectedClientName),
+  }));
 }
 
 function rangeForSchedule(draft: ReportCreateDraft, range: string): ReportCreateDraft {
@@ -354,11 +394,14 @@ export default function ReportsPage() {
   ) => {
     const now = new Date();
     const typeName = reportTypeName(reportDraft.entityType);
-    const scopeDetail = selectedScope(reportDraft.entityType, reportDraft.entityIds, reportDraft.allEntities, getReportCenterEntities());
+    const entities = getReportCenterEntities();
+    const scopeDetail = selectedScope(reportDraft.entityType, reportDraft.entityIds, reportDraft.allEntities, entities);
+    const scopeHeader = reportScopeHeaderLines(reportDraft, entities)[0];
     const record: Omit<StoredReportCenterHistory, "id"> = {
-      name: `${reportDraft.module} Report`,
+      name: reportHistoryName(reportDraft, entities),
       scope: typeName,
       scopeDetail,
+      scopeHeader,
       reportType: typeName,
       module: reportDraft.module,
       generatedAt: formatIST(now),
@@ -418,16 +461,18 @@ export default function ReportsPage() {
       const reportRecords = withReportRunMetadata(selectedRecords, reportDraft);
       columns = getReportCenterExportData(reportRecords, orderedColumns);
       rows = getReportCenterRows(reportRecords, orderedColumns);
-      const title = `${reportDraft.module} Report`;
+      const title = reportHistoryName(reportDraft, entities);
+      const headerContext = reportScopeHeaderLines(reportDraft, entities);
+      const exportColumns = displayReportColumns(columns, reportDraft, entities);
 
       if (delivery === "Download") {
-        downloadReportExport(reportDraft.format, title, columns, rows);
+        downloadReportExport(reportDraft.format, title, exportColumns, rows, { headerContext });
       } else {
         const recipients = [...new Set(reportDraft.recipients.split(/[;,]/).map((address) => address.trim()).filter(Boolean))];
         if (!recipients.length) throw new Error("Add at least one email recipient.");
         const invalidAddress = recipients.find((address) => !EMAIL_PATTERN.test(address));
         if (invalidAddress) throw new Error(`Invalid email address: ${invalidAddress}`);
-        const attachment = createReportExportAttachment(reportDraft.format, title, columns, rows);
+        const attachment = createReportExportAttachment(reportDraft.format, title, exportColumns, rows, { headerContext });
         const runKey = `reports-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const results = await Promise.allSettled(recipients.map((to) => sendEmail({
           templateKey: "general_notification",
@@ -624,7 +669,21 @@ export default function ReportsPage() {
           mappedColumns,
         );
       }
-      downloadReportExport(saved.format, saved.name, columns, rows);
+      const currentEntities = getReportCenterEntities();
+      const historyTitle = saved.scopeHeader
+        ? saved.name
+        : saved.draft
+          ? reportHistoryName(saved.draft, currentEntities)
+        : saved.name;
+      const headerContext = saved.scopeHeader
+        ? [saved.scopeHeader]
+        : saved.draft
+          ? reportScopeHeaderLines(saved.draft, currentEntities)
+        : saved.scopeDetail ? [`Report scope: ${saved.scopeDetail}`] : [];
+      const exportColumns = saved.draft
+        ? displayReportColumns(columns, saved.draft, currentEntities, saved.scopeHeader)
+        : columns;
+      downloadReportExport(saved.format, historyTitle, exportColumns, rows, { headerContext });
       toast({ title: "Report downloaded", description: `${rows.length.toLocaleString()} rows exported from the saved report snapshot.` });
     } catch (error) {
       toastError("Could not download report", error);
@@ -658,6 +717,7 @@ export default function ReportsPage() {
       previewCount={filteredRecords.length}
       previewError={sourceError || (sourceLoading ? "Loading live report data…" : "")}
       previewCurrency={currency}
+      previewScope={reportScopeHeaderLines(draft, entitiesByType)[0]}
       onPreview={() => setReloadToken((token) => token + 1)}
       onDownloadReport={(reportDraft) => { void executeReport(reportDraft, "Manual", "Download"); }}
       onSendReportEmail={(reportDraft) => { void executeReport(reportDraft, "Manual", "Email"); }}

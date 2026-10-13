@@ -35,6 +35,7 @@ export interface StoredReportCenterHistory {
   name: string;
   scope: string;
   scopeDetail?: string;
+  scopeHeader?: string;
   reportType: string;
   module: string;
   generatedAt: string;

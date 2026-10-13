@@ -29,6 +29,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { reportCenterDisplayColumn } from "@/lib/reportHeaderUtils";
 import "./reports-center.css";
 
 export type ReportsCenterTab = "create" | "scheduled" | "history";
@@ -129,6 +130,7 @@ export interface ReportsCenterUIProps {
   previewCount?: number;
   previewError?: string;
   previewCurrency?: string;
+  previewScope?: string;
   onPreview?: (draft: ReportCreateDraft) => void;
   onDownloadReport?: (draft: ReportCreateDraft) => void;
   onSendReportEmail?: (draft: ReportCreateDraft) => void;
@@ -251,6 +253,7 @@ function CreateReportView({
   previewCount,
   previewError,
   previewCurrency,
+  previewScope,
   onPreview,
   onDownloadReport,
   onSendReportEmail,
@@ -265,6 +268,7 @@ function CreateReportView({
   previewCount?: number;
   previewError?: string;
   previewCurrency: string;
+  previewScope?: string;
   onPreview?: (draft: ReportCreateDraft) => void;
   onDownloadReport?: (draft: ReportCreateDraft) => void;
   onSendReportEmail?: (draft: ReportCreateDraft) => void;
@@ -275,6 +279,10 @@ function CreateReportView({
   const [previewVisible, setPreviewVisible] = useState(true);
   const [previewRequested, setPreviewRequested] = useState(false);
   const entities = entitiesByType[draft.entityType] ?? [];
+  const selectedClientName = draft.entityType === "client" && !draft.allEntities && draft.entityIds.length === 1
+    ? entities.find((entity) => entity.id === draft.entityIds[0])?.name
+    : undefined;
+  const displayColumn = (column: string) => reportCenterDisplayColumn(column, draft.entityType, selectedClientName);
   const modules = modulesByType[draft.entityType] ?? DEFAULT_MODULES[draft.entityType];
   const effectiveModule = modules.includes(draft.module) ? draft.module : modules[0] ?? "";
   const groups = columnsByModule[effectiveModule] ?? DEFAULT_COLUMNS[effectiveModule] ?? [];
@@ -378,7 +386,7 @@ function CreateReportView({
           <button type="button" className="rc-button" onClick={() => updateDraft({ selectedColumns: [] })}>Clear</button>
         </div>
         <div className="rc-columns-grid">
-          {filteredColumns.length ? filteredColumns.flatMap((group) => group.columns).map((column) => <label key={column} className="rc-column-label"><input type="checkbox" checked={selectedColumns.includes(column)} onChange={() => toggleColumn(column)} />{column}</label>) : <span className="rc-help">No columns match your search.</span>}
+          {filteredColumns.length ? filteredColumns.flatMap((group) => group.columns).map((column) => <label key={column} className="rc-column-label"><input type="checkbox" checked={selectedColumns.includes(column)} onChange={() => toggleColumn(column)} />{displayColumn(column)}</label>) : <span className="rc-help">No columns match your search.</span>}
         </div>
       </section>
       <div className="rc-bottom-grid">
@@ -405,9 +413,15 @@ function CreateReportView({
       </section>
       <p className="rc-error-note">{!selectedEntities ? `Select at least one ${draft.entityType === "internal" ? "department" : `${draft.entityType}s`}.` : ""}</p>
       {previewVisible && <section className="rc-card rc-section">
-        <div className="rc-section-title"><span>Report preview <span style={{ color: "#9299a3", fontWeight: 400 }}>· Selected columns only</span></span><span style={{ color: "#9299a3", fontSize: 9 }}>Showing {Math.min(previewRecords.length, 5)} of {previewCount ?? previewRecords.length} rows</span></div>
+        <div className="rc-section-title">
+          <span>
+            Report preview <span style={{ color: "#9299a3", fontWeight: 400 }}>· Selected columns only</span>
+            {previewScope && <span style={{ display: "block", color: "#68717f", fontSize: 9, fontWeight: 400, marginTop: 3 }}>{previewScope}</span>}
+          </span>
+          <span style={{ color: "#9299a3", fontSize: 9 }}>Showing {Math.min(previewRecords.length, 5)} of {previewCount ?? previewRecords.length} rows</span>
+        </div>
         {previewRequested && !previewRecords.length && <span className="rc-help">Preview refreshed from the current selection.</span>}
-        <div className="rc-preview-table"><table><thead><tr>{selectedColumns.map((column) => <th key={column}>{column}{/price|amount|total/i.test(column) ? ` (${previewCurrency})` : ""}</th>)}</tr></thead>
+          <div className="rc-preview-table"><table><thead><tr>{selectedColumns.map((column) => <th key={column}>{displayColumn(column)}{/price|amount|total/i.test(column) ? ` (${previewCurrency})` : ""}</th>)}</tr></thead>
           <tbody>{previewRecords.length && selectedColumns.length ? previewRecords.slice(0, 5).map((record) => <tr key={record.id}>{selectedColumns.map((column) => <td key={column}>{record.values[column] ?? "—"}</td>)}</tr>) : <tr><td className="rc-empty" colSpan={Math.max(selectedColumns.length, 1)}>{previewError || "No stored records match this selection. Try another entity or date range."}</td></tr>}</tbody>
         </table></div>
       </section>}
@@ -700,6 +714,7 @@ export default function ReportsCenterUI(props: ReportsCenterUIProps) {
         previewCount={props.previewCount}
         previewError={props.previewError}
         previewCurrency={props.previewCurrency ?? "INR"}
+        previewScope={props.previewScope}
         onPreview={props.onPreview}
         onDownloadReport={props.onDownloadReport}
         onSendReportEmail={props.onSendReportEmail}

@@ -14,3 +14,9 @@ In every report module, item-list columns show product names only; remove duplic
 **Why:** The user asked for names-only item columns and no duplicated report columns across modules.
 
 **How to apply:** Keep this output rule centralized so the same columns and values appear in report previews, new downloads, and historical downloads.
+
+Client Contracts report column paths that contain the legacy "Apex" segment must keep that canonical segment for data lookup, but display the selected client's name for a single-client report and "Client" for broader scopes. Save the exact scope label with report history so later downloads retain the original label.
+
+**Why:** The user requested selected client/vendor names instead of a fixed Apex name in report headers, and changing canonical paths would break field resolution.
+
+**How to apply:** Change display labels only; preserve keys used by report data mapping, and use the saved scope snapshot for historical exports.
