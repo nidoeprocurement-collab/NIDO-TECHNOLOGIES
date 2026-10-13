@@ -142,7 +142,7 @@ const CLIENT_ORDER_SUPPORTED_COLUMNS = new Set([
   "Approved By", "Approved Date", "Approval Status", "Ordered Item Count", "Total Quantity", "Last Comment",
 ]);
 
-export const REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = {
+const RAW_REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = {
   ...LEGACY_REPORT_CENTER_COLUMNS,
   ...Object.fromEntries(
     [...new Set(Object.values(REPORT_CENTER_MODULES).flat())].map((module) => [
@@ -157,13 +157,44 @@ export const REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = {
   ),
 };
 
+export function uniqueReportCenterColumns(columns: string[]): string[] {
+  const seen = new Set<string>();
+  return columns.filter((column) => {
+    const identity = normalize(column);
+    if (!identity || seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
+export const REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = Object.fromEntries(
+  Object.entries(RAW_REPORT_CENTER_COLUMNS).map(([module, groups]) => {
+    const seen = new Set<string>();
+    const uniqueGroups = groups
+      .map((columnGroup) => ({
+        ...columnGroup,
+        columns: columnGroup.columns.filter((column) => {
+          const identity = normalize(column);
+          if (!identity || seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        }),
+      }))
+      .filter((columnGroup) => columnGroup.columns.length > 0);
+    return [module, uniqueGroups];
+  }),
+);
+
 export function orderReportCenterColumns(module: string, selectedColumns: string[]): string[] {
-  const selected = new Set(selectedColumns);
+  const selected = new Set(selectedColumns.map(normalize));
   const canonical = REPORT_CENTER_COLUMNS[module]?.flatMap((columnGroup) => columnGroup.columns) ?? [];
-  const ordered = canonical.filter((column) => selected.has(column));
-  const canonicalSet = new Set(canonical);
+  const ordered = canonical.filter((column) => selected.has(normalize(column)));
+  const canonicalSet = new Set(canonical.map(normalize));
   if (module === "Client Orders") return ordered;
-  return [...ordered, ...selectedColumns.filter((column) => !canonicalSet.has(column))];
+  return uniqueReportCenterColumns([
+    ...ordered,
+    ...selectedColumns.filter((column) => !canonicalSet.has(normalize(column))),
+  ]);
 }
 
 export function getReportCenterDefaultColumns(module: string, count = 6): string[] {
@@ -1431,27 +1462,56 @@ function findValue(record: ReportRecord, column: string): unknown {
   return fallback === "—" ? undefined : fallback;
 }
 
+const PRODUCT_LIST_COLUMN_IDENTITIES = new Set(["item", "items", "lineitems", "cartitems"]);
+
+export function isReportCenterProductListColumn(column: string): boolean {
+  return PRODUCT_LIST_COLUMN_IDENTITIES.has(normalize(column));
+}
+
+function productNamesOnly(value: unknown): string {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    const trimmed = parsed.trim();
+    if (!trimmed) return "—";
+    if (trimmed.startsWith("[") || trimmed.startsWith("{") || trimmed.startsWith('"')) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        parsed = trimmed;
+      }
+    } else {
+      parsed = trimmed;
+    }
+  }
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  const names = items.flatMap((item) => {
+    if (typeof item === "string") return item.trim() ? [item.trim()] : [];
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+
+    const entry = item as ReportRecord;
+    const nestedProducts = [entry.product, entry.item, entry.catalogItem, entry.productSnapshot]
+      .filter((candidate): candidate is ReportRecord =>
+        Boolean(candidate) && typeof candidate === "object" && !Array.isArray(candidate),
+      );
+    const name = [
+      entry.productName,
+      entry.itemName,
+      entry.name,
+      entry.title,
+      ...nestedProducts.flatMap((product) => [product.productName, product.itemName, product.name, product.title]),
+      typeof entry.product === "string" ? entry.product : undefined,
+      typeof entry.item === "string" ? entry.item : undefined,
+    ].find((candidate) => typeof candidate === "string" && candidate.trim());
+    return typeof name === "string" ? [name.trim()] : [];
+  });
+  return names.length ? names.join(", ") : "—";
+}
+
 export function getReportCenterCellValue(record: ReportRecord, column: string): string {
   const value = findValue(record, column);
   if (value === undefined || value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (column === "Cart Items") {
-    const items = Array.isArray(value) ? value : [value];
-    const names = items.flatMap((item) => {
-      if (typeof item === "string") return item.trim() ? [item.trim()] : [];
-      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-
-      const cartItem = item as ReportRecord;
-      const product = cartItem.product && typeof cartItem.product === "object" && !Array.isArray(cartItem.product)
-        ? cartItem.product as ReportRecord
-        : {};
-      const name = cartItem.productName ?? cartItem.name ?? cartItem.itemName ?? cartItem.title ?? product.name;
-      return name === null || name === undefined || String(name).trim() === ""
-        ? []
-        : [String(name).trim()];
-    });
-    return names.length ? names.join(", ") : "—";
-  }
+  if (isReportCenterProductListColumn(column)) return productNamesOnly(value);
   if (typeof value === "object") return JSON.stringify(value);
   if (/(amount|price|total|spend|cost)$/i.test(column)) {
     const amount = Number(value);
@@ -1526,9 +1586,10 @@ export function getReportCenterPreview(
   records: ReportRecord[],
   columns: string[],
 ): { id: string; values: Record<string, string> }[] {
+  const uniqueColumns = uniqueReportCenterColumns(columns);
   return records.slice(0, 100).map((record, index) => ({
     id: String(record.id ?? record.number ?? record.poNumber ?? record.orderNumber ?? index),
-    values: Object.fromEntries(columns.map((column) => [column, getReportCenterCellValue(record, column)])),
+    values: Object.fromEntries(uniqueColumns.map((column) => [column, getReportCenterCellValue(record, column)])),
   }));
 }
 
@@ -1536,13 +1597,14 @@ export function getReportCenterExportData(
   records: ReportRecord[],
   columns: string[],
 ): { key: string; label: string }[] {
-  return columns.map((column) => ({ key: column, label: column }));
+  return uniqueReportCenterColumns(columns).map((column) => ({ key: column, label: column }));
 }
 
 export function getReportCenterRows(
   records: ReportRecord[],
   columns: string[],
 ): Record<string, string>[] {
-  return records.map((record) => Object.fromEntries(columns.map((column) => [column, getReportCenterCellValue(record, column)])));
+  const uniqueColumns = uniqueReportCenterColumns(columns);
+  return records.map((record) => Object.fromEntries(uniqueColumns.map((column) => [column, getReportCenterCellValue(record, column)])));
 }
 

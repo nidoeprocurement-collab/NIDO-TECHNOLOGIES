@@ -91,12 +91,15 @@ import {
   filterReportCenterRecords,
   getReportCenterRecords,
   getReportCenterDefaultColumns,
+  getReportCenterCellValue,
+  getReportCenterExportData,
   getReportCenterPreview,
   getReportCenterRows,
   loadReportCenterRecords,
   orderReportCenterColumns,
   REPORT_CENTER_COLUMNS,
   REPORT_CENTER_MODULES,
+  uniqueReportCenterColumns,
 } from "@/lib/reportCenterData";
 
 describe("report center live data sources", () => {
@@ -168,6 +171,49 @@ describe("report center live data sources", () => {
 
     expect(preview[0].values["Cart Items"]).toBe("Acme Keyboard, Nido Monitor");
     expect(rows[0]["Cart Items"]).toBe("Acme Keyboard, Nido Monitor");
+  });
+
+  it("shows product names only for Item, Items, Line Items, and Cart Items columns", () => {
+    const record = {
+      item: { name: "Adapter", quantity: 4, sku: "AD-4", price: 250 },
+      items: [
+        { productName: "Keyboard", quantity: 2, sku: "KB-1", rate: 900 },
+        { product: { name: "Monitor", sku: "MN-2" }, qty: 1, amount: 7200 },
+      ],
+      lineItems: [{ itemName: "Dock", quantity: 3, description: "USB-C docking station" }],
+      cartItems: [{ name: "Mouse", quantity: 5, productCode: "MS-5" }],
+    };
+
+    expect(getReportCenterCellValue(record, "Item")).toBe("Adapter");
+    expect(getReportCenterCellValue(record, "Items")).toBe("Keyboard, Monitor");
+    expect(getReportCenterCellValue(record, "Line Items")).toBe("Dock");
+    expect(getReportCenterCellValue(record, "Cart Items")).toBe("Mouse");
+  });
+
+  it("removes duplicate report columns from selection, preview, and exports", () => {
+    const selected = ["Cart Items", "cart-items", "Cart Items"];
+    const columns = uniqueReportCenterColumns(selected);
+    const record = { cartItems: [{ name: "Keyboard", quantity: 2 }] };
+
+    expect(columns).toEqual(["Cart Items"]);
+    expect(orderReportCenterColumns("Client Orders", selected)).toEqual(["Cart Items"]);
+    expect(getReportCenterPreview([record], selected)[0].values).toEqual({ "Cart Items": "Keyboard" });
+    expect(getReportCenterRows([record], selected)[0]).toEqual({ "Cart Items": "Keyboard" });
+    expect(getReportCenterExportData([record], selected)).toEqual([
+      { key: "Cart Items", label: "Cart Items" },
+    ]);
+  });
+
+  it("keeps each report module's column catalog free of duplicate labels", () => {
+    Object.entries(REPORT_CENTER_COLUMNS).forEach(([, groups]) => {
+      const columns = groups.flatMap((group) => group.columns);
+      const identities = columns.map((column) => column.toLowerCase().replace(/[^a-z0-9]/g, ""));
+      expect(new Set(identities).size).toBe(identities.length);
+    });
+
+    expect(getReportCenterCellValue({
+      Items: JSON.stringify([{ name: "Serialized product", quantity: 3, price: 150 }]),
+    }, "Items")).toBe("Serialized product");
   });
 
   it("loads client services and includes their start date in date filtering", () => {

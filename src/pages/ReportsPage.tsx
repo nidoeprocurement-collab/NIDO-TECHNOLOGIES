@@ -19,6 +19,8 @@ import {
   getReportCenterRows,
   loadReportCenterRecords,
   getReportCenterDefaultColumns,
+  getReportCenterCellValue,
+  isReportCenterProductListColumn,
   orderReportCenterColumns,
   withReportRunMetadata,
 } from "@/lib/reportCenterData";
@@ -138,6 +140,18 @@ function parseISTDateTime(value: string): number {
   const match = value.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) IST$/);
   if (!match) return Number.NaN;
   return new Date(`${match[1]}T${match[2]}:00+05:30`).getTime();
+}
+
+function uniqueHistoryColumns(columns: { key: string; label: string }[]): { key: string; label: string }[] {
+  const seen = new Set<string>();
+  return columns.filter((column) => {
+    const identities = [column.key, column.label]
+      .map((value) => value.toLowerCase().replace(/[^a-z0-9]/g, ""))
+      .filter(Boolean);
+    if (identities.some((identity) => seen.has(identity))) return false;
+    identities.forEach((identity) => seen.add(identity));
+    return true;
+  });
 }
 
 function periodFor(draft: ReportCreateDraft): string {
@@ -541,8 +555,15 @@ export default function ReportsPage() {
       return;
     }
     try {
-      const columns = saved.columns;
-      let rows = saved.rows;
+      const columns = uniqueHistoryColumns(saved.columns);
+      let rows = saved.rows.map((row) => Object.fromEntries(
+        columns.map((column) => [
+          column.key,
+          isReportCenterProductListColumn(column.label || column.key)
+            ? getReportCenterCellValue({ [column.key]: row[column.key] }, column.label || column.key)
+            : row[column.key],
+        ]),
+      ));
       if (!rows.length && saved.rowCount > 0 && saved.draft) {
         const currentModuleRecords = await loadReportCenterRecords(saved.draft.module, saved.draft.entityType);
         const current = filterReportCenterRecords(
