@@ -91,7 +91,7 @@ type RenewalFormValues = Pick<
 type RenewalWizardValues = {
   client: string;
   order: string;
-  subOrder: string;
+  subOrders: string[];
   product: string;
   productImage: string;
   brand: Renewal["brand"];
@@ -136,6 +136,11 @@ type RenewalWizardSubOrder = {
   products: RenewalWizardProduct[];
   orderDate: string;
   deliveryDate: string;
+};
+
+type RenewalWizardSelectedProduct = {
+  subOrderId: string;
+  product: RenewalWizardProduct;
 };
 
 type RenewalWizardOrder = {
@@ -448,7 +453,7 @@ function createEmptyRenewalWizardValues(): RenewalWizardValues {
   return {
   client: "",
   order: "",
-  subOrder: "",
+  subOrders: [],
   product: "",
   productImage: "",
   brand: "other",
@@ -545,17 +550,35 @@ function isRenewableOrderItem(
   catalogProduct?: CatalogProduct,
 ): boolean {
   const fulfillmentType = String(item.fulfillmentType || "").toLowerCase();
-  const physicalType = String(item.physicalType || catalogProduct?.physicalType || "").toLowerCase();
-  const productType = String(item.productType || catalogProduct?.productType || "").toLowerCase();
+  const orderTypes = [
+    item.productType,
+    item.physicalType,
+    item.commercialTerms?.productType,
+    item.category,
+  ].map(value => String(value || "").trim()).filter(Boolean);
+  const isDigitalType = (value: string) =>
+    /(digital|subscription|saas|cloud|software|license|virtual)/i.test(value)
+    && !/(physical|hybrid|hardware|equipment)/i.test(value);
 
-  // Physical goods are not renewal candidates. Older orders may not have a
-  // fulfillmentType, so the catalog physicalType/productType checks cover
-  // those records as well.
-  if (fulfillmentType === "physical") return false;
-  if (physicalType.includes("physical")) return false;
-  if (!fulfillmentType && !productType && !physicalType) return false;
-  if (productType === "physical product" || productType === "physical") return false;
-  return true;
+  if (fulfillmentType) {
+    if (fulfillmentType !== "digital") return false;
+    return !orderTypes.some(value => /(physical|hybrid|hardware|equipment)/i.test(value));
+  }
+
+  const explicitlyNonDigital = orderTypes.some(value =>
+    /(physical|hybrid|hardware|equipment)/i.test(value),
+  );
+  if (explicitlyNonDigital) return false;
+  if (orderTypes.some(isDigitalType)) return true;
+
+  const catalogTypes = [
+    catalogProduct?.productType,
+    catalogProduct?.physicalType,
+    catalogProduct?.category,
+  ]
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  return catalogTypes.some(isDigitalType);
 }
 
 function createRenewalWizardProduct(
@@ -636,6 +659,34 @@ function createRenewalWizardOrders(orders: MyOrder[], products: CatalogProduct[]
 
 function createInitialRenewalWizardValues(): RenewalWizardValues {
   return createEmptyRenewalWizardValues();
+}
+
+function commonProductValue(
+  products: RenewalWizardProduct[],
+  readValue: (product: RenewalWizardProduct) => string,
+): string {
+  const values = [...new Set(products.map(readValue).filter(Boolean))];
+  return values.length === 1 ? values[0] : "";
+}
+
+function renewalProductQuantity(
+  product: RenewalWizardProduct,
+  values: RenewalWizardValues,
+  selectedProductCount: number,
+): string {
+  return selectedProductCount === 1 && values.quantity
+    ? values.quantity
+    : product.quantity || values.quantity;
+}
+
+function renewalProductUnitPrice(
+  product: RenewalWizardProduct,
+  values: RenewalWizardValues,
+  selectedProductCount: number,
+): string {
+  return selectedProductCount === 1 && values.unitPrice
+    ? values.unitPrice
+    : product.unitPrice || values.unitPrice;
 }
 
 function wizardDateLabel(value: string): string {
@@ -736,6 +787,55 @@ function WizardSelect({
   );
 }
 
+function SubOrderMultiSelect({
+  options,
+  selectedIds,
+  onChange,
+}: {
+  options: RenewalWizardSubOrder[];
+  selectedIds: string[];
+  onChange: (selectedIds: string[]) => void;
+}) {
+  const toggle = (subOrderId: string) => {
+    onChange(selectedIds.includes(subOrderId)
+      ? selectedIds.filter(id => id !== subOrderId)
+      : [...selectedIds, subOrderId]);
+  };
+
+  if (!options.length) {
+    return (
+      <button type="button" disabled className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 text-left text-sm text-gray-400">
+        Select an order first
+      </button>
+    );
+  }
+
+  return (
+    <details className="group relative">
+      <summary className="flex h-10 cursor-pointer list-none items-center justify-between rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 outline-none hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-blue-100">
+        <span>{selectedIds.length ? `${selectedIds.length} sub-order${selectedIds.length === 1 ? "" : "s"} selected` : "Select sub-orders"}</span>
+        <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div role="group" aria-label="Available digital sub-orders" className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg">
+        {options.map(subOrder => (
+          <label key={subOrder.id} className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-blue-50">
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(subOrder.id)}
+              onChange={() => toggle(subOrder.id)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-gray-800">{subOrder.id}</span>
+              <span className="block truncate text-xs text-gray-500">{subOrder.products.map(product => product.name).join(", ")}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function RenewalWizardStepper({ step }: { step: 1 | 2 | 3 | 4 }) {
   const steps = ["Select Order & Product", "Renewal Details", "Notifications", "Review & Create"];
   return (
@@ -763,50 +863,65 @@ function RenewalWizardStepper({ step }: { step: 1 | 2 | 3 | 4 }) {
 function RenewalProductSummary({
   values,
   nextExpiryDate,
+  selectedProducts,
   showOrderDetails = true,
 }: {
   values: RenewalWizardValues;
   nextExpiryDate: string;
+  selectedProducts: RenewalWizardSelectedProduct[];
   showOrderDetails?: boolean;
 }) {
-  const estimatedAmount =
-    (Number(values.quantity) || 0) *
-    (Number(values.unitPrice) || 0) *
-    renewalTermYears(values.renewalTerm);
+  const commonTerm = values.renewalTerm || commonProductValue(
+    selectedProducts.map(item => item.product),
+    product => product.renewalTerm,
+  );
+  const estimatedAmount = selectedProducts.reduce((total, item) => {
+    const quantity = Number(renewalProductQuantity(item.product, values, selectedProducts.length)) || 0;
+    const unitPrice = Number(renewalProductUnitPrice(item.product, values, selectedProducts.length)) || 0;
+    const term = values.renewalTerm || item.product.renewalTerm;
+    return total + quantity * unitPrice * renewalTermYears(term);
+  }, 0);
   return (
     <aside className="min-w-0 w-full rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-900">Selected Product</h2>
-        <button type="button" className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">
-          <Pencil className="h-3.5 w-3.5" /> Edit
-        </button>
+        <h2 className="text-sm font-bold text-gray-900">Selected Digital Products</h2>
+        <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{selectedProducts.length}</span>
       </div>
-      <div className="flex items-start gap-3 border-b border-gray-100 pb-4">
-        <BrandMark brand={values.brand} image={values.productImage} />
-        <div className="min-w-0">
-          <p className="font-semibold text-gray-900">{values.product}</p>
-          <span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">{values.licenseType || "Renewable Product"}</span>
-          <p className="mt-1 text-xs text-gray-500">{values.licenseType} | {values.quantity} Users</p>
+      {selectedProducts.length ? (
+        <div className="max-h-72 divide-y divide-gray-100 overflow-y-auto border-b border-gray-100">
+          {selectedProducts.map(({ subOrderId, product }) => (
+            <div key={`${subOrderId}-${product.name}`} className="flex min-w-0 items-start gap-2 py-3">
+              <BrandMark brand={product.brand} image={product.image} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900">{product.name}</p>
+                <p className="text-xs text-gray-500">{subOrderId} · {product.licenseType || "Digital Product"}</p>
+                <p className="mt-1 text-xs text-gray-600">{product.quantity || "—"} units · {product.unitPrice ? formatCurrencyAmount(product.unitPrice) : "—"} each</p>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      ) : (
+        <p className="border-b border-gray-100 pb-4 text-xs text-gray-500">Select digital sub-orders to load their products.</p>
+      )}
       {showOrderDetails && (
         <div className="space-y-3 border-b border-gray-100 py-4 text-xs">
           <div className="flex justify-between gap-4"><span className="text-gray-500">Client</span><span className="text-right font-medium text-gray-800">{values.client}</span></div>
           <div className="flex justify-between gap-4"><span className="text-gray-500">Order ID</span><span className="font-medium text-gray-800">{values.order}</span></div>
           <div className="flex justify-between gap-4"><span className="text-gray-500">Order Date</span><span className="font-medium text-gray-800">{wizardDateLabel(values.orderDate)}</span></div>
           <div className="flex justify-between gap-4"><span className="text-gray-500">Delivery Date</span><span className="font-medium text-gray-800">{wizardDateLabel(values.deliveryDate)}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-gray-500">Current Expiry</span><span className="font-medium text-gray-800">{wizardDateLabel(values.currentExpiryDate)} <span className="ml-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-600">Active</span></span></div>
+          <div className="flex justify-between gap-4"><span className="text-gray-500">Sub-orders</span><span className="text-right font-medium text-gray-800">{values.subOrders.length || "—"}</span></div>
+          {selectedProducts.length === 1 && <div className="flex justify-between gap-4"><span className="text-gray-500">Current Expiry</span><span className="font-medium text-gray-800">{wizardDateLabel(selectedProducts[0].product.currentExpiryDate || values.currentExpiryDate)}</span></div>}
         </div>
       )}
       <div className="space-y-3 border-b border-gray-100 py-4 text-xs">
-        <div className="flex justify-between gap-4"><span className="text-gray-500">Renewal Term</span><span className="font-medium text-gray-800">{values.renewalTerm}</span></div>
-        <div className="flex justify-between gap-4"><span className="text-gray-500">Quantity / Users</span><span className="font-medium text-gray-800">{values.quantity}</span></div>
-        <div className="flex justify-between gap-4"><span className="text-gray-500">Unit Price</span><span className="font-semibold text-gray-800">{formatCurrencyAmount(values.unitPrice)}</span></div>
+        <div className="flex justify-between gap-4"><span className="text-gray-500">Renewal Term</span><span className="font-medium text-gray-800">{commonTerm || "Set for each selected product"}</span></div>
+        <div className="flex justify-between gap-4"><span className="text-gray-500">Quantity / Users</span><span className="font-medium text-gray-800">Loaded per product</span></div>
+        <div className="flex justify-between gap-4"><span className="text-gray-500">Unit Price</span><span className="font-semibold text-gray-800">Loaded per product</span></div>
         {nextExpiryDate && <div className="flex justify-between gap-4"><span className="text-gray-500">Next Expiry Date</span><span className="font-medium text-gray-800">{wizardDateLabel(nextExpiryDate)}</span></div>}
       </div>
       <div className="pt-4">
-        <p className="text-xs font-medium text-gray-600">Estimated Renewal Amount</p>
-        <p className="mt-1 text-2xl font-bold text-blue-600">{values.product ? formatCurrencyAmount(String(estimatedAmount)) : "—"}</p>
+        <p className="text-xs font-medium text-gray-600">Estimated Total Renewal Amount</p>
+        <p className="mt-1 text-2xl font-bold text-blue-600">{selectedProducts.length ? formatCurrencyAmount(String(estimatedAmount)) : "—"}</p>
         <p className="text-xs text-gray-500">(Inclusive of applicable taxes)</p>
       </div>
       <div className="mt-5 rounded-lg bg-blue-50 p-3 text-xs text-blue-900">
@@ -827,7 +942,7 @@ function NewRenewalWizard({
   portalUsers,
 }: {
   onCancel: () => void;
-  onCreate: (values: RenewalWizardValues) => Renewal;
+  onCreate: (values: RenewalWizardValues, selectedProducts: RenewalWizardSelectedProduct[]) => Renewal[];
   onView: (renewal: Renewal) => void;
   initialValues: RenewalWizardValues;
   clients: StoredClient[];
@@ -837,7 +952,7 @@ function NewRenewalWizard({
 }) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [values, setValues] = useState<RenewalWizardValues>(initialValues);
-  const [createdRenewal, setCreatedRenewal] = useState<Renewal>();
+  const [createdRenewals, setCreatedRenewals] = useState<Renewal[]>([]);
   const selectedClientRecord = clients.find(client => client.name === values.client);
   const notificationRecipients = useMemo(() => {
     const recipients: RenewalNotificationRecipient[] = [];
@@ -865,47 +980,63 @@ function NewRenewalWizard({
     });
     return Array.from(uniqueRecipients.values());
   }, [internalUsers, portalUsers, selectedClientRecord]);
-  const nextExpiryDate = wizardNextExpiryDate(values.renewalStartDate, values.renewalTerm);
-  const estimatedAmount =
-    (Number(values.quantity) || 0) *
-    (Number(values.unitPrice) || 0) *
-    renewalTermYears(values.renewalTerm);
   const selectedOrder = orders.find(order => order.id === values.order);
-  const selectedSubOrder = selectedOrder?.subOrders.find(subOrder => subOrder.id === values.subOrder);
+  const selectedSubOrders = selectedOrder?.subOrders.filter(subOrder => values.subOrders.includes(subOrder.id)) || [];
+  const selectedRenewalItems = selectedSubOrders.flatMap(subOrder =>
+    subOrder.products.map(product => ({ subOrderId: subOrder.id, product })),
+  );
+  const selectedProducts = selectedRenewalItems.map(item => item.product);
+  const commonSourceStartDate = commonProductValue(selectedProducts, product => product.renewalStartDate);
+  const commonSourceTerm = commonProductValue(selectedProducts, product => product.renewalTerm);
+  const nextExpiryDate = wizardNextExpiryDate(
+    values.renewalStartDate || commonSourceStartDate,
+    values.renewalTerm || commonSourceTerm,
+  );
   const clientOrders = orders.filter(order => {
     const selectedClient = clients.find(client => client.name === values.client);
     if (!selectedClient) return false;
     if (selectedClient.id && order.clientId) return order.clientId === selectedClient.id;
     return order.client === selectedClient.name;
   });
-  const availableProducts = selectedSubOrder?.products || [];
   const hasLiveProduct = Boolean(
     selectedOrder &&
-    selectedSubOrder &&
-    availableProducts.some(product => product.name === values.product),
+    values.subOrders.length > 0 &&
+    selectedSubOrders.length === values.subOrders.length &&
+    selectedRenewalItems.length > 0,
+  );
+  const hasCompleteProductData = selectedRenewalItems.length > 0 && selectedRenewalItems.every(({ product }) =>
+    Boolean(
+      (values.renewalStartDate || product.renewalStartDate) &&
+      (values.renewalTerm || product.renewalTerm) &&
+      renewalProductQuantity(product, values, selectedRenewalItems.length) &&
+      renewalProductUnitPrice(product, values, selectedRenewalItems.length),
+    ),
   );
   const hasLiveRecipients = values.notifyTo.length > 0 && values.notifyTo.every(email =>
     notificationRecipients.some(recipient => recipient.email.toLowerCase() === email.toLowerCase()),
   );
+  const estimatedAmount = selectedRenewalItems.reduce((total, { product }) => {
+    const quantity = Number(renewalProductQuantity(product, values, selectedRenewalItems.length)) || 0;
+    const unitPrice = Number(renewalProductUnitPrice(product, values, selectedRenewalItems.length)) || 0;
+    const term = values.renewalTerm || product.renewalTerm;
+    return total + quantity * unitPrice * renewalTermYears(term);
+  }, 0);
   const canContinue = step === 1
     ? Boolean(
         hasLiveProduct &&
+        hasCompleteProductData &&
         values.client &&
         values.order &&
-        values.subOrder &&
-        values.product &&
-        values.renewalStartDate &&
-        values.renewalTerm &&
-        values.quantity &&
-        values.unitPrice &&
+        values.subOrders.length &&
         values.reminders.length > 0 &&
         values.reminders.every(reminder => reminder.trim()),
       )
     : step === 2
-      ? Boolean(hasLiveProduct && values.renewalStartDate && values.renewalTerm && values.quantity && values.unitPrice)
+      ? Boolean(hasLiveProduct && hasCompleteProductData)
       : step === 3
         ? Boolean(
             hasLiveProduct &&
+            hasCompleteProductData &&
             values.reminders.length > 0 &&
             values.reminders.every(reminder => reminder.trim()) &&
             hasLiveRecipients,
@@ -913,14 +1044,10 @@ function NewRenewalWizard({
         : false;
   const canCreate = Boolean(
     hasLiveProduct &&
+    hasCompleteProductData &&
     values.client &&
     values.order &&
-    values.subOrder &&
-    values.product &&
-    values.renewalStartDate &&
-    values.renewalTerm &&
-    values.quantity &&
-    values.unitPrice &&
+    values.subOrders.length &&
     values.reminders.length > 0 &&
     values.reminders.every(reminder => reminder.trim()) &&
     hasLiveRecipients,
@@ -941,14 +1068,44 @@ function NewRenewalWizard({
     }));
   };
 
-  const selectSubOrder = (subOrderId: string) => {
+  const selectSubOrders = (subOrderIds: string[]) => {
+    const selectedIds = [...new Set(subOrderIds)];
+    const selectedSubOrders = selectedOrder?.subOrders.filter(subOrder => selectedIds.includes(subOrder.id)) || [];
+    const selectedProducts = selectedSubOrders.flatMap(subOrder => subOrder.products);
+    const firstProduct = selectedProducts[0];
+    const isSingleProduct = selectedProducts.length === 1;
+    const sourceReminders = commonProductValue(selectedProducts, product => JSON.stringify(product.reminders));
+    let sourceReminderValues: string[] = [];
+    try {
+      sourceReminderValues = sourceReminders ? JSON.parse(sourceReminders) : [];
+    } catch {
+      sourceReminderValues = [];
+    }
+
     setValues(current => ({
-      ...createEmptyRenewalWizardValues(),
-      client: current.client,
-      order: current.order,
-      subOrder: subOrderId,
-      orderDate: selectedOrder?.orderDate || current.orderDate,
-      deliveryDate: selectedOrder?.deliveryDate || current.deliveryDate,
+      ...current,
+      subOrders: selectedIds,
+      product: [...new Set(selectedProducts.map(product => product.name))].join(", "),
+      productImage: firstProduct?.image || "",
+      brand: firstProduct?.brand || "other",
+      licenseType: [...new Set(selectedProducts.map(product => product.licenseType).filter(Boolean))].join(", "),
+      currentExpiryDate: isSingleProduct ? firstProduct?.currentExpiryDate || "" : "",
+      renewalStartDate: commonProductValue(selectedProducts, product => product.renewalStartDate)
+        || (selectedIds.length ? current.renewalStartDate : ""),
+      renewalTerm: commonProductValue(selectedProducts, product => product.renewalTerm)
+        || (selectedIds.length ? current.renewalTerm : ""),
+      quantity: isSingleProduct ? firstProduct?.quantity || "" : "",
+      unitPrice: isSingleProduct ? firstProduct?.unitPrice || "" : "",
+      contractNo: isSingleProduct
+        ? firstProduct?.contractNo || ""
+        : commonProductValue(selectedProducts, product => product.contractNo),
+      purchaseOrderNo: isSingleProduct
+        ? firstProduct?.purchaseOrderNo || ""
+        : commonProductValue(selectedProducts, product => product.purchaseOrderNo),
+      reminders: current.reminders.length
+        ? current.reminders
+        : sourceReminderValues,
+      notes: isSingleProduct ? firstProduct?.notes || current.notes : current.notes,
     }));
   };
 
@@ -956,28 +1113,6 @@ function NewRenewalWizard({
     setValues(current => ({
       ...createEmptyRenewalWizardValues(),
       client: clientName,
-    }));
-  };
-
-  const selectProduct = (productName: string) => {
-    const product = availableProducts.find(item => item.name === productName);
-    setValues(current => ({
-      ...current,
-      product: productName,
-      productImage: product?.image || "",
-      brand: product?.brand || "other",
-      licenseType: product?.licenseType || "",
-      currentExpiryDate: product?.currentExpiryDate || "",
-      renewalStartDate: product?.renewalStartDate || "",
-      renewalTerm: product?.renewalTerm || "",
-      quantity: product?.quantity || "",
-      unitPrice: product?.unitPrice || "",
-      contractNo: product?.contractNo || "",
-      purchaseOrderNo: product?.purchaseOrderNo || "",
-      notes: product?.notes || "",
-      reminders: product?.reminders || [],
-      notifyTo: [],
-      notificationMessage: product?.notificationMessage || "",
     }));
   };
 
@@ -993,10 +1128,11 @@ function NewRenewalWizard({
   const goNext = () => setStep(current => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
   const goBack = () => setStep(current => Math.max(1, current - 1) as 1 | 2 | 3 | 4);
   const create = () => {
-    if (canCreate) setCreatedRenewal(onCreate(values));
+    if (canCreate) setCreatedRenewals(onCreate(values, selectedRenewalItems));
   };
 
-  if (createdRenewal) {
+  if (createdRenewals.length) {
+    const firstCreatedRenewal = createdRenewals[0];
     return (
       <div className="renewals-page min-h-screen w-full max-w-full min-w-0 bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
         <RenewalTypography />
@@ -1004,30 +1140,41 @@ function NewRenewalWizard({
           <div className="mb-4 flex items-center gap-2 text-xs text-gray-500"><Home className="h-3.5 w-3.5" /> Home <ChevronRight className="h-3.5 w-3.5" /> Renewals <ChevronRight className="h-3.5 w-3.5" /> New Renewal <ChevronRight className="h-3.5 w-3.5" /><span className="rounded bg-emerald-50 px-2 py-1 text-emerald-700">Success</span></div>
           <section className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 sm:p-7">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg"><Check className="h-9 w-9" /></div><div><h1 className="text-2xl font-bold text-gray-900">Renewal Created Successfully!</h1><p className="mt-1 text-sm text-gray-600">The renewal and its reminder preferences have been saved.</p></div></div>
-              <div className="rounded-lg bg-emerald-100 px-5 py-3"><p className="text-xs text-gray-600">Renewal ID</p><p className="text-2xl font-bold text-gray-900">{createdRenewal.id}</p><p className="text-xs text-gray-600">Created on {wizardDateLabel(createdRenewal.createdAt?.slice(0, 10) || "")}</p></div>
-              <div className="flex flex-col gap-2 sm:min-w-[190px]"><button type="button" onClick={() => onView(createdRenewal)} className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">View Renewal</button><button type="button" onClick={() => { setCreatedRenewal(undefined); setStep(1); setValues(initialValues); }} className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-blue-700 hover:bg-blue-50">Create Another Renewal</button></div>
+              <div className="flex items-center gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg"><Check className="h-9 w-9" /></div><div><h1 className="text-2xl font-bold text-gray-900">{createdRenewals.length === 1 ? "Renewal Created Successfully!" : `${createdRenewals.length} Renewals Created Successfully!`}</h1><p className="mt-1 text-sm text-gray-600">Renewals were saved for the selected digital order items.</p></div></div>
+              <div className="rounded-lg bg-emerald-100 px-5 py-3"><p className="text-xs text-gray-600">Renewal IDs</p><p className="text-2xl font-bold text-gray-900">{firstCreatedRenewal.id}{createdRenewals.length > 1 ? ` +${createdRenewals.length - 1}` : ""}</p><p className="text-xs text-gray-600">Created on {wizardDateLabel(firstCreatedRenewal.createdAt?.slice(0, 10) || "")}</p></div>
+              <div className="flex flex-col gap-2 sm:min-w-[190px]"><button type="button" onClick={() => onView(firstCreatedRenewal)} className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">View Renewal</button><button type="button" onClick={() => { setCreatedRenewals([]); setStep(1); setValues(initialValues); }} className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-blue-700 hover:bg-blue-50">Create Another Renewal</button></div>
             </div>
           </section>
           <WizardCard title="Renewal Summary" className="mt-4">
             <div className="grid gap-5 md:grid-cols-4">
-              <div className="flex items-start gap-3 md:col-span-2"><BrandMark brand={values.brand} image={values.productImage} /><div><p className="font-semibold text-gray-900">{values.product}</p><span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">{values.licenseType || "—"}</span><p className="mt-1 text-xs text-gray-500">{values.licenseType || "—"} | {values.quantity || "—"}</p></div></div>
-              <div className="space-y-2 text-sm"><p><span className="text-gray-500">Status</span> <span className={`ml-4 rounded-full px-2 py-1 ${STATUS_STYLES[createdRenewal.renewalStatus]}`}>{createdRenewal.renewalStatus}</span></p><p><span className="text-gray-500">Next Expiry Date</span> <strong className="ml-3">{wizardDateLabel(nextExpiryDate)}</strong></p><p><span className="text-gray-500">Renewal Term</span> <strong className="ml-8">{values.renewalTerm || "—"}</strong></p></div>
-              <div className="space-y-2 text-sm"><p><span className="text-gray-500">Client</span> <strong className="float-right">{values.client}</strong></p><p><span className="text-gray-500">Order ID</span> <strong className="float-right">{values.order}</strong></p><p><span className="text-gray-500">Contract No.</span> <strong className="float-right">{values.contractNo}</strong></p></div>
+              <div className="flex items-start gap-3 md:col-span-2"><BrandMark brand={selectedRenewalItems[0]?.product.brand} image={selectedRenewalItems[0]?.product.image} /><div><p className="font-semibold text-gray-900">{createdRenewals.length} digital product renewal{createdRenewals.length === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-gray-500">{values.subOrders.join(", ")}</p></div></div>
+              <div className="space-y-2 text-sm"><p><span className="text-gray-500">Status</span> <span className={`ml-4 rounded-full px-2 py-1 ${STATUS_STYLES[firstCreatedRenewal.renewalStatus]}`}>{firstCreatedRenewal.renewalStatus}</span></p><p><span className="text-gray-500">Next Expiry Date</span> <strong className="ml-3">{wizardDateLabel(firstCreatedRenewal.dueDate)}</strong></p><p><span className="text-gray-500">Renewal Term</span> <strong className="ml-8">{firstCreatedRenewal.renewalTerm || "—"}</strong></p></div>
+              <div className="space-y-2 text-sm"><p><span className="text-gray-500">Client</span> <strong className="float-right">{values.client}</strong></p><p><span className="text-gray-500">Order ID</span> <strong className="float-right">{values.order}</strong></p><p><span className="text-gray-500">Contract No.</span> <strong className="float-right">{firstCreatedRenewal.contractNo || "—"}</strong></p></div>
+            </div>
+          </WizardCard>
+          <WizardCard title="Created Renewals" className="mt-4">
+            <div className="divide-y divide-gray-100">
+              {createdRenewals.map(renewal => (
+                <div key={renewal.id} className="grid gap-1 py-3 text-sm sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+                  <div><p className="font-semibold text-gray-900">{renewal.product}</p><p className="text-xs text-gray-500">{renewal.subOrderId} · {renewal.id}</p></div>
+                  <p className="text-gray-600">{renewal.quantity || renewal.seats || "—"} units · {renewal.amount || "—"}</p>
+                  <span className={`w-fit rounded-full px-2 py-1 text-xs ${STATUS_STYLES[renewal.renewalStatus]}`}>{renewal.renewalStatus}</span>
+                </div>
+              ))}
             </div>
           </WizardCard>
           <div className="mt-4 grid min-w-0 gap-y-4 gap-x-1.5 xl:grid-cols-[minmax(0,2fr)_minmax(0,300px)]">
               <WizardCard title="Reminder Schedule">
-                <div className="overflow-hidden rounded-lg border border-gray-200"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Reminder Date</th><th className="px-3 py-2">Days Before Expiry</th><th className="px-3 py-2">Notify To</th><th className="px-3 py-2">Status</th></tr></thead><tbody>{values.reminders.map((days, index) => { const date = nextExpiryDate ? new Date(`${nextExpiryDate}T00:00:00`) : undefined; if (date && days) date.setDate(date.getDate() - Number(days)); return <tr key={`${days}-${index}`} className="border-t border-gray-100"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3">{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td><td className="px-3 py-3">{days ? `${days} days` : "—"}</td><td className="px-3 py-3">{values.notifyTo.join(", ") || "—"}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 ${date && days ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>{date && days ? "Configured" : "Incomplete"}</span></td></tr>; })}</tbody></table></div>
+                <div className="overflow-hidden rounded-lg border border-gray-200"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">Renewal / #</th><th className="px-3 py-2">Reminder Date</th><th className="px-3 py-2">Days Before Expiry</th><th className="px-3 py-2">Notify To</th><th className="px-3 py-2">Status</th></tr></thead><tbody>{createdRenewals.flatMap(renewal => values.reminders.map((days, index) => { const date = renewal.dueDate ? new Date(renewal.dueDate) : undefined; if (date && days) date.setDate(date.getDate() - Number(days)); const isConfigured = Boolean(date && days && !Number.isNaN(date.getTime())); return <tr key={`${renewal.id}-${days}-${index}`} className="border-t border-gray-100"><td className="px-3 py-3">{renewal.id} · {index + 1}</td><td className="px-3 py-3">{isConfigured ? date?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td><td className="px-3 py-3">{days ? `${days} days` : "—"}</td><td className="px-3 py-3">{values.notifyTo.join(", ") || "—"}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 ${isConfigured ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>{isConfigured ? "Configured" : "Incomplete"}</span></td></tr>; }))}</tbody></table></div>
             </WizardCard>
-            <WizardCard title="Quick Actions"><div className="divide-y divide-gray-100 text-sm"><button type="button" onClick={() => onView(createdRenewal)} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><Eye className="h-4 w-4 text-blue-600" /> View Renewal Details</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={() => setCreatedRenewal(undefined)} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><Pencil className="h-4 w-4 text-blue-600" /> Edit Renewal</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={onCancel} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><ArrowLeft className="h-4 w-4 text-blue-600" /> Back to Renewals</span><ChevronRight className="h-4 w-4" /></button></div></WizardCard>
+            <WizardCard title="Quick Actions"><div className="divide-y divide-gray-100 text-sm"><button type="button" onClick={() => onView(firstCreatedRenewal)} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><Eye className="h-4 w-4 text-blue-600" /> View Renewal Details</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={() => setCreatedRenewals([])} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><Pencil className="h-4 w-4 text-blue-600" /> Edit Renewal</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={onCancel} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><ArrowLeft className="h-4 w-4 text-blue-600" /> Back to Renewals</span><ChevronRight className="h-4 w-4" /></button></div></WizardCard>
           </div>
         </div>
       </div>
     );
   }
 
-  const sidebar = <RenewalProductSummary values={values} nextExpiryDate={nextExpiryDate} />;
+  const sidebar = <RenewalProductSummary values={values} nextExpiryDate={nextExpiryDate} selectedProducts={selectedRenewalItems} />;
 
   return (
     <div className="renewals-page min-h-screen w-full max-w-full min-w-0 bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
@@ -1056,20 +1203,46 @@ function NewRenewalWizard({
                 <div className="grid gap-y-4 gap-x-1.5 sm:grid-cols-2">
                   <WizardField label="Client" required><WizardSelect value={values.client} onChange={selectClient}><option value="" disabled>Select a client</option>{clients.map(client => <option key={client.id} value={client.name}>{client.name}</option>)}</WizardSelect></WizardField>
                    <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>{values.client ? clientOrders.length ? "Select an order" : "No eligible delivered orders for this client" : "Select a client first"}</option>{clientOrders.map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Orders and delivery dates are loaded from saved order records."}</span></WizardField>
-                   <WizardField label="Sub Order" required><WizardSelect value={values.subOrder} onChange={selectSubOrder}><option value="" disabled>{selectedOrder?.subOrders.length ? "Select a sub order" : "Select an order first"}</option>{(selectedOrder?.subOrders || []).map(subOrder => <option key={subOrder.id} value={subOrder.id}>{subOrder.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">Each eligible sub order can be renewed separately.</span></WizardField>
-                  <WizardField label="Product / License" required className="sm:col-span-2">
-                    <WizardSelect value={values.product} onChange={selectProduct}><option value="" disabled>{availableProducts.length ? "Select a product from the order" : "Select an order first"}</option>{availableProducts.map(product => <option key={product.name} value={product.name}>{product.name}</option>)}</WizardSelect>
+                    <WizardField label="Sub-orders" required>
+                      <SubOrderMultiSelect options={selectedOrder?.subOrders || []} selectedIds={values.subOrders} onChange={selectSubOrders} />
+                      <span className="mt-1 block text-xs text-gray-500">Select one or more delivered digital sub-orders. Only products from these selections will renew.</span>
+                    </WizardField>
+                   <WizardField label="Product / License" required className="sm:col-span-2">
+                     {selectedRenewalItems.length ? (
+                       <div className="max-h-64 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-200 bg-white px-3">
+                         {selectedRenewalItems.map(({ subOrderId, product }, index) => (
+                           <div key={`${subOrderId}-${product.name}-${index}`} className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,120px))] sm:items-center">
+                             <div className="min-w-0"><p className="truncate text-sm font-semibold text-gray-800">{product.name}</p><p className="text-xs text-gray-500">{subOrderId} · {product.licenseType || "Digital Product"}</p></div>
+                             <p className="text-xs text-gray-600">Expiry: {wizardDateLabel(product.currentExpiryDate || values.currentExpiryDate)}</p>
+                             <p className="text-xs text-gray-600">Qty: {product.quantity || "—"}</p>
+                             <p className="text-xs font-medium text-gray-700">{product.unitPrice ? formatCurrencyAmount(product.unitPrice) : "Price not saved"}</p>
+                           </div>
+                         ))}
+                       </div>
+                     ) : (
+                       <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-500">Select one or more sub-orders to load their saved digital product and license details automatically.</div>
+                     )}
                   </WizardField>
                 </div>
               </WizardCard>
               <WizardCard title="2. Renewal Details">
                 <div className="grid gap-y-4 gap-x-1.5 sm:grid-cols-2">
-                    <WizardField label="Current Expiry Date"><WizardInput type="date" value={values.currentExpiryDate} onChange={value => update("currentExpiryDate", value)} /></WizardField>
-                    <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
-                  <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Select renewal term</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
-                  <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
-                   <WizardField label="Unit Price" required><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Enter unit price" /></WizardField>
+                     <WizardField label={selectedRenewalItems.length > 1 ? "Current Expiry Date (fallback)" : "Current Expiry Date"}><WizardInput type="date" value={values.currentExpiryDate} onChange={value => update("currentExpiryDate", value)} /></WizardField>
+                     <WizardField label="Renewal Start Date"><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
+                   <WizardField label="Renewal Term"><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Use saved term or select one</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
+                   {selectedRenewalItems.length <= 1 ? (
+                     <>
+                       <WizardField label="Quantity / Users"><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
+                       <WizardField label="Unit Price"><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Enter unit price" /></WizardField>
+                     </>
+                   ) : (
+                     <>
+                       <WizardField label="Fallback Quantity (if missing from order)"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} placeholder="Uses each order item's saved quantity" /></WizardField>
+                       <WizardField label="Fallback Unit Price (if missing from order)"><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Uses each order item's saved price" /></WizardField>
+                     </>
+                   )}
                 </div>
+                 {selectedRenewalItems.length > 1 && <p className="mt-3 text-xs text-gray-500">Quantity and price are loaded separately for each selected product. Fallback values are used only when an order item has no saved value.</p>}
               </WizardCard>
               <WizardCard title="3. Renewal Notifications">
                 <div className="grid gap-y-4 gap-x-1.5 sm:grid-cols-2">
@@ -1091,11 +1264,20 @@ function NewRenewalWizard({
             <div className="min-w-0 space-y-4">
               <WizardCard title="Renewal Details">
                 <div className="grid gap-y-4 gap-x-1.5 sm:grid-cols-2">
-                    <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
+                    <WizardField label="Renewal Start Date"><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
                   <WizardField label="Next Expiry Date"><WizardInput type="date" value={nextExpiryDate} readOnly /></WizardField>
-                   <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Select renewal term</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
-                  <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
-                  <WizardField label="Unit Price" required><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Enter unit price" /></WizardField>
+                    <WizardField label="Renewal Term"><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Use saved term or select one</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
+                  {selectedRenewalItems.length <= 1 ? (
+                    <>
+                      <WizardField label="Quantity / Users"><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
+                      <WizardField label="Unit Price"><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Enter unit price" /></WizardField>
+                    </>
+                  ) : (
+                    <>
+                      <WizardField label="Fallback Quantity (if missing from order)"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} placeholder="Uses each order item's saved quantity" /></WizardField>
+                      <WizardField label="Fallback Unit Price (if missing from order)"><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Uses each order item's saved price" /></WizardField>
+                    </>
+                  )}
                   <WizardField label="Expected Renewal Amount"><WizardInput value={formatCurrencyAmount(String(estimatedAmount))} readOnly /></WizardField>
                   <WizardField label="Contract No."><WizardInput value={values.contractNo} onChange={value => update("contractNo", value)} /></WizardField>
                   <WizardField label="Purchase Order No. (Optional)"><WizardInput value={values.purchaseOrderNo} onChange={value => update("purchaseOrderNo", value)} placeholder="Enter PO number" /></WizardField>
@@ -1148,8 +1330,27 @@ function NewRenewalWizard({
               <WizardCard title="Review Renewal Information">
                 <p className="mb-4 text-sm text-gray-500">Please review all details before creating the renewal. You can go back and make changes if needed.</p>
                 <div className="space-y-4">
-                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Order & Product</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><div className="space-y-2"><p><span className="text-gray-500">Client :</span> <strong>{values.client || "—"}</strong></p><p><span className="text-gray-500">Order ID :</span> <strong>{values.order || "—"}</strong></p><p><span className="text-gray-500">Sub Order ID :</span> <strong>{values.subOrder || "—"}</strong></p><p><span className="text-gray-500">Order Date :</span> <strong>{wizardDateLabel(values.orderDate)}</strong></p><p><span className="text-gray-500">Delivery Date :</span> <strong>{wizardDateLabel(values.deliveryDate)}</strong></p></div><div className="space-y-2"><p><span className="text-gray-500">Product / License :</span> <strong>{values.product || "—"}</strong></p><p><span className="text-gray-500">License Type :</span> <strong>{values.licenseType || "—"}</strong></p><p><span className="text-gray-500">Users / Quantity :</span> <strong>{values.quantity ? `${values.quantity} Users` : "—"}</strong></p><p><span className="text-gray-500">Unit Price :</span> <strong>{values.unitPrice ? formatCurrencyAmount(values.unitPrice) : "—"}</strong></p></div></div></div>
-                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Renewal Details</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-gray-500">Current Expiry Date :</span> <strong>{wizardDateLabel(values.currentExpiryDate)}</strong></p><p><span className="text-gray-500">Renewal Start Date :</span> <strong>{wizardDateLabel(values.renewalStartDate)}</strong></p><p><span className="text-gray-500">Contract No. :</span> <strong>{values.contractNo || "—"}</strong></p><p><span className="text-gray-500">Next Expiry Date :</span> <strong>{wizardDateLabel(nextExpiryDate)}</strong></p><p><span className="text-gray-500">Purchase Order No. :</span> <strong>{values.purchaseOrderNo || "—"}</strong></p><p><span className="text-gray-500">Renewal Term :</span> <strong>{values.renewalTerm || "—"}</strong></p><p><span className="text-gray-500">Expected Amount :</span> <strong>{formatCurrencyAmount(String(estimatedAmount))}</strong></p></div></div>
+                   <div className="rounded-lg bg-gray-50 p-4">
+                     <h3 className="mb-3 text-sm font-bold text-gray-800">Order & Selected Digital Products</h3>
+                     <div className="grid gap-3 text-sm sm:grid-cols-2">
+                       <div className="space-y-2">
+                         <p><span className="text-gray-500">Client :</span> <strong>{values.client || "—"}</strong></p>
+                         <p><span className="text-gray-500">Order ID :</span> <strong>{values.order || "—"}</strong></p>
+                         <p><span className="text-gray-500">Selected Sub-orders :</span> <strong>{values.subOrders.join(", ") || "—"}</strong></p>
+                         <p><span className="text-gray-500">Order Date :</span> <strong>{wizardDateLabel(values.orderDate)}</strong></p>
+                         <p><span className="text-gray-500">Delivery Date :</span> <strong>{wizardDateLabel(values.deliveryDate)}</strong></p>
+                       </div>
+                     </div>
+                     <div className="mt-4 divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+                       {selectedRenewalItems.map(({ subOrderId, product }, index) => (
+                         <div key={`${subOrderId}-${product.name}-${index}`} className="grid gap-2 p-3 text-sm sm:grid-cols-2">
+                           <div><p className="font-semibold text-gray-800">{product.name}</p><p className="text-xs text-gray-500">{subOrderId} · {product.licenseType || "Digital Product"}</p></div>
+                           <p className="text-gray-600">{product.quantity || values.quantity || "—"} units · {product.unitPrice ? formatCurrencyAmount(product.unitPrice) : values.unitPrice ? formatCurrencyAmount(values.unitPrice) : "Price not saved"}</p>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Renewal Details</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-gray-500">Renewal Start Date :</span> <strong>{wizardDateLabel(values.renewalStartDate || commonSourceStartDate)}</strong></p><p><span className="text-gray-500">Renewal Term :</span> <strong>{values.renewalTerm || commonSourceTerm || "Per selected product"}</strong></p><p><span className="text-gray-500">Contract No. :</span> <strong>{values.contractNo || "Per selected product"}</strong></p><p><span className="text-gray-500">Purchase Order No. :</span> <strong>{values.purchaseOrderNo || "Per selected product"}</strong></p><p><span className="text-gray-500">Expected Amount :</span> <strong>{formatCurrencyAmount(String(estimatedAmount))}</strong></p></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Reminder & Notifications</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><div className="space-y-2">{values.reminders.map((reminder, index) => <p key={index}><span className="text-gray-500">Reminder {index + 1} :</span> <strong>{reminder} days before expiry</strong></p>)}</div><div className="space-y-2"><p><span className="text-gray-500">Notify To :</span> <strong>{values.notifyTo.join(", ") || "—"}</strong></p><p><span className="text-gray-500">Auto Renewal :</span> <strong>{values.autoRenew ? "Enabled" : "Disabled"}</strong></p></div></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-2 text-sm font-bold text-gray-800">Message</h3><p className="text-sm text-gray-700">{values.notificationMessage}</p></div>
                 </div>
@@ -1987,46 +2188,56 @@ export default function MyRenewalsPage() {
     setEditingRenewal(undefined);
   };
 
-  const createRenewalFromWizard = (values: RenewalWizardValues): Renewal => {
-    const dueDateInput = wizardNextExpiryDate(values.renewalStartDate, values.renewalTerm);
-    const dueDays = Math.ceil((new Date(`${dueDateInput}T00:00:00`).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-    const total =
-      (Number(values.quantity) || 0) *
-      (Number(values.unitPrice) || 0) *
-      renewalTermYears(values.renewalTerm);
-    const renewal: Renewal = {
-      id: nextRenewalId([...renewals, ...renewalHistory]),
-      product: values.product,
-      brand: values.brand,
-      client: values.client,
-      clientId: liveWizardOrders.find(order => order.id === values.order)?.clientId
-        ?? liveClients.find(item => item.name === values.client)?.id,
-      licenseType: values.licenseType,
-      seats: values.quantity,
-      dueDate: wizardDateLabel(dueDateInput),
-      dueIn: dueDays < 0 ? `Overdue by ${Math.abs(dueDays)} days` : `Due in ${dueDays} days`,
-      amount: formatCurrencyAmount(String(total)),
-      renewalStatus: getRenewalStatus(dueDateInput),
-      autoRenew: values.autoRenew ? "Enabled" : "Disabled",
-      orderId: values.order,
-      subOrderId: values.subOrder,
-      orderDate: values.orderDate,
-      deliveryDate: values.deliveryDate,
-      currentExpiryDate: values.currentExpiryDate,
-      renewalStartDate: values.renewalStartDate,
-      renewalTerm: values.renewalTerm,
-      quantity: values.quantity,
-      unitPrice: values.unitPrice,
-      contractNo: values.contractNo,
-      purchaseOrderNo: values.purchaseOrderNo,
-      reminders: values.reminders,
-      notifyTo: values.notifyTo,
-      notificationMessage: values.notificationMessage,
-      notes: values.notes,
-      createdAt: new Date().toISOString(),
-    };
-    setRenewals(current => [renewal, ...current]);
-    return renewal;
+  const createRenewalFromWizard = (
+    values: RenewalWizardValues,
+    selectedItems: RenewalWizardSelectedProduct[],
+  ): Renewal[] => {
+    const createdAt = new Date().toISOString();
+    const baseRecords = [...renewals, ...renewalHistory];
+    const generatedRenewals: Renewal[] = [];
+    selectedItems.forEach(({ subOrderId, product }) => {
+      const renewalStartDate = values.renewalStartDate || product.renewalStartDate;
+      const renewalTerm = values.renewalTerm || product.renewalTerm;
+      const dueDateInput = wizardNextExpiryDate(renewalStartDate, renewalTerm);
+      const dueDays = Math.ceil((new Date(`${dueDateInput}T00:00:00`).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+      const quantity = renewalProductQuantity(product, values, selectedItems.length);
+      const unitPrice = renewalProductUnitPrice(product, values, selectedItems.length);
+      const total = (Number(quantity) || 0) * (Number(unitPrice) || 0) * renewalTermYears(renewalTerm);
+
+      generatedRenewals.push({
+        id: nextRenewalId([...baseRecords, ...generatedRenewals]),
+        product: product.name,
+        brand: product.brand,
+        client: values.client,
+        clientId: liveWizardOrders.find(order => order.id === values.order)?.clientId
+          ?? liveClients.find(item => item.name === values.client)?.id,
+        licenseType: product.licenseType,
+        seats: quantity,
+        dueDate: wizardDateLabel(dueDateInput),
+        dueIn: dueDays < 0 ? `Overdue by ${Math.abs(dueDays)} days` : `Due in ${dueDays} days`,
+        amount: formatCurrencyAmount(String(total)),
+        renewalStatus: getRenewalStatus(dueDateInput),
+        autoRenew: values.autoRenew ? "Enabled" : "Disabled",
+        orderId: values.order,
+        subOrderId,
+        orderDate: values.orderDate,
+        deliveryDate: values.deliveryDate,
+        currentExpiryDate: product.currentExpiryDate || values.currentExpiryDate,
+        renewalStartDate,
+        renewalTerm,
+        quantity,
+        unitPrice,
+        contractNo: values.contractNo || product.contractNo,
+        purchaseOrderNo: values.purchaseOrderNo || product.purchaseOrderNo,
+        reminders: values.reminders.length ? values.reminders : product.reminders,
+        notifyTo: values.notifyTo,
+        notificationMessage: values.notificationMessage || product.notificationMessage,
+        notes: values.notes || product.notes,
+        createdAt,
+      });
+    });
+    setRenewals(current => [...generatedRenewals, ...current]);
+    return generatedRenewals;
   };
 
   const markRenewed = (row: Renewal) => {
