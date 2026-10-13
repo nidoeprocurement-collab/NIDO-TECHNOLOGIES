@@ -35,6 +35,7 @@ import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence }
 import { toast } from "sonner";
 import {
   appendOrderActivity,
+  createActivityNote,
   getActivityActor,
   type ActivityNote,
 } from "@/lib/orderActivityStore";
