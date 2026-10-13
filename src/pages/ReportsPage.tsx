@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReportsCenterUI, {
   type NewReportSchedule,
@@ -19,6 +19,8 @@ import {
   getReportCenterRows,
   loadReportCenterRecords,
   getReportCenterDefaultColumns,
+  getReportCenterColumnsForRecords,
+  getReportCenterMappedColumns,
   getReportCenterCellValue,
   isReportCenterProductListColumn,
   orderReportCenterColumns,
@@ -289,6 +291,7 @@ export default function ReportsPage() {
     let active = true;
     setSourceLoading(true);
     setSourceError("");
+    setSourceRecords([]);
     loadReportCenterRecords(draft.module, draft.entityType)
       .then((records) => {
         if (active) setSourceRecords(records);
@@ -309,12 +312,24 @@ export default function ReportsPage() {
     () => filterReportCenterRecords(sourceRecords, draft, entitiesByType),
     [sourceRecords, draft, entitiesByType],
   );
+  const columnsForCurrentRecords = useMemo(
+    () => getReportCenterColumnsForRecords(draft.module, sourceRecords),
+    [draft.module, sourceRecords],
+  );
+  const availableColumnsByModule = useMemo(() => ({
+    ...REPORT_CENTER_COLUMNS,
+    [draft.module]: columnsForCurrentRecords,
+  }), [draft.module, columnsForCurrentRecords]);
+  const mappedSelectedColumns = useMemo(
+    () => getReportCenterMappedColumns(draft.module, draft.selectedColumns, sourceRecords),
+    [draft.module, draft.selectedColumns, sourceRecords],
+  );
   const previewRecords = useMemo(
     () => getReportCenterPreview(
       withReportRunMetadata(filteredRecords, draft),
-      orderReportCenterColumns(draft.module, draft.selectedColumns),
+      mappedSelectedColumns,
     ),
-    [filteredRecords, draft.selectedColumns, draft.module, draft.dateFrom, draft.dateTo, draft.dateBasis],
+    [filteredRecords, mappedSelectedColumns, draft],
   );
   const scheduleItems = useMemo(() => scheduleRows(storedSchedules), [storedSchedules]);
   const recentDeliveries = useMemo(
@@ -328,7 +343,7 @@ export default function ReportsPage() {
   );
   const currency = loadConfig().localization.currency || "INR";
 
-  const createHistory = (
+  const createHistory = useCallback((
     reportDraft: ReportCreateDraft,
     source: string,
     delivery: "Download" | "Email",
@@ -366,9 +381,9 @@ export default function ReportsPage() {
       console.warn("Report ran but its history entry could not be saved.", saveError);
       toastError("Report history could not be saved", saveError);
     }
-  };
+  }, [setStoredHistory]);
 
-  const executeReport = async (
+  const executeReport = useCallback(async (
     reportDraft: ReportCreateDraft,
     source: string,
     delivery: "Download" | "Email",
@@ -392,7 +407,14 @@ export default function ReportsPage() {
       const entities = getReportCenterEntities();
       const records = await loadReportCenterRecords(reportDraft.module, reportDraft.entityType);
       const selectedRecords = filterReportCenterRecords(records, reportDraft, entities);
-      const orderedColumns = orderReportCenterColumns(reportDraft.module, reportDraft.selectedColumns);
+      const orderedColumns = getReportCenterMappedColumns(
+        reportDraft.module,
+        reportDraft.selectedColumns,
+        records,
+      );
+      if (!orderedColumns.length) {
+        throw new Error("None of the selected columns have values in the current source records. Choose columns that the module stores.");
+      }
       const reportRecords = withReportRunMetadata(selectedRecords, reportDraft);
       columns = getReportCenterExportData(reportRecords, orderedColumns);
       rows = getReportCenterRows(reportRecords, orderedColumns);
@@ -443,7 +465,7 @@ export default function ReportsPage() {
       return true;
     }
     return false;
-  };
+  }, [createHistory]);
 
   const executeReportRef = useRef(executeReport);
   useEffect(() => {
@@ -492,7 +514,10 @@ export default function ReportsPage() {
   }, []);
 
   const onCreateSchedule = (schedule: NewReportSchedule) => {
-    const scheduleDraft = reportDraftForSchedule(schedule, draft);
+    const scheduleDraft = reportDraftForSchedule(schedule, {
+      ...draft,
+      selectedColumns: draft.module === schedule.module ? mappedSelectedColumns : draft.selectedColumns,
+    });
     const saved = saveReportCenterSchedule({
       name: schedule.name.trim(),
       reportType: schedule.reportType,
@@ -512,7 +537,13 @@ export default function ReportsPage() {
 
   const onEditSchedule = (record: ScheduledReportRecord, schedule: NewReportSchedule) => {
     const previous = getReportCenterSchedules().find((item) => item.id === record.id);
-    const scheduleDraft = reportDraftForSchedule(schedule, previous?.draft ?? draft);
+    const previousDraft = previous?.draft ?? draft;
+    const scheduleDraft = reportDraftForSchedule(schedule, {
+      ...previousDraft,
+      selectedColumns: schedule.module === draft.module
+        ? mappedSelectedColumns
+        : previousDraft.selectedColumns,
+    });
     saveReportCenterSchedule({
       id: record.id,
       createdAt: previous?.createdAt,
@@ -555,7 +586,18 @@ export default function ReportsPage() {
       return;
     }
     try {
-      const columns = uniqueHistoryColumns(saved.columns);
+      const savedColumns = uniqueHistoryColumns(saved.columns);
+      const mappedHistoryFields = new Set(
+        getReportCenterMappedColumns(
+          saved.module,
+          savedColumns.map((column) => column.label || column.key),
+          saved.rows as unknown as Parameters<typeof getReportCenterMappedColumns>[2],
+        ).map((column) => column.trim().toLowerCase()),
+      );
+      const columns = savedColumns.filter((column) =>
+        mappedHistoryFields.has((column.label || column.key).trim().toLowerCase())
+        || mappedHistoryFields.has(column.key.trim().toLowerCase()),
+      );
       let rows = saved.rows.map((row) => Object.fromEntries(
         columns.map((column) => [
           column.key,
@@ -572,11 +614,14 @@ export default function ReportsPage() {
           entitiesByType,
         );
         const reportColumns = saved.columns.map((column) => column.key);
+        const mappedColumns = getReportCenterMappedColumns(
+          saved.draft.module,
+          reportColumns.length ? reportColumns : saved.draft.selectedColumns,
+          currentModuleRecords,
+        );
         rows = getReportCenterRows(
           withReportRunMetadata(current, saved.draft),
-          reportColumns.length
-            ? reportColumns
-            : orderReportCenterColumns(saved.draft.module, saved.draft.selectedColumns),
+          mappedColumns,
         );
       }
       downloadReportExport(saved.format, saved.name, columns, rows);
@@ -606,8 +651,8 @@ export default function ReportsPage() {
       onTabChange={setTab}
       entitiesByType={entitiesByType}
       modulesByType={REPORT_CENTER_MODULES}
-      columnsByModule={REPORT_CENTER_COLUMNS}
-      createDraft={draft}
+      columnsByModule={availableColumnsByModule}
+      createDraft={{ ...draft, selectedColumns: mappedSelectedColumns }}
       onCreateDraftChange={setDraft}
       previewRecords={previewRecords}
       previewCount={filteredRecords.length}

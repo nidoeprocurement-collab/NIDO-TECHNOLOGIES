@@ -298,10 +298,14 @@ function mapClientAddresses(): ReportRecord[] {
       const addressDetails = structured && typeof structured === "object" && !Array.isArray(structured)
         ? structured as ReportRecord
         : {};
-      const field = (...names: string[]) =>
-        readMatchingField(addressDetails, ...names)
-        ?? readMatchingField(onboarding, ...names)
-        ?? readMatchingField(client as unknown as ReportRecord, ...names);
+      const field = (...names: string[]) => {
+        const structuredValue = readMatchingField(addressDetails, ...names);
+        if (structuredValue !== undefined) return structuredValue;
+        const formValue = readMatchingField(onboarding, ...names);
+        if (formValue !== undefined) return formValue;
+        const addressSpecificNames = names.filter((name) => normalize(name).startsWith(prefix));
+        return readMatchingField(client as unknown as ReportRecord, ...addressSpecificNames);
+      };
       const line1 = field(`${prefix}_address`, `${prefix}AddressLine1`, "addressLine1");
       const line2 = field(`${prefix}_address_line2`, `${prefix}AddressLine2`, "addressLine2");
       const attention = field(`${prefix}_attention`, "attentionName", "attention");
@@ -443,12 +447,29 @@ function mapPriceEngineComparisons(): ReportRecord[] {
   );
 
   return getAllProductPricing().flatMap((pricing) => {
-    const productRecord = {
-      ...(productsByCode.get(String(pricing.masterProductCode)) as unknown as ReportRecord | undefined),
-      ...pricing,
-    };
+    const catalogProduct = productsByCode.get(String(pricing.masterProductCode));
     const comparisons = Array.isArray(pricing.vendorComparisons) ? pricing.vendorComparisons : [];
-    if (!comparisons.length) return [{ ...pricing, product: productRecord, vendorComparisons: [] }];
+    const productRecord: ReportRecord = {
+      ...(catalogProduct as unknown as ReportRecord | undefined),
+      masterProductCode: pricing.masterProductCode,
+      productName: pricing.productName,
+      sku: pricing.sku,
+      category: pricing.category,
+      vendorComparisons: comparisons,
+      winningVendor: pricing.winningVendor ?? undefined,
+      landedCostPerUnit: pricing.winningVendor ? pricing.landedCostPerUnit : undefined,
+      moq: catalogProduct?.moq,
+    };
+    if (!comparisons.length) {
+      return [{
+        ...pricing,
+        landedCostPerUnit: undefined,
+        moq: undefined,
+        winningVendor: undefined,
+        product: productRecord,
+        vendorComparisons: [],
+      }];
+    }
     return comparisons.map((comparison) => ({
       ...(comparison as unknown as ReportRecord),
       product: productRecord,
@@ -496,7 +517,7 @@ function mapClientPricingMargins(): ReportRecord[] {
     const profit = getClientProfitSettings(String(pricing.clientId));
     const cart = getClientCartPricingSettings(String(pricing.clientId));
     const calc = pricing.calc;
-    const cost = numberFrom(pricing.landedCostPerUnit);
+    const cost = pricing.winningVendor ? numberFrom(pricing.landedCostPerUnit) : undefined;
     const categoryRule = categoryRules.find((rule) =>
       normalize(rule.category) === normalize(pricing.category),
     );
@@ -506,6 +527,7 @@ function mapClientPricingMargins(): ReportRecord[] {
 
     return {
       ...(pricing as unknown as ReportRecord),
+      landedCostPerUnit: cost,
       product: {
         ...(productsByCode.get(String(pricing.masterProductCode)) as unknown as ReportRecord | undefined),
         masterProductCode: pricing.masterProductCode,
@@ -767,10 +789,11 @@ function mapSalesRevenueRecords(): ReportRecord[] {
     getCatalogProducts().map((product) => [String(product.masterProductCode), product]),
   );
   return invoices.flatMap((invoice) => {
-    const lines = [
-      ...(Array.isArray(invoice.lineItems) ? invoice.lineItems as ReportRecord[] : []),
-      ...(Array.isArray(invoice.items) ? invoice.items as ReportRecord[] : []),
-    ];
+    const lines = Array.isArray(invoice.lineItems)
+      ? invoice.lineItems as ReportRecord[]
+      : Array.isArray(invoice.items)
+        ? invoice.items as ReportRecord[]
+        : [];
     const invoiceLines = lines.length ? lines : [invoice];
     return invoiceLines.map((line, index) => {
       const quantity = numberFrom(line.quantity, line.qty, line.units);
@@ -1060,7 +1083,8 @@ function getAllFinanceRecords(): ReportRecord[] {
     ...getBills(),
     ...toRecords(getReceipts()).map((record) => ({ ...record, paymentType: "Client receipt" })),
     ...getPaymentsMade(),
-    ...getVendorCredits(),
+    ...getVendorCredits().map((record) => ({ ...record, documentType: "Vendor credit" })),
+    ...mapCreditNotes().map((record) => ({ ...record, documentType: "Credit note" })),
   ];
 }
 
@@ -1965,6 +1989,12 @@ function normalize(value: string): string {
 
 const VALUE_ALIASES: Record<string, string[]> = {
   "Vendor Name": ["vendorName", "supplierName"],
+  "GST Number": ["gstNumber", "gstin", "taxId"],
+  "PAN Number": ["panNumber", "pan"],
+  "SKU Code": ["skuCode", "sku"],
+  "Master Product Code": ["masterProductCode", "productCode"],
+  "Subcategory": ["subcategory", "subCategory"],
+  Name: ["name", "productName", "clientName", "vendorName"],
   "Product Name": ["productName", "itemName", "item", "name"],
   "Item Name": ["productName", "itemName", "item", "name"],
   "Client Email": ["clientEmail", "customerEmail", "email"],
@@ -2050,10 +2080,10 @@ const VALUE_ALIASES: Record<string, string[]> = {
 const PATH_SEGMENT_ALIASES: Record<string, string[]> = {
   onboarding: ["onboarding", "onboardingFormData", "lastUpdatedFormData"],
   permission: ["permission"],
-  payment: ["payment"],
-  activity: ["activity"],
+  payment: ["payment", "payments"],
+  activity: ["activity", "activities"],
   assignment: ["assignment", "assignmentDetails"],
-  appointment: ["appointment", "appointmentDetails"],
+  appointment: ["appointment", "appointments", "appointmentDetails"],
   loginhistory: ["loginHistory", "login"],
   data: ["data", "payload"],
   detail: ["detail", "details", "productDetails"],
@@ -2066,6 +2096,7 @@ const PATH_SEGMENT_ALIASES: Record<string, string[]> = {
   threshold: ["threshold", "stockThreshold"],
   entities: ["entities", "entityList"],
   attachment: ["attachment", "attachments", "files"],
+  prefix: ["prefix", "prefixes"],
 };
 
 function findNestedValue(value: unknown, aliases: string[], seen = new WeakSet<object>(), depth = 0): unknown {
@@ -2138,6 +2169,57 @@ function findValue(record: ReportRecord, column: string): unknown {
   return fallback === "—" ? undefined : fallback;
 }
 
+const REPORT_RUN_METADATA_COLUMNS = new Set([
+  "Report Date From",
+  "Report Date To",
+  "Report Date Basis",
+  "Report Generated At",
+  "Report Timezone",
+].map(normalize));
+
+function hasReportColumnValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") return false;
+  if (Array.isArray(value)) return value.some(hasReportColumnValue);
+  if (typeof value === "string") return value.trim() !== "" && value.trim() !== "—";
+  if (typeof value === "object") return Object.keys(value as object).length > 0;
+  return true;
+}
+
+/**
+ * Keep the workbook order, but only offer fields that resolve to data in at
+ * least one current record (along with report-run metadata). This prevents
+ * users from generating reports full of columns the underlying module cannot
+ * populate.
+ */
+export function getReportCenterColumnsForRecords(
+  module: string,
+  records: ReportRecord[],
+): ReportColumnGroup[] {
+  return (REPORT_CENTER_COLUMNS[module] ?? [])
+    .map((columnGroup) => ({
+      ...columnGroup,
+      columns: columnGroup.columns.filter((column) =>
+        REPORT_RUN_METADATA_COLUMNS.has(normalize(column))
+        || records.some((record) => hasReportColumnValue(findValue(record, column))),
+      ),
+    }))
+    .filter((columnGroup) => columnGroup.columns.length > 0);
+}
+
+export function getReportCenterMappedColumns(
+  module: string,
+  selectedColumns: string[],
+  records: ReportRecord[],
+): string[] {
+  const available = new Set(
+    getReportCenterColumnsForRecords(module, records)
+      .flatMap((columnGroup) => columnGroup.columns)
+      .map(normalize),
+  );
+  return orderReportCenterColumns(module, selectedColumns)
+    .filter((column) => available.has(normalize(column)));
+}
+
 const PRODUCT_LIST_COLUMN_IDENTITIES = new Set(["item", "items", "lineitems", "cartitems"]);
 
 export function isReportCenterProductListColumn(column: string): boolean {
@@ -2188,6 +2270,14 @@ export function getReportCenterCellValue(record: ReportRecord, column: string): 
   if (value === undefined || value === null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (isReportCenterProductListColumn(column)) return productNamesOnly(value);
+  if (Array.isArray(value)) {
+    const entries = value.flatMap((entry) => {
+      if (entry === undefined || entry === null || entry === "") return [];
+      if (typeof entry === "object") return [JSON.stringify(entry)];
+      return [String(entry)];
+    });
+    return entries.length ? entries.join(", ") : "—";
+  }
   if (typeof value === "object") return JSON.stringify(value);
   if (/(amount|price|total|spend|cost)$/i.test(column)) {
     const amount = Number(value);

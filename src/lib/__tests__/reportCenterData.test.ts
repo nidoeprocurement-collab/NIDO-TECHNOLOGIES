@@ -92,7 +92,9 @@ import {
   getReportCenterRecords,
   getReportCenterDefaultColumns,
   getReportCenterCellValue,
+  getReportCenterColumnsForRecords,
   getReportCenterExportData,
+  getReportCenterMappedColumns,
   getReportCenterPreview,
   getReportCenterRows,
   loadReportCenterRecords,
@@ -202,6 +204,48 @@ describe("report center live data sources", () => {
     expect(getReportCenterExportData([record], selected)).toEqual([
       { key: "Cart Items", label: "Cart Items" },
     ]);
+  });
+
+  it("resolves nested values inside arrays and flattened workbook groups", () => {
+    const record = {
+      generalSpecs: [{ id: "GS-1", category: "Display", attributeValue: "27 inch" }],
+      options: [{ id: "OPT-1", label: "Black", priceAdjustment: 15 }],
+      activities: [{ title: "Updated", date: "2026-10-10" }],
+      prefixes: [{ key: "order", label: "Order", value: "ORD-" }],
+      productName: "Monitor",
+    };
+
+    expect(getReportCenterCellValue(record, "General / Category")).toBe("Display");
+    expect(getReportCenterCellValue(record, "Option / Label")).toBe("Black");
+    expect(getReportCenterCellValue(record, "Option / Price Adjustment")).toContain("15");
+    expect(getReportCenterCellValue(record, "Activity / Title")).toBe("Updated");
+    expect(getReportCenterCellValue(record, "Prefix / Value")).toBe("ORD-");
+    expect(getReportCenterCellValue(record, "Detail / Name")).toBe("Monitor");
+  });
+
+  it("offers and exports only columns with values in the selected module's records", () => {
+    const records = [{
+      id: "ORDER-1",
+      cartItems: [{ name: "Keyboard", quantity: 2 }],
+    }];
+    const available = getReportCenterColumnsForRecords("Client Orders", records)
+      .flatMap((columnGroup) => columnGroup.columns);
+
+    expect(available).toContain("Report Generated At");
+    expect(available).toContain("ID");
+    expect(available).toContain("Cart Items");
+    expect(available).not.toContain("Payment Method");
+    expect(getReportCenterMappedColumns(
+      "Client Orders",
+      ["ID", "Payment Method", "Cart Items"],
+      records,
+    )).toEqual(["ID", "Cart Items"]);
+    expect(REPORT_CENTER_MODULES.internal).not.toContain("Transactions Ledger");
+  });
+
+  it("does not present non-ledger source documents as posted transaction-ledger entries", () => {
+    expect(() => getReportCenterRecords("Transactions Ledger", "internal"))
+      .toThrow(/ledger postings are not stored/i);
   });
 
   it("keeps each report module's column catalog free of duplicate labels", () => {
