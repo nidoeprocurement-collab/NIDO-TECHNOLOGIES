@@ -33,7 +33,7 @@ import {
   Home,
 } from "lucide-react";
 import { getClients, isSharedClient, type StoredClient } from "@/lib/clientStore";
-import { getCatalogProducts, type CatalogProduct } from "@/lib/catalogStore";
+import { getCatalogProducts, normalizeCatalogProductName, type CatalogProduct } from "@/lib/catalogStore";
 import { useMyOrders, type MyOrder } from "@/contexts/MyOrdersContext";
 import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore";
 import { getPortalUsers, type PortalUser } from "@/lib/portalUserStore";
@@ -537,7 +537,7 @@ function isDeliveredOrderItem(
   // Per-sub-order state is authoritative for partially delivered orders and
   // for an item that was changed after the master order was created.
   if (storedStatus) return storedStatus === "delivered";
-  return order.status === "Delivered";
+  return String(order.status || "").toLowerCase() === "delivered";
 }
 
 function isRenewableOrderItem(
@@ -600,8 +600,13 @@ function createRenewalWizardOrders(orders: MyOrder[], products: CatalogProduct[]
     const grouped = new Map<string, RenewalWizardProduct[]>();
 
     (order.cartItems || []).forEach((item, index) => {
+      const itemSource = item as unknown as Record<string, unknown>;
+      const productCode = String(itemSource.productCode || itemSource.skuCode || itemSource.masterProductCode || "").trim().toLowerCase();
       const catalogProduct = products.find(product =>
-        product.productName.trim().toLowerCase() === item.name.trim().toLowerCase()
+        productCode && [product.masterProductCode, product.skuCode]
+          .some(code => String(code || "").trim().toLowerCase() === productCode)
+      ) || products.find(product =>
+        normalizeCatalogProductName(product.productName) === normalizeCatalogProductName(item.name)
       );
       const subOrderId = item.subOrderId || `SO-${order.id}-${String(index + 1).padStart(3, "0")}`;
       if (!isDeliveredOrderItem(order, item, subOrderId, savedSubOrderState)) return;
@@ -867,8 +872,47 @@ function NewRenewalWizard({
     renewalTermYears(values.renewalTerm);
   const selectedOrder = orders.find(order => order.id === values.order);
   const selectedSubOrder = selectedOrder?.subOrders.find(subOrder => subOrder.id === values.subOrder);
+  const clientOrders = orders.filter(order => {
+    const selectedClient = clients.find(client => client.name === values.client);
+    if (!selectedClient) return false;
+    if (selectedClient.id && order.clientId) return order.clientId === selectedClient.id;
+    return order.client === selectedClient.name;
+  });
   const availableProducts = selectedSubOrder?.products || [];
+  const hasLiveProduct = Boolean(
+    selectedOrder &&
+    selectedSubOrder &&
+    availableProducts.some(product => product.name === values.product),
+  );
+  const hasLiveRecipients = values.notifyTo.length > 0 && values.notifyTo.every(email =>
+    notificationRecipients.some(recipient => recipient.email.toLowerCase() === email.toLowerCase()),
+  );
+  const canContinue = step === 1
+    ? Boolean(
+        hasLiveProduct &&
+        values.client &&
+        values.order &&
+        values.subOrder &&
+        values.product &&
+        values.renewalStartDate &&
+        values.renewalTerm &&
+        values.quantity &&
+        values.unitPrice &&
+        values.reminders.length > 0 &&
+        values.reminders.every(reminder => reminder.trim()),
+      )
+    : step === 2
+      ? Boolean(hasLiveProduct && values.renewalStartDate && values.renewalTerm && values.quantity && values.unitPrice)
+      : step === 3
+        ? Boolean(
+            hasLiveProduct &&
+            values.reminders.length > 0 &&
+            values.reminders.every(reminder => reminder.trim()) &&
+            hasLiveRecipients,
+          )
+        : false;
   const canCreate = Boolean(
+    hasLiveProduct &&
     values.client &&
     values.order &&
     values.subOrder &&
@@ -879,7 +923,7 @@ function NewRenewalWizard({
     values.unitPrice &&
     values.reminders.length > 0 &&
     values.reminders.every(reminder => reminder.trim()) &&
-    values.notifyTo.length > 0,
+    hasLiveRecipients,
   );
 
   const update = <K extends keyof RenewalWizardValues>(key: K, value: RenewalWizardValues[K]) => {
@@ -994,13 +1038,24 @@ function NewRenewalWizard({
         <p className="mt-1 text-sm text-gray-500">{step === 1 ? "Create a renewal for a product/service you have already purchased" : step === 2 ? "Set renewal details and reminder preferences" : step === 3 ? "Configure notification and reminder settings" : "Review the details and create the renewal"}</p>
         <div className="mt-5"><RenewalWizardStepper step={step} /></div>
 
+        {!clients.length && (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            No saved client records are available for renewals. Add a client before creating a renewal.
+          </p>
+        )}
+        {clients.length > 0 && !orders.length && (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            No delivered, renewal-eligible order items were found in the saved order records. Only real delivered subscriptions or licenses can be selected.
+          </p>
+        )}
+
         {step === 1 && (
           <div className="grid min-w-0 gap-y-4 gap-x-1.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
             <div className="min-w-0 space-y-4">
               <WizardCard title="1. Select Order & Product">
                 <div className="grid gap-y-4 gap-x-1.5 sm:grid-cols-2">
                   <WizardField label="Client" required><WizardSelect value={values.client} onChange={selectClient}><option value="" disabled>Select a client</option>{clients.map(client => <option key={client.id} value={client.name}>{client.name}</option>)}</WizardSelect></WizardField>
-                   <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>Select an order</option>{orders.filter(order => { const selectedClient = clients.find(client => client.name === values.client); return (selectedClient?.id && order.clientId === selectedClient.id) || order.client === values.client; }).map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Select an order to load its live details"}</span></WizardField>
+                   <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>{values.client ? clientOrders.length ? "Select an order" : "No eligible delivered orders for this client" : "Select a client first"}</option>{clientOrders.map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Orders and delivery dates are loaded from saved order records."}</span></WizardField>
                    <WizardField label="Sub Order" required><WizardSelect value={values.subOrder} onChange={selectSubOrder}><option value="" disabled>{selectedOrder?.subOrders.length ? "Select a sub order" : "Select an order first"}</option>{(selectedOrder?.subOrders || []).map(subOrder => <option key={subOrder.id} value={subOrder.id}>{subOrder.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">Each eligible sub order can be renewed separately.</span></WizardField>
                   <WizardField label="Product / License" required className="sm:col-span-2">
                     <WizardSelect value={values.product} onChange={selectProduct}><option value="" disabled>{availableProducts.length ? "Select a product from the order" : "Select an order first"}</option>{availableProducts.map(product => <option key={product.name} value={product.name}>{product.name}</option>)}</WizardSelect>
@@ -1106,7 +1161,7 @@ function NewRenewalWizard({
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <button type="button" onClick={step === 1 ? onCancel : goBack} className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"><ArrowLeft className="h-4 w-4" /> {step === 1 ? "Cancel" : "Back"}</button>
-           {step < 4 ? <button type="button" onClick={goNext} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">Next <ChevronRight className="h-4 w-4" /></button> : <button type="button" onClick={create} disabled={!canCreate} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"><Check className="h-4 w-4" /> Create Renewal</button>}
+           {step < 4 ? <button type="button" onClick={goNext} disabled={!canContinue} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Next <ChevronRight className="h-4 w-4" /></button> : <button type="button" onClick={create} disabled={!canCreate} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"><Check className="h-4 w-4" /> Create Renewal</button>}
         </div>
       </div>
     </div>
@@ -1689,8 +1744,9 @@ export default function MyRenewalsPage() {
   const liveWizardOrders = useMemo(
     () => createRenewalWizardOrders(liveOrders, liveCatalog).filter(order =>
       liveClients.some(clientRecord =>
-        (clientRecord.id && clientRecord.id === order.clientId) ||
-        clientRecord.name === order.client,
+        clientRecord.id && order.clientId
+          ? clientRecord.id === order.clientId
+          : clientRecord.name === order.client,
       ),
     ),
     [liveCatalog, liveClients, liveOrders, orderStatusVersion],
@@ -1710,21 +1766,46 @@ export default function MyRenewalsPage() {
       setLivePortalUsers(getPortalUsers());
     };
     const reloadInvoices = () => setLiveInvoices(getInvoices());
-    const reloadStoredRenewals = (event: StorageEvent) => {
-      if (event.key === RENEWALS_STORAGE_KEY || event.key === null) {
+    const reloadStoredRenewals = (event?: StorageEvent) => {
+      if (!event || event.key === RENEWALS_STORAGE_KEY || event.key === null) {
         setRenewals(readStoredRenewals(RENEWALS_STORAGE_KEY));
       }
-      if (event.key === RENEWAL_HISTORY_STORAGE_KEY || event.key === null) {
+      if (!event || event.key === RENEWAL_HISTORY_STORAGE_KEY || event.key === null) {
         setRenewalHistory(readStoredRenewals(RENEWAL_HISTORY_STORAGE_KEY));
       }
+    };
+    const refreshAllLiveData = () => {
+      reloadLiveSources();
+      reloadLiveRecipients();
+      reloadInvoices();
+      reloadStoredRenewals();
+      setOrderStatusVersion(current => current + 1);
+    };
+    const onStorage = (event: StorageEvent) => {
+      const key = event.key;
+      if (
+        key === null ||
+        key === "nido_catalog_products" ||
+        key?.startsWith("nido_clients_v3:")
+      ) reloadLiveSources();
+      if (key === null || key === "nido_config_users" || key === "nido_portal_users") reloadLiveRecipients();
+      if (key === null || key === "nido_sales_invoices") reloadInvoices();
+      reloadStoredRenewals(event);
+      if (key === null || key?.startsWith("nido_subitems_")) {
+        setOrderStatusVersion(current => current + 1);
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshAllLiveData();
     };
     window.addEventListener("nidoClientsUpdated", reloadLiveSources);
     window.addEventListener("catalogUpdated", reloadLiveSources);
     window.addEventListener(NIDO_USERS_EVENT, reloadLiveRecipients);
     window.addEventListener("nidoPortalUsersUpdated", reloadLiveRecipients);
     window.addEventListener("nidoInvoicesUpdated", reloadInvoices);
-    window.addEventListener("storage", reloadInvoices);
-    window.addEventListener("storage", reloadStoredRenewals);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", refreshAllLiveData);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     const reloadOrderStatuses = () => setOrderStatusVersion(current => current + 1);
     window.addEventListener("orderSubItemsUpdated", reloadOrderStatuses);
     return () => {
@@ -1733,8 +1814,9 @@ export default function MyRenewalsPage() {
       window.removeEventListener(NIDO_USERS_EVENT, reloadLiveRecipients);
       window.removeEventListener("nidoPortalUsersUpdated", reloadLiveRecipients);
       window.removeEventListener("nidoInvoicesUpdated", reloadInvoices);
-      window.removeEventListener("storage", reloadInvoices);
-      window.removeEventListener("storage", reloadStoredRenewals);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", refreshAllLiveData);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("orderSubItemsUpdated", reloadOrderStatuses);
     };
   }, []);
@@ -1917,7 +1999,8 @@ export default function MyRenewalsPage() {
       product: values.product,
       brand: values.brand,
       client: values.client,
-      clientId: liveClients.find(item => item.name === values.client)?.id,
+      clientId: liveWizardOrders.find(order => order.id === values.order)?.clientId
+        ?? liveClients.find(item => item.name === values.client)?.id,
       licenseType: values.licenseType,
       seats: values.quantity,
       dueDate: wizardDateLabel(dueDateInput),
