@@ -43,7 +43,17 @@ import { getAllRolePermissions } from "@/lib/permissionsStore";
 import { getUserDocuments } from "@/lib/nidoUserDocumentsStore";
 import { getUserNotes } from "@/lib/nidoUserNotesStore";
 import { getAutoAssignmentSettings } from "@/lib/autoAssignmentStore";
-import { getAllClientPricing, getAllProductPricing, getClientPriceSlabs } from "@/lib/priceEngineStore";
+import {
+  getAllClientPricing,
+  getAllProductPricing,
+  getClientCartPricingSettings,
+  getClientCommonSettings,
+  getClientPriceSlabs,
+  getClientProductProfitRules,
+  getClientProfitSettings,
+  getGlobalCategoryRules,
+  getVendorCommonSettings,
+} from "@/lib/priceEngineStore";
 import { getAllRecurring } from "@/lib/recurringInvoiceStore";
 import { getOrderStatusConfig } from "@/lib/orderStatusStore";
 import { getConfig } from "@/lib/configService";
@@ -87,7 +97,6 @@ const LIVE_MODULES_BY_TYPE: Record<ReportEntityType, Set<string>> = {
     "Organization and General Settings", "Order Status Configuration", "Tax Audit",
     "Tax Transaction Reconciliation", "Audit and Impersonation", "Report Definitions", "Scheduled Reports",
     "Report Download and Email History", "Product Categories Brands and Tags", "Expenses",
-    "Transactions Ledger",
   ]),
 };
 
@@ -246,6 +255,26 @@ function readLocalObject(key: string): Record<string, unknown> {
   }
 }
 
+function readMatchingField(record: ReportRecord, ...names: string[]): unknown {
+  for (const name of names) {
+    const key = Object.keys(record).find((candidate) => normalize(candidate) === normalize(name));
+    const value = key ? record[key] : undefined;
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return undefined;
+}
+
+function numberFrom(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const direct = Number(value);
+    if (Number.isFinite(direct)) return direct;
+    const cleaned = Number(String(value).replace(/,/g, "").replace(/[^\d.-]/g, ""));
+    if (Number.isFinite(cleaned)) return cleaned;
+  }
+  return undefined;
+}
+
 function mapVendorProducts(): ReportRecord[] {
   const vendorsById = new Map(getVendors().map((vendor) => [String(vendor.id), vendor.name]));
   return Object.entries(getAllVendorProducts()).flatMap(([vendorId, products]) =>
@@ -253,8 +282,69 @@ function mapVendorProducts(): ReportRecord[] {
       ...(product as unknown as ReportRecord),
       vendorId,
       vendorName: vendorsById.get(vendorId) ?? "",
+      detail: product as unknown as ReportRecord,
     })),
   );
+}
+
+function mapClientAddresses(): ReportRecord[] {
+  return getClients().flatMap((client) => {
+    const onboarding = (client.lastUpdatedFormData ?? client.onboardingFormData ?? {}) as ReportRecord;
+    const result: ReportRecord[] = [];
+
+    for (const addressType of ["Billing", "Shipping"] as const) {
+      const prefix = addressType.toLowerCase();
+      const structured = client[`${prefix}AddressDetails`];
+      const addressDetails = structured && typeof structured === "object" && !Array.isArray(structured)
+        ? structured as ReportRecord
+        : {};
+      const field = (...names: string[]) =>
+        readMatchingField(addressDetails, ...names)
+        ?? readMatchingField(onboarding, ...names)
+        ?? readMatchingField(client as unknown as ReportRecord, ...names);
+      const line1 = field(`${prefix}_address`, `${prefix}AddressLine1`, "addressLine1");
+      const line2 = field(`${prefix}_address_line2`, `${prefix}AddressLine2`, "addressLine2");
+      const attention = field(`${prefix}_attention`, "attentionName", "attention");
+      const city = field(`${prefix}_city`, `${prefix}City`, "city");
+      const state = field(`${prefix}_state`, `${prefix}State`, "state");
+      const zip = field(`${prefix}_pincode`, `${prefix}Pincode`, "zip", "zipCode");
+      const country = field(`${prefix}_country`, `${prefix}Country`, "country");
+      const phone = field(`${prefix}_phone`, "phone");
+      const phoneCountryCode = field(`${prefix}_phone_country_code`, "phoneCountryCode");
+      const faxNumber = field(`${prefix}_fax_number`, "faxNumber");
+      const hasAddress = [line1, line2, city, state, zip, country, attention, phone, faxNumber]
+        .some((value) => value !== undefined && value !== null && value !== "");
+      if (!hasAddress) continue;
+
+      result.push({
+        id: `${client.id}:${prefix}`,
+        label: addressType,
+        addressType,
+        line1,
+        line2,
+        addressLine1: line1,
+        addressLine2: line2,
+        attention,
+        attentionName: attention,
+        city,
+        state,
+        zip,
+        pinCode: zip,
+        country,
+        phone,
+        phoneCountryCode,
+        faxNumber,
+        clientId: client.id,
+        clientName: client.name,
+        createdBy: client.createdBy,
+        createdAt: client.createdAt,
+        updatedBy: client.updatedBy,
+        updatedAt: client.updatedAt,
+      });
+    }
+
+    return result;
+  });
 }
 
 function mapClientCatalogRecords(): ReportRecord[] {
@@ -272,6 +362,558 @@ function mapClientCatalogRecords(): ReportRecord[] {
       status: product.availability,
     }));
   });
+}
+
+function mapProductSpecificationRecords(): ReportRecord[] {
+  return getCatalogProducts().flatMap((product) => {
+    const shared = {
+      ...(product as unknown as ReportRecord),
+      masterProductCode: product.masterProductCode,
+      sku: product.skuCode,
+    };
+    const specifications = (product.specifications ?? []).map((specification, index) => ({
+      ...shared,
+      ...(specification as unknown as ReportRecord),
+      specificationGroup: "Specifications",
+      sortOrder: index + 1,
+    }));
+    const generalSpecs = (product.generalSpecs ?? []).map((specification, index) => ({
+      ...shared,
+      general: specification as unknown as ReportRecord,
+      specification: specification.category,
+      value: specification.attributeValue,
+      specificationGroup: "General",
+      sortOrder: index + 1,
+    }));
+    return [...specifications, ...generalSpecs];
+  });
+}
+
+function mapProductVariantRecords(): ReportRecord[] {
+  return getCatalogProducts().flatMap((product) =>
+    (product.variations ?? []).flatMap((variation) => {
+      const options = Array.isArray(variation.options) ? variation.options : [];
+      const base = {
+        ...(product as unknown as ReportRecord),
+        ...(variation as unknown as ReportRecord),
+        masterProductCode: product.masterProductCode,
+        variantId: variation.id,
+        status: product.publishStatus,
+        name: variation.name,
+        options,
+      };
+      return options.length
+        ? options.map((option) => ({
+            ...base,
+            id: option.id,
+            option: option as unknown as ReportRecord,
+          }))
+        : [{ ...base, id: variation.id }];
+    }),
+  );
+}
+
+function mapProductTaxonomy(): ReportRecord[] {
+  const taxonomy = new Map<string, { type: string; name: string; productCount: number }>();
+  const add = (type: string, rawName: unknown) => {
+    const name = typeof rawName === "string" ? rawName.trim() : "";
+    if (!name) return;
+    const key = `${type}:${normalize(name)}`;
+    const existing = taxonomy.get(key);
+    if (existing) existing.productCount += 1;
+    else taxonomy.set(key, { type, name, productCount: 1 });
+  };
+
+  getCatalogProducts().forEach((product) => {
+    add("Category", product.category);
+    add("Brand", product.brand);
+    (product.tags ?? []).forEach((tag) => add("Tag", tag));
+  });
+
+  return [...taxonomy.values()].map((entry) => ({
+    ...entry,
+    masterDataType: entry.type,
+    taxonomyType: entry.type,
+  }));
+}
+
+function mapPriceEngineComparisons(): ReportRecord[] {
+  const productsByCode = new Map(
+    getCatalogProducts().map((product) => [String(product.masterProductCode), product]),
+  );
+
+  return getAllProductPricing().flatMap((pricing) => {
+    const productRecord = {
+      ...(productsByCode.get(String(pricing.masterProductCode)) as unknown as ReportRecord | undefined),
+      ...pricing,
+    };
+    const comparisons = Array.isArray(pricing.vendorComparisons) ? pricing.vendorComparisons : [];
+    if (!comparisons.length) return [{ ...pricing, product: productRecord, vendorComparisons: [] }];
+    return comparisons.map((comparison) => ({
+      ...(comparison as unknown as ReportRecord),
+      product: productRecord,
+      vendorComparisons: comparisons,
+      winningVendor: pricing.winningVendor,
+      selectedVendorId: pricing.winningVendor?.vendorId,
+      masterProductCode: pricing.masterProductCode,
+      productName: pricing.productName,
+      currency: comparison.currency,
+    }));
+  });
+}
+
+function mapVendorPricingChargeRecords(): ReportRecord[] {
+  const configuredVendors = readLocalObject("nido_price_engine_vendor_settings");
+  return getVendors().flatMap((vendor) => {
+    const vendorId = String(vendor.id);
+    const configured = configuredVendors[vendorId];
+    if (!configured || typeof configured !== "object" || Array.isArray(configured)) return [];
+
+    const settings = getVendorCommonSettings(vendorId);
+    const charges = Array.isArray(settings.extraCharges) ? settings.extraCharges : [];
+    const chargeRows: (ReportRecord | undefined)[] = charges.length
+      ? charges.map((charge) => charge as unknown as ReportRecord)
+      : [undefined];
+    return chargeRows.map((charge) => ({
+      ...vendor,
+      ...settings,
+      vendorId,
+      vendorName: vendor.name,
+      ...(charge ? { charge, chargeType: "Extra charge" } : {}),
+      currency: vendor.currency,
+    }));
+  });
+}
+
+function mapClientPricingMargins(): ReportRecord[] {
+  const productsByCode = new Map(
+    getCatalogProducts().map((product) => [String(product.masterProductCode), product]),
+  );
+  const categoryRules = getGlobalCategoryRules();
+
+  return getAllClientPricing().map((pricing) => {
+    const settings = getClientCommonSettings(String(pricing.clientId));
+    const profit = getClientProfitSettings(String(pricing.clientId));
+    const cart = getClientCartPricingSettings(String(pricing.clientId));
+    const calc = pricing.calc;
+    const cost = numberFrom(pricing.landedCostPerUnit);
+    const categoryRule = categoryRules.find((rule) =>
+      normalize(rule.category) === normalize(pricing.category),
+    );
+    const riskBufferAmount = cost !== undefined && categoryRule
+      ? cost * Number(categoryRule.bufferPct || 0) / 100
+      : undefined;
+
+    return {
+      ...(pricing as unknown as ReportRecord),
+      product: {
+        ...(productsByCode.get(String(pricing.masterProductCode)) as unknown as ReportRecord | undefined),
+        masterProductCode: pricing.masterProductCode,
+        productName: pricing.productName,
+        sku: pricing.sku,
+        category: pricing.category,
+      },
+      settings: settings as unknown as ReportRecord,
+      profit: profit as unknown as ReportRecord,
+      cart: cart as unknown as ReportRecord,
+      vendorId: pricing.winningVendor?.vendorId,
+      currency: getConfig().localization.currency,
+      baseCost: cost,
+      riskBufferAmount,
+      operationalCostAmount: calc?.perUnitTotal,
+      marginAmount: calc?.profit,
+      marginPercent: calc && calc.subtotal > 0 ? calc.profit / calc.subtotal * 100 : undefined,
+      clientPriceExcludingTax: calc?.preTaxFinalPrice,
+      clientPriceIncludingTax: calc?.finalPrice,
+    };
+  });
+}
+
+function mapPricingSlabsAndRules(): ReportRecord[] {
+  const clients = getClients();
+  const clientNameById = new Map(clients.map((client) => [String(client.id), String(client.name ?? client.id)]));
+  const productsByCode = new Map(
+    getCatalogProducts().map((product) => [String(product.masterProductCode), product]),
+  );
+  const clientRules = clients.flatMap((client) => [
+    ...getClientPriceSlabs(String(client.id)).map((slab) => ({
+      ...(slab as unknown as ReportRecord),
+      clientId: client.id,
+      clientName: client.name,
+      ruleType: "Client price slab",
+    })),
+    ...getClientProductProfitRules(String(client.id)).map((rule) => ({
+      ...(rule as unknown as ReportRecord),
+      clientId: client.id,
+      clientName: client.name,
+      ruleType: "Client product profit",
+      product: {
+        ...(productsByCode.get(String(rule.masterProductCode)) as unknown as ReportRecord | undefined),
+        ...rule,
+      },
+    })),
+  ]);
+  const globalRules = getGlobalCategoryRules().map((rule) => ({
+    ...(rule as unknown as ReportRecord),
+    name: rule.category,
+    ruleType: "Global category pricing",
+    category: rule as unknown as ReportRecord,
+  }));
+  return [...globalRules, ...clientRules].map((record) => ({
+    ...record,
+    clientName: record.clientName ?? clientNameById.get(String(record.clientId ?? "")),
+  }));
+}
+
+function mapInventoryBalances(): ReportRecord[] {
+  const vendorsById = new Map(getVendors().map((vendor) => [String(vendor.id), vendor]));
+  const pricesByCode = new Map(
+    getAllProductPricing().map((pricing) => [String(pricing.masterProductCode), pricing]),
+  );
+  const thresholds = getAllThresholds();
+  const configuredCurrency = getConfig().localization.currency;
+
+  return Object.entries(getAllVendorProducts()).flatMap(([vendorId, products]) => {
+    const vendor = vendorsById.get(vendorId);
+    return products.map((product) => {
+      const code = String(product.masterProductCode || product.id);
+      const physicalStock = numberFrom(product.physicalStock, product.stock) ?? 0;
+      const reservedStock = numberFrom(product.reservedStock) ?? 0;
+      const incomingStock = numberFrom(product.incomingStock);
+      const availableQuantity = Math.max(0, physicalStock - reservedStock);
+      const basePrice = numberFrom(product.price);
+      const productPricing = pricesByCode.get(code);
+      const vendorComparison = productPricing?.vendorComparisons.find((comparison) =>
+        String(comparison.vendorId) === vendorId,
+      );
+
+      return {
+        ...(product as unknown as ReportRecord),
+        id: `${vendorId}:${product.id}:${code}`,
+        vendorId,
+        vendorName: vendor?.name ?? "",
+        productName: product.productName,
+        masterProductCode: product.masterProductCode,
+        sku: product.skuCode,
+        stock: physicalStock,
+        currentStock: physicalStock,
+        onHandQuantity: physicalStock,
+        reservedStock,
+        reservedQuantity: reservedStock,
+        incomingStock,
+        incomingQuantity: incomingStock,
+        availableQuantity,
+        basePrice,
+        landedCostPerUnit: vendorComparison?.landedCostPerUnit,
+        threshold: thresholds[code] ?? thresholds[String(product.id)],
+        stockValue: basePrice === undefined ? undefined : availableQuantity * basePrice,
+        lastStockUpdate: product.lastStockUpdate,
+        currency: vendor?.currency ?? configuredCurrency,
+      };
+    });
+  });
+}
+
+function mapOrderStatusConfiguration(): ReportRecord[] {
+  const config = getOrderStatusConfig();
+  const particulars = config.particulars.map((particular) => ({
+    ...particular,
+    id: particular.value,
+    category: particular.value,
+  })) as ReportRecord[];
+
+  return config.statuses.map((status) => ({
+    ...(status as unknown as ReportRecord),
+    particular: particulars.find((particular) =>
+      normalize(String(particular.value)) === normalize(status.category),
+    ),
+  }));
+}
+
+function mapScheduledReportRecords(): ReportRecord[] {
+  const entitiesByType = getReportCenterEntities();
+  return toRecords(getReportCenterSchedules()).map((schedule) => {
+    const draft = (schedule.draft ?? {}) as unknown as ReportRecord;
+    const entityType = String(draft.entityType ?? "internal") as ReportEntityType;
+    const allEntities = draft.allEntities === true || schedule.allEntities;
+    const entityIds = Array.isArray(draft.entityIds)
+      ? draft.entityIds.map(String)
+      : schedule.entityIds.map(String);
+    const availableEntities = entitiesByType[entityType] ?? [];
+    const entities = allEntities
+      ? availableEntities
+      : availableEntities.filter((entity) => entityIds.includes(entity.id));
+
+    return {
+      ...schedule,
+      type: schedule.reportType,
+      moduleId: schedule.module,
+      entityMode: allEntities ? "All" : "Selected",
+      entities,
+      columns: Array.isArray(draft.selectedColumns) ? draft.selectedColumns : [],
+      dateBasis: draft.dateBasis,
+      from: draft.dateFrom,
+      to: draft.dateTo,
+      format: draft.format,
+      period: schedule.dateRange,
+      recipients: schedule.recipients,
+      subject: schedule.name,
+      enabled: schedule.status === "active",
+      scheduleId: schedule.id,
+      nextRunAt: schedule.nextRun,
+      draft,
+    };
+  });
+}
+
+function mapReportDefinitionRecords(): ReportRecord[] {
+  const builtins = getBuiltinReportViews().map((view) => ({
+    ...(view as unknown as ReportRecord),
+    type: "Built-in",
+    moduleId: view.module,
+    columns: view.selectedColumns,
+    reportId: view.id,
+    visibility: "Global",
+  }));
+  const custom = getCustomReports().map((report) => ({
+    ...(report as unknown as ReportRecord),
+    type: report.reportType,
+    moduleId: report.module,
+    columns: report.selectedColumns,
+    recipients: report.emailRecipients,
+    subject: report.name,
+    reportId: report.id,
+  }));
+  return [...builtins, ...custom];
+}
+
+function mapReportHistoryRecords(): ReportRecord[] {
+  return toRecords(getReportCenterHistory()).map((history) => {
+    const draft = (history.draft ?? {}) as unknown as ReportRecord;
+    return {
+      ...history,
+      at: history.generatedAtIso || history.generatedAt,
+      type: history.reportType,
+      moduleId: history.module,
+      records: history.rowCount,
+      periodLabel: history.period,
+      selectedColumns: history.columns.map((column) => column.label || column.key),
+      dateBasis: draft.dateBasis,
+      dateFrom: draft.dateFrom,
+      dateTo: draft.dateTo,
+      spec: draft,
+      sentAt: history.delivery === "Email" && history.status === "completed"
+        ? history.generatedAtIso || history.generatedAt
+        : undefined,
+    };
+  });
+}
+
+function mapClientVendorSpendRecords(): ReportRecord[] {
+  const config = getConfig();
+  const currency = config.localization.currency;
+  const baseCurrency = config.localization.baseCurrency;
+  const exchangeRates = config.localization.exchangeRates as unknown as ReportRecord;
+  const documents = [
+    ...getAllFinanceRecords(),
+    ...toRecords(getOrders()).map((record) => ({ ...record, documentType: "Sales order" })),
+    ...mapPurchaseOrders().map((record) => ({ ...record, documentType: "Purchase order" })),
+    ...mapExpenses().map((record) => ({ ...record, documentType: "Expense" })),
+  ];
+
+  return documents.map((record) => {
+    const documentType = String(record.documentType ?? record.paymentType ?? "");
+    const amount = numberFrom(record.grandTotal, record.totalAmount, record.amountReceived, record.amount, record.total);
+    const isInvoice = /invoice/i.test(documentType);
+    const isBill = /^bill$/i.test(documentType);
+    const isCredit = /credit/i.test(documentType);
+    const isPayment = /payment|receipt/i.test(`${documentType} ${record.paymentType ?? ""}`);
+    const isOrder = /order/i.test(documentType);
+    const netInvoice = isInvoice ? numberFrom(record.subtotal, record.netAmount, amount) : undefined;
+    const netBill = isBill ? numberFrom(record.subtotal, record.netAmount, amount) : undefined;
+    const creditValue = isCredit ? numberFrom(record.creditAmount, record.grandTotal, record.amount, record.total) : undefined;
+    const paidValue = isPayment ? numberFrom(record.amountReceived, record.amount, record.totalAmount) : undefined;
+    const sourceCurrency = String(record.currency ?? currency);
+    const rate = numberFrom(exchangeRates[sourceCurrency]);
+
+    return {
+      ...record,
+      documentType,
+      transactionDate: record.invoiceDate ?? record.billDate ?? record.paymentDate ?? record.orderDate ?? record.date ?? record.createdAt,
+      orderCount: isOrder ? 1 : undefined,
+      orderedValue: isOrder ? amount : undefined,
+      invoicedNetValue: netInvoice,
+      billNetValue: netBill,
+      creditValue,
+      paidValue,
+      outstandingValue: numberFrom(record.balanceDue, record.outstandingAmount),
+      taxAmount: numberFrom(record.taxAmount, record.totalTax),
+      freightAmount: numberFrom(record.freightAmount, record.shippingAmount, record.shippingCost),
+      netSpend: isBill
+        ? (netBill ?? 0) - (creditValue ?? 0)
+        : isCredit
+          ? -(creditValue ?? 0)
+          : undefined,
+      currency: sourceCurrency,
+      baseCurrency,
+      exchangeRate: rate,
+    };
+  });
+}
+
+function mapSalesRevenueRecords(): ReportRecord[] {
+  const invoices = mapInvoiceRecords();
+  const products = new Map(
+    getCatalogProducts().map((product) => [String(product.masterProductCode), product]),
+  );
+  return invoices.flatMap((invoice) => {
+    const lines = [
+      ...(Array.isArray(invoice.lineItems) ? invoice.lineItems as ReportRecord[] : []),
+      ...(Array.isArray(invoice.items) ? invoice.items as ReportRecord[] : []),
+    ];
+    const invoiceLines = lines.length ? lines : [invoice];
+    return invoiceLines.map((line, index) => {
+      const quantity = numberFrom(line.quantity, line.qty, line.units);
+      const rate = numberFrom(line.rate, line.unitPrice, line.price);
+      const discount = numberFrom(line.discount, line.discountAmount) ?? 0;
+      const revenue = numberFrom(line.lineTaxableAmount, line.lineSubtotal, line.taxableAmount, line.netAmount)
+        ?? (quantity !== undefined && rate !== undefined ? Math.max(0, quantity * rate - discount) : undefined)
+        ?? (line === invoice ? numberFrom(invoice.subtotal, invoice.netAmount) : undefined);
+      const credit = numberFrom(line.salesCreditAmount, line.creditAmount);
+      const netRevenue = revenue !== undefined ? revenue - (credit ?? 0) : undefined;
+      const explicitCogs = numberFrom(line.matchedCostOfGoodsSold, line.costOfGoodsSold, line.cogsAmount);
+      const unitCost = numberFrom(line.landedCostPerUnit, line.unitCost);
+      const cogs = explicitCogs ?? (
+        quantity !== undefined && unitCost !== undefined ? quantity * unitCost : undefined
+      );
+      const freightCost = numberFrom(line.freightCost, line.freightAmount);
+      const operationalCost = numberFrom(line.operationalCost, line.operationalCostAmount);
+      const grossProfit = netRevenue !== undefined && cogs !== undefined
+        ? netRevenue - cogs - (freightCost ?? 0)
+        : undefined;
+      const netProfit = grossProfit !== undefined
+        ? grossProfit - (operationalCost ?? 0)
+        : undefined;
+      const productCode = String(line.masterProductCode ?? line.productCode ?? line.sku ?? "");
+      const product = products.get(productCode);
+
+      return {
+        ...invoice,
+        ...line,
+        id: lines.length ? `${invoice.id ?? invoice.invoiceNumber ?? "invoice"}:${line.id ?? index + 1}` : invoice.id,
+        clientId: invoice.clientId ?? line.clientId,
+        clientName: invoice.clientName ?? invoice.customerName ?? line.clientName,
+        vendorId: line.vendorId ?? invoice.vendorId,
+        productCode: productCode || undefined,
+        productName: line.productName ?? line.itemName ?? product?.productName,
+        category: line.category ?? product?.category,
+        unitsSold: quantity,
+        invoiceNetRevenue: revenue,
+        salesCreditAmount: credit,
+        netRevenue,
+        matchedCostOfGoodsSold: cogs,
+        freightCost,
+        operationalCost,
+        grossProfit,
+        grossMarginPercent: grossProfit !== undefined && netRevenue
+          ? grossProfit / netRevenue * 100
+          : undefined,
+        netProfit,
+        netMarginPercent: netProfit !== undefined && netRevenue
+          ? netProfit / netRevenue * 100
+          : undefined,
+        unmatchedCostAmount: line.unmatchedCostAmount,
+        currency: invoice.currency ?? line.currency ?? getConfig().localization.currency,
+      };
+    });
+  });
+}
+
+function mapAgeingRecords(): ReportRecord[] {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const invoices = mapInvoiceRecords();
+  const bills = getBills();
+  const receipts = toRecords(getReceipts());
+  const vendorPayments = getPaymentsMade();
+  const clientCredits = mapCreditNotes();
+  const vendorCredits = getVendorCredits();
+
+  const mapDocument = (
+    document: ReportRecord,
+    side: "AR" | "AP",
+  ): ReportRecord => {
+    const number = String(document.invoiceNumber ?? document.billNumber ?? document.number ?? document.id ?? "");
+    const linkedPayments = side === "AR"
+      ? receipts.filter((receipt) =>
+          String(receipt.invoiceNumber ?? "") === number ||
+          String(receipt.invoiceId ?? "") === String(document.id ?? ""),
+        )
+      : vendorPayments.flatMap((payment) => {
+          const allocations = Array.isArray(payment.allocations)
+            ? payment.allocations as ReportRecord[]
+            : [];
+          return allocations
+            .filter((allocation) =>
+              String(allocation.billNumber ?? "") === number ||
+              String(allocation.billId ?? "") === String(document.id ?? ""),
+            )
+            .map((allocation) => ({ ...allocation, payment }));
+        });
+    const embeddedPayments = Array.isArray(document.payments) ? document.payments as ReportRecord[] : [];
+    const payments = embeddedPayments.length
+      ? embeddedPayments
+      : linkedPayments;
+    const appliedPayments = payments.reduce((sum, payment) =>
+      sum + (numberFrom(payment.amountReceived, payment.allocatedAmount, payment.amount, payment.totalAmount) ?? 0),
+    0);
+    const credits = side === "AR" ? clientCredits : vendorCredits;
+    const linkedCredits = credits.filter((credit) =>
+      (String(credit.invoiceNumber ?? credit.billNumber ?? credit.associatedBillNumber ?? "") === number) ||
+      String(credit.invoiceId ?? credit.billId ?? "") === String(document.id ?? ""),
+    );
+    const appliedCredits = linkedCredits.reduce((sum, credit) =>
+      sum + (numberFrom(credit.creditAmount, credit.grandTotal, credit.amount, credit.total) ?? 0),
+    0);
+    const originalAmount = numberFrom(document.grandTotal, document.totalAmount, document.amount, document.subtotal) ?? 0;
+    const explicitBalance = numberFrom(document.balanceDue, document.openBalance, document.outstandingAmount);
+    const openBalance = Math.max(0, explicitBalance ?? originalAmount - appliedPayments - appliedCredits);
+    const dueDateValue = document.dueDate ?? document.paymentDueDate;
+    const dueDate = dueDateValue ? new Date(String(dueDateValue)) : undefined;
+    const daysOverdue = dueDate && Number.isFinite(dueDate.getTime())
+      ? Math.max(0, Math.floor((todayStart.getTime() - new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()).getTime()) / 86400000))
+      : 0;
+    const dueTime = dueDate?.getTime() ?? Number.NaN;
+    const notDue = Number.isFinite(dueTime) && dueTime >= todayStart.getTime() ? openBalance : 0;
+    const bucket = (minDays: number, maxDays?: number) =>
+      daysOverdue >= minDays && (maxDays === undefined || daysOverdue <= maxDays) ? openBalance : 0;
+
+    return {
+      ...document,
+      ledgerSide: side,
+      documentId: document.id,
+      documentNumber: number,
+      documentDate: document.invoiceDate ?? document.billDate ?? document.date ?? document.createdAt,
+      dueDate: dueDateValue,
+      originalAmount,
+      appliedPayments,
+      appliedCredits,
+      openBalance,
+      daysOverdue,
+      notDueAmount: notDue,
+      "1To30Days": bucket(1, 30),
+      "31To60Days": bucket(31, 60),
+      "61To90Days": bucket(61, 90),
+      over90Days: bucket(91),
+      currency: document.currency ?? getConfig().localization.currency,
+      ownerId: document.ownerId ?? document.createdById,
+    };
+  };
+
+  return [
+    ...invoices.map((invoice) => mapDocument(invoice, "AR")),
+    ...bills.map((bill) => mapDocument(bill, "AP")),
+  ];
 }
 
 function mapClientOrderRecords(): ReportRecord[] {
@@ -603,6 +1245,7 @@ function mapPortalUserRecords(): ReportRecord[] {
   return getPortalUsers().map((user) => ({
     ...(user as unknown as ReportRecord),
     clientName: clientNames.get(String(user.clientId)) ?? "",
+    profile: user.details as ReportRecord | undefined,
   }));
 }
 
@@ -960,8 +1603,9 @@ function mapServiceAppointmentRecords(): ReportRecord[] {
 function getReportRunRecords(module: string, entityType?: ReportEntityType): ReportRecord[] | undefined {
   switch (module) {
     case "Client Master and Onboarding":
-    case "Client Addresses":
       return mapClientMasterRecords();
+    case "Client Addresses":
+      return mapClientAddresses();
     case "Client Contracts":
       return mapClientContracts();
     case "Client Users and External Stakeholders":
@@ -1049,6 +1693,7 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
         ...record,
         vendorId: record.vendorId ?? record.id,
         vendorName: record.vendorName ?? record.name,
+        onboarding: (record.lastUpdatedFormData ?? record.onboardingFormData) as ReportRecord | undefined,
       }));
     case "Vendor Categories":
       return mapVendorCategories();
@@ -1071,32 +1716,36 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "User Documents":
       return mapUserNotesAndDocuments("documents");
     case "Automatic Assignment Rules":
-      return toRecords(getAutoAssignmentSettings().rules);
+      {
+        const settings = getAutoAssignmentSettings();
+        return settings.rules.map((rule, index) => ({
+          ...(rule as unknown as ReportRecord),
+          settings: settings as unknown as ReportRecord,
+          rulePriority: index + 1,
+        }));
+      }
     case "Master Catalog":
-    case "Product Specifications":
     case "Product Commercial Terms":
-    case "Product Categories Brands and Tags":
-      return toRecords(getCatalogProducts());
-    case "Product Variants":
-      return linkedChildRecords(toRecords(getCatalogProducts()), ["variants", "variations", "options"], "product");
-    case "Price Engine and Vendor Comparison":
-    case "Vendor Pricing Charges":
-      return toRecords(getAllProductPricing());
-    case "Client Pricing and Margins":
-      return toRecords(getAllClientPricing());
-    case "Pricing Slabs and Rules":
-      return getClients().flatMap((client) =>
-        getClientPriceSlabs(String(client.id)).map((slab) => ({
-          ...(slab as unknown as ReportRecord),
-          clientId: client.id,
-          clientName: client.name,
-        })),
-      );
-    case "Inventory Balances":
       return toRecords(getCatalogProducts()).map((product) => ({
-        ...product,
-        ...(getAllThresholds()[String(product.masterProductCode ?? product.id)] ?? {}),
+        ...(product as unknown as ReportRecord),
+        detail: product as unknown as ReportRecord,
       }));
+    case "Product Specifications":
+      return mapProductSpecificationRecords();
+    case "Product Categories Brands and Tags":
+      return mapProductTaxonomy();
+    case "Product Variants":
+      return mapProductVariantRecords();
+    case "Price Engine and Vendor Comparison":
+      return mapPriceEngineComparisons();
+    case "Vendor Pricing Charges":
+      return mapVendorPricingChargeRecords();
+    case "Client Pricing and Margins":
+      return mapClientPricingMargins();
+    case "Pricing Slabs and Rules":
+      return mapPricingSlabsAndRules();
+    case "Inventory Balances":
+      return mapInventoryBalances();
     case "Stock Movements":
       return toRecords(getStockHistory());
     case "Returns and Cancellations": {
@@ -1131,15 +1780,11 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "SLA Outcomes and Breaches":
       return mapSlaRecords(module);
     case "Client and Vendor Spend":
-      return getAllFinanceRecords();
+      return mapClientVendorSpendRecords();
     case "Sales Revenue and Profit":
-      return [
-        ...toRecords(getOrders()).map((record) => ({ ...record, documentType: "Sales order" })),
-        ...mapInvoiceRecords(),
-        ...toRecords(getQuotes()).map((record) => ({ ...record, documentType: "Quote" })),
-      ];
+      return mapSalesRevenueRecords();
     case "AR and AP Ageing":
-      return [...mapInvoiceRecords(), ...getBills()];
+      return mapAgeingRecords();
     case "Vendor Performance":
       return mapVendorPerformance();
     case "Dashboard and Client Activity Summary":
@@ -1147,7 +1792,7 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "Organization and General Settings":
       return recordsFrom(getConfig());
     case "Order Status Configuration":
-      return recordsFrom(getOrderStatusConfig());
+      return mapOrderStatusConfiguration();
     case "Tax Audit":
       return toRecords(getTaxAuditLog());
     case "Tax Transaction Reconciliation":
@@ -1156,19 +1801,15 @@ function getReportRunRecords(module: string, entityType?: ReportEntityType): Rep
     case "Audit Trail":
       return getAuditRecords();
     case "Report Definitions":
-      return [...toRecords(getBuiltinReportViews()), ...toRecords(getCustomReports())];
+      return mapReportDefinitionRecords();
     case "Scheduled Reports":
-      return toRecords(getReportCenterSchedules());
+      return mapScheduledReportRecords();
     case "Report Download and Email History":
-      return toRecords(getReportCenterHistory());
+      return mapReportHistoryRecords();
     case "Expenses":
       return mapExpenses();
     case "Transactions Ledger":
-      return [
-        ...getAllFinanceRecords(),
-        ...mapExpenses(),
-        ...toRecords(getOrders()).map((record) => ({ ...record, documentType: "Sales order" })),
-      ];
+      throw new Error("Transaction-ledger postings are not stored by this app, so this report cannot be generated from real ledger data.");
     default:
       return undefined;
   }
@@ -1415,10 +2056,27 @@ const PATH_SEGMENT_ALIASES: Record<string, string[]> = {
   appointment: ["appointment", "appointmentDetails"],
   loginhistory: ["loginHistory", "login"],
   data: ["data", "payload"],
+  detail: ["detail", "details", "productDetails"],
+  view: ["view", "display"],
+  profile: ["profile", "details"],
+  option: ["option", "options"],
+  general: ["general", "generalSpecs"],
+  generalspecs: ["generalSpecs", "generalSpecifications"],
+  specifications: ["specifications", "specs"],
+  threshold: ["threshold", "stockThreshold"],
+  entities: ["entities", "entityList"],
+  attachment: ["attachment", "attachments", "files"],
 };
 
 function findNestedValue(value: unknown, aliases: string[], seen = new WeakSet<object>(), depth = 0): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value) || depth > 6 || seen.has(value)) return undefined;
+  if (!value || typeof value !== "object" || depth > 6) return undefined;
+  if (Array.isArray(value)) {
+    const matches = value
+      .map((item) => findNestedValue(item, aliases, seen, depth + 1))
+      .filter((match) => match !== undefined && match !== null && match !== "");
+    return matches.length ? matches : undefined;
+  }
+  if (seen.has(value)) return undefined;
   seen.add(value);
   const object = value as Record<string, unknown>;
   for (const alias of aliases) {
@@ -1427,34 +2085,52 @@ function findNestedValue(value: unknown, aliases: string[], seen = new WeakSet<o
     if (candidate !== null && candidate !== undefined && candidate !== "") return candidate;
   }
   for (const nested of Object.values(object)) {
-    if (!nested || typeof nested !== "object" || Array.isArray(nested)) continue;
+    if (!nested || typeof nested !== "object") continue;
     const match = findNestedValue(nested, aliases, seen, depth + 1);
     if (match !== undefined && match !== null && match !== "") return match;
   }
   return undefined;
 }
 
+function findPathValue(value: unknown, path: string[]): unknown {
+  if (!path.length) return value;
+  if (Array.isArray(value)) {
+    const matches = value
+      .map((item) => findPathValue(item, path))
+      .flatMap((match) => Array.isArray(match) ? match : match === undefined ? [] : [match]);
+    return matches.length ? matches : undefined;
+  }
+  if (!value || typeof value !== "object") return undefined;
+
+  const [segment, ...remaining] = path;
+  const aliases = PATH_SEGMENT_ALIASES[normalize(segment)]
+    ?? VALUE_ALIASES[segment]
+    ?? [segment];
+  const object = value as Record<string, unknown>;
+  const key = Object.keys(object).find((candidate) =>
+    aliases.some((alias) => normalize(candidate) === normalize(alias)),
+  );
+  return key ? findPathValue(object[key], remaining) : undefined;
+}
+
 function findValue(record: ReportRecord, column: string): unknown {
+  const path = column.split("/").map((segment) => segment.trim()).filter(Boolean);
+  if (path.length > 1) {
+    const nestedPath = findPathValue(record, path);
+    if (nestedPath !== null && nestedPath !== undefined && nestedPath !== "") return nestedPath;
+
+    // The workbook sometimes uses a grouping label that isn't a source object,
+    // such as Detail / Name. In that case resolve the actual leaf against the
+    // existing record rather than returning an empty cell.
+    const leaf = path[path.length - 1];
+    const leafValue = findNestedValue(record, VALUE_ALIASES[leaf] ?? [leaf]);
+    if (leafValue !== undefined) return leafValue;
+  }
+
   const aliases = VALUE_ALIASES[column] ?? [column];
   for (const alias of aliases) {
     const key = Object.keys(record).find((candidate) => normalize(candidate) === normalize(alias));
     if (key && record[key] !== null && record[key] !== undefined && record[key] !== "") return record[key];
-  }
-  const path = column.split("/").map((segment) => segment.trim()).filter(Boolean);
-  if (path.length > 1) {
-    let current: unknown = record;
-    for (const segment of path) {
-      if (!current || typeof current !== "object" || Array.isArray(current)) {
-        current = undefined;
-        break;
-      }
-      const candidates = PATH_SEGMENT_ALIASES[normalize(segment)] ?? [segment];
-      const key = Object.keys(current).find((candidate) =>
-        candidates.some((candidateAlias) => normalize(candidate) === normalize(candidateAlias)),
-      );
-      current = key ? (current as Record<string, unknown>)[key] : undefined;
-    }
-    if (current !== null && current !== undefined && current !== "") return current;
   }
   const nested = findNestedValue(record, aliases);
   if (nested !== undefined) return nested;
