@@ -527,13 +527,13 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-gray-900">
       <div className="border-b border-gray-200 bg-white px-3 sm:px-5">
-        <div className="flex w-full flex-wrap items-center gap-x-1">
+        <div className={`flex ${activeTab === "Contracts" ? "w-full flex-wrap items-center gap-x-1" : "items-center gap-1 overflow-x-auto"}`}>
           {(portalMode ? ["Overview"] : visibleAdminTabs).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`relative flex min-w-[84px] flex-1 items-center justify-center whitespace-nowrap px-2 py-3 text-center text-[11px] font-semibold transition-colors sm:px-3 ${activeTab === tab ? "text-blue-600" : "text-gray-600 hover:text-gray-900"}`}
+              className={`relative whitespace-nowrap font-semibold transition-colors ${activeTab === "Contracts" ? "flex min-w-[84px] flex-1 items-center justify-center px-2 py-2.5 text-center text-[10px]" : "px-3 py-3 text-[11px]"} ${activeTab === tab ? "text-blue-600" : "text-gray-600 hover:text-gray-900"}`}
             >
               {tab}
               {activeTab === tab && <span className="absolute inset-x-1 bottom-0 h-0.5 rounded-t-full bg-blue-600" />}
