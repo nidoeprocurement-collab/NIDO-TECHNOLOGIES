@@ -107,9 +107,9 @@ import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
     const paymentTermModeStorageKey = clientId
       ? `nido_payment_term_mode:${encodeURIComponent(clientId)}`
       : "nido_payment_term_mode";
-    const selectedPaymentTerms = localStorage.getItem(paymentTermsStorageKey)
-      || localStorage.getItem("nido_payment_terms")
-      || "Net 30";
+    const selectedPaymentTerms = clientId
+      ? localStorage.getItem(paymentTermsStorageKey) ?? ""
+      : localStorage.getItem(paymentTermsStorageKey) || "Net 30";
     const selectedPaymentTermMode = localStorage.getItem(paymentTermModeStorageKey)
       || localStorage.getItem("nido_payment_term_mode")
       || (selectedPaymentTerms === "Prepaid" ? "prepaid" : "postpaid");

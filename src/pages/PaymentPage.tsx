@@ -11,7 +11,6 @@ import { isValidPhoneNumber } from "@/lib/phoneValidation";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientContract } from "@/lib/clientDataStore";
-import { getClientForPortal, getClients } from "@/lib/clientStore";
 
 const PAYMENT_METHODS = [
   { id: "card",       label: "Credit / Debit Card",  sub: "Visa, Mastercard, Rupay",       icon: CreditCard, badge: null    },
@@ -78,16 +77,7 @@ const PAYMENT_SELECTION_KEY = "nido_payment_selection";
 const PAYMENT_TERMS_KEY = "nido_payment_terms";
 const PAYMENT_TERM_MODE_KEY = "nido_payment_term_mode";
 
-const PAYMENT_TERMS_OPTIONS = [
-  { value: "Net 30", label: "Net 30 – Payment due in 30 days" },
-  { value: "Net 45", label: "Net 45 – Payment due in 45 days" },
-  { value: "Net 60", label: "Net 60 – Payment due in 60 days" },
-  { value: "Net 90", label: "Net 90 – Payment due in 90 days" },
-  { value: "Immediate", label: "Immediate – Payment on delivery" },
-  { value: "Advance", label: "Advance – Payment before dispatch" },
-];
-
-function getClientAgreementPaymentTerm(clientId: string, isClientPortalUser: boolean): string {
+function getClientAgreementPaymentTerm(clientId: string): string {
   if (!clientId) return "";
 
   const contractTerms = getClientContract(clientId)?.data.commercialTerms;
@@ -96,10 +86,7 @@ function getClientAgreementPaymentTerm(clientId: string, isClientPortalUser: boo
     if (typeof term === "string" && term.trim()) return term.trim();
   }
 
-  const client = isClientPortalUser
-    ? getClientForPortal(clientId)
-    : getClients().find((candidate) => candidate.id === clientId);
-  return String(client?.payment_terms || client?.paymentTerms || "").trim();
+  return "";
 }
 
 function paymentStorageKey(key: string, clientId: string): string {
@@ -328,7 +315,7 @@ export default function PaymentPage() {
   const clientId = isClientPortalUser
     ? user?.clientId || cartClientId
     : localStorage.getItem("nido_shop_selected_client") || cartClientId;
-  const agreementPaymentTerm = getClientAgreementPaymentTerm(clientId, isClientPortalUser);
+  const agreementPaymentTerm = getClientAgreementPaymentTerm(clientId);
   const isPortalFlow = location.pathname.startsWith("/portal/");
   const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
   const cartPath = isPortalFlow ? "/portal/shop/cart" : "/shop/cart";
@@ -343,14 +330,7 @@ export default function PaymentPage() {
       || localStorage.getItem(PAYMENT_TERMS_KEY);
     return savedMode === "prepaid" || savedTerms === "Prepaid" ? "prepaid" : "postpaid";
   });
-  const [paymentTerms, setPaymentTerms] = useState(() =>
-    (() => {
-      const savedTerms = localStorage.getItem(paymentStorageKey(PAYMENT_TERMS_KEY, clientId));
-      if (agreementPaymentTerm) return agreementPaymentTerm;
-      const legacyTerms = savedTerms || localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
-      return legacyTerms === "Prepaid" ? "Net 30" : legacyTerms;
-    })(),
-  );
+  const paymentTerms = agreementPaymentTerm;
 
   useEffect(() => {
     localStorage.setItem(paymentStorageKey(PAYMENT_TERMS_KEY, clientId), paymentTerms);
@@ -487,25 +467,18 @@ export default function PaymentPage() {
                 <div className="mt-3">
                   <label className="block text-[11px] font-medium text-gray-700 mb-1">Contract payment term</label>
                   <select
-                    value={paymentTerms}
-                    onChange={(event) => {
-                      setPaymentTerms(event.target.value);
-                      localStorage.setItem(PAYMENT_TERMS_KEY, event.target.value);
-                      localStorage.setItem(PAYMENT_TERM_MODE_KEY, "postpaid");
-                    }}
+                    value={agreementPaymentTerm}
+                    disabled={!agreementPaymentTerm}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-800 outline-none focus:border-blue-400"
                   >
-                    {!PAYMENT_TERMS_OPTIONS.some((opt) => opt.value === paymentTerms) && (
-                      <option value={paymentTerms}>
-                        {paymentTerms}{paymentTerms === agreementPaymentTerm ? " — Client Agreement" : ""}
-                      </option>
-                    )}
-                    {PAYMENT_TERMS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                    {agreementPaymentTerm
+                      ? <option value={agreementPaymentTerm}>{agreementPaymentTerm}</option>
+                      : <option value="">No payment term saved in this client’s contract</option>}
                   </select>
                   <p className="mt-2 text-[11px] text-gray-500">
-                    This order will be billed to the company account and follow the signed client contract.
+                    {agreementPaymentTerm
+                      ? "Fetched from this client’s saved contract and cannot be changed here."
+                      : "Add a payment term to this client’s contract to use postpaid billing."}
                   </p>
                 </div>
               ) : (
