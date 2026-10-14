@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Minus, Plus, ChevronLeft, ChevronRight,
   ShoppingCart, Lock, X, Phone, Mail, MessageCircle,
-  CheckCircle2, RotateCcw, Headphones, BadgeCheck,
+  CheckCircle2, RotateCcw, Headphones, BadgeCheck, ZoomIn,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
@@ -167,6 +167,22 @@ export default function CartPage() {
   const checkoutPath = isPortalFlow ? "/portal/shop/checkout" : "/shop/checkout";
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
+  const [imagePreview, setImagePreview] = useState<{ src: string; alt: string } | null>(null);
+
+  useEffect(() => {
+    if (!imagePreview) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImagePreview(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [imagePreview]);
 
   type VendorInfo = {
     leadTime: string;
@@ -422,9 +438,24 @@ export default function CartPage() {
                           {/* Image */}
                           <div className="shrink-0">
                             {item.image ? (
-                              <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-lg border border-gray-200 bg-gray-50" />
+                              <button
+                                type="button"
+                                onClick={() => setImagePreview({ src: item.image, alt: item.name })}
+                                aria-label={`View larger image of ${item.name}`}
+                                title="View larger image"
+                                className="group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 transition-shadow hover:border-blue-300 hover:shadow-md sm:h-28 sm:w-28"
+                              >
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="h-full w-full object-contain"
+                                />
+                                <span className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900/75 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                                  <ZoomIn size={13} aria-hidden="true" />
+                                </span>
+                              </button>
                             ) : (
-                              <div className="w-20 h-20 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center">
+                              <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-gray-200 bg-gray-100 sm:h-28 sm:w-28">
                                 <ShoppingCart size={24} className="text-gray-300" />
                               </div>
                             )}
@@ -736,6 +767,36 @@ export default function CartPage() {
 
         </div>
       </div>
+
+      {imagePreview && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Product image: ${imagePreview.alt}`}
+          onClick={() => setImagePreview(null)}
+        >
+          <div
+            className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl bg-white p-3 shadow-2xl sm:p-5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setImagePreview(null)}
+              aria-label="Close image preview"
+              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-gray-700 shadow hover:bg-gray-100"
+            >
+              <X size={18} />
+            </button>
+            <img
+              src={imagePreview.src}
+              alt={imagePreview.alt}
+              className="min-h-0 w-full flex-1 object-contain"
+            />
+            <p className="pt-3 text-center text-sm font-medium text-gray-700">{imagePreview.alt}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
