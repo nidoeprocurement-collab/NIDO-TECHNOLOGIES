@@ -16,6 +16,7 @@ import {
   ORDER_NOTES_KEY,
   limitCheckoutNote,
 } from "@/lib/checkoutNotes";
+import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
 
                       // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -254,6 +255,7 @@ import {
                          const location = useLocation();
                          const { user, isClientPortalUser } = useAuth();
                          const { items: cart } = useCart();
+                          const requiresDeliveryDetails = cart.some((item) => !isDigitalOnlyProduct(item));
                          const isPortalFlow = location.pathname.startsWith("/portal/");
                          const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
                          const cartPath = isPortalFlow ? "/portal/shop/cart" : "/shop/cart";
@@ -351,14 +353,18 @@ import {
                               </div>
 
                               <h1 className="text-2xl font-bold text-gray-900 mb-1">Checkout</h1>
-                              <p className="text-sm text-gray-500 mb-6">Review your order, provide delivery details &amp; choose payment method</p>
+                              <p className="text-sm text-gray-500 mb-6">
+                                {requiresDeliveryDetails
+                                  ? "Review your order, provide delivery details & choose payment method"
+                                  : "Review your digital order and choose a payment method"}
+                              </p>
 
                               <CheckoutStepper current={1} />
 
                               <div className="flex gap-2 items-start">
                                 {/* Left */}
                                 <div className="flex-1 min-w-0 space-y-4">
-                                  {/* Delivery Details card */}
+                                  {requiresDeliveryDetails ? (
                                   <div className="bg-white border border-gray-200 rounded-xl p-6">
                                     <h2 className="font-semibold text-gray-900 text-base mb-4">Delivery Details</h2>
 
@@ -479,6 +485,19 @@ import {
                                       </div>
                                     </div>
                                   </div>
+                                  ) : (
+                                    <div className="flex items-start gap-3 rounded-xl border border-violet-100 bg-violet-50 p-4">
+                                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100">
+                                        <Check size={16} className="text-violet-700" />
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-semibold text-violet-900">Digital delivery</p>
+                                        <p className="mt-1 text-xs text-violet-800">
+                                          No physical delivery address or delivery instructions are required for this order.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {/* Order Notes */}
                                   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">

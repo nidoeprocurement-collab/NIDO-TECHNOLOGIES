@@ -34,6 +34,29 @@ export interface ProductTypeMetadata {
   commercialTerms?: { productType?: string } | null;
 }
 
+/** True only when the cart item is explicitly classified as digital-only. */
+export function isDigitalOnlyProduct(metadata: ProductTypeMetadata): boolean {
+  const fulfillmentType = String(metadata.fulfillmentType || "").trim().toLowerCase();
+  if (fulfillmentType === "digital") return true;
+  if (fulfillmentType === "physical" || fulfillmentType === "hybrid") return false;
+
+  const classifications = [
+    metadata.physicalType,
+    metadata.commercialTerms?.productType,
+    metadata.productType,
+    metadata.category,
+  ].map((value) => String(value || "").trim()).filter(Boolean);
+
+  // Treat conflicting or hybrid classifications conservatively: they may need
+  // physical delivery, so don't make the address optional.
+  if (classifications.some((value) => {
+    const normalized = value.toLowerCase();
+    return normalized.includes("physical") || isHybridType(normalized);
+  })) return false;
+
+  return classifications.some(isExplicitlyNonPhysicalType);
+}
+
 function isExplicitlyNonPhysicalType(type: string): boolean {
   const normalized = type.trim().toLowerCase();
   return isDigitalType(normalized)

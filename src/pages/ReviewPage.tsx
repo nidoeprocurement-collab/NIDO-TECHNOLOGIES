@@ -21,6 +21,7 @@ import { getOrderRequesterOptions, ORDER_REQUESTER_KEY, normalizeOrderRequester,
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
+import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -94,11 +95,23 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
       setDeliveryInstructions(limitCheckoutNote(localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || ""));
     }, [clientId]);
 
-    const selectedAddr = addresses.find((a) => a.id === selectedAddressId) ?? null;
+    const requiresDeliveryDetails = cart.some((item) => !isDigitalOnlyProduct(item));
+    const selectedAddr = requiresDeliveryDetails
+      ? addresses.find((a) => a.id === selectedAddressId) ?? null
+      : null;
 
     // Read saved payment terms (selected on the checkout page)
-    const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
-    const selectedPaymentTermMode = localStorage.getItem("nido_payment_term_mode")
+    const paymentTermsStorageKey = clientId
+      ? `nido_payment_terms:${encodeURIComponent(clientId)}`
+      : "nido_payment_terms";
+    const paymentTermModeStorageKey = clientId
+      ? `nido_payment_term_mode:${encodeURIComponent(clientId)}`
+      : "nido_payment_term_mode";
+    const selectedPaymentTerms = localStorage.getItem(paymentTermsStorageKey)
+      || localStorage.getItem("nido_payment_terms")
+      || "Net 30";
+    const selectedPaymentTermMode = localStorage.getItem(paymentTermModeStorageKey)
+      || localStorage.getItem("nido_payment_term_mode")
       || (selectedPaymentTerms === "Prepaid" ? "prepaid" : "postpaid");
     const paymentTermsLabel = (() => {
       if (selectedPaymentTermMode === "prepaid") {
@@ -405,33 +418,42 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 
               {/* Delivery Details */}
               <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-gray-900">Delivery Details</h2>
-                  <button onClick={() => navigate(checkoutPath)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                    <Pencil size={11} /> Edit
-                  </button>
-                </div>
-                {selectedAddr ? (
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-                      <MapPin size={18} className="text-blue-500" />
+                {requiresDeliveryDetails ? (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="font-semibold text-gray-900">Delivery Details</h2>
+                      <button onClick={() => navigate(checkoutPath)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                        <Pencil size={11} /> Edit
+                      </button>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm text-gray-900">{selectedAddr.label}</span>
-                        {selectedAddr.isDefault && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Default</span>
-                        )}
+                    {selectedAddr ? (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                          <MapPin size={18} className="text-blue-500" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm text-gray-900">{selectedAddr.label}</span>
+                            {selectedAddr.isDefault && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Default</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 leading-relaxed">
+                            {selectedAddr.line1}
+                            {selectedAddr.line2 && <><br />{selectedAddr.line2}</>}
+                            <br />{selectedAddr.phone}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500 leading-relaxed">
-                        {selectedAddr.line1}
-                        {selectedAddr.line2 && <><br />{selectedAddr.line2}</>}
-                        <br />{selectedAddr.phone}
-                      </p>
-                    </div>
-                  </div>
+                    ) : (
+                      <p className="text-sm text-gray-400">No delivery address selected. <button onClick={() => navigate(checkoutPath)} className="text-blue-600 hover:underline">Add one</button></p>
+                    )}
+                  </>
                 ) : (
-                  <p className="text-sm text-gray-400">No delivery address selected. <button onClick={() => navigate(checkoutPath)} className="text-blue-600 hover:underline">Add one</button></p>
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Digital delivery</h2>
+                    <p className="mt-1 text-sm text-gray-500">No physical delivery address is required for this order.</p>
+                  </div>
                 )}
               </div>
 

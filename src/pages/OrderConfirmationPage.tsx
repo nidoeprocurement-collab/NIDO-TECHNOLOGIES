@@ -6,6 +6,7 @@ import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
+import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,10 @@ type ConfirmationState = {
     priceNum: number;
     quantity: number;
     category?: string;
+    productType?: string;
+    physicalType?: string;
+    fulfillmentType?: "physical" | "digital" | "hybrid";
+    commercialTerms?: { productType?: string } | null;
     specs?: string[];
     clientId?: string;
     checkoutUnitPriceInclusive?: number;
@@ -86,6 +91,7 @@ export default function OrderConfirmationPage() {
   const paymentDetail = (state as any)?.paymentDetail ?? "";
   const paymentTerms = state?.paymentTerms ?? "Net 30 (Payment due in 30 days)";
   const orderDate = state?.orderDate ?? new Date().toISOString().split("T")[0];
+  const isDigitalOnlyOrder = items.length > 0 && items.every((item) => isDigitalOnlyProduct(item));
 
   const handleCopy = () => {
     navigator.clipboard.writeText(orderNumber).catch(() => {});
@@ -278,26 +284,36 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Delivery Address */}
-            <div className="px-2 py-2 border-t border-gray-100">
-              <div className="flex items-center gap-1.5 mb-2">
-                <MapPin size={14} className="text-gray-400" />
-                <span className="text-sm font-semibold text-gray-800">Delivery Address</span>
-              </div>
-              {address ? (
-                <div className="text-sm text-gray-600 space-y-0.5 pl-5">
-                  <p className="font-medium text-gray-800">{address.label}</p>
-                  <p>{address.line1}</p>
-                  {address.line2 && <p>{address.line2}</p>}
-                  {(address.city || address.state || address.zip) && (
-                    <p>{[address.city, address.state, address.zip].filter(Boolean).join(", ")}</p>
-                  )}
-                  {address.line3 && <p>{address.line3}</p>}
-                  <p className="text-gray-400 text-xs mt-1">{address.phone}</p>
+            {isDigitalOnlyOrder ? (
+              <div className="px-2 py-2 border-t border-gray-100">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Check size={14} className="text-violet-600" />
+                  <span className="text-sm font-semibold text-gray-800">Digital Delivery</span>
                 </div>
-              ) : (
-                <p className="text-xs text-gray-400 pl-5">No address provided</p>
-              )}
-            </div>
+                <p className="pl-5 text-xs text-gray-500">No physical delivery address is required for this digital order.</p>
+              </div>
+            ) : (
+              <div className="px-2 py-2 border-t border-gray-100">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <MapPin size={14} className="text-gray-400" />
+                  <span className="text-sm font-semibold text-gray-800">Delivery Address</span>
+                </div>
+                {address ? (
+                  <div className="text-sm text-gray-600 space-y-0.5 pl-5">
+                    <p className="font-medium text-gray-800">{address.label}</p>
+                    <p>{address.line1}</p>
+                    {address.line2 && <p>{address.line2}</p>}
+                    {(address.city || address.state || address.zip) && (
+                      <p>{[address.city, address.state, address.zip].filter(Boolean).join(", ")}</p>
+                    )}
+                    {address.line3 && <p>{address.line3}</p>}
+                    <p className="text-gray-400 text-xs mt-1">{address.phone}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 pl-5">No address provided</p>
+                )}
+              </div>
+            )}
 
             {/* Payment */}
             <div className="px-2 py-2 border-t border-gray-100">

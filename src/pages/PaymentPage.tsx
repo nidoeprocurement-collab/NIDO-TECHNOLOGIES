@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
@@ -9,6 +9,9 @@ import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { isValidPhoneNumber } from "@/lib/phoneValidation";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { getClientContract } from "@/lib/clientDataStore";
+import { getClientForPortal, getClients } from "@/lib/clientStore";
 
 const PAYMENT_METHODS = [
   { id: "card",       label: "Credit / Debit Card",  sub: "Visa, Mastercard, Rupay",       icon: CreditCard, badge: null    },
@@ -83,6 +86,25 @@ const PAYMENT_TERMS_OPTIONS = [
   { value: "Immediate", label: "Immediate – Payment on delivery" },
   { value: "Advance", label: "Advance – Payment before dispatch" },
 ];
+
+function getClientAgreementPaymentTerm(clientId: string, isClientPortalUser: boolean): string {
+  if (!clientId) return "";
+
+  const contractTerms = getClientContract(clientId)?.data.commercialTerms;
+  if (contractTerms && typeof contractTerms === "object" && "paymentTerms" in contractTerms) {
+    const term = (contractTerms as { paymentTerms?: unknown }).paymentTerms;
+    if (typeof term === "string" && term.trim()) return term.trim();
+  }
+
+  const client = isClientPortalUser
+    ? getClientForPortal(clientId)
+    : getClients().find((candidate) => candidate.id === clientId);
+  return String(client?.payment_terms || client?.paymentTerms || "").trim();
+}
+
+function paymentStorageKey(key: string, clientId: string): string {
+  return clientId ? `${key}:${encodeURIComponent(clientId)}` : key;
+}
 
 const DEFAULT_PAYMENT_STATE: PaymentState = {
   paymentMethod: "card",
@@ -300,24 +322,42 @@ function CompanyBanPanel() {
 export default function PaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { items: cart } = useCart();
+  const { user, isClientPortalUser } = useAuth();
+  const cartClientId = cart.find((item) => item.clientId)?.clientId || "";
+  const clientId = isClientPortalUser
+    ? user?.clientId || cartClientId
+    : localStorage.getItem("nido_shop_selected_client") || cartClientId;
+  const agreementPaymentTerm = getClientAgreementPaymentTerm(clientId, isClientPortalUser);
   const isPortalFlow = location.pathname.startsWith("/portal/");
   const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
   const cartPath = isPortalFlow ? "/portal/shop/cart" : "/shop/cart";
   const checkoutPath = isPortalFlow ? "/portal/shop/checkout" : "/shop/checkout";
   const reviewPath = isPortalFlow ? "/portal/shop/checkout/review" : "/shop/checkout/review";
   const [state, setState] = useState<PaymentState>(loadPaymentState);
-  const { items: cart } = useCart();
   const [paymentTermMode, setPaymentTermMode] = useState<"postpaid" | "prepaid">(() => {
-    const savedMode = localStorage.getItem(PAYMENT_TERM_MODE_KEY);
-    const savedTerms = localStorage.getItem(PAYMENT_TERMS_KEY);
+    if (agreementPaymentTerm) return "postpaid";
+    const savedMode = localStorage.getItem(paymentStorageKey(PAYMENT_TERM_MODE_KEY, clientId))
+      || localStorage.getItem(PAYMENT_TERM_MODE_KEY);
+    const savedTerms = localStorage.getItem(paymentStorageKey(PAYMENT_TERMS_KEY, clientId))
+      || localStorage.getItem(PAYMENT_TERMS_KEY);
     return savedMode === "prepaid" || savedTerms === "Prepaid" ? "prepaid" : "postpaid";
   });
   const [paymentTerms, setPaymentTerms] = useState(() =>
     (() => {
-      const savedTerms = localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
-      return savedTerms === "Prepaid" ? "Net 30" : savedTerms;
+      const savedTerms = localStorage.getItem(paymentStorageKey(PAYMENT_TERMS_KEY, clientId));
+      if (agreementPaymentTerm) return agreementPaymentTerm;
+      const legacyTerms = savedTerms || localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
+      return legacyTerms === "Prepaid" ? "Net 30" : legacyTerms;
     })(),
   );
+
+  useEffect(() => {
+    localStorage.setItem(paymentStorageKey(PAYMENT_TERMS_KEY, clientId), paymentTerms);
+    localStorage.setItem(paymentStorageKey(PAYMENT_TERM_MODE_KEY, clientId), paymentTermMode);
+    localStorage.setItem(PAYMENT_TERMS_KEY, paymentTermMode === "prepaid" ? "Prepaid" : paymentTerms);
+    localStorage.setItem(PAYMENT_TERM_MODE_KEY, paymentTermMode);
+  }, [clientId, paymentTermMode, paymentTerms]);
 
   const onChange = (d: Partial<PaymentState>) => {
     setState((prev) => {
@@ -455,6 +495,11 @@ export default function PaymentPage() {
                     }}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-800 outline-none focus:border-blue-400"
                   >
+                    {!PAYMENT_TERMS_OPTIONS.some((opt) => opt.value === paymentTerms) && (
+                      <option value={paymentTerms}>
+                        {paymentTerms}{paymentTerms === agreementPaymentTerm ? " — Client Agreement" : ""}
+                      </option>
+                    )}
                     {PAYMENT_TERMS_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
