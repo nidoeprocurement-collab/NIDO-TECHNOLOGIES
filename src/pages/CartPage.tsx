@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Minus, Plus, ChevronLeft, ChevronRight,
   ShoppingCart, Lock, X, Phone, Mail, MessageCircle,
-  CheckCircle2, RotateCcw, Headphones, BadgeCheck, ZoomIn,
+  CheckCircle2, RotateCcw, Headphones, BadgeCheck, ZoomIn, ImageOff,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
@@ -22,6 +22,54 @@ import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } 
 import { getCartTaxRate, getCartUnitPriceExclGst, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
+
+function CartProductImage({
+  src,
+  name,
+  onPreview,
+}: {
+  src: string;
+  name: string;
+  onPreview: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  const frameClass = "h-32 w-32 shrink-0 sm:h-36 sm:w-36";
+
+  if (!src || failed) {
+    return (
+      <div
+        className={`flex ${frameClass} items-center justify-center rounded-xl border border-gray-200 bg-slate-50`}
+        role="img"
+        aria-label={`No product image available for ${name}`}
+      >
+        <ImageOff size={28} className="text-gray-300" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onPreview}
+      aria-label={`View larger image of ${name}`}
+      title="View larger image"
+      className={`group relative flex ${frameClass} items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-slate-50 p-2 transition-shadow hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+    >
+      <img
+        src={src}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.03]"
+      />
+      <span className="absolute bottom-2 right-2 flex h-7 items-center gap-1 rounded-full bg-gray-900/80 px-2 text-[10px] font-medium text-white shadow-sm">
+        <ZoomIn size={13} aria-hidden="true" />
+        Enlarge
+      </span>
+    </button>
+  );
+}
 import { formatCurrency } from "@/lib/formatters";
 import {
   getProductType,
@@ -359,8 +407,8 @@ export default function CartPage() {
                     No {productTab} products in your cart.
                   </div>
                 ) : (
-                  <div className={productTab === "digital" ? "overflow-x-hidden" : "overflow-x-auto"}>
-                    <div className={productTab === "digital" ? "w-full min-w-0" : "min-w-[1040px]"}>
+                  <div className="overflow-x-auto">
+                    <div className={productTab === "digital" ? "min-w-[1180px]" : "min-w-[1040px]"}>
                       {/* Header mirrors Vendor Products for each product type. */}
                       <div
                         className={`grid border-b border-gray-200 bg-gray-50 py-3 ${productTab === "digital" ? "px-2 gap-1" : "px-5 gap-3"}`}
@@ -435,31 +483,13 @@ export default function CartPage() {
 
                         {/* ── Product info ────────────────────────────── */}
                         <div className="flex gap-4 min-w-0 pr-2">
-                          {/* Image */}
-                          <div className="shrink-0">
-                            {item.image ? (
-                              <button
-                                type="button"
-                                onClick={() => setImagePreview({ src: item.image, alt: item.name })}
-                                aria-label={`View larger image of ${item.name}`}
-                                title="View larger image"
-                                className="group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 transition-shadow hover:border-blue-300 hover:shadow-md sm:h-28 sm:w-28"
-                              >
-                                <img
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="h-full w-full object-contain"
-                                />
-                                <span className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900/75 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                                  <ZoomIn size={13} aria-hidden="true" />
-                                </span>
-                              </button>
-                            ) : (
-                              <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-gray-200 bg-gray-100 sm:h-28 sm:w-28">
-                                <ShoppingCart size={24} className="text-gray-300" />
-                              </div>
-                            )}
-                          </div>
+                          {/* Larger, contain-fitted images keep the full product visible. */}
+                          <CartProductImage
+                            key={item.image}
+                            src={item.image}
+                            name={item.name}
+                            onPreview={() => setImagePreview({ src: item.image, alt: item.name })}
+                          />
 
                           {/* Details */}
                           <div className="min-w-0 flex-1">
@@ -777,7 +807,7 @@ export default function CartPage() {
           onClick={() => setImagePreview(null)}
         >
           <div
-            className="relative flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl bg-white p-3 shadow-2xl sm:p-5"
+            className="relative flex max-h-[94vh] w-full max-w-6xl flex-col rounded-2xl bg-white p-2 shadow-2xl sm:p-4"
             onClick={(event) => event.stopPropagation()}
           >
             <button
