@@ -903,13 +903,11 @@ function AddNewProductModal({
       return;
     }
 
-    // Require a role and a preference to be set for every selected product
-    // before it can be added to the client catalog.
+    // A role is required for every selected product. Preference is optional.
     const errors: MissingField[] = [];
     for (const row of rowsToAdd) {
       const missing: string[] = [];
       if (!row.roles || row.roles.length === 0) missing.push("Role");
-      if (!row.preference || row.preference.trim() === "") missing.push("Preference");
       if (missing.length > 0) errors.push({ productName: row.product.productName, missing });
     }
     if (errors.length > 0) {
@@ -1099,7 +1097,7 @@ function AddNewProductModal({
                   Assign Roles &amp; Preferences
                   {rows.length > 0 && <span className="ml-2 text-blue-600">({rows.length} product{rows.length !== 1 ? "s" : ""})</span>}
                 </h3>
-                <p className="text-xs text-gray-400 mt-0.5">Set roles and preferences for each selected product</p>
+                <p className="text-xs text-gray-400 mt-0.5">Assign a role to each product; preference is optional</p>
               </div>
             </div>
 
@@ -1118,7 +1116,7 @@ function AddNewProductModal({
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference (optional)</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Client Product Code</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">Remove</th>
                     </tr>
@@ -1195,7 +1193,7 @@ function AddNewProductModal({
         </div>
       </div>
 
-      {/* Validation warning modal — require role & preference before adding */}
+      {/* Validation warning modal — require a role before adding */}
       {validationErrors.length > 0 && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-2 flex flex-col gap-4">
@@ -1206,7 +1204,7 @@ function AddNewProductModal({
               <div>
                 <h3 className="text-base font-semibold text-gray-900">Missing Required Details</h3>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Please set a role and preference for every selected product before adding them.
+                  Please set a role for every selected product before adding them.
                 </p>
               </div>
             </div>
