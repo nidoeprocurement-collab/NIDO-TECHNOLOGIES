@@ -53,40 +53,71 @@ interface ContractDetailViewProps {
 interface FieldConfig {
   key: string;
   label: string;
-  type: "text" | "textarea" | "select";
+  type: "text" | "textarea" | "select" | "date";
   options?: string[];
+  optionLabels?: Record<string, string>;
+  placeholder?: string;
+}
+
+interface RowEditorConfig {
+  initialRowCount: number;
+  makeRowFields: (rowIndex: number) => FieldConfig[];
+  addButtonLabel?: string;
 }
 
 interface EditModalProps {
   title: string;
   fields: FieldConfig[];
   currentValues: Record<string, string>;
-  onSave: (values: Record<string, string>) => void;
+  onSave: (values: Record<string, string>, rowCount?: number) => void;
   onClose: () => void;
+  rowEditor?: RowEditorConfig;
 }
 
-function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalProps) {
+function EditModal({ title, fields, currentValues, onSave, onClose, rowEditor }: EditModalProps) {
   const [values, setValues] = useState<Record<string, string>>(currentValues);
+  const [visibleFields, setVisibleFields] = useState(fields);
+  const [rowCount, setRowCount] = useState(rowEditor?.initialRowCount || 0);
+
+  const addRow = () => {
+    if (!rowEditor) return;
+    const newFields = rowEditor.makeRowFields(rowCount);
+    setVisibleFields((current) => [...current, ...newFields]);
+    setValues((current) => ({
+      ...current,
+      ...Object.fromEntries(newFields.map((field) => [field.key, ""])),
+    }));
+    setRowCount((current) => current + 1);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+        className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-2 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
           <h2 className="text-base font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-2 overflow-y-auto flex-1 space-y-4">
-          {fields.map((field) => (
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {visibleFields.map((field) => (
             <div key={field.key} className="space-y-1">
               <label className="block text-xs font-medium text-gray-700">{field.label}</label>
               {field.type === "text" && (
                 <input
                   type="text"
+                  value={values[field.key] ?? ""}
+                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                  placeholder={field.placeholder}
+                  className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+              {field.type === "date" && (
+                <input
+                  type="date"
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
                   className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -96,6 +127,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
                 <textarea
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                  placeholder={field.placeholder}
                   rows={3}
                   className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -106,21 +138,31 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
                   className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  {field.placeholder && <option value="">{field.placeholder}</option>}
                   {field.options.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
+                    <option key={opt} value={opt}>{field.optionLabels?.[opt] || opt}</option>
                   ))}
                 </select>
               )}
             </div>
           ))}
+          {rowEditor && (
+            <button
+              type="button"
+              onClick={addRow}
+              className="rounded-lg border border-dashed border-blue-300 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+            >
+              {rowEditor.addButtonLabel || "Add another row"}
+            </button>
+          )}
         </div>
-        <div className="px-5 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-5 py-3">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">
             Cancel
           </button>
           <button
             type="button"
-            onClick={() => onSave(values)}
+            onClick={() => onSave(values, rowCount)}
             data-testid="save-contract-changes"
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
           >
@@ -218,7 +260,7 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function ContractDetailView({
+export function ContractDetailView({
   contractId,
   contractTitle,
   clientId,
@@ -267,7 +309,8 @@ function ContractDetailView({
     title: string;
     fields: FieldConfig[];
     currentValues: Record<string, string>;
-    onSave: (values: Record<string, string>) => void;
+    onSave: (values: Record<string, string>, rowCount?: number) => void;
+    rowEditor?: RowEditorConfig;
   } | null>(null);
 
   const closeModal = () => setEditModalConfig(null);
@@ -539,17 +582,28 @@ function ContractDetailView({
   const openResponseTargetsEdit = () => {
     const flat: Record<string, string> = {};
     responseTargets.forEach((row, i) => { flat[`p${i}_priority`] = row.priority; flat[`p${i}_response`] = row.response; flat[`p${i}_resolution`] = row.resolution; });
-    const fields: FieldConfig[] = responseTargets.flatMap((_, i) => [
-      { key: `p${i}_priority`, label: `Row ${i + 1} — Priority Label`, type: "text" as const },
-      { key: `p${i}_response`, label: `Row ${i + 1} — Response Time`, type: "text" as const },
-      { key: `p${i}_resolution`, label: `Row ${i + 1} — Resolution Time`, type: "text" as const },
-    ]);
+    const initialRowCount = Math.max(1, responseTargets.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      { key: `p${i}_priority`, label: `Row ${i + 1} — Priority Label`, type: "text", placeholder: "Enter priority" },
+      { key: `p${i}_response`, label: `Row ${i + 1} — Response Time`, type: "text", placeholder: "Enter response time" },
+      { key: `p${i}_resolution`, label: `Row ${i + 1} — Resolution Time`, type: "text", placeholder: "Enter resolution time" },
+    ];
     setEditModalConfig({
       title: "Edit Response & Resolution Targets",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setResponseTargets(responseTargets.map((row, i) => ({ ...row, priority: v[`p${i}_priority`] ?? row.priority, response: v[`p${i}_response`] ?? row.response, resolution: v[`p${i}_resolution`] ?? row.resolution })));
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = responseTargets[i];
+          const priority = (v[`p${i}_priority`] ?? existing?.priority ?? "").trim();
+          const response = (v[`p${i}_response`] ?? existing?.response ?? "").trim();
+          const resolution = (v[`p${i}_resolution`] ?? existing?.resolution ?? "").trim();
+          if (!priority && !response && !resolution) return null;
+          if (!priority || !response || !resolution) return null;
+          return { priority, response, resolution, color: existing?.color || "blue" };
+        }).filter((row): row is NonNullable<typeof row> => row !== null);
+        setResponseTargets(updated);
         closeModal();
       },
     });
@@ -578,20 +632,26 @@ function ContractDetailView({
     const scopeOptions = ["Included", "Change Request Required", "Excluded"];
     const flat: Record<string, string> = {};
     servicesCovered.forEach((row, i) => { flat[`s${i}_service`] = row.service; flat[`s${i}_scope`] = row.scope; });
-    const fields: FieldConfig[] = servicesCovered.flatMap((_, i) => [
-      { key: `s${i}_service`, label: `Service ${i + 1} — Name`, type: "text" as const },
-      { key: `s${i}_scope`, label: `Service ${i + 1} — Scope`, type: "select" as const, options: scopeOptions },
-    ]);
+    const initialRowCount = Math.max(1, servicesCovered.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      { key: `s${i}_service`, label: `Service ${i + 1} — Name`, type: "text", placeholder: "Enter service name" },
+      { key: `s${i}_scope`, label: `Service ${i + 1} — Scope`, type: "select", options: scopeOptions, placeholder: "Choose scope" },
+    ];
     setEditModalConfig({
       title: "Edit Services Covered",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setServicesCovered(servicesCovered.map((row, i) => {
-          const scope = v[`s${i}_scope`] ?? row.scope;
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = servicesCovered[i];
+          const service = (v[`s${i}_service`] ?? existing?.service ?? "").trim();
+          const scope = (v[`s${i}_scope`] ?? existing?.scope ?? "").trim();
+          if (!service || !scope) return null;
           const badge = scope === "Included" ? "green" : scope === "Excluded" ? "red" : "amber";
-          return { service: v[`s${i}_service`] ?? row.service, scope, badge };
-        }));
+          return { service, scope, badge };
+        }).filter((row): row is NonNullable<typeof row> => row !== null);
+        setServicesCovered(updated);
         closeModal();
       },
     });
@@ -599,14 +659,55 @@ function ContractDetailView({
 
   const openDataSecurityEdit = () => {
     const flat: Record<string, string> = {};
-    dataSecurity.forEach((item, i) => { flat[`ds${i}_label`] = item.label; });
-    const fields: FieldConfig[] = dataSecurity.map((_, i) => ({ key: `ds${i}_label`, label: `Security Feature ${i + 1}`, type: "text" as const }));
+    const baseTypes = ["ssl", "backup", "disaster", "audit", "rbac", "hosting"];
+    const typeOptions = Array.from(new Set([...baseTypes, ...dataSecurity.map((item) => item.type)]));
+    const typeLabels: Record<string, string> = {
+      ssl: "SSL / TLS",
+      backup: "Backup",
+      disaster: "Disaster Recovery",
+      audit: "Audit Logging",
+      rbac: "Role-Based Access",
+      hosting: "Hosting",
+    };
+    dataSecurity.forEach((item, i) => {
+      flat[`ds${i}_type`] = item.type;
+      flat[`ds${i}_label`] = item.label;
+      flat[`ds${i}_active`] = item.active ? "Active" : "Inactive";
+    });
+    const initialRowCount = Math.max(1, dataSecurity.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      {
+        key: `ds${i}_type`,
+        label: `Feature ${i + 1} — Type`,
+        type: "select",
+        options: typeOptions,
+        optionLabels: typeLabels,
+        placeholder: "Choose feature type",
+      },
+      { key: `ds${i}_label`, label: `Feature ${i + 1} — Name`, type: "text", placeholder: "Enter security feature" },
+      {
+        key: `ds${i}_active`,
+        label: `Feature ${i + 1} — Status`,
+        type: "select",
+        options: ["Active", "Inactive"],
+        placeholder: "Choose status",
+      },
+    ];
     setEditModalConfig({
       title: "Edit Data Security & Compliance",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setDataSecurity(dataSecurity.map((item, i) => ({ ...item, label: v[`ds${i}_label`] ?? item.label })));
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = dataSecurity[i];
+          const type = (v[`ds${i}_type`] ?? existing?.type ?? "").trim();
+          const label = (v[`ds${i}_label`] ?? existing?.label ?? "").trim();
+          const active = v[`ds${i}_active`] ?? (existing?.active ? "Active" : "Inactive");
+          if (!type || !label || !active) return null;
+          return { type, label, active: active === "Active" };
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
+        setDataSecurity(updated);
         closeModal();
       },
     });
@@ -628,18 +729,30 @@ function ContractDetailView({
   const openSupportMatrixEdit = () => {
     const flat: Record<string, string> = {};
     supportMatrix.forEach((row, i) => { flat[`sm${i}_level`] = row.level; flat[`sm${i}_team`] = row.team; flat[`sm${i}_email`] = row.email; flat[`sm${i}_availability`] = row.availability; });
-    const fields: FieldConfig[] = supportMatrix.flatMap((_, i) => [
-      { key: `sm${i}_level`, label: `Row ${i + 1} — Level`, type: "text" as const },
-      { key: `sm${i}_team`, label: `Row ${i + 1} — Contact / Team`, type: "text" as const },
-      { key: `sm${i}_email`, label: `Row ${i + 1} — Email`, type: "text" as const },
-      { key: `sm${i}_availability`, label: `Row ${i + 1} — Availability`, type: "text" as const },
-    ]);
+    const initialRowCount = Math.max(1, supportMatrix.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      { key: `sm${i}_level`, label: `Row ${i + 1} — Level`, type: "text", placeholder: "Enter support level" },
+      { key: `sm${i}_team`, label: `Row ${i + 1} — Contact / Team`, type: "text", placeholder: "Enter team or contact" },
+      { key: `sm${i}_email`, label: `Row ${i + 1} — Email`, type: "text", placeholder: "Enter email (optional)" },
+      { key: `sm${i}_availability`, label: `Row ${i + 1} — Availability`, type: "text", placeholder: "Enter availability" },
+    ];
     setEditModalConfig({
       title: "Edit Support & Escalation Matrix",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setSupportMatrix(supportMatrix.map((row, i) => ({ level: v[`sm${i}_level`] ?? row.level, team: v[`sm${i}_team`] ?? row.team, email: v[`sm${i}_email`] ?? row.email, availability: v[`sm${i}_availability`] ?? row.availability })));
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = supportMatrix[i];
+          const level = (v[`sm${i}_level`] ?? existing?.level ?? "").trim();
+          const team = (v[`sm${i}_team`] ?? existing?.team ?? "").trim();
+          const email = (v[`sm${i}_email`] ?? existing?.email ?? "").trim();
+          const availability = (v[`sm${i}_availability`] ?? existing?.availability ?? "").trim();
+          if (!level && !team && !email && !availability) return null;
+          if (!level || !team) return null;
+          return { level, team, email, availability };
+        }).filter((row): row is NonNullable<typeof row> => row !== null);
+        setSupportMatrix(updated);
         closeModal();
       },
     });
@@ -647,14 +760,45 @@ function ContractDetailView({
 
   const openRenewalTermEdit = () => {
     const flat: Record<string, string> = {};
-    renewalTerm.forEach((item, i) => { flat[`rt${i}_label`] = item.label; });
-    const fields: FieldConfig[] = renewalTerm.map((_, i) => ({ key: `rt${i}_label`, label: `Item ${i + 1}`, type: "text" as const }));
+    const typeOptions = ["renewal", "notice", "termination", "exit", "export", "retention"];
+    const typeLabels: Record<string, string> = {
+      renewal: "Renewal",
+      notice: "Notice",
+      termination: "Termination",
+      exit: "Exit",
+      export: "Data Export",
+      retention: "Data Retention",
+    };
+    renewalTerm.forEach((item, i) => {
+      flat[`rt${i}_type`] = item.type;
+      flat[`rt${i}_label`] = item.label;
+    });
+    const initialRowCount = Math.max(1, renewalTerm.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      {
+        key: `rt${i}_type`,
+        label: `Item ${i + 1} — Type`,
+        type: "select",
+        options: typeOptions,
+        optionLabels: typeLabels,
+        placeholder: "Choose item type",
+      },
+      { key: `rt${i}_label`, label: `Item ${i + 1} — Details`, type: "text", placeholder: "Enter renewal or termination detail" },
+    ];
     setEditModalConfig({
       title: "Edit Renewal & Termination",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setRenewalTerm(renewalTerm.map((item, i) => ({ ...item, label: v[`rt${i}_label`] ?? item.label })));
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = renewalTerm[i];
+          const type = (v[`rt${i}_type`] ?? existing?.type ?? "").trim();
+          const label = (v[`rt${i}_label`] ?? existing?.label ?? "").trim();
+          if (!type || !label) return null;
+          return { type, label };
+        }).filter((item): item is NonNullable<typeof item> => item !== null);
+        setRenewalTerm(updated);
         closeModal();
       },
     });
@@ -679,16 +823,26 @@ function ContractDetailView({
   const openSLAEdit = () => {
     const flat: Record<string, string> = {};
     slaCommitments.forEach((row, i) => { flat[`sla${i}_commitment`] = row.commitment; flat[`sla${i}_target`] = row.target; });
-    const fields: FieldConfig[] = slaCommitments.flatMap((_, i) => [
-      { key: `sla${i}_commitment`, label: `Row ${i + 1} — Commitment`, type: "text" as const },
-      { key: `sla${i}_target`, label: `Row ${i + 1} — Target`, type: "text" as const },
-    ]);
+    const initialRowCount = Math.max(1, slaCommitments.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      { key: `sla${i}_commitment`, label: `Row ${i + 1} — Commitment`, type: "text", placeholder: "Enter SLA commitment" },
+      { key: `sla${i}_target`, label: `Row ${i + 1} — Target`, type: "text", placeholder: "Enter target" },
+    ];
     setEditModalConfig({
       title: "Edit SLA Commitments",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setSlaCommitments(slaCommitments.map((row, i) => ({ ...row, commitment: v[`sla${i}_commitment`] ?? row.commitment, target: v[`sla${i}_target`] ?? row.target })));
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = slaCommitments[i];
+          const commitment = (v[`sla${i}_commitment`] ?? existing?.commitment ?? "").trim();
+          const target = (v[`sla${i}_target`] ?? existing?.target ?? "").trim();
+          if (!commitment && !target) return null;
+          if (!commitment || !target) return null;
+          return { commitment, target, color: existing?.color || "blue" };
+        }).filter((row): row is NonNullable<typeof row> => row !== null);
+        setSlaCommitments(updated);
         closeModal();
       },
     });
@@ -750,16 +904,26 @@ function ContractDetailView({
   const openRemindersEdit = () => {
     const flat: Record<string, string> = {};
     reminders.forEach((r, i) => { flat[`r${i}_label`] = r.label; flat[`r${i}_date`] = r.date; });
-    const fields: FieldConfig[] = reminders.flatMap((_, i) => [
-      { key: `r${i}_label`, label: `Reminder ${i + 1} — Label`, type: "text" as const },
-      { key: `r${i}_date`, label: `Reminder ${i + 1} — Date`, type: "text" as const },
-    ]);
+    const initialRowCount = Math.max(1, reminders.length);
+    const makeRowFields = (i: number): FieldConfig[] => [
+      { key: `r${i}_label`, label: `Reminder ${i + 1} — Label`, type: "text", placeholder: "Enter reminder details" },
+      { key: `r${i}_date`, label: `Reminder ${i + 1} — Date`, type: "text", placeholder: "Enter reminder date" },
+    ];
     setEditModalConfig({
       title: "Edit Reminders",
-      fields,
+      fields: Array.from({ length: initialRowCount }, (_, i) => makeRowFields(i)).flat(),
+      rowEditor: { initialRowCount, makeRowFields },
       currentValues: flat,
-      onSave: (v) => {
-        setReminders(reminders.map((r, i) => ({ label: v[`r${i}_label`] ?? r.label, date: v[`r${i}_date`] ?? r.date })));
+      onSave: (v, rowCount = initialRowCount) => {
+        const updated = Array.from({ length: rowCount }, (_, i) => {
+          const existing = reminders[i];
+          const label = (v[`r${i}_label`] ?? existing?.label ?? "").trim();
+          const date = (v[`r${i}_date`] ?? existing?.date ?? "").trim();
+          if (!label && !date) return null;
+          if (!label || !date) return null;
+          return { label, date };
+        }).filter((reminder): reminder is NonNullable<typeof reminder> => reminder !== null);
+        setReminders(updated);
         closeModal();
       },
     });
@@ -951,8 +1115,9 @@ function ContractDetailView({
           title={editModalConfig.title}
           fields={editModalConfig.fields}
           currentValues={editModalConfig.currentValues}
-          onSave={(values) => {
-            editModalConfig.onSave(values);
+          rowEditor={editModalConfig.rowEditor}
+          onSave={(values, rowCount) => {
+            editModalConfig.onSave(values, rowCount);
             setSaveConfirmation("Changes saved successfully.");
             window.setTimeout(() => setSaveConfirmation(""), 3000);
           }}
@@ -991,7 +1156,7 @@ function ContractDetailView({
           )}
         </div>
 
-        <div className="px-6 pt-5 pb-4 border-b border-gray-100">
+        <div className="px-4 pt-5 pb-4 border-b border-gray-100 sm:px-6">
           <button
             onClick={onBack}
             className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors mb-4"
@@ -1000,9 +1165,9 @@ function ContractDetailView({
             Back to Contracts
           </button>
 
-          <div className="flex items-start justify-between gap-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
             {/* Left — Service Provider */}
-            <div className="w-64 shrink-0">
+            <div className="w-full lg:w-64 lg:shrink-0">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
                   <span className="text-white font-black text-sm">N</span>
@@ -1021,7 +1186,7 @@ function ContractDetailView({
             </div>
 
             {/* Center */}
-            <div className="flex-1 flex flex-col items-center text-center">
+            <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="text-[10px] border border-blue-300 text-blue-600 px-2 py-0.5 rounded tracking-widest font-semibold mb-2 bg-blue-50">CONTRACT</span>
               <h2 className="text-lg font-bold text-gray-900 mb-3">{contractTitle || "SaaS & Services Agreement"}</h2>
               <p className="text-[11px] text-gray-400 mb-2">Between</p>
@@ -1050,11 +1215,11 @@ function ContractDetailView({
             </div>
 
             {/* Right — Client */}
-            <div className="w-64 shrink-0 text-right pr-6">
-              <div className="flex items-center justify-end gap-2 mb-2">
+            <div className="w-full text-left lg:w-64 lg:shrink-0 lg:pr-6 lg:text-right">
+              <div className="mb-2 flex items-center justify-start gap-2 lg:justify-end">
                 <div>
                    <p className="text-sm font-bold text-gray-900 leading-tight">{clientName || "Client"}</p>
-                  <div className="flex justify-end">
+                  <div className="flex justify-start lg:justify-end">
                     <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Client</span>
                   </div>
                 </div>
@@ -1062,7 +1227,7 @@ function ContractDetailView({
                   <span className="text-white font-black text-[10px]">{getInitials(clientName)}</span>
                 </div>
               </div>
-              <div className="text-[11px] text-gray-500 space-y-0.5 pr-11">
+              <div className="space-y-0.5 pl-11 text-[11px] text-gray-500 lg:pl-0 lg:pr-11">
                 <p className="text-[10px] text-gray-400 font-medium">GSTIN</p>
                  <p className="font-mono">{clientGstin || "—"}</p>
                 <p className="text-[10px] text-gray-400 font-medium mt-1">Registered Address</p>
@@ -1090,8 +1255,8 @@ function ContractDetailView({
       </div>
 
       {/* Main Content Grid */}
-      <div className="flex-1 p-2 overflow-auto">
-        <div className="grid grid-cols-[1fr_2fr_1fr] gap-2 max-w-[1600px] mx-auto">
+        <div className="flex-1 overflow-auto p-2">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
 
           {/* LEFT COLUMN */}
           <div className="space-y-4">
@@ -1305,7 +1470,7 @@ function ContractDetailView({
             </SectionCard>
 
             <SectionCard title="5. Data Security & Compliance" onEdit={openDataSecurityEdit}>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                 {dataSecurity.map((item, i) => (
                   <div key={i} className="flex flex-col items-center justify-center p-2 bg-gray-50 rounded-lg border border-gray-100 text-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center">
