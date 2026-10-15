@@ -600,7 +600,7 @@ function VendorContractSection({
   return (
     <section className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/50 px-4 py-2">
-        <h2 className="text-xs font-bold text-gray-800">{title}</h2>
+        <h3 className="text-xs font-bold text-gray-800">{title}</h3>
         {onEdit && (
           <button
             type="button"
@@ -781,6 +781,34 @@ function VendorContractDetailPage({
     { icon: <CalendarDays size={13} />, label: "Renewal Reminder", value: contract.renewalReminder || "—" },
     { icon: <FileText size={13} />, label: "Governing Law", value: contract.terms.governingLaw || "—" },
     { icon: <Pencil size={13} />, label: "Signed On", value: "—" },
+  ];
+  const vendorContactRows = [
+    {
+      level: "Contract Owner",
+      name: contract.contacts.owner,
+      phone: "",
+      email: "",
+    },
+    {
+      level: "Vendor Contact",
+      name: contract.contacts.vendor || vendor?.primaryContact || "",
+      phone: contract.contacts.vendorPhone || vendor?.phone || "",
+      email: vendor?.email || "",
+    },
+    {
+      level: "Procurement Head",
+      name: contract.contacts.procurement,
+      phone: contract.contacts.procurementPhone,
+      email: "",
+    },
+  ];
+  const vendorProfileTiles = [
+    { label: "Vendor ID", value: vendor?.id },
+    { label: "Category", value: vendor?.category },
+    { label: "Region", value: vendor?.region },
+    { label: "Status", value: vendor?.status },
+    { label: "Tax ID", value: vendor?.taxId },
+    { label: "Address", value: vendorAddress },
   ];
 
   const downloadContract = () => {
@@ -1056,57 +1084,162 @@ function VendorContractDetailPage({
             <VendorContractSection title="Contract Overview" onEdit={editOverview}>
               <div className="space-y-3">
                 <VendorContractInfoRow label="Contract Name" value={contract.name} />
-                <VendorContractInfoRow label="Contract Type" value={contract.type} />
-                <VendorContractInfoRow label="Start Date" value={contract.startDate} />
-                <VendorContractInfoRow label="End Date" value={contract.endDate} />
+                <VendorContractInfoRow label="Contract Purpose" value={contract.type} />
+                <VendorContractInfoRow label="Contract ID" value={contract.id} />
+                <VendorContractInfoRow label="Contract Term" value={`${contract.startDate} – ${contract.endDate}`} />
                 <VendorContractInfoRow label="Contract Value" value={contract.value} />
                 <VendorContractInfoRow label="Payment Terms" value={contract.paymentTerms} />
-                <VendorContractInfoRow label="Status" value={<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[contract.status]}`}>{contract.status}</span>} />
+                <VendorContractInfoRow label="Contract Status" value={<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[contract.status]}`}>{contract.status}</span>} />
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Contract Governance" onEdit={editGovernance}>
-              <div className="space-y-3">
-                <VendorContractInfoRow label="Contract ID" value={contract.id} />
+            <VendorContractSection title="2. Response & Resolution Targets" onEdit={editServiceTerms}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] font-medium text-gray-500">
+                    <tr>
+                      <th className="border-b border-gray-200 px-3 py-2">Vendor Commitment</th>
+                      <th className="border-b border-gray-200 px-3 py-2">Contract Term</th>
+                      <th className="border-b border-gray-200 px-3 py-2">Valid Through</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {[
+                      { label: "SLA Uptime", value: contract.terms.slaUptime },
+                      { label: "Warranty Period", value: contract.terms.warrantyPeriod },
+                      { label: "Penalty Clause", value: contract.terms.penaltyClause },
+                    ].map(row => (
+                      <tr key={row.label}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{row.label}</td>
+                        <td className="px-3 py-2 font-medium">{row.value || "—"}</td>
+                        <td className="px-3 py-2 text-gray-600">{contract.endDate || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+          </div>
+
+          <div className="space-y-4">
+            <VendorContractSection title="1. Commercial Terms" onEdit={editCommercialTerms}>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                 <VendorContractInfoRow label="Contract Type" value={contract.type} />
+                <VendorContractInfoRow label="Contract Value" value={contract.value} />
+                <VendorContractInfoRow label="Price Validity" value={contract.terms.priceValidity} />
+                <VendorContractInfoRow label="Delivery Term" value={contract.terms.deliveryTerm} />
+                <VendorContractInfoRow label="Payment Terms" value={contract.paymentTerms} />
                 <VendorContractInfoRow label="Governing Law" value={contract.terms.governingLaw} />
               </div>
             </VendorContractSection>
+
+            <VendorContractSection title="3. Services Covered" onEdit={editServiceTerms}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] font-medium text-gray-500">
+                    <tr>
+                      <th className="border-b border-gray-200 px-4 py-2">Agreement Term</th>
+                      <th className="border-b border-gray-200 px-4 py-2">Vendor Terms</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {[
+                      { label: "Contract Type", value: contract.type },
+                      { label: "Delivery Term", value: contract.terms.deliveryTerm },
+                      { label: "Warranty Period", value: contract.terms.warrantyPeriod },
+                    ].map(row => (
+                      <tr key={row.label}>
+                        <td className="px-4 py-2 font-medium text-gray-800">{row.label}</td>
+                        <td className="px-4 py-2 text-gray-700">{row.value || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="5. Vendor Compliance & Registration">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                {vendorProfileTiles.map(item => (
+                  <div key={item.label} className="flex min-h-[92px] flex-col items-center justify-center gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 text-center">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+                      <ShieldCheck size={18} className="text-blue-500" />
+                    </div>
+                    <span className="text-[10px] font-medium leading-tight text-gray-700">{item.label}</span>
+                    <span className="break-words text-[9px] leading-tight text-gray-500">{item.value || "—"}</span>
+                  </div>
+                ))}
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="6. Contract Governance" onEdit={editGovernance}>
+              <div className="flex gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
+                  <ShieldCheck size={20} className="text-blue-500" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <p className="text-[11px] leading-relaxed text-gray-600">
+                    Governing law: {contract.terms.governingLaw || "—"}. Penalty clause: {contract.terms.penaltyClause || "—"}.
+                  </p>
+                  <div className="border-t border-gray-100 pt-2">
+                    <p className="text-[11px] font-medium text-gray-800">
+                      Price Validity: <span className="font-normal text-gray-500">{contract.terms.priceValidity || "—"}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="7. Support & Escalation Matrix" onEdit={editContacts}>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full min-w-[520px] text-left">
+                  <thead className="bg-gray-50 text-[10px] font-medium text-gray-500">
+                    <tr>
+                      <th className="border-b border-gray-200 px-3 py-2">Level</th>
+                      <th className="border-b border-gray-200 px-3 py-2">Contact / Team</th>
+                      <th className="border-b border-gray-200 px-3 py-2">Phone</th>
+                      <th className="border-b border-gray-200 px-3 py-2">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {vendorContactRows.map(row => (
+                      <tr key={row.level}>
+                        <td className="px-3 py-2 font-medium text-gray-800">{row.level}</td>
+                        <td className="px-3 py-2 text-gray-700">{row.name || "—"}</td>
+                        <td className="px-3 py-2 text-gray-600">{row.phone || "—"}</td>
+                        <td className="px-3 py-2">
+                          {row.email ? <a href={`mailto:${row.email}`} className="text-blue-600 hover:underline">{row.email}</a> : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="8. Renewal & Termination" onEdit={editRenewal}>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: `Auto Renewal: ${contract.autoRenewal ? "Enabled" : "Disabled"}`, icon: <RefreshCcw size={14} className="text-blue-500" /> },
+                  { label: contract.renewalReminder || "No renewal reminder", icon: <CalendarDays size={14} className="text-amber-500" /> },
+                  { label: `Ends ${contract.endDate || "—"}`, icon: <Clock size={14} className="text-gray-500" /> },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-2">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">{item.icon}</div>
+                    <span className="text-[11px] font-medium text-gray-700">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </VendorContractSection>
           </div>
 
           <div className="space-y-4">
-            <VendorContractSection title="Commercial Terms" onEdit={editCommercialTerms}>
-              <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <VendorContractInfoRow label="Price Validity" value={contract.terms.priceValidity} />
-                <VendorContractInfoRow label="Delivery Term" value={contract.terms.deliveryTerm} />
-                <VendorContractInfoRow label="Contract Value" value={contract.value} />
-                <VendorContractInfoRow label="Payment Terms" value={contract.paymentTerms} />
-              </div>
-            </VendorContractSection>
-
-            <VendorContractSection title="Service Level & Warranty" onEdit={editServiceTerms}>
-              <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <VendorContractInfoRow label="Warranty Period" value={contract.terms.warrantyPeriod} />
-                <VendorContractInfoRow label="SLA Uptime" value={contract.terms.slaUptime} />
-                <VendorContractInfoRow label="Penalty Clause" value={contract.terms.penaltyClause} />
-              </div>
-            </VendorContractSection>
-
-            <VendorContractSection title="Renewal Information" onEdit={editRenewal}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <VendorContractInfoRow label="Auto Renewal" value={contract.autoRenewal ? "Enabled" : "Disabled"} />
-                <VendorContractInfoRow label="Renewal Reminder" value={contract.renewalReminder} />
-                <VendorContractInfoRow label="Contract End Date" value={contract.endDate} />
-              </div>
-            </VendorContractSection>
-          </div>
-
-          <div className="space-y-4">
-            <VendorContractSection title="Vendor Information">
+            <VendorContractSection title="2. Vendor Information">
               <div className="space-y-3">
                 <VendorContractInfoRow label="Vendor Name" value={actualVendorName} />
                 <VendorContractInfoRow label="Vendor ID" value={vendor?.id || "—"} />
                 <VendorContractInfoRow label="Category" value={vendor?.category} />
+                <VendorContractInfoRow label="Region" value={vendor?.region} />
                 <VendorContractInfoRow label="Vendor Status" value={vendor?.status} />
                 <VendorContractInfoRow
                   label="Email"
@@ -1117,36 +1250,114 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Vendor Contact">
+            <VendorContractSection title="4. SLA Commitments" onEdit={editServiceTerms}>
+              <div className="mb-2 overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] font-medium text-gray-500">
+                    <tr>
+                      <th className="border-b border-gray-200 px-3 py-2">Commitment</th>
+                      <th className="border-b border-gray-200 px-3 py-2 text-right">Target</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {[
+                      { commitment: "SLA Uptime", target: contract.terms.slaUptime },
+                      { commitment: "Warranty Period", target: contract.terms.warrantyPeriod },
+                      { commitment: "Penalty Clause", target: contract.terms.penaltyClause },
+                    ].map(row => (
+                      <tr key={row.commitment}>
+                        <td className="px-3 py-2 text-gray-700">{row.commitment}</td>
+                        <td className="px-3 py-2 text-right font-medium text-blue-600">{row.target || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Renewal Information" onEdit={editRenewal}>
               <div className="space-y-3">
-                <VendorContractInfoRow label="Primary Contact" value={vendor?.primaryContact} />
-                <VendorContractInfoRow label="Phone" value={vendor?.phone} />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600"><CalendarDays size={14} className="text-gray-400" /><span>Contract Renewal</span></div>
+                  <span className="text-[11px] font-medium text-gray-900">{contract.endDate || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600"><RefreshCcw size={14} className="text-gray-400" /><span>Auto Renewal</span></div>
+                  <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] font-medium ${contract.autoRenewal ? "border-green-200 bg-green-50 text-green-600" : "border-gray-200 bg-gray-50 text-gray-600"}`}>{contract.autoRenewal ? "Enabled" : "Disabled"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600"><Clock size={14} className="text-gray-400" /><span>Time Remaining</span></div>
+                  <span className="text-[11px] font-bold text-blue-600">{contract.expiryIn || "—"}</span>
+                </div>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Support Information">
+              <div className="mb-4 space-y-3">
+                <VendorContractInfoRow label="Support Contact" value={vendor?.primaryContact || contract.contacts.vendor} />
+                <VendorContractInfoRow label="Support Phone" value={vendor?.phone || contract.contacts.vendorPhone} />
                 <VendorContractInfoRow
-                  label="Email"
+                  label="Support Email"
                   value={vendor?.email ? <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">{vendor.email}</a> : "—"}
                 />
+              </div>
+              <div className="w-full rounded-lg border border-blue-600 py-2 text-center text-[11px] font-medium text-blue-600">
+                Vendor support details
               </div>
             </VendorContractSection>
 
             <VendorContractSection title="Key Contacts" onEdit={editContacts}>
-              <div className="space-y-3">
-                {[
-                  { label: "Contract Owner", name: contract.contacts.owner, phone: "" },
-                  { label: "Vendor Contact", name: contract.contacts.vendor || vendor?.primaryContact, phone: contract.contacts.vendorPhone || vendor?.phone },
-                  { label: "Procurement Head", name: contract.contacts.procurement, phone: contract.contacts.procurementPhone },
-                ].map(contact => (
-                  <div key={contact.label} className="flex items-start gap-2.5">
-                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                      <User className="h-3.5 w-3.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-gray-400">{contact.label}</p>
-                      <p className="text-xs font-semibold text-gray-800">{contact.name || "—"}</p>
-                      {contact.phone && <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-gray-500"><Phone className="h-3 w-3" />{contact.phone}</p>}
+              <div className="space-y-4">
+                {vendorContactRows.map((contact, index) => (
+                  <div key={contact.level} className={index ? "border-t border-gray-100 pt-3" : ""}>
+                    <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">{contact.level}</h4>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${index === 1 ? "bg-gray-100 text-gray-700" : "bg-blue-100 text-blue-700"}`}>
+                          {getVendorInitials(contact.name || contact.level)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold leading-tight text-gray-900">{contact.name || "—"}</p>
+                          <p className="text-[10px] text-gray-500">{contact.phone || "No phone on record"}</p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        {contact.email && (
+                          <a href={`mailto:${contact.email}`} aria-label={`Email ${contact.name}`} className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 hover:border-blue-200 hover:text-blue-600">
+                            <Mail size={12} />
+                          </a>
+                        )}
+                        {contact.phone && (
+                          <a href={`tel:${contact.phone}`} aria-label={`Call ${contact.name}`} className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 hover:border-blue-200 hover:text-blue-600">
+                            <Phone size={12} />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Reminders" onEdit={editRenewal}>
+              <div className="mb-4 space-y-3">
+                {[
+                  { label: "Renewal Reminder", value: contract.renewalReminder },
+                  { label: "Contract End Date", value: contract.endDate },
+                  { label: "Time Remaining", value: contract.expiryIn },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-[11px] text-gray-700">
+                      <CalendarDays size={14} className="text-blue-500" />
+                      <span>{item.label}</span>
+                    </div>
+                    <span className="text-right text-[11px] font-medium text-gray-900">{item.value || "—"}</span>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="w-full text-center text-[11px] font-medium text-blue-600 hover:underline">
+                View All Reminders
+              </button>
             </VendorContractSection>
           </div>
         </div>

@@ -560,7 +560,8 @@ export default function VendorDetailPage() {
       {/* Sticky Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
         {/* Vendor identity row */}
-        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
+        {activeTab !== "contracts" && (
+          <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <button
               onClick={() => navigate("/vendors")}
@@ -609,10 +610,12 @@ export default function VendorDetailPage() {
               Message Vendor
             </button>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Stats strip */}
-        <div className="px-6 pb-3">
+        {activeTab !== "contracts" && (
+          <div className="px-6 pb-3">
           <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
             {stats.map((s, i) => (
               <div key={i} className="flex flex-col items-center py-2 px-2 text-center">
@@ -622,22 +625,27 @@ export default function VendorDetailPage() {
               </div>
             ))}
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Tabs */}
-        <div className="relative">
-          <div className="flex items-center px-2 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
+        <div className={`relative ${activeTab === "contracts" ? "border-b border-gray-200 bg-white" : ""}`}>
+          <div className={`flex items-center gap-0 overflow-x-auto no-scrollbar ${activeTab === "contracts" ? "w-full px-3 sm:px-5" : "border-t border-gray-100 px-2"}`}>
             {TABS.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 px-2 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+                className={`relative flex whitespace-nowrap border-b-2 font-semibold transition-colors ${
+                  activeTab === "contracts"
+                    ? "min-w-[84px] flex-1 items-center justify-center px-2 py-2.5 text-center text-[10px]"
+                    : "flex-shrink-0 items-center gap-1.5 px-2 py-2 text-sm font-medium"
+                } ${
                   activeTab === tab.key
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
                 }`}
               >
-                <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
+                {activeTab !== "contracts" && <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>}
                 {tab.label}
               </button>
             ))}
