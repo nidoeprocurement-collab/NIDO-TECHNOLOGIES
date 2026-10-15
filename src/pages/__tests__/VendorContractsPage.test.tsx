@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import VendorContractsPage from "@/pages/VendorContractsPage";
+import VendorContractsTabStrip from "@/pages/VendorContractsTabStrip";
 
 describe("Vendor contract detail page", () => {
   beforeEach(() => {
@@ -47,5 +48,14 @@ describe("Vendor contract detail page", () => {
     expect(screen.getByRole("heading", { name: "2. Vendor Information" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Key Contacts" })).toBeTruthy();
     expect(screen.getAllByText("Rahul Sharma").length).toBeGreaterThan(0);
+  });
+
+  it("shows the exact client detail tab labels and order only in the vendor Contracts tab", () => {
+    const { container } = render(<VendorContractsTabStrip />);
+    const row = screen.getByTestId("vendor-contract-tab-row");
+
+    expect(row.textContent).toBe("OverviewRolesUsersOrdersServicesContractsCatalogActivityConfigurationDocuments");
+    expect(screen.getByText("Contracts").getAttribute("aria-current")).toBe("page");
+    expect(container.firstElementChild?.className).toContain("border-b border-gray-200 bg-white px-3 sm:px-5");
   });
 });

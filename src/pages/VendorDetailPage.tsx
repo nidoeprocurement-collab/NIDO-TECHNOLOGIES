@@ -11,6 +11,7 @@ import {
 import VendorProductsPage from "./VendorProductsPage";
 import VendorOrdersPage from "./VendorOrdersPage";
 import VendorContractsPage from "./VendorContractsPage";
+import VendorContractsTabStrip from "./VendorContractsTabStrip";
 import VendorPaymentsPage from "./VendorPaymentsPage";
 import VendorServicesPage from "./VendorServicesPage";
 import VendorNewsActivityPage from "./VendorNewsActivityPage";
@@ -558,7 +559,7 @@ export default function VendorDetailPage() {
   return (
     <div className="min-h-screen bg-white font-[Inter,sans-serif] flex flex-col">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
+      <div className={`sticky top-0 z-30 bg-white ${activeTab === "contracts" ? "" : "border-b border-gray-100 shadow-sm"}`}>
         {/* Vendor identity row */}
         {activeTab !== "contracts" && (
           <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
@@ -629,28 +630,28 @@ export default function VendorDetailPage() {
         )}
 
         {/* Tabs */}
-        <div className={`relative ${activeTab === "contracts" ? "border-b border-gray-200 bg-white" : ""}`}>
-          <div className={`flex items-center gap-0 overflow-x-auto no-scrollbar ${activeTab === "contracts" ? "w-full px-3 sm:px-5" : "border-t border-gray-100 px-2"}`}>
-            {TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`relative flex whitespace-nowrap border-b-2 font-semibold transition-colors ${
-                  activeTab === "contracts"
-                    ? "min-w-[84px] flex-1 items-center justify-center px-2 py-2.5 text-center text-[10px]"
-                    : "flex-shrink-0 items-center gap-1.5 px-2 py-2 text-sm font-medium"
-                } ${
-                  activeTab === tab.key
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
-                }`}
-              >
-                {activeTab !== "contracts" && <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>}
-                {tab.label}
-              </button>
-            ))}
+        {activeTab === "contracts" ? (
+          <VendorContractsTabStrip />
+        ) : (
+          <div className="relative">
+            <div className="flex items-center gap-0 overflow-x-auto border-t border-gray-100 px-2 no-scrollbar">
+              {TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2 py-2 text-sm font-medium transition-colors ${
+                    activeTab === tab.key
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-800"
+                  }`}
+                >
+                  <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Page body */}
