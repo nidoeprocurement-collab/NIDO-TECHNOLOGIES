@@ -4087,7 +4087,7 @@ export default function MyOrderPage() {
                 ← Back to Orders
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Order Details / <span style={{ color: "#374151" }}>Order #{orderId}</span></h1>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}><span style={{ color: "#374151" }}>{orderId}</span></h1>
                 <StatusPill status={masterStatus} />
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>

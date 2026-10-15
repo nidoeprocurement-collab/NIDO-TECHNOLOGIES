@@ -1223,7 +1223,7 @@ export default function VendorOrderDetailPage() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-                Vendor Order Details / <span style={{ color: "#374151" }}>{initialData.poNumber}</span>
+                <span style={{ color: "#374151" }}>{initialData.poNumber}</span>
               </h1>
               <StatusPill status={orderStatus} />
               {isPOCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>PO Cancelled</span>}
