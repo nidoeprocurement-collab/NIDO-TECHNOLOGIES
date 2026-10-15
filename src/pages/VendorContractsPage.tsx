@@ -596,14 +596,14 @@ function VendorContractSection({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <section className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/50 px-4 py-2">
         <h2 className="text-xs font-bold text-gray-800">{title}</h2>
         <button
           type="button"
           onClick={onEdit}
           aria-label={`Edit ${title}`}
-          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
+          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
@@ -666,51 +666,70 @@ function VendorContractDetailPage({
     { icon: <IndianRupee className="h-3.5 w-3.5" />, label: "Contract Value", value: contract.value || "—" },
     { icon: <FileText className="h-3.5 w-3.5" />, label: "Payment Terms", value: contract.paymentTerms || "—" },
     { icon: <CheckCircle className="h-3.5 w-3.5" />, label: "Contract Status", value: contract.status },
+    { icon: <ShieldCheck className="h-3.5 w-3.5" />, label: "Vendor Status", value: vendor?.status || "—" },
     { icon: <RefreshCcw className="h-3.5 w-3.5" />, label: "Auto Renewal", value: contract.autoRenewal ? "Enabled" : "Disabled" },
+    { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Renewal Reminder", value: contract.renewalReminder || "—" },
+    { icon: <FileText className="h-3.5 w-3.5" />, label: "Governing Law", value: contract.terms.governingLaw || "—" },
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: "—" },
   ];
 
   return (
     <div className="flex min-h-full flex-col bg-gray-50">
       <header className="relative border-b border-gray-100 bg-white">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="Edit contract"
+          className="absolute right-4 top-4 rounded-md border border-blue-200 bg-white p-1.5 text-blue-600 transition-colors hover:bg-blue-50"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
         <div className="px-4 pb-4 pt-5 sm:px-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-blue-600"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back to Contracts
-            </button>
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit Contract
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-4 inline-flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-blue-600"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Contracts
+          </button>
 
-          <div className="grid items-start gap-5 lg:grid-cols-[minmax(180px,1fr)_minmax(300px,2fr)_minmax(180px,1fr)]">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-black text-white">N</div>
-              <div>
-                <p className="text-sm font-bold leading-tight text-gray-900">Nido Tech</p>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Contracting Party</span>
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+            <div className="w-full lg:w-64 lg:shrink-0">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+                  <span className="text-sm font-black text-white">N</span>
+                </div>
+                <div>
+                  <p className="text-sm font-bold leading-tight text-gray-900">Nido-Tech</p>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Service Provider (We)</span>
+                </div>
+              </div>
+              <div className="space-y-0.5 pl-11 text-[11px] text-gray-500">
+                <p className="text-[10px] font-medium text-gray-400">GSTIN</p>
+                <p className="font-mono">—</p>
+                <p className="mt-1 text-[10px] font-medium text-gray-400">Registered Address</p>
+                <p>—</p>
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-col items-center text-center">
+            <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="mb-2 rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-blue-600">CONTRACT</span>
-              <h1 className="mb-2 text-lg font-bold text-gray-900">{contract.name || "Vendor Contract"}</h1>
+              <h1 className="mb-3 text-lg font-bold text-gray-900">{contract.name || "Vendor Contract"}</h1>
               <p className="mb-2 text-[11px] text-gray-400">Between</p>
-              <div className="mb-3 flex items-center gap-2">
-                <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-800">Nido Tech</span>
-                <span className="text-gray-300">↔</span>
-                <span className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-800">{actualVendorName}</span>
+              <div className="mb-4 flex items-center gap-3">
+                <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-[11px] font-medium text-yellow-800">
+                  Nido-Tech<br /><span className="text-[10px] text-yellow-600">(Service Provider)</span>
+                </div>
+                <div className="flex items-center gap-0.5 text-gray-300">
+                  <div className="h-px w-8 bg-gray-300" />
+                  <ChevronRight className="h-3 w-3 text-gray-400" />
+                </div>
+                <div className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-800">
+                  {actualVendorName}<br /><span className="text-[10px] text-blue-600">(Vendor)</span>
+                </div>
               </div>
-              <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-center">
+              <div className="flex gap-2 text-center">
                 <div>
                   <p className="text-[10px] text-gray-400">Contract No.</p>
                   <p className="text-xs font-semibold text-gray-800">{contract.id || "—"}</p>
@@ -722,22 +741,30 @@ function VendorContractDetailPage({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 lg:justify-end">
-              <div className="min-w-0 lg:text-right">
-                <p className="truncate text-sm font-bold leading-tight text-gray-900">{actualVendorName}</p>
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Vendor</span>
+            <div className="w-full text-left lg:w-64 lg:shrink-0 lg:pr-6 lg:text-right">
+              <div className="mb-2 flex items-center justify-start gap-2 lg:justify-end">
+                <div>
+                  <p className="text-sm font-bold leading-tight text-gray-900">{actualVendorName}</p>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Vendor</span>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-800">
+                  <span className="text-[10px] font-black text-white">{getVendorInitials(actualVendorName)}</span>
+                </div>
               </div>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-800 text-[10px] font-black text-white">
-                {getVendorInitials(actualVendorName)}
+              <div className="space-y-0.5 pl-11 text-[11px] text-gray-500 lg:pl-0 lg:pr-11">
+                <p className="text-[10px] font-medium text-gray-400">GSTIN</p>
+                <p className="font-mono">{vendor?.taxId || "—"}</p>
+                <p className="mt-1 text-[10px] font-medium text-gray-400">Registered Address</p>
+                <p>{vendorAddress}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto border-t border-gray-200 bg-gray-50">
+        <div className="overflow-x-auto border-b border-gray-200 bg-gray-50">
           <div className="flex min-w-max">
             {meta.map(item => (
-              <div key={item.label} className="flex items-start gap-2 border-r border-gray-200 px-3 py-2 last:border-0">
+              <div key={item.label} className="flex items-start gap-2 border-r border-gray-200 px-2 py-2 last:border-0">
                 <span className="mt-0.5 shrink-0 text-gray-400">{item.icon}</span>
                 <div>
                   <p className="text-[10px] leading-tight text-gray-400">{item.label}</p>
@@ -749,9 +776,9 @@ function VendorContractDetailPage({
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-2 sm:p-3">
-        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
-          <div className="space-y-3">
+      <main className="flex-1 overflow-auto p-2">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="space-y-4">
             <VendorContractSection title="Contract Overview" onEdit={onEdit}>
               <div className="space-y-3">
                 <VendorContractInfoRow label="Contract Name" value={contract.name} />
@@ -786,19 +813,25 @@ function VendorContractDetailPage({
             </VendorContractSection>
           </div>
 
-          <div className="space-y-3">
-            <VendorContractSection title="Commercial & Service Terms" onEdit={onEdit}>
+          <div className="space-y-4">
+            <VendorContractSection title="Commercial Terms" onEdit={onEdit}>
               <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                 <VendorContractInfoRow label="Price Validity" value={contract.terms.priceValidity} />
                 <VendorContractInfoRow label="Delivery Term" value={contract.terms.deliveryTerm} />
-                <VendorContractInfoRow label="Warranty Period" value={contract.terms.warrantyPeriod} />
-                <VendorContractInfoRow label="SLA Uptime" value={contract.terms.slaUptime} />
-                <VendorContractInfoRow label="Penalty Clause" value={contract.terms.penaltyClause} />
-                <VendorContractInfoRow label="Governing Law" value={contract.terms.governingLaw} />
+                <VendorContractInfoRow label="Contract Value" value={contract.value} />
+                <VendorContractInfoRow label="Payment Terms" value={contract.paymentTerms} />
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Renewal Schedule" onEdit={onEdit}>
+            <VendorContractSection title="Service Level & Warranty" onEdit={onEdit}>
+              <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                <VendorContractInfoRow label="Warranty Period" value={contract.terms.warrantyPeriod} />
+                <VendorContractInfoRow label="SLA Uptime" value={contract.terms.slaUptime} />
+                <VendorContractInfoRow label="Penalty Clause" value={contract.terms.penaltyClause} />
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Renewal Information" onEdit={onEdit}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <VendorContractInfoRow label="Auto Renewal" value={contract.autoRenewal ? "Enabled" : "Disabled"} />
                 <VendorContractInfoRow label="Renewal Reminder" value={contract.renewalReminder} />
@@ -807,7 +840,7 @@ function VendorContractDetailPage({
             </VendorContractSection>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             <VendorContractSection title="Vendor Information" onEdit={onEdit}>
               <div className="space-y-3">
                 <VendorContractInfoRow label="Vendor Name" value={actualVendorName} />
@@ -823,15 +856,24 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
-              <div className="flex items-start gap-2.5">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                <div>
-                  <p className="text-xs font-semibold text-blue-900">Contract record</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-blue-800">This view shows the saved contract terms and vendor profile information currently available in the system.</p>
-                </div>
+            <VendorContractSection title="Vendor Contact" onEdit={onEdit}>
+              <div className="space-y-3">
+                <VendorContractInfoRow label="Primary Contact" value={vendor?.primaryContact} />
+                <VendorContractInfoRow label="Phone" value={vendor?.phone} />
+                <VendorContractInfoRow
+                  label="Email"
+                  value={vendor?.email ? <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">{vendor.email}</a> : "—"}
+                />
               </div>
-            </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Contract Governance" onEdit={onEdit}>
+              <div className="space-y-3">
+                <VendorContractInfoRow label="Contract ID" value={contract.id} />
+                <VendorContractInfoRow label="Contract Type" value={contract.type} />
+                <VendorContractInfoRow label="Governing Law" value={contract.terms.governingLaw} />
+              </div>
+            </VendorContractSection>
           </div>
         </div>
       </main>
@@ -861,8 +903,11 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   const scoped = hasVendorScope(scope);
   const vendorRecord = (scope.vendorId ? getVendorById(scope.vendorId) : undefined) ||
     getVendors().find(vendor => scope.vendorName && vendor.name.toLowerCase() === scope.vendorName.toLowerCase());
-  const [contracts, setContracts] = useState(() => readContracts(scope));
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [initialContracts] = useState(() => readContracts(scope));
+  const [contracts, setContracts] = useState(initialContracts);
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(
+    () => initialContracts.find(contract => contract.status !== "Archived") ?? null
+  );
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [showAddContract, setShowAddContract] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
