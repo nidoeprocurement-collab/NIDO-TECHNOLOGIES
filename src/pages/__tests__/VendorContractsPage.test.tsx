@@ -3,10 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import VendorContractsPage from "@/pages/VendorContractsPage";
 
-function renderVendorContractsPage() {
+function renderVendorContractsPage(scope: { vendorId?: string; vendorName?: string } = {}) {
   return render(
     <MemoryRouter>
-      <VendorContractsPage />
+      <VendorContractsPage {...scope} />
     </MemoryRouter>,
   );
 }
@@ -64,5 +64,59 @@ describe("Vendor contract detail page", () => {
     }
 
     expect(screen.getByRole("button", { name: "Create Support Ticket" })).toBeTruthy();
+  });
+
+  it("shows a blank vendor detail view without changing saved contract data", () => {
+    const storageKey = "nido_vendor_contracts_V-TEST";
+    const savedContract = {
+      id: "CONTRACT-SECRET",
+      name: "Secret Contract Title",
+      type: "Supply Agreement",
+      startDate: "Jan 1, 2025",
+      endDate: "Jan 1, 2026",
+      value: "₹20,000",
+      paymentTerms: "Net 30",
+      status: "Active",
+      autoRenewal: true,
+      renewalReminder: "30 Days",
+      expiryIn: null,
+      contacts: {
+        owner: "Hidden Owner",
+        vendor: "Hidden Vendor Contact",
+        vendorPhone: "1111111111",
+        procurement: "Hidden Procurement",
+        procurementPhone: "2222222222",
+      },
+      terms: {
+        priceValidity: "Hidden price term",
+        deliveryTerm: "FOB",
+        warrantyPeriod: "Hidden warranty",
+        slaUptime: "99%",
+        penaltyClause: "Hidden penalty",
+        governingLaw: "Hidden governing law",
+      },
+      details: {
+        purpose: "Hidden contract purpose",
+        billingModel: "Hidden billing model",
+      },
+    };
+    const serialized = JSON.stringify([savedContract]);
+    localStorage.setItem(storageKey, serialized);
+
+    renderVendorContractsPage({ vendorId: "V-TEST", vendorName: "Test Vendor" });
+
+    expect(screen.getByRole("heading", { name: "Contract Overview" })).toBeTruthy();
+    expect(screen.queryByText("Secret Contract Title")).toBeNull();
+    expect(screen.queryByText("Hidden contract purpose")).toBeNull();
+    expect(screen.queryByText("Hidden Vendor Contact")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Contract actions" })).toBeNull();
+    expect(localStorage.getItem(storageKey)).toBe(serialized);
+  });
+
+  it("shows the blank detail layout when a vendor has no saved contracts", () => {
+    renderVendorContractsPage({ vendorId: "V-EMPTY", vendorName: "Empty Vendor" });
+
+    expect(screen.getByRole("heading", { name: "Contract Overview" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "All Contracts" })).toBeNull();
   });
 });

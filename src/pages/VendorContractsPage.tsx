@@ -763,18 +763,20 @@ function VendorContractDetailPage({
   vendor,
   onBack,
   onUpdate,
+  blankView = false,
 }: {
   contract: Contract;
   vendorName: string;
   vendor?: StoredVendor;
   onBack: () => void;
   onUpdate: (contract: Contract) => void;
+  blankView?: boolean;
 }) {
   const contractMenu = useDropdown();
   const navigate = useNavigate();
   const [editingSection, setEditingSection] = useState<VendorContractEditConfig | null>(null);
   const actualVendorName = vendor?.name || vendorName || contract.contacts.vendor || "Vendor";
-  const vendorAddress = [
+  const vendorAddress = blankView ? "" : [
     vendor?.addressLine1,
     vendor?.addressLine2,
     vendor?.city,
@@ -782,22 +784,23 @@ function VendorContractDetailPage({
     vendor?.zipCode,
     vendor?.country,
   ].filter(Boolean).join(", ") || vendor?.address || "—";
-  const details = contract.details || {};
-  const detail = (key: string, fallback = "") => details[key] || fallback;
-  const daysRemaining = contract.endDate
+  const details = blankView ? {} : contract.details || {};
+  const detail = (key: string, fallback = "") => blankView ? "" : details[key] || fallback;
+  const editAction = (action: () => void) => blankView ? undefined : action;
+  const daysRemaining = !blankView && contract.endDate
     ? Math.max(0, Math.ceil((new Date(contract.endDate).getTime() - Date.now()) / 86400000))
     : null;
   const meta = [
-    { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Contract Start Date", value: contract.startDate || "—" },
-    { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Contract End Date", value: contract.endDate || "—" },
+    { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Contract Start Date", value: blankView ? "" : contract.startDate || "—" },
+    { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Contract End Date", value: blankView ? "" : contract.endDate || "—" },
     { icon: <IndianRupee className="h-3.5 w-3.5" />, label: "Currency", value: detail("currency", "INR") },
     { icon: <Receipt className="h-3.5 w-3.5" />, label: "Billing Model", value: detail("billingModel", "—") },
-    { icon: <FileText className="h-3.5 w-3.5" />, label: "Payment Terms", value: contract.paymentTerms || "—" },
-    { icon: <CheckCircle className="h-3.5 w-3.5" />, label: "Vendor Status", value: vendor?.status || contract.status },
-    { icon: <RefreshCcw className="h-3.5 w-3.5" />, label: "Auto Renewal", value: contract.autoRenewal ? "Enabled" : "Disabled" },
+    { icon: <FileText className="h-3.5 w-3.5" />, label: "Payment Terms", value: blankView ? "" : contract.paymentTerms || "—" },
+    { icon: <CheckCircle className="h-3.5 w-3.5" />, label: "Vendor Status", value: blankView ? "" : vendor?.status || contract.status },
+    { icon: <RefreshCcw className="h-3.5 w-3.5" />, label: "Auto Renewal", value: blankView ? "" : contract.autoRenewal ? "Enabled" : "Disabled" },
     { icon: <Bell className="h-3.5 w-3.5" />, label: "Notice Period", value: detail("noticePeriod", contract.renewalReminder || "—") },
-    { icon: <Scale className="h-3.5 w-3.5" />, label: "Governing Law", value: contract.terms.governingLaw || "—" },
-    { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: "—" },
+    { icon: <Scale className="h-3.5 w-3.5" />, label: "Governing Law", value: blankView ? "" : contract.terms.governingLaw || "—" },
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: blankView ? "" : "—" },
   ];
 
   const downloadContract = () => {
@@ -999,7 +1002,7 @@ function VendorContractDetailPage({
         <VendorContractEditModal config={editingSection} onClose={() => setEditingSection(null)} />
       )}
       <header className="relative border-b border-gray-100 bg-white">
-        <div className="absolute right-4 top-4 z-20" ref={contractMenu.ref}>
+        {!blankView && <div className="absolute right-4 top-4 z-20" ref={contractMenu.ref}>
           <button
             type="button"
             onClick={() => contractMenu.setOpen(open => !open)}
@@ -1021,7 +1024,7 @@ function VendorContractDetailPage({
               </button>
             </div>
           )}
-        </div>
+        </div>}
         <div className="px-4 pb-4 pt-5 sm:px-6">
           <button
             type="button"
@@ -1045,15 +1048,15 @@ function VendorContractDetailPage({
               </div>
               <div className="space-y-0.5 pl-11 text-[11px] text-gray-500">
                 <p className="text-[10px] font-medium text-gray-400">GSTIN</p>
-                <p className="font-mono">—</p>
+                <p className="font-mono">{blankView ? "" : "—"}</p>
                 <p className="mt-1 text-[10px] font-medium text-gray-400">Registered Address</p>
-                <p>—</p>
+                <p>{blankView ? "" : "—"}</p>
               </div>
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="mb-2 rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-blue-600">CONTRACT</span>
-              <h1 className="mb-3 text-lg font-bold text-gray-900">{contract.name || "Vendor Contract"}</h1>
+              <h1 className="mb-3 text-lg font-bold text-gray-900">{blankView ? "" : contract.name || "Vendor Contract"}</h1>
               <p className="mb-2 text-[11px] text-gray-400">Between</p>
               <div className="mb-4 flex items-center gap-3">
                 <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-[11px] font-medium text-yellow-800">
@@ -1070,11 +1073,11 @@ function VendorContractDetailPage({
               <div className="flex gap-2 text-center">
                 <div>
                   <p className="text-[10px] text-gray-400">Contract No.</p>
-                  <p className="text-xs font-semibold text-gray-800">{contract.id || "—"}</p>
+                  <p className="text-xs font-semibold text-gray-800">{blankView ? "" : contract.id || "—"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400">Contract Type</p>
-                  <p className="text-xs font-semibold text-gray-800">{contract.type || "—"}</p>
+                  <p className="text-xs font-semibold text-gray-800">{blankView ? "" : contract.type || "—"}</p>
                 </div>
               </div>
             </div>
@@ -1091,9 +1094,9 @@ function VendorContractDetailPage({
               </div>
               <div className="space-y-0.5 pl-11 text-[11px] text-gray-500 min-[900px]:pl-0 min-[900px]:pr-11">
                 <p className="text-[10px] font-medium text-gray-400">GSTIN</p>
-                <p className="font-mono">{vendor?.taxId || "—"}</p>
+                <p className="font-mono">{blankView ? "" : vendor?.taxId || "—"}</p>
                 <p className="mt-1 text-[10px] font-medium text-gray-400">Registered Address</p>
-                <p>{vendorAddress}</p>
+                <p>{blankView ? "" : vendorAddress}</p>
               </div>
             </div>
           </div>
@@ -1111,7 +1114,7 @@ function VendorContractDetailPage({
       <main className="flex-1 overflow-auto bg-[#f8fafc] p-2">
         <div className="mx-auto grid max-w-[1600px] grid-cols-1 items-start gap-2 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
           <div className="space-y-4">
-            <VendorContractSection title="Contract Overview" onEdit={editOverview}>
+            <VendorContractSection title="Contract Overview" onEdit={editAction(editOverview)}>
               <div className="space-y-2">
                 {[
                   ["Contract Purpose", detail("purpose")],
@@ -1127,25 +1130,25 @@ function VendorContractDetailPage({
                 <p className="mb-2 text-[10px] font-medium uppercase text-gray-500">Relationship Owner (Nido-Tech)</p>
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{getVendorInitials(contract.contacts.owner || "N")}</span>
-                  <span className="text-xs font-semibold text-gray-800">{contract.contacts.owner || "—"}</span>
+                  <span className="text-xs font-semibold text-gray-800">{blankView ? "" : contract.contacts.owner || "—"}</span>
                 </div>
               </div>
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <p className="mb-2 text-[10px] font-medium uppercase text-gray-500">Relationship Owner (Vendor)</p>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-700">{getVendorInitials(contract.contacts.vendor || vendor?.primaryContact || actualVendorName)}</span>
-                    <div className="min-w-0"><p className="truncate text-xs font-semibold text-gray-800">{contract.contacts.vendor || vendor?.primaryContact || actualVendorName}</p><p className="truncate text-[10px] text-gray-500">{vendor?.email || "—"}</p></div>
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-700">{blankView ? "" : getVendorInitials(contract.contacts.vendor || vendor?.primaryContact || actualVendorName)}</span>
+                    <div className="min-w-0"><p className="truncate text-xs font-semibold text-gray-800">{blankView ? "" : contract.contacts.vendor || vendor?.primaryContact || actualVendorName}</p><p className="truncate text-[10px] text-gray-500">{blankView ? "" : vendor?.email || "—"}</p></div>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    {vendor?.email && <a href={`mailto:${vendor.email}`} aria-label="Email vendor contact" className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Mail size={12} /></a>}
-                    {vendor?.phone && <a href={`tel:${vendor.phone}`} aria-label="Call vendor contact" className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Phone size={12} /></a>}
+                    {!blankView && vendor?.email && <a href={`mailto:${vendor.email}`} aria-label="Email vendor contact" className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Mail size={12} /></a>}
+                    {!blankView && vendor?.phone && <a href={`tel:${vendor.phone}`} aria-label="Call vendor contact" className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Phone size={12} /></a>}
                   </div>
                 </div>
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="2. Response & Resolution Targets" onEdit={() => editDetails("Edit Response & Resolution Targets", [{ key: "responseTargets", label: "Priority | Response | Resolution (one row per line)", type: "textarea" }])}>
+            <VendorContractSection title="2. Response & Resolution Targets" onEdit={editAction(() => editDetails("Edit Response & Resolution Targets", [{ key: "responseTargets", label: "Priority | Response | Resolution (one row per line)", type: "textarea" }]))}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500"><tr>{["Priority", "Response", "Resolution"].map(item => <th key={item} className="px-2 py-2">{item}</th>)}</tr></thead>
@@ -1158,7 +1161,7 @@ function VendorContractDetailPage({
           </div>
 
           <div className="space-y-4">
-            <VendorContractSection title="1. Commercial Terms" onEdit={editCommercialTerms}>
+            <VendorContractSection title="1. Commercial Terms" onEdit={editAction(editCommercialTerms)}>
               <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
                 {[
                   ["Agreement Type", contract.type],
@@ -1174,7 +1177,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="3. Services Covered" onEdit={() => editDetails("Edit Services Covered", [{ key: "servicesCovered", label: "Service | In Scope (one row per line)", type: "textarea" }])}>
+            <VendorContractSection title="3. Services Covered" onEdit={editAction(() => editDetails("Edit Services Covered", [{ key: "servicesCovered", label: "Service | In Scope (one row per line)", type: "textarea" }]))}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500"><tr><th className="px-3 py-2">Service</th><th className="px-3 py-2 text-right">In Scope</th></tr></thead>
@@ -1185,19 +1188,19 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="5. Data Security & Compliance" onEdit={() => editDetails("Edit Data Security & Compliance", [{ key: "securityControls", label: "Controls (one per line)", type: "textarea" }])}>
-              {detail("securityControls") ? (
+            <VendorContractSection title="5. Data Security & Compliance" onEdit={editAction(() => editDetails("Edit Data Security & Compliance", [{ key: "securityControls", label: "Controls (one per line)", type: "textarea" }]))}>
+              {blankView ? <div className="h-8" /> : detail("securityControls") ? (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {detail("securityControls").split("\n").filter(Boolean).map((control, index) => <div key={`${control}-${index}`} className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-center"><Database className="h-5 w-5 text-indigo-500" /><span className="text-[10px] font-medium text-gray-700">{control}</span><CheckCircle className="h-3 w-3 text-emerald-500" /></div>)}
                 </div>
               ) : <p className="rounded-lg bg-gray-50 p-4 text-xs text-gray-400">No security controls recorded.</p>}
             </VendorContractSection>
 
-            <VendorContractSection title="6. Confidentiality Clause" onEdit={() => editDetails("Edit Confidentiality Clause", [
+            <VendorContractSection title="6. Confidentiality Clause" onEdit={editAction(() => editDetails("Edit Confidentiality Clause", [
               { key: "confidentialityText", label: "Clause", type: "textarea" },
               { key: "confidentialityEffective", label: "Effective Until" },
               { key: "confidentialityStatus", label: "Status" },
-            ])}>
+            ]))}>
               <div className="flex gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50"><ShieldCheck size={18} className="text-blue-500" /></div>
                 <div className="min-w-0 flex-1">
@@ -1207,7 +1210,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="7. Support & Escalation Matrix" onEdit={() => editDetails("Edit Support & Escalation Matrix", [{ key: "supportMatrix", label: "Level | Contact / Team | Email | Availability (one row per line)", type: "textarea" }])}>
+            <VendorContractSection title="7. Support & Escalation Matrix" onEdit={editAction(() => editDetails("Edit Support & Escalation Matrix", [{ key: "supportMatrix", label: "Level | Contact / Team | Email | Availability (one row per line)", type: "textarea" }]))}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left text-[10px]">
                   <thead className="bg-gray-50 text-gray-500"><tr>{["Level", "Contact / Team", "Email", "Availability"].map(item => <th key={item} className="px-2 py-2">{item}</th>)}</tr></thead>
@@ -1218,9 +1221,9 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="8. Renewal & Termination" onEdit={() => editDetails("Edit Renewal & Termination", [{ key: "renewalTermination", label: "Renewal / termination terms", type: "textarea" }])}>
+            <VendorContractSection title="8. Renewal & Termination" onEdit={editAction(() => editDetails("Edit Renewal & Termination", [{ key: "renewalTermination", label: "Renewal / termination terms", type: "textarea" }]))}>
               <div className="space-y-2">
-                {detail("renewalTermination") ? detail("renewalTermination").split("\n").filter(Boolean).map((line, index) => <div key={index} className="rounded-lg bg-gray-50 p-2.5 text-[11px] text-gray-700"><Database size={13} className="mr-2 inline text-emerald-500" />{line}</div>) : <>
+                {blankView ? <div className="h-8" /> : detail("renewalTermination") ? detail("renewalTermination").split("\n").filter(Boolean).map((line, index) => <div key={index} className="rounded-lg bg-gray-50 p-2.5 text-[11px] text-gray-700"><Database size={13} className="mr-2 inline text-emerald-500" />{line}</div>) : <>
                   <VendorContractInfoRow label="Renewal" value={contract.autoRenewal ? "Automatic" : "Manual"} />
                   <VendorContractInfoRow label="Renewal Notice" value={contract.renewalReminder} />
                   <VendorContractInfoRow label="Termination / End Date" value={contract.endDate} />
@@ -1230,11 +1233,11 @@ function VendorContractDetailPage({
           </div>
 
           <div className="space-y-4">
-            <VendorContractSection title="2. Subscription & Licensing" onEdit={() => editDetails("Edit Subscription & Licensing", [
+            <VendorContractSection title="2. Subscription & Licensing" onEdit={editAction(() => editDetails("Edit Subscription & Licensing", [
               { key: "userLicensing", label: "User Licensing" }, { key: "licensedUsers", label: "Licensed Users" },
               { key: "concurrentUsers", label: "Concurrent Users" }, { key: "additionalUserCost", label: "Additional User Cost" },
               { key: "licenseTransfer", label: "License Transfer" }, { key: "minimumCommitment", label: "Minimum Commitment" },
-            ])}>
+            ]))}>
               <div className="space-y-2">{[
                 ["User Licensing", detail("userLicensing")], ["Licensed Users", detail("licensedUsers")],
                 ["Concurrent Users", detail("concurrentUsers")], ["Additional User Cost", detail("additionalUserCost")],
@@ -1242,7 +1245,7 @@ function VendorContractDetailPage({
               ].map(([label, value]) => <VendorContractInfoRow key={label} label={label} value={value} />)}</div>
             </VendorContractSection>
 
-            <VendorContractSection title="4. SLA Commitments" onEdit={() => editDetails("Edit SLA Commitments", [{ key: "slaCommitments", label: "Commitment | Target (one row per line)", type: "textarea" }])}>
+            <VendorContractSection title="4. SLA Commitments" onEdit={editAction(() => editDetails("Edit SLA Commitments", [{ key: "slaCommitments", label: "Commitment | Target (one row per line)", type: "textarea" }]))}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left text-[10px]">
                   <thead className="bg-gray-50 text-gray-500"><tr><th className="px-2 py-2">Commitment</th><th className="px-2 py-2 text-right">Target</th></tr></thead>
@@ -1253,17 +1256,17 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Renewal Information" onEdit={editRenewal}>
+            <VendorContractSection title="Renewal Information" onEdit={editAction(editRenewal)}>
               <div className="space-y-2">
-                <VendorContractInfoRow label="Contract Renewal" value={contract.endDate || "—"} />
-                <VendorContractInfoRow label="Auto Renewal" value={contract.autoRenewal ? "Enabled" : "Disabled"} />
-                <VendorContractInfoRow label="Days Remaining" value={daysRemaining == null ? "—" : `${daysRemaining} days`} />
+                <VendorContractInfoRow label="Contract Renewal" value={blankView ? "" : contract.endDate || "—"} />
+                <VendorContractInfoRow label="Auto Renewal" value={blankView ? "" : contract.autoRenewal ? "Enabled" : "Disabled"} />
+                <VendorContractInfoRow label="Days Remaining" value={blankView ? "" : daysRemaining == null ? "—" : `${daysRemaining} days`} />
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Support Information" onEdit={() => editDetails("Edit Support Information", [
+            <VendorContractSection title="Support Information" onEdit={editAction(() => editDetails("Edit Support Information", [
               { key: "supportPlan", label: "Support Plan" }, { key: "supportHours", label: "Support Hours" }, { key: "responseSLA", label: "Response SLA" },
-            ])}>
+            ]))}>
               <div className="space-y-2">
                 <VendorContractInfoRow label="Support Plan" value={detail("supportPlan", contract.type === "SLA" || contract.type === "AMC" ? contract.type : "")} />
                 <VendorContractInfoRow label="Support Hours" value={detail("supportHours")} />
@@ -1274,22 +1277,22 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Key Contacts" onEdit={editContacts}>
+            <VendorContractSection title="Key Contacts" onEdit={editAction(editContacts)}>
               <div className="space-y-3">
                 {[
-                  { label: "Vendor", name: contract.contacts.vendor || vendor?.primaryContact || actualVendorName, email: vendor?.email || "", phone: contract.contacts.vendorPhone || vendor?.phone || "" },
-                  { label: "Nido-Tech", name: contract.contacts.owner, email: "", phone: "" },
-                  { label: "Procurement", name: contract.contacts.procurement, email: "", phone: contract.contacts.procurementPhone },
+                  { label: "Vendor", name: blankView ? "" : contract.contacts.vendor || vendor?.primaryContact || actualVendorName, email: blankView ? "" : vendor?.email || "", phone: blankView ? "" : contract.contacts.vendorPhone || vendor?.phone || "" },
+                  { label: "Nido-Tech", name: blankView ? "" : contract.contacts.owner, email: "", phone: "" },
+                  { label: "Procurement", name: blankView ? "" : contract.contacts.procurement, email: "", phone: blankView ? "" : contract.contacts.procurementPhone },
                 ].map(contact => <div key={contact.label} className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2 last:border-0 last:pb-0">
-                  <div className="flex min-w-0 items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[9px] font-bold text-gray-700">{getVendorInitials(contact.name || contact.label)}</span><div className="min-w-0"><p className="text-[9px] font-medium uppercase text-gray-400">{contact.label}</p><p className="truncate text-[10px] font-semibold text-gray-800">{contact.name || "—"}</p></div></div>
+                  <div className="flex min-w-0 items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[9px] font-bold text-gray-700">{blankView ? "" : getVendorInitials(contact.name || contact.label)}</span><div className="min-w-0"><p className="text-[9px] font-medium uppercase text-gray-400">{contact.label}</p><p className="truncate text-[10px] font-semibold text-gray-800">{blankView ? "" : contact.name || "—"}</p></div></div>
                   <div className="flex shrink-0 gap-1">{contact.email && <a href={`mailto:${contact.email}`} aria-label={`Email ${contact.label}`} className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Mail size={11} /></a>}{contact.phone && <a href={`tel:${contact.phone}`} aria-label={`Call ${contact.label}`} className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Phone size={11} /></a>}</div>
                 </div>)}
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Reminders" onEdit={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])}>
-              {detail("reminders") ? <div className="space-y-2">{parseContractRows(detail("reminders"), 2).map((row, index) => <div key={index} className="flex items-center gap-2 text-[10px] text-gray-600"><Calendar size={12} className="text-gray-400" /><span>{row[0]}</span><span className="ml-auto font-medium">{row[1]}</span></div>)}</div> : <div className="space-y-2 text-[10px] text-gray-600"><div className="flex items-center gap-2"><Calendar size={12} className="text-gray-400" /><span>{contract.renewalReminder || "Renewal reminder"}</span></div><div className="flex items-center gap-2"><Clock size={12} className="text-gray-400" /><span>{contract.endDate || "No due date set"}</span></div></div>}
-              <button type="button" onClick={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])} className="mt-4 w-full text-center text-[10px] font-medium text-blue-600 hover:underline">View All Reminders</button>
+            <VendorContractSection title="Reminders" onEdit={editAction(() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }]))}>
+              {blankView ? <div className="h-8" /> : detail("reminders") ? <div className="space-y-2">{parseContractRows(detail("reminders"), 2).map((row, index) => <div key={index} className="flex items-center gap-2 text-[10px] text-gray-600"><Calendar size={12} className="text-gray-400" /><span>{row[0]}</span><span className="ml-auto font-medium">{row[1]}</span></div>)}</div> : <div className="space-y-2 text-[10px] text-gray-600"><div className="flex items-center gap-2"><Calendar size={12} className="text-gray-400" /><span>{contract.renewalReminder || "Renewal reminder"}</span></div><div className="flex items-center gap-2"><Clock size={12} className="text-gray-400" /><span>{contract.endDate || "No due date set"}</span></div></div>}
+              {!blankView && <button type="button" onClick={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])} className="mt-4 w-full text-center text-[10px] font-medium text-blue-600 hover:underline">View All Reminders</button>}
             </VendorContractSection>
           </div>
         </div>
@@ -1314,6 +1317,38 @@ function persistContracts(scope: VendorScope, contracts: Contract[]) {
   if (!scope.vendorId) return;
   localStorage.setItem(`nido_vendor_contracts_${scope.vendorId}`, JSON.stringify(contracts));
   window.dispatchEvent(new Event("vendorContractsUpdated"));
+}
+
+function createBlankVendorContract(): Contract {
+  return {
+    id: "",
+    name: "",
+    type: "" as ContractType,
+    startDate: "",
+    endDate: "",
+    value: "",
+    paymentTerms: "",
+    status: "" as ContractStatus,
+    autoRenewal: false,
+    renewalReminder: "",
+    expiryIn: null,
+    contacts: {
+      owner: "",
+      vendor: "",
+      vendorPhone: "",
+      procurement: "",
+      procurementPhone: "",
+    },
+    terms: {
+      priceValidity: "",
+      deliveryTerm: "",
+      warrantyPeriod: "",
+      slaUptime: "",
+      penaltyClause: "",
+      governingLaw: "",
+    },
+    details: {},
+  };
 }
 
 export default function VendorContractsPage(scope: VendorScope = {}) {
@@ -1389,14 +1424,15 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   if (editingContract) {
     return <AddContractPage onCancel={() => setEditingContract(null)} contract={editingContract} onSave={handleSaveContract} vendor={vendorRecord} />;
   }
-  if (selectedContract) {
+  if (selectedContract || scoped) {
     return (
       <VendorContractDetailPage
-        contract={selectedContract}
-        vendorName={scope.vendorName || vendorRecord?.name || selectedContract.contacts.vendor}
+        contract={scoped ? createBlankVendorContract() : selectedContract!}
+        vendorName={scope.vendorName || vendorRecord?.name || selectedContract?.contacts.vendor || ""}
         vendor={vendorRecord}
         onBack={() => setSelectedContract(null)}
-        onUpdate={handleUpdateContract}
+        onUpdate={scoped ? () => undefined : handleUpdateContract}
+        blankView={scoped}
       />
     );
   }
