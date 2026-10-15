@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   FileText, CheckCircle, Clock, IndianRupee, RefreshCcw,
   MoreVertical, Eye, ChevronDown, ChevronLeft, ChevronRight,
@@ -592,24 +594,130 @@ function VendorContractSection({
   children,
 }: {
   title: string;
-  onEdit: () => void;
+  onEdit?: () => void;
   children: ReactNode;
 }) {
   return (
     <section className="relative overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/50 px-4 py-2">
         <h2 className="text-xs font-bold text-gray-800">{title}</h2>
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label={`Edit ${title}`}
-          className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={`Edit ${title}`}
+            data-testid={`edit-${title.replace(/\s+/g, "-").toLowerCase()}`}
+            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       <div className="p-4">{children}</div>
     </section>
+  );
+}
+
+type VendorContractEditField = {
+  key: string;
+  label: string;
+  type?: "text" | "textarea" | "select";
+  options?: string[];
+};
+
+type VendorContractEditConfig = {
+  title: string;
+  fields: VendorContractEditField[];
+  values: Record<string, string>;
+  save: (values: Record<string, string>) => void;
+};
+
+function VendorContractEditModal({
+  config,
+  onClose,
+}: {
+  config: VendorContractEditConfig;
+  onClose: () => void;
+}) {
+  const [values, setValues] = useState(config.values);
+
+  const update = (key: string, value: string) => {
+    setValues(current => ({ ...current, [key]: value }));
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vendor-contract-edit-title"
+        className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+          <h2 id="vendor-contract-edit-title" className="text-base font-semibold text-gray-900">{config.title}</h2>
+          <button type="button" onClick={onClose} aria-label="Close edit dialog" className="text-gray-400 transition-colors hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          {config.fields.map(field => (
+            <div key={field.key} className="space-y-1">
+              <label htmlFor={`vendor-contract-${field.key}`} className="block text-xs font-medium text-gray-700">{field.label}</label>
+              {field.type === "textarea" ? (
+                <textarea
+                  id={`vendor-contract-${field.key}`}
+                  rows={3}
+                  value={values[field.key] ?? ""}
+                  onChange={event => update(field.key, event.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : field.type === "select" ? (
+                <select
+                  id={`vendor-contract-${field.key}`}
+                  value={values[field.key] ?? ""}
+                  onChange={event => update(field.key, event.target.value)}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {(field.options ?? []).map(option => <option key={option} value={option}>{option}</option>)}
+                </select>
+              ) : (
+                <input
+                  id={`vendor-contract-${field.key}`}
+                  type="text"
+                  value={values[field.key] ?? ""}
+                  onChange={event => update(field.key, event.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="button" onClick={() => { config.save(values); onClose(); }} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VendorContractMetaCell({ icon, label, value }: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2 border-r border-gray-200 px-2 py-2 last:border-0">
+      <div className="mt-0.5 shrink-0 text-gray-400">{icon}</div>
+      <div>
+        <p className="text-[10px] leading-tight text-gray-400">{label}</p>
+        <div className="mt-0.5 text-xs font-semibold text-gray-800">{value}</div>
+      </div>
+    </div>
   );
 }
 
@@ -643,14 +751,16 @@ function VendorContractDetailPage({
   vendorName,
   vendor,
   onBack,
-  onEdit,
+  onUpdate,
 }: {
   contract: Contract;
   vendorName: string;
   vendor?: StoredVendor;
   onBack: () => void;
-  onEdit: () => void;
+  onUpdate: (contract: Contract) => void;
 }) {
+  const contractMenu = useDropdown();
+  const [editingSection, setEditingSection] = useState<VendorContractEditConfig | null>(null);
   const actualVendorName = vendor?.name || vendorName || contract.contacts.vendor || "Vendor";
   const vendorAddress = [
     vendor?.addressLine1,
@@ -673,17 +783,184 @@ function VendorContractDetailPage({
     { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: "—" },
   ];
 
+  const downloadContract = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 42;
+    const generatedOn = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    doc.text("NIDO-TECH | VENDOR CONTRACT", margin, 28);
+    doc.setDrawColor(229, 231, 235);
+    doc.line(margin, 34, pageWidth - margin, 34);
+
+    doc.setFontSize(20);
+    doc.setTextColor(31, 41, 55);
+    doc.text(contract.name || "Vendor Contract", margin, 66);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    doc.text(`Contract ID: ${contract.id}  |  Vendor: ${actualVendorName}  |  Generated: ${generatedOn}`, margin, 84);
+
+    const rows: Array<[string, string]> = [
+      ["Contract Type", contract.type],
+      ["Start Date", contract.startDate],
+      ["End Date", contract.endDate],
+      ["Contract Value", contract.value],
+      ["Payment Terms", contract.paymentTerms],
+      ["Status", contract.status],
+      ["Auto Renewal", contract.autoRenewal ? "Enabled" : "Disabled"],
+      ["Renewal Reminder", contract.renewalReminder],
+      ["Contract Owner", contract.contacts.owner],
+      ["Vendor Contact", contract.contacts.vendor || vendor?.primaryContact || ""],
+      ["Vendor Phone", contract.contacts.vendorPhone || vendor?.phone || ""],
+      ["Procurement Head", contract.contacts.procurement],
+      ["Price Validity", contract.terms.priceValidity],
+      ["Delivery Term", contract.terms.deliveryTerm],
+      ["Warranty Period", contract.terms.warrantyPeriod],
+      ["SLA Uptime", contract.terms.slaUptime],
+      ["Penalty Clause", contract.terms.penaltyClause],
+      ["Governing Law", contract.terms.governingLaw],
+      ["Vendor Email", vendor?.email || ""],
+      ["Vendor Address", vendorAddress],
+      ["Vendor Tax ID", vendor?.taxId || ""],
+    ];
+    autoTable(doc, {
+      startY: 104,
+      margin: { left: margin, right: margin },
+      head: [["Contract Detail", "Value"]],
+      body: rows.map(([label, value]) => [label, value || "—"]),
+      theme: "grid",
+      styles: { font: "helvetica", fontSize: 9, cellPadding: 6, textColor: [31, 41, 55] },
+      headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
+      columnStyles: { 0: { cellWidth: 150, fontStyle: "bold" } },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+    });
+
+    const safeName = (contract.name || "Vendor-Contract").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    doc.save(`${safeName || "Vendor-Contract"}.pdf`);
+    contractMenu.setOpen(false);
+  };
+
+  const openSectionEditor = (
+    title: string,
+    fields: VendorContractEditField[],
+    values: Record<string, string>,
+    save: (values: Record<string, string>) => Contract,
+  ) => {
+    setEditingSection({
+      title,
+      fields,
+      values,
+      save: nextValues => onUpdate(save(nextValues)),
+    });
+  };
+
+  const editOverview = () => openSectionEditor(
+    "Edit Contract Overview",
+    [
+      { key: "name", label: "Contract Name" },
+      { key: "type", label: "Contract Type", type: "select", options: Object.keys(TYPE_STYLES) },
+      { key: "startDate", label: "Start Date" },
+      { key: "endDate", label: "End Date" },
+      { key: "value", label: "Contract Value" },
+      { key: "paymentTerms", label: "Payment Terms", type: "select", options: PAYMENT_TERMS_LIST },
+      { key: "status", label: "Status", type: "select", options: ["Active", "Expired", "Expiring Soon", "Archived"] },
+    ],
+    { name: contract.name, type: contract.type, startDate: contract.startDate, endDate: contract.endDate, value: contract.value, paymentTerms: contract.paymentTerms, status: contract.status },
+    values => ({ ...contract, name: values.name, type: values.type as ContractType, startDate: values.startDate, endDate: values.endDate, value: values.value, paymentTerms: values.paymentTerms, status: values.status as ContractStatus }),
+  );
+
+  const editContacts = () => openSectionEditor(
+    "Edit Key Contacts",
+    [
+      { key: "owner", label: "Contract Owner" },
+      { key: "vendor", label: "Vendor Contact" },
+      { key: "vendorPhone", label: "Vendor Phone" },
+      { key: "procurement", label: "Procurement Head" },
+      { key: "procurementPhone", label: "Procurement Phone" },
+    ],
+    { ...contract.contacts },
+    values => ({ ...contract, contacts: { ...contract.contacts, ...values } }),
+  );
+
+  const editCommercialTerms = () => openSectionEditor(
+    "Edit Commercial Terms",
+    [
+      { key: "priceValidity", label: "Price Validity" },
+      { key: "deliveryTerm", label: "Delivery Term", type: "select", options: DELIVERY_TERMS },
+    ],
+    { priceValidity: contract.terms.priceValidity, deliveryTerm: contract.terms.deliveryTerm },
+    values => ({ ...contract, terms: { ...contract.terms, ...values } }),
+  );
+
+  const editServiceTerms = () => openSectionEditor(
+    "Edit Service Level & Warranty",
+    [
+      { key: "warrantyPeriod", label: "Warranty Period", type: "select", options: WARRANTY_PERIODS },
+      { key: "slaUptime", label: "SLA Uptime" },
+      { key: "penaltyClause", label: "Penalty Clause", type: "select", options: PENALTY_CLAUSES },
+    ],
+    { warrantyPeriod: contract.terms.warrantyPeriod, slaUptime: contract.terms.slaUptime, penaltyClause: contract.terms.penaltyClause },
+    values => ({ ...contract, terms: { ...contract.terms, warrantyPeriod: values.warrantyPeriod, slaUptime: values.slaUptime, penaltyClause: values.penaltyClause } }),
+  );
+
+  const editRenewal = () => openSectionEditor(
+    "Edit Renewal Information",
+    [
+      { key: "autoRenewal", label: "Auto Renewal", type: "select", options: ["Enabled", "Disabled"] },
+      { key: "renewalReminder", label: "Renewal Reminder", type: "select", options: RENEWAL_REMINDERS },
+      { key: "expiryIn", label: "Expiry In" },
+    ],
+    { autoRenewal: contract.autoRenewal ? "Enabled" : "Disabled", renewalReminder: contract.renewalReminder, expiryIn: contract.expiryIn ?? "" },
+    values => ({ ...contract, autoRenewal: values.autoRenewal === "Enabled", renewalReminder: values.renewalReminder, expiryIn: values.expiryIn || null }),
+  );
+
+  const editGovernance = () => openSectionEditor(
+    "Edit Contract Governance",
+    [
+      { key: "id", label: "Contract ID" },
+      { key: "governingLaw", label: "Governing Law", type: "select", options: GOVERNING_LAWS },
+    ],
+    { id: contract.id, governingLaw: contract.terms.governingLaw },
+    values => ({ ...contract, id: values.id, terms: { ...contract.terms, governingLaw: values.governingLaw } }),
+  );
+
   return (
     <div className="flex min-h-full flex-col bg-gray-50">
+      {editingSection && (
+        <VendorContractEditModal config={editingSection} onClose={() => setEditingSection(null)} />
+      )}
       <header className="relative border-b border-gray-100 bg-white">
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label="Edit contract"
-          className="absolute right-4 top-4 rounded-md border border-blue-200 bg-white p-1.5 text-blue-600 transition-colors hover:bg-blue-50"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
+        <div className="absolute right-4 top-4 z-20" ref={contractMenu.ref}>
+          <button
+            type="button"
+            onClick={() => contractMenu.setOpen(open => !open)}
+            aria-label="Contract actions"
+            data-testid="contract-menu"
+            className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+          >
+            <MoreVertical size={18} />
+          </button>
+          {contractMenu.open && (
+            <div className="absolute right-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={downloadContract}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Download size={14} className="text-gray-400" />
+                Download Contract
+              </button>
+            </div>
+          )}
+        </div>
         <div className="px-4 pb-4 pt-5 sm:px-6">
           <button
             type="button"
@@ -764,13 +1041,7 @@ function VendorContractDetailPage({
         <div className="overflow-x-auto border-b border-gray-200 bg-gray-50">
           <div className="flex min-w-max">
             {meta.map(item => (
-              <div key={item.label} className="flex items-start gap-2 border-r border-gray-200 px-2 py-2 last:border-0">
-                <span className="mt-0.5 shrink-0 text-gray-400">{item.icon}</span>
-                <div>
-                  <p className="text-[10px] leading-tight text-gray-400">{item.label}</p>
-                  <p className="mt-0.5 text-xs font-semibold text-gray-800">{item.value}</p>
-                </div>
-              </div>
+              <VendorContractMetaCell key={item.label} icon={item.icon} label={item.label} value={item.value} />
             ))}
           </div>
         </div>
@@ -779,7 +1050,7 @@ function VendorContractDetailPage({
       <main className="flex-1 overflow-auto p-2">
         <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
           <div className="space-y-4">
-            <VendorContractSection title="Contract Overview" onEdit={onEdit}>
+            <VendorContractSection title="Contract Overview" onEdit={editOverview}>
               <div className="space-y-3">
                 <VendorContractInfoRow label="Contract Name" value={contract.name} />
                 <VendorContractInfoRow label="Contract Type" value={contract.type} />
@@ -791,7 +1062,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Key Contacts" onEdit={onEdit}>
+            <VendorContractSection title="Key Contacts" onEdit={editContacts}>
               <div className="space-y-3">
                 {[
                   { label: "Contract Owner", name: contract.contacts.owner, phone: "" },
@@ -814,7 +1085,7 @@ function VendorContractDetailPage({
           </div>
 
           <div className="space-y-4">
-            <VendorContractSection title="Commercial Terms" onEdit={onEdit}>
+            <VendorContractSection title="Commercial Terms" onEdit={editCommercialTerms}>
               <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                 <VendorContractInfoRow label="Price Validity" value={contract.terms.priceValidity} />
                 <VendorContractInfoRow label="Delivery Term" value={contract.terms.deliveryTerm} />
@@ -823,7 +1094,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Service Level & Warranty" onEdit={onEdit}>
+            <VendorContractSection title="Service Level & Warranty" onEdit={editServiceTerms}>
               <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                 <VendorContractInfoRow label="Warranty Period" value={contract.terms.warrantyPeriod} />
                 <VendorContractInfoRow label="SLA Uptime" value={contract.terms.slaUptime} />
@@ -831,7 +1102,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Renewal Information" onEdit={onEdit}>
+            <VendorContractSection title="Renewal Information" onEdit={editRenewal}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <VendorContractInfoRow label="Auto Renewal" value={contract.autoRenewal ? "Enabled" : "Disabled"} />
                 <VendorContractInfoRow label="Renewal Reminder" value={contract.renewalReminder} />
@@ -841,7 +1112,7 @@ function VendorContractDetailPage({
           </div>
 
           <div className="space-y-4">
-            <VendorContractSection title="Vendor Information" onEdit={onEdit}>
+            <VendorContractSection title="Vendor Information">
               <div className="space-y-3">
                 <VendorContractInfoRow label="Vendor Name" value={actualVendorName} />
                 <VendorContractInfoRow label="Vendor ID" value={vendor?.id || "—"} />
@@ -856,7 +1127,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Vendor Contact" onEdit={onEdit}>
+            <VendorContractSection title="Vendor Contact">
               <div className="space-y-3">
                 <VendorContractInfoRow label="Primary Contact" value={vendor?.primaryContact} />
                 <VendorContractInfoRow label="Phone" value={vendor?.phone} />
@@ -867,7 +1138,7 @@ function VendorContractDetailPage({
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Contract Governance" onEdit={onEdit}>
+            <VendorContractSection title="Contract Governance" onEdit={editGovernance}>
               <div className="space-y-3">
                 <VendorContractInfoRow label="Contract ID" value={contract.id} />
                 <VendorContractInfoRow label="Contract Type" value={contract.type} />
@@ -943,6 +1214,15 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
     }
   };
 
+  const handleUpdateContract = (updated: Contract) => {
+    setContracts(prev => {
+      const next = prev.map(contract => contract.id === selectedContract?.id ? updated : contract);
+      persistContracts(scope, next);
+      return next;
+    });
+    setSelectedContract(updated);
+  };
+
   const activeContracts = contracts.filter(c => c.status !== "Archived");
   const archivedContracts = contracts.filter(c => c.status === "Archived");
   const totalValue = activeContracts.reduce((sum, contract) => {
@@ -970,7 +1250,7 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
         vendorName={scope.vendorName || vendorRecord?.name || selectedContract.contacts.vendor}
         vendor={vendorRecord}
         onBack={() => setSelectedContract(null)}
-        onEdit={() => setEditingContract(selectedContract)}
+        onUpdate={handleUpdateContract}
       />
     );
   }

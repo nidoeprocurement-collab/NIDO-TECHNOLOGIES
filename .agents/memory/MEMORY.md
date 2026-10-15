@@ -11,6 +11,7 @@
 - [Sales order PDF fidelity](sales-order-pdf-fidelity.md) — sales-order downloads reuse the quote renderer so both documents stay visually identical apart from labels and dates.
 - [Prefix configuration behavior](prefix-configuration.md) — new IDs read centralized prefixes; vendor credits remain distinct, while legacy stored identifiers are preserved.
 - [Global currency display](global-currency-display.md) — all UI and generated documents must format amounts from saved General Settings localization currency.
+- [Vendor contract page parity](vendor-contract-parity.md) — keep vendor contract details aligned with client contracts; vendor directory attributes stay read-only here.
 - [Approval engine adapter](approval-engine-local-mode.md) — approval UI/service contracts support local persistence now and a future backend switch via one environment flag.
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
