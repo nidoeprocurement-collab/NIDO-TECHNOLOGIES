@@ -82,6 +82,8 @@ export function createDraftPOsForOrder(
         productType: item.productType,
         physicalType: item.physicalType,
         commercialTerms: item.commercialTerms,
+        configuration: item.configuration,
+        configurationPriceAdjustment: item.configurationPriceAdjustment,
         status: "Pending",
         tracking: null,
       };

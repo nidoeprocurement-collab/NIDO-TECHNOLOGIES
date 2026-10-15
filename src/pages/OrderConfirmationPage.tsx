@@ -34,6 +34,8 @@ type ConfirmationState = {
     vendorPrice?: number;
     vendorProductCode?: string;
     gstSnapshot?: number;
+    configuration?: Record<string, string>;
+    configurationPriceAdjustment?: number;
   }[];
   subtotal: number;
   gst: number;
@@ -227,6 +229,15 @@ export default function OrderConfirmationPage() {
                       {item.quantity > 1 && (
                         <span className="text-xs text-gray-400">Qty: {item.quantity}</span>
                       )}
+                        {item.configuration && Object.keys(item.configuration).length > 0 && (
+                          <span className="mt-1 block text-xs text-gray-500">
+                            {Object.entries(item.configuration).map(([label, value]) => (
+                              <span key={label} className="mr-2 inline-block">
+                                {label.replace(/-\d+$/, "")}: <strong className="font-medium text-gray-700">{value}</strong>
+                              </span>
+                            ))}
+                          </span>
+                        )}
                     </span>
                     <span className="text-gray-800 font-medium shrink-0">
                       {(() => {

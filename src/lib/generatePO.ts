@@ -306,7 +306,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       ? activePoLines
       : po.items && po.items.length > 0
         ? []
-      : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal }];
+      : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal, configuration: undefined }];
 
   const gstRate = po.sgstPct + po.cgstPct; // combined GST % for all PO items
 
@@ -320,6 +320,11 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       const specLine = li.specs && li.specs.length > 0 ? li.specs[0] : '';
       let itemCell = li.item;
       if (specLine) itemCell += `\n${specLine}`;
+      if (li.configuration && Object.keys(li.configuration).length > 0) {
+        itemCell += `\nConfiguration: ${Object.entries(li.configuration)
+          .map(([label, value]) => `${label.replace(/-\d+$/, "")}: ${value}`)
+          .join(" · ")}`;
+      }
       if (li.referenceNumber) itemCell += `\nRef/Model No: ${li.referenceNumber}`;
       if (li.commercialTerms) itemCell += `\n${getCommercialTermsLines(li.commercialTerms).join('\n')}`;
       if (!digital) {

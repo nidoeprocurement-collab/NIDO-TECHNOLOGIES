@@ -69,6 +69,9 @@ export interface POLineItem {
   gstPct?: number;
   productType?: string;
   commercialTerms?: ProductCommercialTerms;
+  /** Shop configuration selected for this service or digital product. */
+  configuration?: Record<string, string>;
+  configurationPriceAdjustment?: number;
   /** Fulfilment state and shipment details for this specific PO line. */
   status?: string;
   cancelReason?: string;

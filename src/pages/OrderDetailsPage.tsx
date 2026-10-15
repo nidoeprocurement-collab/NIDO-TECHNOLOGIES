@@ -815,6 +815,16 @@ function ViewItemsModal({ group, onClose }) {
                   {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Reference No: {sub.referenceNumber}</div>}
                   {sub.serialNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Serial No: {sub.serialNumber}</div>}
                   {sub.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
+                  {sub.configuration && Object.keys(sub.configuration).length > 0 && (
+                    <div style={{ marginTop: 6, padding: "6px 8px", borderRadius: 6, background: "#f5f3ff", color: "#5b21b6", fontSize: 11 }}>
+                      <strong>Selected configuration</strong>
+                      <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 10px" }}>
+                        {Object.entries(sub.configuration).map(([label, value]) => (
+                          <span key={label}>{label.replace(/-\d+$/, "")}: <strong>{value}</strong></span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {sub.commercialTerms && (
                     <div style={{ marginTop: 7, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 12px", fontSize: 10.5, color: "#6b7280" }}>
                       <span>Pricing Model: <strong style={{ color: "#374151" }}>{sub.commercialTerms.pricingModel}</strong></span>
@@ -2519,6 +2529,8 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     productType: item.productType,
     physicalType: item.physicalType,
     fulfillmentType: item.fulfillmentType,
+    configuration: item.configuration && typeof item.configuration === "object" ? { ...item.configuration } : undefined,
+    configurationPriceAdjustment: Number(item.configurationPriceAdjustment || 0),
     commercialTerms: item.commercialTerms || (
       item.productType || item.physicalType || item.fulfillmentType
         ? getProductCommercialTerms(
@@ -3587,6 +3599,8 @@ export default function MyOrderPage() {
         hsnCode: "",
         specs: Array.isArray(previousSubOrder.specs) ? previousSubOrder.specs : [],
         referenceNumber: previousSubOrder.referenceNumber || "",
+        configuration: previousSubOrder.configuration,
+        configurationPriceAdjustment: previousSubOrder.configurationPriceAdjustment,
         qty,
         unitPrice,
         lineSubtotal,
@@ -3831,6 +3845,8 @@ export default function MyOrderPage() {
           category: sub.category,
           hsnCode: "",
           specs: sub.specs,
+          configuration: sub.configuration,
+          configurationPriceAdjustment: sub.configurationPriceAdjustment,
           productType: sub.commercialTerms?.productType,
           commercialTerms: lm.commercialTerms || sub.commercialTerms,
           referenceNumber: sub.referenceNumber || "",
@@ -4698,6 +4714,16 @@ export default function MyOrderPage() {
                                   <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{li.item}</div>
                                   {li.sku && <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 1 }}>SKU: {li.sku}</div>}
                                   {li.hsnCode && <div style={{ fontSize: 10.5, color: "#9ca3af" }}>HSN: {li.hsnCode} · GST {li.gstPct ?? 18}%</div>}
+                                  {li.configuration && Object.keys(li.configuration).length > 0 && (
+                                    <div style={{ marginTop: 5, padding: "6px 8px", borderRadius: 6, background: "#f5f3ff", color: "#5b21b6", fontSize: 10.5 }}>
+                                      <strong>Selected configuration</strong>
+                                      <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 10px" }}>
+                                        {Object.entries(li.configuration).map(([label, value]) => (
+                                          <span key={label}>{label.replace(/-\d+$/, "")}: <strong>{value}</strong></span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                   {li.commercialTerms && (
                                     <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px", fontSize: 10.5, color: "#6b7280" }}>
                                       <span>Pricing Model: <strong style={{ color: "#374151" }}>{li.commercialTerms.pricingModel}</strong></span>

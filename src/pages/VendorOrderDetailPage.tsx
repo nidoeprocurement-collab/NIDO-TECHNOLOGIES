@@ -733,6 +733,8 @@ function storedPOToDetail(po: StoredPO) {
             referenceNumber: li.referenceNumber || "",
             serialNumber: li.serialNumber || "",
             specs: li.specs || [],
+             configuration: li.configuration || {},
+             configurationPriceAdjustment: li.configurationPriceAdjustment || 0,
              commercialTerms: li.commercialTerms,
             qty: li.qty,
             unitPrice: fmtINR(li.unitPrice),
@@ -1404,6 +1406,16 @@ export default function VendorOrderDetailPage() {
                   <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
+                    {item.configuration && Object.keys(item.configuration).length > 0 && (
+                      <div style={{ marginTop: 5, padding: "5px 7px", borderRadius: 5, background: "#f5f3ff", color: "#5b21b6", fontSize: 10.5, lineHeight: 1.5 }}>
+                        <strong>Selected configuration</strong>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 9px" }}>
+                          {Object.entries(item.configuration).map(([label, value]) => (
+                            <span key={label}>{label.replace(/-\d+$/, "")}: <strong>{value}</strong></span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                      {item.commercialTerms && (
                        <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 14px", fontSize: 10.5, color: "#6b7280", lineHeight: 1.4 }}>
                          <span>Pricing Model: <strong style={{ color: "#374151" }}>{item.commercialTerms.pricingModel}</strong></span>
