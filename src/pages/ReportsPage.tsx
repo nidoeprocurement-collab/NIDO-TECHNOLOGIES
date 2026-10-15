@@ -86,7 +86,7 @@ const LIVE_DATA_EVENTS = [
   "nidoPermissionsUpdated",
   "nidoCustomModulesUpdated",
   "nidoUsersUpdated",
-  "nidoRolesUpdated",
+  "nidoConfigRolesUpdated",
   "nidoCustomReportsUpdated",
   "poCreated",
   "poCancelled",
@@ -326,6 +326,18 @@ export default function ReportsPage() {
       events.forEach((eventName) => window.removeEventListener(eventName, refresh));
     };
   }, []);
+
+  useEffect(() => {
+    if (draft.entityType !== "internal" || draft.allEntities) return;
+    const availableDepartmentIds = new Set(entitiesByType.internal.map((department) => department.id));
+    setDraft((current) => {
+      if (current.entityType !== "internal" || current.allEntities) return current;
+      const validEntityIds = current.entityIds.filter((id) => availableDepartmentIds.has(id));
+      return validEntityIds.length === current.entityIds.length
+        ? current
+        : { ...current, entityIds: validEntityIds };
+    });
+  }, [draft.allEntities, draft.entityIds, draft.entityType, entitiesByType.internal]);
 
   useEffect(() => {
     let active = true;

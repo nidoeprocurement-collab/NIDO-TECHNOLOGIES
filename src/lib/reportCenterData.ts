@@ -1976,10 +1976,20 @@ export async function loadReportCenterRecords(module: string, entityType?: Repor
 }
 
 export function getReportCenterEntities(): Record<ReportEntityType, { id: string; name: string }[]> {
+  const departments = new Map<string, string>();
+  for (const role of getRoles()) {
+    const department = String(role.department ?? "").trim();
+    const key = department.toLowerCase();
+    if (!department || key === "all departments" || departments.has(key)) continue;
+    departments.set(key, department);
+  }
+
   return {
     client: getClients().map((client) => ({ id: String(client.id), name: String(client.name ?? client.id) })),
     vendor: getVendors().map((vendor) => ({ id: String(vendor.id), name: String(vendor.name ?? vendor.id) })),
-    internal: mapDepartments().map((department) => ({ id: String(department.id), name: String(department.department) })),
+    internal: [...departments.values()]
+      .sort((a, b) => a.localeCompare(b))
+      .map((department) => ({ id: department, name: department })),
   };
 }
 
