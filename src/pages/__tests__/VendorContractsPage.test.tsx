@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import VendorContractsPage from "@/pages/VendorContractsPage";
+
+function renderVendorContractsPage() {
+  return render(
+    <MemoryRouter>
+      <VendorContractsPage />
+    </MemoryRouter>,
+  );
+}
 
 describe("Vendor contract detail page", () => {
   beforeEach(() => {
@@ -13,7 +22,7 @@ describe("Vendor contract detail page", () => {
   });
 
   it("edits contract sections in a dialog and updates the detail view", () => {
-    render(<VendorContractsPage />);
+    renderVendorContractsPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Contract Overview" }));
     fireEvent.change(screen.getByLabelText("Contract Name"), {
@@ -25,7 +34,7 @@ describe("Vendor contract detail page", () => {
   });
 
   it("offers contract download from the matching three-dot actions menu", () => {
-    render(<VendorContractsPage />);
+    renderVendorContractsPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Contract actions" }));
 

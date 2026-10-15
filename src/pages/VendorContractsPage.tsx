@@ -5,9 +5,10 @@ import {
   FileText, CheckCircle, Clock, IndianRupee, RefreshCcw,
   MoreVertical, Eye, ChevronDown, ChevronLeft, ChevronRight,
   X, Download, Archive, Pencil, Check, ArrowLeft, CalendarDays,
-  Mail, MapPin, Phone, ShieldCheck,
-  User, AlertTriangle, Plus, Upload,
+  Mail, MapPin, Phone, ShieldCheck, Database, Bell, Headphones,
+  User, AlertTriangle, Plus, Upload, Calendar, Receipt, Scale,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 import { getVendorById, getVendors, type StoredVendor } from "@/lib/vendorDataStore";
 
@@ -21,6 +22,7 @@ interface Contract {
   status: ContractStatus; autoRenewal: boolean; renewalReminder: string; expiryIn: string | null;
   contacts: { owner: string; vendor: string; vendorPhone: string; procurement: string; procurementPhone: string };
   terms: { priceValidity: string; deliveryTerm: string; warrantyPeriod: string; slaUptime: string; penaltyClause: string; governingLaw: string };
+  details?: Record<string, string>;
 }
 
 /* ─── Static data ───────────────────────────────────────────────────────── */
@@ -180,6 +182,7 @@ function AddContractPage({ onCancel, contract, onSave, vendor }: {
         penaltyClause: form.penaltyClause || contract?.terms.penaltyClause || "",
         governingLaw: form.governingLaw || contract?.terms.governingLaw || "",
       },
+      details: { ...(contract?.details || {}) },
     };
     onSave(updated);
   };
@@ -736,6 +739,14 @@ function VendorContractInfoRow({
   );
 }
 
+function parseContractRows(value: string | undefined, columns: number): string[][] {
+  return String(value || "")
+    .split("\n")
+    .map(line => line.split("|").map(part => part.trim()))
+    .filter(parts => parts.some(Boolean))
+    .map(parts => Array.from({ length: columns }, (_, index) => parts[index] || "—"));
+}
+
 function getVendorInitials(name: string) {
   return name
     .split(/\s+/)
@@ -760,6 +771,7 @@ function VendorContractDetailPage({
   onUpdate: (contract: Contract) => void;
 }) {
   const contractMenu = useDropdown();
+  const navigate = useNavigate();
   const [editingSection, setEditingSection] = useState<VendorContractEditConfig | null>(null);
   const actualVendorName = vendor?.name || vendorName || contract.contacts.vendor || "Vendor";
   const vendorAddress = [
@@ -770,16 +782,21 @@ function VendorContractDetailPage({
     vendor?.zipCode,
     vendor?.country,
   ].filter(Boolean).join(", ") || vendor?.address || "—";
+  const details = contract.details || {};
+  const detail = (key: string, fallback = "") => details[key] || fallback;
+  const daysRemaining = contract.endDate
+    ? Math.max(0, Math.ceil((new Date(contract.endDate).getTime() - Date.now()) / 86400000))
+    : null;
   const meta = [
     { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Contract Start Date", value: contract.startDate || "—" },
     { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Contract End Date", value: contract.endDate || "—" },
-    { icon: <IndianRupee className="h-3.5 w-3.5" />, label: "Contract Value", value: contract.value || "—" },
+    { icon: <IndianRupee className="h-3.5 w-3.5" />, label: "Currency", value: detail("currency", "INR") },
+    { icon: <Receipt className="h-3.5 w-3.5" />, label: "Billing Model", value: detail("billingModel", "—") },
     { icon: <FileText className="h-3.5 w-3.5" />, label: "Payment Terms", value: contract.paymentTerms || "—" },
-    { icon: <CheckCircle className="h-3.5 w-3.5" />, label: "Contract Status", value: contract.status },
-    { icon: <ShieldCheck className="h-3.5 w-3.5" />, label: "Vendor Status", value: vendor?.status || "—" },
+    { icon: <CheckCircle className="h-3.5 w-3.5" />, label: "Vendor Status", value: vendor?.status || contract.status },
     { icon: <RefreshCcw className="h-3.5 w-3.5" />, label: "Auto Renewal", value: contract.autoRenewal ? "Enabled" : "Disabled" },
-    { icon: <CalendarDays className="h-3.5 w-3.5" />, label: "Renewal Reminder", value: contract.renewalReminder || "—" },
-    { icon: <FileText className="h-3.5 w-3.5" />, label: "Governing Law", value: contract.terms.governingLaw || "—" },
+    { icon: <Bell className="h-3.5 w-3.5" />, label: "Notice Period", value: detail("noticePeriod", contract.renewalReminder || "—") },
+    { icon: <Scale className="h-3.5 w-3.5" />, label: "Governing Law", value: contract.terms.governingLaw || "—" },
     { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: "—" },
   ];
 
@@ -862,6 +879,15 @@ function VendorContractDetailPage({
     });
   };
 
+  const editDetails = (title: string, fields: VendorContractEditField[]) => {
+    openSectionEditor(
+      title,
+      fields,
+      Object.fromEntries(fields.map(field => [field.key, details[field.key] || ""])),
+      values => ({ ...contract, details: { ...details, ...values } }),
+    );
+  };
+
   const editOverview = () => openSectionEditor(
     "Edit Contract Overview",
     [
@@ -872,9 +898,26 @@ function VendorContractDetailPage({
       { key: "value", label: "Contract Value" },
       { key: "paymentTerms", label: "Payment Terms", type: "select", options: PAYMENT_TERMS_LIST },
       { key: "status", label: "Status", type: "select", options: ["Active", "Expired", "Expiring Soon", "Archived"] },
+      { key: "purpose", label: "Contract Purpose" },
+      { key: "scope", label: "Scope of Work", type: "textarea" },
+      { key: "deployment", label: "Deployment Model" },
+      { key: "currency", label: "Currency" },
+      { key: "taxation", label: "Taxation" },
+      { key: "jurisdiction", label: "Jurisdiction" },
+      { key: "confidentiality", label: "Confidentiality" },
     ],
-    { name: contract.name, type: contract.type, startDate: contract.startDate, endDate: contract.endDate, value: contract.value, paymentTerms: contract.paymentTerms, status: contract.status },
-    values => ({ ...contract, name: values.name, type: values.type as ContractType, startDate: values.startDate, endDate: values.endDate, value: values.value, paymentTerms: values.paymentTerms, status: values.status as ContractStatus }),
+    { name: contract.name, type: contract.type, startDate: contract.startDate, endDate: contract.endDate, value: contract.value, paymentTerms: contract.paymentTerms, status: contract.status, ...details },
+    values => ({
+      ...contract,
+      name: values.name,
+      type: values.type as ContractType,
+      startDate: values.startDate,
+      endDate: values.endDate,
+      value: values.value,
+      paymentTerms: values.paymentTerms,
+      status: values.status as ContractStatus,
+      details: { ...details, ...Object.fromEntries(["purpose", "scope", "deployment", "currency", "taxation", "jurisdiction", "confidentiality"].map(key => [key, values[key] || ""])) },
+    }),
   );
 
   const editContacts = () => openSectionEditor(
@@ -895,9 +938,19 @@ function VendorContractDetailPage({
     [
       { key: "priceValidity", label: "Price Validity" },
       { key: "deliveryTerm", label: "Delivery Term", type: "select", options: DELIVERY_TERMS },
+      { key: "billingModel", label: "Billing Model" },
+      { key: "latePaymentPenalty", label: "Late Payment Penalty" },
+      { key: "extras", label: "Extras" },
+      { key: "priceRevision", label: "Price Revision" },
+      { key: "forceMajeure", label: "Force Majeure" },
+      { key: "disputeResolution", label: "Dispute Resolution" },
     ],
-    { priceValidity: contract.terms.priceValidity, deliveryTerm: contract.terms.deliveryTerm },
-    values => ({ ...contract, terms: { ...contract.terms, ...values } }),
+    { priceValidity: contract.terms.priceValidity, deliveryTerm: contract.terms.deliveryTerm, ...details },
+    values => ({
+      ...contract,
+      terms: { ...contract.terms, priceValidity: values.priceValidity, deliveryTerm: values.deliveryTerm },
+      details: { ...details, ...Object.fromEntries(["billingModel", "latePaymentPenalty", "extras", "priceRevision", "forceMajeure", "disputeResolution"].map(key => [key, values[key] || ""])) },
+    }),
   );
 
   const editServiceTerms = () => openSectionEditor(
@@ -1047,103 +1100,188 @@ function VendorContractDetailPage({
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-2">
-        <div className="mx-auto grid max-w-[1600px] grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
-          <div className="space-y-4">
+      <main className="flex-1 overflow-auto bg-[#f8fafc] p-2">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-1 items-start gap-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.9fr)_minmax(0,0.95fr)]">
+          <div className="space-y-2">
             <VendorContractSection title="Contract Overview" onEdit={editOverview}>
-              <div className="space-y-3">
-                <VendorContractInfoRow label="Contract Name" value={contract.name} />
-                <VendorContractInfoRow label="Contract Type" value={contract.type} />
-                <VendorContractInfoRow label="Start Date" value={contract.startDate} />
-                <VendorContractInfoRow label="End Date" value={contract.endDate} />
-                <VendorContractInfoRow label="Contract Value" value={contract.value} />
-                <VendorContractInfoRow label="Payment Terms" value={contract.paymentTerms} />
-                <VendorContractInfoRow label="Status" value={<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[contract.status]}`}>{contract.status}</span>} />
+              <div className="space-y-2">
+                {[
+                  ["Contract Purpose", detail("purpose", contract.name)],
+                  ["Scope of Work", detail("scope", vendor?.category || contract.type)],
+                  ["Deployment Model", detail("deployment", contract.terms.deliveryTerm)],
+                  ["Currency", detail("currency", "INR")],
+                  ["Taxation", detail("taxation")],
+                  ["Jurisdiction", detail("jurisdiction", contract.terms.governingLaw)],
+                  ["Confidentiality", detail("confidentiality")],
+                ].map(([label, value]) => <VendorContractInfoRow key={label} label={label} value={value} />)}
+              </div>
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="mb-2 text-[10px] font-medium uppercase text-gray-500">Relationship Owner (Nido-Tech)</p>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{getVendorInitials(contract.contacts.owner || "N")}</span>
+                  <span className="text-xs font-semibold text-gray-800">{contract.contacts.owner || "—"}</span>
+                </div>
+              </div>
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="mb-2 text-[10px] font-medium uppercase text-gray-500">Relationship Owner (Vendor)</p>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-700">{getVendorInitials(contract.contacts.vendor || vendor?.primaryContact || actualVendorName)}</span>
+                    <div className="min-w-0"><p className="truncate text-xs font-semibold text-gray-800">{contract.contacts.vendor || vendor?.primaryContact || actualVendorName}</p><p className="truncate text-[10px] text-gray-500">{vendor?.email || "—"}</p></div>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    {vendor?.email && <a href={`mailto:${vendor.email}`} aria-label="Email vendor contact" className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Mail size={12} /></a>}
+                    {vendor?.phone && <a href={`tel:${vendor.phone}`} aria-label="Call vendor contact" className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Phone size={12} /></a>}
+                  </div>
+                </div>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="2. Response & Resolution Targets" onEdit={() => editDetails("Edit Response & Resolution Targets", [{ key: "responseTargets", label: "Priority | Response | Resolution (one row per line)", type: "textarea" }])}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] text-gray-500"><tr>{["Priority", "Response", "Resolution"].map(item => <th key={item} className="px-2 py-2">{item}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {(parseContractRows(detail("responseTargets"), 3).length ? parseContractRows(detail("responseTargets"), 3) : [["Standard", contract.terms.slaUptime || "—", contract.terms.warrantyPeriod || "—"]]).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="px-2 py-2 text-gray-700">{cell}</td>)}</tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+          </div>
+
+          <div className="space-y-2">
+            <VendorContractSection title="1. Commercial Terms" onEdit={editCommercialTerms}>
+              <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
+                {[
+                  ["Agreement Type", contract.type],
+                  ["Billing Model", detail("billingModel")],
+                  ["Contract Duration", detail("contractDuration", [contract.startDate, contract.endDate].filter(Boolean).join(" – "))],
+                  ["Payment Terms", contract.paymentTerms],
+                  ["Late Payment Penalty", detail("latePaymentPenalty", contract.terms.penaltyClause)],
+                  ["Extras", detail("extras")],
+                  ["Price Revision", detail("priceRevision", contract.terms.priceValidity)],
+                  ["Force Majeure", detail("forceMajeure")],
+                  ["Dispute Resolution", detail("disputeResolution", contract.terms.governingLaw)],
+                ].map(([label, value]) => <VendorContractInfoRow key={label} label={label} value={value} />)}
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="3. Services Covered" onEdit={() => editDetails("Edit Services Covered", [{ key: "servicesCovered", label: "Service | In Scope (one row per line)", type: "textarea" }])}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] text-gray-500"><tr><th className="px-3 py-2">Service</th><th className="px-3 py-2 text-right">In Scope</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {(parseContractRows(detail("servicesCovered"), 2).length ? parseContractRows(detail("servicesCovered"), 2) : [[vendor?.category || contract.type, "—"]]).map((row, index) => <tr key={index}><td className="px-3 py-2 font-medium text-gray-800">{row[0]}</td><td className="px-3 py-2 text-right text-gray-600">{row[1]}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="5. Data Security & Compliance" onEdit={() => editDetails("Edit Data Security & Compliance", [{ key: "securityControls", label: "Controls (one per line)", type: "textarea" }])}>
+              {detail("securityControls") ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {detail("securityControls").split("\n").filter(Boolean).map((control, index) => <div key={`${control}-${index}`} className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-center"><Database className="h-5 w-5 text-indigo-500" /><span className="text-[10px] font-medium text-gray-700">{control}</span><CheckCircle className="h-3 w-3 text-emerald-500" /></div>)}
+                </div>
+              ) : <p className="rounded-lg bg-gray-50 p-4 text-xs text-gray-400">No security controls recorded.</p>}
+            </VendorContractSection>
+
+            <VendorContractSection title="6. Confidentiality Clause" onEdit={() => editDetails("Edit Confidentiality Clause", [
+              { key: "confidentialityText", label: "Clause", type: "textarea" },
+              { key: "confidentialityEffective", label: "Effective Until" },
+              { key: "confidentialityStatus", label: "Status" },
+            ])}>
+              <div className="flex gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50"><ShieldCheck size={18} className="text-blue-500" /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] leading-relaxed text-gray-600">{detail("confidentialityText", "No confidentiality clause details recorded.")}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-2 text-[10px] text-gray-600"><span>Effective Until: {detail("confidentialityEffective", contract.endDate || "—")}</span><span>Status: <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{detail("confidentialityStatus", contract.status)}</span></span></div>
+                </div>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="7. Support & Escalation Matrix" onEdit={() => editDetails("Edit Support & Escalation Matrix", [{ key: "supportMatrix", label: "Level | Contact / Team | Email | Availability (one row per line)", type: "textarea" }])}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left text-[10px]">
+                  <thead className="bg-gray-50 text-gray-500"><tr>{["Level", "Contact / Team", "Email", "Availability"].map(item => <th key={item} className="px-2 py-2">{item}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-gray-100 text-gray-700">
+                    {(parseContractRows(detail("supportMatrix"), 4).length ? parseContractRows(detail("supportMatrix"), 4) : [["Primary", contract.contacts.vendor || vendor?.primaryContact || actualVendorName, vendor?.email || "—", "—"]]).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="max-w-36 truncate px-2 py-2">{cell}</td>)}</tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="8. Renewal & Termination" onEdit={() => editDetails("Edit Renewal & Termination", [{ key: "renewalTermination", label: "Renewal / termination terms", type: "textarea" }])}>
+              <div className="space-y-2">
+                {detail("renewalTermination") ? detail("renewalTermination").split("\n").filter(Boolean).map((line, index) => <div key={index} className="rounded-lg bg-gray-50 p-2.5 text-[11px] text-gray-700"><Database size={13} className="mr-2 inline text-emerald-500" />{line}</div>) : <>
+                  <VendorContractInfoRow label="Renewal" value={contract.autoRenewal ? "Automatic" : "Manual"} />
+                  <VendorContractInfoRow label="Renewal Notice" value={contract.renewalReminder} />
+                  <VendorContractInfoRow label="Termination / End Date" value={contract.endDate} />
+                </>}
+              </div>
+            </VendorContractSection>
+          </div>
+
+          <div className="space-y-2">
+            <VendorContractSection title="2. Subscription & Licensing" onEdit={() => editDetails("Edit Subscription & Licensing", [
+              { key: "userLicensing", label: "User Licensing" }, { key: "licensedUsers", label: "Licensed Users" },
+              { key: "concurrentUsers", label: "Concurrent Users" }, { key: "additionalUserCost", label: "Additional User Cost" },
+              { key: "licenseTransfer", label: "License Transfer" }, { key: "minimumCommitment", label: "Minimum Commitment" },
+            ])}>
+              <div className="space-y-2">{[
+                ["User Licensing", detail("userLicensing")], ["Licensed Users", detail("licensedUsers")],
+                ["Concurrent Users", detail("concurrentUsers")], ["Additional User Cost", detail("additionalUserCost")],
+                ["License Transfer", detail("licenseTransfer")], ["Minimum Commitment", detail("minimumCommitment")],
+              ].map(([label, value]) => <VendorContractInfoRow key={label} label={label} value={value} />)}</div>
+            </VendorContractSection>
+
+            <VendorContractSection title="4. SLA Commitments" onEdit={() => editDetails("Edit SLA Commitments", [{ key: "slaCommitments", label: "Commitment | Target (one row per line)", type: "textarea" }])}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left text-[10px]">
+                  <thead className="bg-gray-50 text-gray-500"><tr><th className="px-2 py-2">Commitment</th><th className="px-2 py-2 text-right">Target</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100 text-gray-700">
+                    {(parseContractRows(detail("slaCommitments"), 2).length ? parseContractRows(detail("slaCommitments"), 2) : [["Availability", contract.terms.slaUptime || "—"], ["Warranty", contract.terms.warrantyPeriod || "—"]]).map((row, index) => <tr key={index}><td className="px-2 py-2">{row[0]}</td><td className="px-2 py-2 text-right font-medium">{row[1]}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Renewal Information" onEdit={editRenewal}>
+              <div className="space-y-2">
+                <VendorContractInfoRow label="Contract Renewal" value={contract.endDate || "—"} />
+                <VendorContractInfoRow label="Auto Renewal" value={contract.autoRenewal ? "Enabled" : "Disabled"} />
+                <VendorContractInfoRow label="Days Remaining" value={daysRemaining == null ? "—" : `${daysRemaining} days`} />
+              </div>
+            </VendorContractSection>
+
+            <VendorContractSection title="Support Information" onEdit={() => editDetails("Edit Support Information", [
+              { key: "supportPlan", label: "Support Plan" }, { key: "supportHours", label: "Support Hours" }, { key: "responseSLA", label: "Response SLA" },
+            ])}>
+              <div className="space-y-2">
+                <VendorContractInfoRow label="Support Plan" value={detail("supportPlan", contract.type === "SLA" || contract.type === "AMC" ? contract.type : "")} />
+                <VendorContractInfoRow label="Support Hours" value={detail("supportHours")} />
+                <VendorContractInfoRow label="Response SLA" value={detail("responseSLA", contract.terms.slaUptime)} />
+                <button type="button" onClick={() => navigate("/support/create", { state: { vendorId: vendor?.id, vendorName: actualVendorName, contractId: contract.id } })} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-500 px-3 py-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                  <Headphones size={13} /> Create Support Ticket
+                </button>
               </div>
             </VendorContractSection>
 
             <VendorContractSection title="Key Contacts" onEdit={editContacts}>
               <div className="space-y-3">
                 {[
-                  { label: "Contract Owner", name: contract.contacts.owner, phone: "" },
-                  { label: "Vendor Contact", name: contract.contacts.vendor || vendor?.primaryContact, phone: contract.contacts.vendorPhone || vendor?.phone },
-                  { label: "Procurement Head", name: contract.contacts.procurement, phone: contract.contacts.procurementPhone },
-                ].map(contact => (
-                  <div key={contact.label} className="flex items-start gap-2.5">
-                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                      <User className="h-3.5 w-3.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-gray-400">{contact.label}</p>
-                      <p className="text-xs font-semibold text-gray-800">{contact.name || "—"}</p>
-                      {contact.phone && <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-gray-500"><Phone className="h-3 w-3" />{contact.phone}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </VendorContractSection>
-          </div>
-
-          <div className="space-y-4">
-            <VendorContractSection title="Commercial Terms" onEdit={editCommercialTerms}>
-              <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <VendorContractInfoRow label="Price Validity" value={contract.terms.priceValidity} />
-                <VendorContractInfoRow label="Delivery Term" value={contract.terms.deliveryTerm} />
-                <VendorContractInfoRow label="Contract Value" value={contract.value} />
-                <VendorContractInfoRow label="Payment Terms" value={contract.paymentTerms} />
+                  { label: "Vendor", name: contract.contacts.vendor || vendor?.primaryContact || actualVendorName, email: vendor?.email || "", phone: contract.contacts.vendorPhone || vendor?.phone || "" },
+                  { label: "Nido-Tech", name: contract.contacts.owner, email: "", phone: "" },
+                  { label: "Procurement", name: contract.contacts.procurement, email: "", phone: contract.contacts.procurementPhone },
+                ].map(contact => <div key={contact.label} className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                  <div className="flex min-w-0 items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[9px] font-bold text-gray-700">{getVendorInitials(contact.name || contact.label)}</span><div className="min-w-0"><p className="text-[9px] font-medium uppercase text-gray-400">{contact.label}</p><p className="truncate text-[10px] font-semibold text-gray-800">{contact.name || "—"}</p></div></div>
+                  <div className="flex shrink-0 gap-1">{contact.email && <a href={`mailto:${contact.email}`} aria-label={`Email ${contact.label}`} className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Mail size={11} /></a>}{contact.phone && <a href={`tel:${contact.phone}`} aria-label={`Call ${contact.label}`} className="rounded-full border border-gray-200 p-1.5 text-gray-500 hover:text-blue-600"><Phone size={11} /></a>}</div>
+                </div>)}
               </div>
             </VendorContractSection>
 
-            <VendorContractSection title="Service Level & Warranty" onEdit={editServiceTerms}>
-              <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <VendorContractInfoRow label="Warranty Period" value={contract.terms.warrantyPeriod} />
-                <VendorContractInfoRow label="SLA Uptime" value={contract.terms.slaUptime} />
-                <VendorContractInfoRow label="Penalty Clause" value={contract.terms.penaltyClause} />
-              </div>
-            </VendorContractSection>
-
-            <VendorContractSection title="Renewal Information" onEdit={editRenewal}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <VendorContractInfoRow label="Auto Renewal" value={contract.autoRenewal ? "Enabled" : "Disabled"} />
-                <VendorContractInfoRow label="Renewal Reminder" value={contract.renewalReminder} />
-                <VendorContractInfoRow label="Contract End Date" value={contract.endDate} />
-              </div>
-            </VendorContractSection>
-          </div>
-
-          <div className="space-y-4">
-            <VendorContractSection title="Vendor Information">
-              <div className="space-y-3">
-                <VendorContractInfoRow label="Vendor Name" value={actualVendorName} />
-                <VendorContractInfoRow label="Vendor ID" value={vendor?.id || "—"} />
-                <VendorContractInfoRow label="Category" value={vendor?.category} />
-                <VendorContractInfoRow label="Vendor Status" value={vendor?.status} />
-                <VendorContractInfoRow
-                  label="Email"
-                  value={vendor?.email ? <a href={`mailto:${vendor.email}`} className="inline-flex items-center gap-1 text-blue-600 hover:underline"><Mail className="h-3 w-3" />{vendor.email}</a> : "—"}
-                />
-                <VendorContractInfoRow label="Address" value={<span className="inline-flex max-w-[180px] items-start gap-1"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" />{vendorAddress}</span>} />
-                {vendor?.taxId && <VendorContractInfoRow label="Tax ID" value={vendor.taxId} />}
-              </div>
-            </VendorContractSection>
-
-            <VendorContractSection title="Vendor Contact">
-              <div className="space-y-3">
-                <VendorContractInfoRow label="Primary Contact" value={vendor?.primaryContact} />
-                <VendorContractInfoRow label="Phone" value={vendor?.phone} />
-                <VendorContractInfoRow
-                  label="Email"
-                  value={vendor?.email ? <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">{vendor.email}</a> : "—"}
-                />
-              </div>
-            </VendorContractSection>
-
-            <VendorContractSection title="Contract Governance" onEdit={editGovernance}>
-              <div className="space-y-3">
-                <VendorContractInfoRow label="Contract ID" value={contract.id} />
-                <VendorContractInfoRow label="Contract Type" value={contract.type} />
-                <VendorContractInfoRow label="Governing Law" value={contract.terms.governingLaw} />
-              </div>
+            <VendorContractSection title="Reminders" onEdit={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])}>
+              {detail("reminders") ? <div className="space-y-2">{parseContractRows(detail("reminders"), 2).map((row, index) => <div key={index} className="flex items-center gap-2 text-[10px] text-gray-600"><Calendar size={12} className="text-gray-400" /><span>{row[0]}</span><span className="ml-auto font-medium">{row[1]}</span></div>)}</div> : <div className="space-y-2 text-[10px] text-gray-600"><div className="flex items-center gap-2"><Calendar size={12} className="text-gray-400" /><span>{contract.renewalReminder || "Renewal reminder"}</span></div><div className="flex items-center gap-2"><Clock size={12} className="text-gray-400" /><span>{contract.endDate || "No due date set"}</span></div></div>}
+              <button type="button" onClick={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])} className="mt-4 w-full text-center text-[10px] font-medium text-blue-600 hover:underline">View All Reminders</button>
             </VendorContractSection>
           </div>
         </div>

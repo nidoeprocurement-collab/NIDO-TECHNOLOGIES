@@ -555,6 +555,29 @@ export default function VendorDetailPage() {
     Pending: "bg-blue-100 text-blue-700",
   }[vendor.status] || "bg-gray-100 text-gray-500";
 
+  if (activeTab === "contracts") {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#f8fafc] font-[Inter,sans-serif]">
+        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
+          <div>
+            <p className="text-[9px] font-semibold tracking-[0.16em] text-blue-600">{vendor.id}</p>
+            <h1 className="text-sm font-bold leading-tight text-gray-900">{vendor.name}</h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("overview")}
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 transition-colors hover:text-blue-800"
+          >
+            <ChevronLeft className="h-3 w-3" /> Overview
+          </button>
+        </header>
+        <main className="min-h-0 flex-1 overflow-auto">
+          <VendorContractsPage vendorId={vendor.id} vendorName={vendor.name} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white font-[Inter,sans-serif] flex flex-col">
       {/* Sticky Header */}
