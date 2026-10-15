@@ -25,6 +25,7 @@ import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { formatConfigurationLabel } from "@/lib/productConfiguration";
 import {
   formatLeadTimeByType,
   getAvailabilityByType,
@@ -299,12 +300,30 @@ function getCloudConfigurationPriceAdjustment(
   }, 0);
 }
 
+function toStoredCloudConfiguration(
+  fields: CloudDataField[],
+  values: Record<string, string>,
+): Record<string, string> {
+  const configuration: Record<string, string> = {};
+  fields.forEach((field, index) => {
+    const baseLabel = field.label.trim() || `Option ${index + 1}`;
+    const label = Object.prototype.hasOwnProperty.call(configuration, baseLabel)
+      ? `${baseLabel} (${index + 1})`
+      : baseLabel;
+    configuration[label] = values[cloudFieldKey(field, index)] ?? field.options[0]?.label ?? field.value;
+  });
+  return configuration;
+}
+
 function haveSameCloudConfiguration(
   left: Record<string, string> | undefined,
   right: Record<string, string>,
 ): boolean {
-  const leftEntries = Object.entries(left || {}).sort(([a], [b]) => a.localeCompare(b));
-  const rightEntries = Object.entries(right).sort(([a], [b]) => a.localeCompare(b));
+  const normalize = (configuration: Record<string, string>) => Object.entries(configuration)
+    .map(([label, value]) => [formatConfigurationLabel(label).toLowerCase(), value] as [string, string])
+    .sort(([a], [b]) => a.localeCompare(b));
+  const leftEntries = normalize(left || {});
+  const rightEntries = normalize(right);
   return JSON.stringify(leftEntries) === JSON.stringify(rightEntries);
 }
 
@@ -911,6 +930,7 @@ function ConfiguredServiceProductCard({
     : { ...product, variations: [] };
   const dataFields = getCloudDataFields(vendorConfiguredProduct);
   const configurationFields = getCatalogVariationFields(vendorConfiguredProduct);
+  const storedConfiguration = toStoredCloudConfiguration(configurationFields, configuration);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
   const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
   const region = findCloudField(dataFields, ["region", "location"]);
@@ -964,7 +984,7 @@ function ConfiguredServiceProductCard({
     item.productCode === product.productCode
     && item.clientId === clientId
     && item.selectedVendorId === selectedVendor.vendorId
-    && haveSameCloudConfiguration(item.configuration, configuration),
+    && haveSameCloudConfiguration(item.configuration, storedConfiguration),
   );
   const configurationPriceAdjustment = getCloudConfigurationPriceAdjustment(configurationFields, configuration);
   const effectiveVendorPrice = selectedVendor
@@ -1008,14 +1028,6 @@ function ConfiguredServiceProductCard({
   const canUseVendor = (vendor: VendorComparisonRow) =>
     isDigitalProduct(product) || canVendorFulfillMoq(vendor);
   const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor) && !isInCart;
-  const selectedConfigurationSummary = Object.entries(configuration)
-    .map(([key, value]) => {
-      const index = Number(key.split("-").pop());
-      const field = configurationFields[index];
-      return field && value.trim() ? `${field.label}: ${value.trim()}` : "";
-    })
-    .filter(Boolean);
-
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!canAdd || !selectedVendor) return;
@@ -1024,10 +1036,7 @@ function ConfiguredServiceProductCard({
         id: Math.random() * 10000,
         name: product.name,
         image: product.image,
-        specs: [
-          ...product.specs,
-          ...selectedConfigurationSummary.map(value => `Configuration: ${value}`),
-        ],
+        specs: product.specs,
         moq: selectedVendor.moq,
         totalStock: selectedVendor.stock,
         priceNum: product.priceNum,
@@ -1052,7 +1061,7 @@ function ConfiguredServiceProductCard({
         gstSnapshot: gstRate,
         hsnSnapshot: hsnForCategory,
         vendorRating: selectedVendor.rating,
-        configuration,
+        configuration: storedConfiguration,
         configurationPriceAdjustment,
       },
       Math.max(1, selectedVendor.moq, qty),
