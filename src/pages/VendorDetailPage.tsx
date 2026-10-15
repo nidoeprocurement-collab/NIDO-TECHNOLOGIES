@@ -3,7 +3,7 @@ import { useLocation, useParams, useNavigate } from "react-router-dom";
 import {
   Star, Phone, Mail, MessageSquare, ChevronLeft, Building2, MapPin,
   CreditCard, FileText, Package, ShoppingCart, TrendingUp, ClipboardList,
-  Newspaper, DollarSign, AlertCircle, CheckCircle2, Clock, ArrowUpRight,
+  Newspaper, DollarSign, AlertCircle, CheckCircle2, Clock, ArrowUpRight, ArrowRight,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -652,7 +652,26 @@ export default function VendorDetailPage() {
         {activeTab === "orders" && <VendorOrdersPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "services" && <VendorServicesPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "performance" && <VendorPerformancePage vendor={vendor} />}
-        {activeTab === "contracts" && <VendorContractsPage vendorId={vendor.id} vendorName={vendor.name} />}
+        {activeTab === "contracts" && (
+          <div className="p-3 sm:p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{vendor.id}</p>
+                <h1 className="text-xl font-bold">{vendor.name}</h1>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("overview")}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
+              >
+                <ArrowRight size={13} className="rotate-180" /> Overview
+              </button>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <VendorContractsPage vendorId={vendor.id} vendorName={vendor.name} />
+            </div>
+          </div>
+        )}
         {activeTab === "configuration" && <div className="px-6 py-5"><VendorConfigurationTab vendorId={vendor.id} /></div>}
         {activeTab === "payments" && <VendorPaymentsPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "news" && <VendorNewsActivityPage vendorId={vendor.id} vendorName={vendor.name} />}
