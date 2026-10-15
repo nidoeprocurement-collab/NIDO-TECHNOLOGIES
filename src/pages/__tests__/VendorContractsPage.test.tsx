@@ -66,7 +66,7 @@ describe("Vendor contract detail page", () => {
     expect(screen.getByRole("button", { name: "Create Support Ticket" })).toBeTruthy();
   });
 
-  it("shows a blank vendor detail view without changing saved contract data", () => {
+  it("hides saved values until edited, then persists section changes", () => {
     const storageKey = "nido_vendor_contracts_V-TEST";
     const savedContract = {
       id: "CONTRACT-SECRET",
@@ -110,13 +110,55 @@ describe("Vendor contract detail page", () => {
     expect(screen.queryByText("Hidden contract purpose")).toBeNull();
     expect(screen.queryByText("Hidden Vendor Contact")).toBeNull();
     expect(screen.queryByRole("button", { name: "Contract actions" })).toBeNull();
+    for (const section of [
+      "Contract Overview",
+      "2. Response & Resolution Targets",
+      "1. Commercial Terms",
+      "3. Services Covered",
+      "5. Data Security & Compliance",
+      "6. Confidentiality Clause",
+      "7. Support & Escalation Matrix",
+      "8. Renewal & Termination",
+      "2. Subscription & Licensing",
+      "4. SLA Commitments",
+      "Renewal Information",
+      "Support Information",
+      "Key Contacts",
+      "Reminders",
+    ]) {
+      expect(screen.getByRole("button", { name: `Edit ${section}` })).toBeTruthy();
+    }
     expect(localStorage.getItem(storageKey)).toBe(serialized);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Contract Overview" }));
+    expect(screen.getByLabelText("Contract Name")).toHaveProperty("value", "Secret Contract Title");
+    fireEvent.change(screen.getByLabelText("Contract Purpose"), {
+      target: { value: "Updated purpose" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(screen.getByText("Updated purpose")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Secret Contract Title" })).toBeTruthy();
+    const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    expect(saved[0].details.billingModel).toBe("Hidden billing model");
+    expect(saved[0].details.purpose).toBe("Updated purpose");
   });
 
-  it("shows the blank detail layout when a vendor has no saved contracts", () => {
+  it("allows a new contract to be created from the blank vendor detail layout", () => {
+    const storageKey = "nido_vendor_contracts_V-EMPTY";
     renderVendorContractsPage({ vendorId: "V-EMPTY", vendorName: "Empty Vendor" });
 
     expect(screen.getByRole("heading", { name: "Contract Overview" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "All Contracts" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Contract Overview" }));
+    fireEvent.change(screen.getByLabelText("Contract Name"), {
+      target: { value: "New Vendor Agreement" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(screen.getByRole("heading", { name: "New Vendor Agreement" })).toBeTruthy();
+    const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    expect(saved).toHaveLength(1);
+    expect(saved[0].id).toMatch(/^CT-\d{4}-\d{3}$/);
   });
 });

@@ -784,9 +784,9 @@ function VendorContractDetailPage({
     vendor?.zipCode,
     vendor?.country,
   ].filter(Boolean).join(", ") || vendor?.address || "—";
-  const details = blankView ? {} : contract.details || {};
+  const details = contract.details || {};
   const detail = (key: string, fallback = "") => blankView ? "" : details[key] || fallback;
-  const editAction = (action: () => void) => blankView ? undefined : action;
+  const editAction = (action: () => void) => action;
   const daysRemaining = !blankView && contract.endDate
     ? Math.max(0, Math.ceil((new Date(contract.endDate).getTime() - Date.now()) / 86400000))
     : null;
@@ -800,7 +800,7 @@ function VendorContractDetailPage({
     { icon: <RefreshCcw className="h-3.5 w-3.5" />, label: "Auto Renewal", value: blankView ? "" : contract.autoRenewal ? "Enabled" : "Disabled" },
     { icon: <Bell className="h-3.5 w-3.5" />, label: "Notice Period", value: detail("noticePeriod", contract.renewalReminder || "—") },
     { icon: <Scale className="h-3.5 w-3.5" />, label: "Governing Law", value: blankView ? "" : contract.terms.governingLaw || "—" },
-    { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: blankView ? "" : "—" },
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: "Signed On", value: detail("signedOn", "—") },
   ];
 
   const downloadContract = () => {
@@ -894,10 +894,12 @@ function VendorContractDetailPage({
   const editOverview = () => openSectionEditor(
     "Edit Contract Overview",
     [
+      { key: "id", label: "Contract ID" },
       { key: "name", label: "Contract Name" },
       { key: "type", label: "Contract Type", type: "select", options: Object.keys(TYPE_STYLES) },
       { key: "startDate", label: "Start Date" },
       { key: "endDate", label: "End Date" },
+      { key: "signedOn", label: "Signed On" },
       { key: "value", label: "Contract Value" },
       { key: "paymentTerms", label: "Payment Terms", type: "select", options: PAYMENT_TERMS_LIST },
       { key: "status", label: "Status", type: "select", options: ["Active", "Expired", "Expiring Soon", "Archived"] },
@@ -909,9 +911,10 @@ function VendorContractDetailPage({
       { key: "jurisdiction", label: "Jurisdiction" },
       { key: "confidentiality", label: "Confidentiality" },
     ],
-    { name: contract.name, type: contract.type, startDate: contract.startDate, endDate: contract.endDate, value: contract.value, paymentTerms: contract.paymentTerms, status: contract.status, ...details },
+    { id: contract.id, name: contract.name, type: contract.type, startDate: contract.startDate, endDate: contract.endDate, value: contract.value, paymentTerms: contract.paymentTerms, status: contract.status, ...details },
     values => ({
       ...contract,
+      id: values.id,
       name: values.name,
       type: values.type as ContractType,
       startDate: values.startDate,
@@ -919,7 +922,7 @@ function VendorContractDetailPage({
       value: values.value,
       paymentTerms: values.paymentTerms,
       status: values.status as ContractStatus,
-      details: { ...details, ...Object.fromEntries(["purpose", "scope", "deployment", "currency", "taxation", "jurisdiction", "confidentiality"].map(key => [key, values[key] || ""])) },
+      details: { ...details, ...Object.fromEntries(["signedOn", "purpose", "scope", "deployment", "currency", "taxation", "jurisdiction", "confidentiality"].map(key => [key, values[key] || ""])) },
     }),
   );
 
@@ -941,6 +944,7 @@ function VendorContractDetailPage({
     [
       { key: "priceValidity", label: "Price Validity" },
       { key: "deliveryTerm", label: "Delivery Term", type: "select", options: DELIVERY_TERMS },
+      { key: "governingLaw", label: "Governing Law", type: "select", options: GOVERNING_LAWS },
       { key: "contractDuration", label: "Contract Duration" },
       { key: "billingModel", label: "Billing Model" },
       { key: "latePaymentPenalty", label: "Late Payment Penalty" },
@@ -949,10 +953,10 @@ function VendorContractDetailPage({
       { key: "forceMajeure", label: "Force Majeure" },
       { key: "disputeResolution", label: "Dispute Resolution" },
     ],
-    { priceValidity: contract.terms.priceValidity, deliveryTerm: contract.terms.deliveryTerm, ...details },
+    { priceValidity: contract.terms.priceValidity, deliveryTerm: contract.terms.deliveryTerm, governingLaw: contract.terms.governingLaw, ...details },
     values => ({
       ...contract,
-      terms: { ...contract.terms, priceValidity: values.priceValidity, deliveryTerm: values.deliveryTerm },
+      terms: { ...contract.terms, priceValidity: values.priceValidity, deliveryTerm: values.deliveryTerm, governingLaw: values.governingLaw },
       details: { ...details, ...Object.fromEntries(["contractDuration", "billingModel", "latePaymentPenalty", "extras", "priceRevision", "forceMajeure", "disputeResolution"].map(key => [key, values[key] || ""])) },
     }),
   );
@@ -976,7 +980,7 @@ function VendorContractDetailPage({
       { key: "noticePeriod", label: "Notice Period" },
       { key: "expiryIn", label: "Expiry In" },
     ],
-    { autoRenewal: contract.autoRenewal ? "Enabled" : "Disabled", renewalReminder: contract.renewalReminder, noticePeriod: detail("noticePeriod"), expiryIn: contract.expiryIn ?? "" },
+    { autoRenewal: contract.autoRenewal ? "Enabled" : "Disabled", renewalReminder: contract.renewalReminder, noticePeriod: details.noticePeriod || "", expiryIn: contract.expiryIn ?? "" },
     values => ({
       ...contract,
       autoRenewal: values.autoRenewal === "Enabled",
@@ -1351,6 +1355,17 @@ function createBlankVendorContract(): Contract {
   };
 }
 
+function nextVendorContractId(contracts: Contract[]): string {
+  const year = new Date().getFullYear();
+  const prefix = `CT-${year}-`;
+  const highestNumber = contracts.reduce((highest, contract) => {
+    if (!contract.id.startsWith(prefix)) return highest;
+    const number = Number(contract.id.slice(prefix.length));
+    return Number.isFinite(number) ? Math.max(highest, number) : highest;
+  }, 0);
+  return `${prefix}${String(highestNumber + 1).padStart(3, "0")}`;
+}
+
 export default function VendorContractsPage(scope: VendorScope = {}) {
   const scoped = hasVendorScope(scope);
   const vendorRecord = (scope.vendorId ? getVendorById(scope.vendorId) : undefined) ||
@@ -1360,6 +1375,8 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   const [selectedContract, setSelectedContract] = useState<Contract | null>(
     () => initialContracts.find(contract => contract.status !== "Archived") ?? null
   );
+  const [blankDetailView, setBlankDetailView] = useState(scoped);
+  const [showScopedContractList, setShowScopedContractList] = useState(false);
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [showAddContract, setShowAddContract] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
@@ -1368,13 +1385,18 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
 
   useEffect(() => {
     const refresh = () => setContracts(readContracts(scope));
+    const scopedContracts = readContracts(scope);
+    setContracts(scopedContracts);
+    setSelectedContract(scopedContracts.find(contract => contract.status !== "Archived") ?? null);
+    setBlankDetailView(scoped);
+    setShowScopedContractList(false);
     window.addEventListener("vendorContractsUpdated", refresh);
     window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener("vendorContractsUpdated", refresh);
       window.removeEventListener("storage", refresh);
     };
-  }, [scope.vendorId, scope.vendorName]);
+  }, [scope.vendorId, scope.vendorName, scoped]);
 
   const handleSaveContract = (updated: Contract) => {
     if (editingContract) {
@@ -1396,12 +1418,29 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   };
 
   const handleUpdateContract = (updated: Contract) => {
+    const originalId = selectedContract?.id;
+    const requestedId = updated.id?.trim();
+    const idTaken = requestedId && contracts.some(contract =>
+      contract.id === requestedId && contract.id !== originalId
+    );
+    const record: Contract = {
+      ...updated,
+      id: idTaken ? originalId || nextVendorContractId(contracts) : requestedId || originalId || nextVendorContractId(contracts),
+      name: updated.name?.trim() || "Untitled Contract",
+      type: updated.type || "Supply Agreement",
+      status: updated.status || "Active",
+    };
     setContracts(prev => {
-      const next = prev.map(contract => contract.id === selectedContract?.id ? updated : contract);
+      const exists = originalId && prev.some(contract => contract.id === originalId);
+      const next = exists
+        ? prev.map(contract => contract.id === originalId ? record : contract)
+        : [record, ...prev];
       persistContracts(scope, next);
       return next;
     });
-    setSelectedContract(updated);
+    setSelectedContract(record);
+    setBlankDetailView(false);
+    setShowScopedContractList(false);
   };
 
   const activeContracts = contracts.filter(c => c.status !== "Archived");
@@ -1424,15 +1463,18 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   if (editingContract) {
     return <AddContractPage onCancel={() => setEditingContract(null)} contract={editingContract} onSave={handleSaveContract} vendor={vendorRecord} />;
   }
-  if (selectedContract || scoped) {
+  if (selectedContract || (scoped && !showScopedContractList)) {
     return (
       <VendorContractDetailPage
-        contract={scoped ? createBlankVendorContract() : selectedContract!}
+        contract={selectedContract ?? createBlankVendorContract()}
         vendorName={scope.vendorName || vendorRecord?.name || selectedContract?.contacts.vendor || ""}
         vendor={vendorRecord}
-        onBack={() => setSelectedContract(null)}
-        onUpdate={scoped ? () => undefined : handleUpdateContract}
-        blankView={scoped}
+        onBack={() => {
+          setSelectedContract(null);
+          setShowScopedContractList(true);
+        }}
+        onUpdate={handleUpdateContract}
+        blankView={blankDetailView}
       />
     );
   }
