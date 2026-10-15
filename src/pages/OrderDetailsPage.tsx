@@ -3227,14 +3227,29 @@ export default function MyOrderPage() {
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
     if (targetPOs.some((po) => hasPOItemShipmentStarted(po, subId, target))) return;
 
-    // Return the pre-PO reservation to vendor availability.
-    if (target.stockAllocations?.length && targetPOs.length === 0) releaseStock(target.stockAllocations);
+    // Draft POs have not committed stock yet. Release the cancelled item's
+    // reservation, whether or not its editable Draft PO already exists.
+    // Preserve the legacy stock-engine path for older allocations that include
+    // a vendor product ID; current Shop allocations are keyed by product code.
+    if (!targetPOs.some(isConfirmedPO) && target.stockAllocations?.length) {
+      const legacyAllocations = target.stockAllocations.filter((allocation: any) => allocation.vendorProductId);
+      if (legacyAllocations.length) releaseStock(legacyAllocations);
+      for (const allocation of target.stockAllocations) {
+        if (allocation.vendorProductId || !target.productCode || !allocation.vendorId || allocation.allocated <= 0) continue;
+        releaseVendorReservation(
+          allocation.vendorId,
+          target.productCode,
+          allocation.allocated,
+          `Order item cancelled: ${subId}`,
+        );
+      }
+    }
 
-    // Keep the line in the PO so the vendor-order detail page shows the
-    // cancelled item and its reason instead of removing the audit trail.
-    // Recalculate financial totals from the still-active lines only; vendor
-    // unit prices remain unchanged on every retained PO line.
+    // Remove the cancelled line from editable Draft POs. Once a PO is confirmed,
+    // retain its cancelled line as the procurement audit trail instead.
+    removeSubOrderFromDraftPOs(orderId, subId);
     targetPOs.forEach((po: any) => {
+      if (po.status === "Draft") return;
       const nextItems = (po.items || []).map((line: any) =>
           poLineMatchesSubOrder(line, subId, target) ? { ...line, status: "Cancelled", cancelReason: reason } : line
       );

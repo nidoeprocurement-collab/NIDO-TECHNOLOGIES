@@ -345,6 +345,7 @@ export function removeSubOrderFromDraftPOs(orderId: string, subOrderId: string):
       hsnCode: primary.hsnCode,
       specs: primary.specs,
       referenceNumber: primary.referenceNumber,
+      serialNumber: primary.serialNumber || "",
       qty: primary.qty,
       unitPrice: primary.unitPrice,
       subtotal,
@@ -353,6 +354,14 @@ export function removeSubOrderFromDraftPOs(orderId: string, subOrderId: string):
       sgstAmt,
       cgstAmt,
       grandTotal: subtotal + sgstAmt + cgstAmt,
+      documents: (po.documents || []).map((document) => {
+        const isSystemDocument = String(document.uploadedBy || "").toLowerCase() === "system";
+        const isGeneratedPO = isSystemDocument && (
+          String(document.type || "").toLowerCase().includes("purchase order") ||
+          String(document.name || "").toLowerCase() === `${String(po.poNumber || "").toLowerCase()}.pdf`
+        );
+        return isGeneratedPO ? { ...document, dataUrl: undefined } : document;
+      }),
     }];
   });
 
