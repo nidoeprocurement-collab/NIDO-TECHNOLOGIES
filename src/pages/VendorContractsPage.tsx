@@ -734,7 +734,7 @@ function VendorContractInfoRow({
   return (
     <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-2 last:border-0 last:pb-0">
       <span className="shrink-0 text-[11px] text-gray-500">{label}</span>
-      <span className="text-right text-[11px] font-medium text-gray-800">{value || "—"}</span>
+      <span className="text-right text-[11px] font-medium text-gray-800">{value ?? ""}</span>
     </div>
   );
 }
@@ -938,6 +938,7 @@ function VendorContractDetailPage({
     [
       { key: "priceValidity", label: "Price Validity" },
       { key: "deliveryTerm", label: "Delivery Term", type: "select", options: DELIVERY_TERMS },
+      { key: "contractDuration", label: "Contract Duration" },
       { key: "billingModel", label: "Billing Model" },
       { key: "latePaymentPenalty", label: "Late Payment Penalty" },
       { key: "extras", label: "Extras" },
@@ -949,7 +950,7 @@ function VendorContractDetailPage({
     values => ({
       ...contract,
       terms: { ...contract.terms, priceValidity: values.priceValidity, deliveryTerm: values.deliveryTerm },
-      details: { ...details, ...Object.fromEntries(["billingModel", "latePaymentPenalty", "extras", "priceRevision", "forceMajeure", "disputeResolution"].map(key => [key, values[key] || ""])) },
+      details: { ...details, ...Object.fromEntries(["contractDuration", "billingModel", "latePaymentPenalty", "extras", "priceRevision", "forceMajeure", "disputeResolution"].map(key => [key, values[key] || ""])) },
     }),
   );
 
@@ -969,10 +970,17 @@ function VendorContractDetailPage({
     [
       { key: "autoRenewal", label: "Auto Renewal", type: "select", options: ["Enabled", "Disabled"] },
       { key: "renewalReminder", label: "Renewal Reminder", type: "select", options: RENEWAL_REMINDERS },
+      { key: "noticePeriod", label: "Notice Period" },
       { key: "expiryIn", label: "Expiry In" },
     ],
-    { autoRenewal: contract.autoRenewal ? "Enabled" : "Disabled", renewalReminder: contract.renewalReminder, expiryIn: contract.expiryIn ?? "" },
-    values => ({ ...contract, autoRenewal: values.autoRenewal === "Enabled", renewalReminder: values.renewalReminder, expiryIn: values.expiryIn || null }),
+    { autoRenewal: contract.autoRenewal ? "Enabled" : "Disabled", renewalReminder: contract.renewalReminder, noticePeriod: detail("noticePeriod"), expiryIn: contract.expiryIn ?? "" },
+    values => ({
+      ...contract,
+      autoRenewal: values.autoRenewal === "Enabled",
+      renewalReminder: values.renewalReminder,
+      expiryIn: values.expiryIn || null,
+      details: { ...details, noticePeriod: values.noticePeriod || "" },
+    }),
   );
 
   const editGovernance = () => openSectionEditor(
@@ -1024,8 +1032,8 @@ function VendorContractDetailPage({
             Back to Contracts
           </button>
 
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-            <div className="w-full lg:w-64 lg:shrink-0">
+          <div className="flex flex-col gap-5 min-[900px]:flex-row min-[900px]:items-start min-[900px]:justify-between min-[900px]:gap-6">
+            <div className="w-full min-[900px]:w-64 min-[900px]:shrink-0">
               <div className="mb-2 flex items-center gap-2">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600">
                   <span className="text-sm font-black text-white">N</span>
@@ -1071,8 +1079,8 @@ function VendorContractDetailPage({
               </div>
             </div>
 
-            <div className="w-full text-left lg:w-64 lg:shrink-0 lg:pr-6 lg:text-right">
-              <div className="mb-2 flex items-center justify-start gap-2 lg:justify-end">
+            <div className="w-full text-left min-[900px]:w-64 min-[900px]:shrink-0 min-[900px]:pr-6 min-[900px]:text-right">
+              <div className="mb-2 flex items-center justify-start gap-2 min-[900px]:justify-end">
                 <div>
                   <p className="text-sm font-bold leading-tight text-gray-900">{actualVendorName}</p>
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Vendor</span>
@@ -1081,7 +1089,7 @@ function VendorContractDetailPage({
                   <span className="text-[10px] font-black text-white">{getVendorInitials(actualVendorName)}</span>
                 </div>
               </div>
-              <div className="space-y-0.5 pl-11 text-[11px] text-gray-500 lg:pl-0 lg:pr-11">
+              <div className="space-y-0.5 pl-11 text-[11px] text-gray-500 min-[900px]:pl-0 min-[900px]:pr-11">
                 <p className="text-[10px] font-medium text-gray-400">GSTIN</p>
                 <p className="font-mono">{vendor?.taxId || "—"}</p>
                 <p className="mt-1 text-[10px] font-medium text-gray-400">Registered Address</p>
@@ -1101,14 +1109,14 @@ function VendorContractDetailPage({
       </header>
 
       <main className="flex-1 overflow-auto bg-[#f8fafc] p-2">
-        <div className="mx-auto grid max-w-[1600px] grid-cols-1 items-start gap-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.9fr)_minmax(0,0.95fr)]">
-          <div className="space-y-2">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-1 items-start gap-2 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="space-y-4">
             <VendorContractSection title="Contract Overview" onEdit={editOverview}>
               <div className="space-y-2">
                 {[
-                  ["Contract Purpose", detail("purpose", contract.name)],
-                  ["Scope of Work", detail("scope", vendor?.category || contract.type)],
-                  ["Deployment Model", detail("deployment", contract.terms.deliveryTerm)],
+                  ["Contract Purpose", detail("purpose")],
+                  ["Scope of Work", detail("scope")],
+                  ["Deployment Model", detail("deployment")],
                   ["Currency", detail("currency", "INR")],
                   ["Taxation", detail("taxation")],
                   ["Jurisdiction", detail("jurisdiction", contract.terms.governingLaw)],
@@ -1142,26 +1150,26 @@ function VendorContractDetailPage({
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500"><tr>{["Priority", "Response", "Resolution"].map(item => <th key={item} className="px-2 py-2">{item}</th>)}</tr></thead>
                   <tbody className="divide-y divide-gray-100 text-[11px]">
-                    {(parseContractRows(detail("responseTargets"), 3).length ? parseContractRows(detail("responseTargets"), 3) : [["Standard", contract.terms.slaUptime || "—", contract.terms.warrantyPeriod || "—"]]).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="px-2 py-2 text-gray-700">{cell}</td>)}</tr>)}
+                    {(parseContractRows(detail("responseTargets"), 3).length ? parseContractRows(detail("responseTargets"), 3) : [["", "", ""]]).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="px-2 py-2 text-gray-700">{cell}</td>)}</tr>)}
                   </tbody>
                 </table>
               </div>
             </VendorContractSection>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-4">
             <VendorContractSection title="1. Commercial Terms" onEdit={editCommercialTerms}>
               <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
                 {[
                   ["Agreement Type", contract.type],
                   ["Billing Model", detail("billingModel")],
-                  ["Contract Duration", detail("contractDuration", [contract.startDate, contract.endDate].filter(Boolean).join(" – "))],
+                  ["Contract Duration", detail("contractDuration")],
                   ["Payment Terms", contract.paymentTerms],
                   ["Late Payment Penalty", detail("latePaymentPenalty", contract.terms.penaltyClause)],
                   ["Extras", detail("extras")],
                   ["Price Revision", detail("priceRevision", contract.terms.priceValidity)],
                   ["Force Majeure", detail("forceMajeure")],
-                  ["Dispute Resolution", detail("disputeResolution", contract.terms.governingLaw)],
+                  ["Dispute Resolution", detail("disputeResolution")],
                 ].map(([label, value]) => <VendorContractInfoRow key={label} label={label} value={value} />)}
               </div>
             </VendorContractSection>
@@ -1171,7 +1179,7 @@ function VendorContractDetailPage({
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500"><tr><th className="px-3 py-2">Service</th><th className="px-3 py-2 text-right">In Scope</th></tr></thead>
                   <tbody className="divide-y divide-gray-100 text-[11px]">
-                    {(parseContractRows(detail("servicesCovered"), 2).length ? parseContractRows(detail("servicesCovered"), 2) : [[vendor?.category || contract.type, "—"]]).map((row, index) => <tr key={index}><td className="px-3 py-2 font-medium text-gray-800">{row[0]}</td><td className="px-3 py-2 text-right text-gray-600">{row[1]}</td></tr>)}
+                    {(parseContractRows(detail("servicesCovered"), 2).length ? parseContractRows(detail("servicesCovered"), 2) : [["", ""]]).map((row, index) => <tr key={index}><td className="px-3 py-2 font-medium text-gray-800">{row[0]}</td><td className="px-3 py-2 text-right text-gray-600">{row[1]}</td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -1204,7 +1212,7 @@ function VendorContractDetailPage({
                 <table className="w-full text-left text-[10px]">
                   <thead className="bg-gray-50 text-gray-500"><tr>{["Level", "Contact / Team", "Email", "Availability"].map(item => <th key={item} className="px-2 py-2">{item}</th>)}</tr></thead>
                   <tbody className="divide-y divide-gray-100 text-gray-700">
-                    {(parseContractRows(detail("supportMatrix"), 4).length ? parseContractRows(detail("supportMatrix"), 4) : [["Primary", contract.contacts.vendor || vendor?.primaryContact || actualVendorName, vendor?.email || "—", "—"]]).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="max-w-36 truncate px-2 py-2">{cell}</td>)}</tr>)}
+                    {(parseContractRows(detail("supportMatrix"), 4).length ? parseContractRows(detail("supportMatrix"), 4) : [["", "", "", ""]]).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex} className="max-w-36 truncate px-2 py-2">{cell}</td>)}</tr>)}
                   </tbody>
                 </table>
               </div>
@@ -1221,7 +1229,7 @@ function VendorContractDetailPage({
             </VendorContractSection>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-4">
             <VendorContractSection title="2. Subscription & Licensing" onEdit={() => editDetails("Edit Subscription & Licensing", [
               { key: "userLicensing", label: "User Licensing" }, { key: "licensedUsers", label: "Licensed Users" },
               { key: "concurrentUsers", label: "Concurrent Users" }, { key: "additionalUserCost", label: "Additional User Cost" },
@@ -1239,7 +1247,7 @@ function VendorContractDetailPage({
                 <table className="w-full text-left text-[10px]">
                   <thead className="bg-gray-50 text-gray-500"><tr><th className="px-2 py-2">Commitment</th><th className="px-2 py-2 text-right">Target</th></tr></thead>
                   <tbody className="divide-y divide-gray-100 text-gray-700">
-                    {(parseContractRows(detail("slaCommitments"), 2).length ? parseContractRows(detail("slaCommitments"), 2) : [["Availability", contract.terms.slaUptime || "—"], ["Warranty", contract.terms.warrantyPeriod || "—"]]).map((row, index) => <tr key={index}><td className="px-2 py-2">{row[0]}</td><td className="px-2 py-2 text-right font-medium">{row[1]}</td></tr>)}
+                    {(parseContractRows(detail("slaCommitments"), 2).length ? parseContractRows(detail("slaCommitments"), 2) : [["", ""]]).map((row, index) => <tr key={index}><td className="px-2 py-2">{row[0]}</td><td className="px-2 py-2 text-right font-medium">{row[1]}</td></tr>)}
                   </tbody>
                 </table>
               </div>

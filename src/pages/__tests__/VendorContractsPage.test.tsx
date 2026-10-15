@@ -40,4 +40,29 @@ describe("Vendor contract detail page", () => {
 
     expect(screen.getByRole("button", { name: "Download Contract" })).toBeTruthy();
   });
+
+  it("shows the contract-detail sections from the reference layout", () => {
+    renderVendorContractsPage();
+
+    for (const heading of [
+      "Contract Overview",
+      "2. Response & Resolution Targets",
+      "1. Commercial Terms",
+      "3. Services Covered",
+      "5. Data Security & Compliance",
+      "6. Confidentiality Clause",
+      "7. Support & Escalation Matrix",
+      "8. Renewal & Termination",
+      "2. Subscription & Licensing",
+      "4. SLA Commitments",
+      "Renewal Information",
+      "Support Information",
+      "Key Contacts",
+      "Reminders",
+    ]) {
+      expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
+    }
+
+    expect(screen.getByRole("button", { name: "Create Support Ticket" })).toBeTruthy();
+  });
 });
