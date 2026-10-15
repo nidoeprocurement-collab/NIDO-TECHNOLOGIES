@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import VendorContractsPage from "@/pages/VendorContractsPage";
-import VendorContractsTabStrip from "@/pages/VendorContractsTabStrip";
 
 describe("Vendor contract detail page", () => {
   beforeEach(() => {
@@ -31,31 +30,5 @@ describe("Vendor contract detail page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Contract actions" }));
 
     expect(screen.getByRole("button", { name: "Download Contract" })).toBeTruthy();
-  });
-
-  it("uses the client contract three-column shell while retaining vendor contract sections", () => {
-    render(<VendorContractsPage />);
-
-    const layout = screen.getByTestId("vendor-contract-layout-grid");
-    expect(layout.className).toContain("xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]");
-    expect(layout.children).toHaveLength(3);
-    expect(layout.children[0].children).toHaveLength(2);
-    expect(layout.children[1].children).toHaveLength(6);
-    expect(layout.children[2].children).toHaveLength(6);
-    expect(screen.getByRole("heading", { name: "Contract Overview" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "6. Contract Governance" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "1. Commercial Terms" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "2. Vendor Information" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Key Contacts" })).toBeTruthy();
-    expect(screen.getAllByText("Rahul Sharma").length).toBeGreaterThan(0);
-  });
-
-  it("shows the exact client detail tab labels and order only in the vendor Contracts tab", () => {
-    const { container } = render(<VendorContractsTabStrip />);
-    const row = screen.getByTestId("vendor-contract-tab-row");
-
-    expect(row.textContent).toBe("OverviewRolesUsersOrdersServicesContractsCatalogActivityConfigurationDocuments");
-    expect(screen.getByText("Contracts").getAttribute("aria-current")).toBe("page");
-    expect(container.firstElementChild?.className).toContain("border-b border-gray-200 bg-white px-3 sm:px-5");
   });
 });

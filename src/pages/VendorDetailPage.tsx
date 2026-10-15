@@ -3,7 +3,7 @@ import { useLocation, useParams, useNavigate } from "react-router-dom";
 import {
   Star, Phone, Mail, MessageSquare, ChevronLeft, Building2, MapPin,
   CreditCard, FileText, Package, ShoppingCart, TrendingUp, ClipboardList,
-  Newspaper, DollarSign, AlertCircle, CheckCircle2, Clock, ArrowUpRight, ArrowRight,
+  Newspaper, DollarSign, AlertCircle, CheckCircle2, Clock, ArrowUpRight,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -11,7 +11,6 @@ import {
 import VendorProductsPage from "./VendorProductsPage";
 import VendorOrdersPage from "./VendorOrdersPage";
 import VendorContractsPage from "./VendorContractsPage";
-import VendorContractsTabStrip from "./VendorContractsTabStrip";
 import VendorPaymentsPage from "./VendorPaymentsPage";
 import VendorServicesPage from "./VendorServicesPage";
 import VendorNewsActivityPage from "./VendorNewsActivityPage";
@@ -559,10 +558,9 @@ export default function VendorDetailPage() {
   return (
     <div className="min-h-screen bg-white font-[Inter,sans-serif] flex flex-col">
       {/* Sticky Header */}
-      <div className={`sticky top-0 z-30 bg-white ${activeTab === "contracts" ? "" : "border-b border-gray-100 shadow-sm"}`}>
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
         {/* Vendor identity row */}
-        {activeTab !== "contracts" && (
-          <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
+        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <button
               onClick={() => navigate("/vendors")}
@@ -611,12 +609,10 @@ export default function VendorDetailPage() {
               Message Vendor
             </button>
           </div>
-          </div>
-        )}
+        </div>
 
         {/* Stats strip */}
-        {activeTab !== "contracts" && (
-          <div className="px-6 pb-3">
+        <div className="px-6 pb-3">
           <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
             {stats.map((s, i) => (
               <div key={i} className="flex flex-col items-center py-2 px-2 text-center">
@@ -626,32 +622,27 @@ export default function VendorDetailPage() {
               </div>
             ))}
           </div>
-          </div>
-        )}
+        </div>
 
         {/* Tabs */}
-        {activeTab === "contracts" ? (
-          <VendorContractsTabStrip />
-        ) : (
-          <div className="relative">
-            <div className="flex items-center gap-0 overflow-x-auto border-t border-gray-100 px-2 no-scrollbar">
-              {TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2 py-2 text-sm font-medium transition-colors ${
-                    activeTab === tab.key
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-800"
-                  }`}
-                >
-                  <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+        <div className="relative">
+          <div className="flex items-center px-2 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-2 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
+                }`}
+              >
+                <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Page body */}
@@ -661,26 +652,7 @@ export default function VendorDetailPage() {
         {activeTab === "orders" && <VendorOrdersPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "services" && <VendorServicesPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "performance" && <VendorPerformancePage vendor={vendor} />}
-        {activeTab === "contracts" && (
-          <div className="p-3 sm:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{vendor.id}</p>
-                <h1 className="text-xl font-bold">{vendor.name}</h1>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab("overview")}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
-              >
-                <ArrowRight size={13} className="rotate-180" /> Overview
-              </button>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-              <VendorContractsPage vendorId={vendor.id} vendorName={vendor.name} />
-            </div>
-          </div>
-        )}
+        {activeTab === "contracts" && <VendorContractsPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "configuration" && <div className="px-6 py-5"><VendorConfigurationTab vendorId={vendor.id} /></div>}
         {activeTab === "payments" && <VendorPaymentsPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "news" && <VendorNewsActivityPage vendorId={vendor.id} vendorName={vendor.name} />}
