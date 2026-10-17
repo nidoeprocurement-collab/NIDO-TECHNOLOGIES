@@ -167,6 +167,8 @@ export interface ClientContractRecord {
   clientId: string;
   contractId: string;
   contractTitle: string;
+  startDate?: string;
+  endDate?: string;
   data: Record<string, unknown>;
   updatedAt: string;
 }
@@ -268,11 +270,28 @@ export function saveClientDocument(document: ClientDocumentRecord): void {
   write(DOCUMENTS_KEY, [document, ...all.filter((item) => item.id !== document.id)]);
 }
 
-export function getClientContract(clientId: string): ClientContractRecord | null {
-  return read<ClientContractRecord[]>(CONTRACTS_KEY, []).find((item) => item.clientId === clientId) || null;
+export function getClientContracts(clientId: string): ClientContractRecord[] {
+  return read<ClientContractRecord[]>(CONTRACTS_KEY, [])
+    .filter((item) => item.clientId === clientId)
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+}
+
+export function getClientContract(clientId: string, contractId?: string): ClientContractRecord | null {
+  const contracts = read<ClientContractRecord[]>(CONTRACTS_KEY, []).filter((item) => item.clientId === clientId);
+  return contractId
+    ? contracts.find((item) => item.contractId === contractId) || null
+    : contracts[0] || null;
 }
 
 export function saveClientContract(contract: ClientContractRecord): void {
   const all = read<ClientContractRecord[]>(CONTRACTS_KEY, []);
-  write(CONTRACTS_KEY, [contract, ...all.filter((item) => item.clientId !== contract.clientId)]);
+  const existingIndex = all.findIndex((item) =>
+    item.clientId === contract.clientId && item.contractId === contract.contractId
+  );
+  if (existingIndex >= 0) {
+    all[existingIndex] = contract;
+  } else {
+    all.push(contract);
+  }
+  write(CONTRACTS_KEY, all);
 }

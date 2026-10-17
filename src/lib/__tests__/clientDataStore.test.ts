@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getClientOrders } from "@/lib/clientDataStore";
+import {
+  getClientContract,
+  getClientContracts,
+  getClientOrders,
+  saveClientContract,
+} from "@/lib/clientDataStore";
 
 describe("client order source mapping", () => {
   beforeEach(() => {
@@ -43,5 +48,38 @@ describe("client order source mapping", () => {
       },
       cartItems: [{ id: 1, name: "Router", quantity: 2 }],
     });
+  });
+
+  it("stores multiple contracts for a client and updates only the matching contract", () => {
+    saveClientContract({
+      clientId: "client-1",
+      contractId: "CON-1",
+      contractTitle: "Support Agreement",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      data: { overview: { purpose: "Support" } },
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    saveClientContract({
+      clientId: "client-1",
+      contractId: "CON-2",
+      contractTitle: "License Agreement",
+      data: {},
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    });
+    saveClientContract({
+      clientId: "client-1",
+      contractId: "CON-1",
+      contractTitle: "Updated Support Agreement",
+      startDate: "2026-01-01",
+      endDate: "2027-12-31",
+      data: { overview: { purpose: "Updated support" } },
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+
+    expect(getClientContracts("client-1").map(contract => contract.contractId)).toEqual(["CON-1", "CON-2"]);
+    expect(getClientContract("client-1", "CON-2")?.contractTitle).toBe("License Agreement");
+    expect(getClientContract("client-1")?.contractTitle).toBe("Updated Support Agreement");
+    expect(getClientContracts("client-2")).toEqual([]);
   });
 });

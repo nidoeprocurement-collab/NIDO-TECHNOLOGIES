@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getClientForPortal, getClients, type StoredClient } from "@/lib/clientStore";
 import {
   getClientActivities,
-  getClientContract,
+  getClientContracts,
   getClientDocuments,
   getClientOrders,
   getClientServices,
@@ -311,7 +311,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const [activities, setActivities] = useState<ClientActivityRecord[]>(() => getClientActivities(clientId));
   const [documents, setDocuments] = useState<ClientDocumentRecord[]>(() => getClientDocuments(clientId));
   const [catalog, setCatalog] = useState<ClientCatalogEntry[]>(() => getClientCatalog(clientId));
-  const [contract, setContract] = useState(() => getClientContract(clientId));
+  const [contracts, setContracts] = useState(() => getClientContracts(clientId));
   const [invoices, setInvoices] = useState<StoredInvoice[]>(() => getInvoices());
   const [tickets, setTickets] = useState<SupportTicket[]>(() => getSupportTickets());
   const [portalUsers, setPortalUsers] = useState(() => getPortalUsersByClient(clientId));
@@ -323,7 +323,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       setActivities(getClientActivities(clientId));
       setDocuments(getClientDocuments(clientId));
       setCatalog(getClientCatalog(clientId));
-      setContract(getClientContract(clientId));
+      setContracts(getClientContracts(clientId));
       setInvoices(getInvoices());
       setTickets(getSupportTickets());
       setPortalUsers(getPortalUsersByClient(clientId));
@@ -490,22 +490,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     if (activeTab === "Contracts") {
       return (
         <ContractsPage
-          key={`${clientId}-${refreshKey}-contracts`}
-          clientId={clientId}
-          contractId={contract?.contractId || ""}
-          contractTitle={contract?.contractTitle || "Client Contract"}
-          clientName={client.name}
-          clientContactName={client.rep || client.contact_person || ""}
-          clientEmail={client.email || ""}
-          clientPhone={client.phone || client.mobile || ""}
-          clientGstin={client.gstin || client.gstin_number || ""}
-          clientAddress={address}
-          contractStartDate={client.contractStartDate || client.contract_start_date || ""}
-          contractEndDate={client.contractEndDate || client.contract_end_date || ""}
-          clientCurrency={client.currency || ""}
-          clientPaymentTerms={client.payment_terms || ""}
-          clientStatus={client.status || ""}
-          onBack={() => goTo("Overview")}
+          key={`${clientId}-contracts`}
         />
       );
     }
@@ -644,8 +629,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
                 {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
               </div>
-                <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : navigate(`/clients/${client.id}/contracts`)} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
-                View Full Profile
+                <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : goTo("Contracts")} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
+                View Contracts
               </button>
             </Panel>
 
@@ -665,7 +650,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
 
              <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
               <div className="space-y-2.5 text-[10px]">
-                 {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Active Contracts</span><strong>{contract ? 1 : 0}</strong></button>}
+                 {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
                 <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>

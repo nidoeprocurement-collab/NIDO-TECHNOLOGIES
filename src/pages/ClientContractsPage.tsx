@@ -28,9 +28,14 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { getClientContract, saveClientContract } from "@/lib/clientDataStore";
+import {
+  getClientContract,
+  getClientContracts,
+  saveClientContract,
+} from "@/lib/clientDataStore";
 import { getClients } from "@/lib/clientStore";
 import { useAuth } from "@/contexts/AuthContext";
+import ClientContractsList from "@/pages/ClientContractsList";
 
 interface ContractDetailViewProps {
   contractId: string;
@@ -105,9 +110,10 @@ function EditModal({ title, fields, currentValues, onSave, onClose, rowEditor }:
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {visibleFields.map((field) => (
             <div key={field.key} className="space-y-1">
-              <label className="block text-xs font-medium text-gray-700">{field.label}</label>
+              <label htmlFor={`contract-edit-${field.key}`} className="block text-xs font-medium text-gray-700">{field.label}</label>
               {field.type === "text" && (
                 <input
+                  id={`contract-edit-${field.key}`}
                   type="text"
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
@@ -117,6 +123,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose, rowEditor }:
               )}
               {field.type === "date" && (
                 <input
+                  id={`contract-edit-${field.key}`}
                   type="date"
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
@@ -125,6 +132,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose, rowEditor }:
               )}
               {field.type === "textarea" && (
                 <textarea
+                  id={`contract-edit-${field.key}`}
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
                   placeholder={field.placeholder}
@@ -134,6 +142,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose, rowEditor }:
               )}
               {field.type === "select" && field.options && (
                 <select
+                  id={`contract-edit-${field.key}`}
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
                   className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -395,6 +404,9 @@ export function ContractDetailView({
   const [contractHydrated, setContractHydrated] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState("");
   const initialSaveSkipped = useRef(false);
+  const [activeContractTitle, setActiveContractTitle] = useState(contractTitle || "Client Contract");
+  const [contractStartDateValue, setContractStartDateValue] = useState(contractStartDate || "");
+  const [contractEndDateValue, setContractEndDateValue] = useState(contractEndDate || "");
 
   useEffect(() => {
     initialSaveSkipped.current = false;
@@ -403,9 +415,18 @@ export function ContractDetailView({
       setContractHydrated(true);
       return;
     }
-    const saved = getClientContract(clientId);
+    const saved = getClientContract(clientId, contractId) || (!contractId ? getClientContract(clientId) : null);
     const data = (saved?.data || {}) as Record<string, unknown>;
+    const savedStartDate = saved && typeof saved.startDate === "string"
+      ? saved.startDate
+      : String(data.contractStartDate || "") || contractStartDate || "";
+    const savedEndDate = saved && typeof saved.endDate === "string"
+      ? saved.endDate
+      : String(data.contractEndDate || "") || contractEndDate || "";
     const clientInitials = getInitials(clientContactName || clientName);
+    setActiveContractTitle(saved?.contractTitle || contractTitle || "Client Contract");
+    setContractStartDateValue(savedStartDate);
+    setContractEndDateValue(savedEndDate);
     const liveDefaults = {
       relationshipOwners: {
         nidoTech: { name: "", email: "", phone: "", initials: "" },
@@ -439,7 +460,7 @@ export function ContractDetailView({
       renewalInfo: {
         renewalDate: "",
         autoRenewal: "",
-        daysRemaining: getDaysRemaining(contractEndDate),
+        daysRemaining: getDaysRemaining(savedEndDate),
       },
       supportInfo: {
         plan: "",
@@ -486,7 +507,7 @@ export function ContractDetailView({
     if (Array.isArray(data.slaCommitments)) setSlaCommitments(data.slaCommitments as typeof slaCommitments);
     if (Array.isArray(data.reminders)) setReminders(data.reminders as typeof reminders);
     setContractHydrated(true);
-  }, [clientId, clientName, clientContactName, clientEmail, clientPhone, clientCurrency, clientPaymentTerms, contractEndDate]);
+  }, [clientId, contractId, contractTitle, clientName, clientContactName, clientEmail, clientPhone, clientCurrency, clientPaymentTerms, contractStartDate, contractEndDate]);
 
   useEffect(() => {
     if (!clientId || !contractHydrated) return;
@@ -497,7 +518,9 @@ export function ContractDetailView({
     saveClientContract({
       clientId,
       contractId: contractId || "CLIENT-CONTRACT",
-      contractTitle: contractTitle || "Client Contract",
+      contractTitle: activeContractTitle || "Client Contract",
+      startDate: contractStartDateValue,
+      endDate: contractEndDateValue,
       data: {
         relationshipOwners,
         overview,
@@ -520,8 +543,10 @@ export function ContractDetailView({
   }, [
     clientId,
     contractId,
-    contractTitle,
+    activeContractTitle,
     contractHydrated,
+    contractStartDateValue,
+    contractEndDateValue,
     relationshipOwners,
     overview,
     responseTargets,
@@ -545,6 +570,9 @@ export function ContractDetailView({
     setEditModalConfig({
       title: "Edit Contract Overview",
       fields: [
+        { key: "contractTitle", label: "Contract Name", type: "text" },
+        { key: "contractStartDate", label: "Contract Start Date", type: "date" },
+        { key: "contractEndDate", label: "Contract End Date", type: "date" },
         { key: "purpose", label: "Contract Purpose", type: "textarea" },
         { key: "scope", label: "Scope of Work", type: "textarea" },
         { key: "deployment", label: "Deployment Model", type: "text" },
@@ -560,6 +588,9 @@ export function ContractDetailView({
         { key: "apexPhone", label: "Relationship Owner — Client (Phone)", type: "text" },
       ],
       currentValues: {
+        contractTitle: activeContractTitle,
+        contractStartDate: contractStartDateValue,
+        contractEndDate: contractEndDateValue,
         ...overview,
         nidoName: relationshipOwners.nidoTech.name,
         nidoEmail: relationshipOwners.nidoTech.email,
@@ -569,6 +600,9 @@ export function ContractDetailView({
         apexPhone: relationshipOwners.apex.phone,
       },
       onSave: (v) => {
+        setActiveContractTitle(v.contractTitle || "Client Contract");
+        setContractStartDateValue(v.contractStartDate || "");
+        setContractEndDateValue(v.contractEndDate || "");
         setOverview({ purpose: v.purpose, scope: v.scope, deployment: v.deployment, currency: v.currency, taxation: v.taxation, jurisdiction: v.jurisdiction, confidentiality: v.confidentiality });
         setRelationshipOwners({
           nidoTech: { name: v.nidoName, email: v.nidoEmail, phone: v.nidoPhone, initials: (v.nidoName || "").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) },
@@ -1015,7 +1049,7 @@ export function ContractDetailView({
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(...colors.dark);
-    doc.text(contractTitle || "SaaS & Services Agreement", margin, y);
+    doc.text(activeContractTitle || "SaaS & Services Agreement", margin, y);
     y += 25;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
@@ -1101,7 +1135,7 @@ export function ContractDetailView({
       doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, 816, { align: "right" });
     }
 
-    const safeName = (contractTitle || "Client-Contract").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    const safeName = (activeContractTitle || "Client-Contract").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
     doc.save(`${safeName || "Client-Contract"}.pdf`);
     setDropdownOpen(false);
   };
@@ -1188,7 +1222,7 @@ export function ContractDetailView({
             {/* Center */}
             <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="text-[10px] border border-blue-300 text-blue-600 px-2 py-0.5 rounded tracking-widest font-semibold mb-2 bg-blue-50">CONTRACT</span>
-              <h2 className="text-lg font-bold text-gray-900 mb-3">{contractTitle || "SaaS & Services Agreement"}</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-3">{activeContractTitle || "SaaS & Services Agreement"}</h2>
               <p className="text-[11px] text-gray-400 mb-2">Between</p>
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[11px] font-medium px-2 py-1 rounded">
@@ -1240,8 +1274,8 @@ export function ContractDetailView({
         {/* Meta bar */}
         <div className="bg-gray-50 border-b border-gray-200 overflow-x-auto">
           <div className="flex min-w-max">
-            <MetaCell icon={<Calendar size={13} />} label="Contract Start Date" value={formatContractDate(contractStartDate)} />
-            <MetaCell icon={<Calendar size={13} />} label="Contract End Date" value={formatContractDate(contractEndDate)} />
+            <MetaCell icon={<Calendar size={13} />} label="Contract Start Date" value={formatContractDate(contractStartDateValue)} />
+            <MetaCell icon={<Calendar size={13} />} label="Contract End Date" value={formatContractDate(contractEndDateValue)} />
             <MetaCell icon={<IndianRupee size={13} />} label="Currency" value={clientCurrency || overview.currency || "—"} />
             <MetaCell icon={<Receipt size={13} />} label="Billing Model" value={commercialTerms.model || "—"} />
             <MetaCell icon={<FileText size={13} />} label="Payment Terms" value={commercialTerms.paymentTerms || "—"} />
@@ -1755,13 +1789,22 @@ export function ContractDetailView({
 }
 
 export default function ClientContractsRoute() {
-  const { id } = useParams<{ id: string }>();
+  const { id, contractId: selectedContractId } = useParams<{ id: string; contractId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const clientId = id || user?.clientId || "";
   const client = getClients().find((item) => item.id === clientId);
-  const contract = getClientContract(clientId);
+  const contracts = getClientContracts(clientId);
+  const contract = selectedContractId
+    ? getClientContract(clientId, selectedContractId)
+    : getClientContract(clientId);
   const isPortalRoute = window.location.pathname.startsWith("/portal/");
+  const address = client ? [
+    client.billingAddress || client.billing_address,
+    client.billingCity || client.billing_city,
+    client.billingState || client.billing_state,
+    client.billingPincode || client.billing_pincode,
+  ].filter(Boolean).join(", ") : "";
 
   if (!client) {
     return (
@@ -1779,15 +1822,39 @@ export default function ClientContractsRoute() {
     );
   }
 
-  const address = [
-    client.billingAddress || client.billing_address,
-    client.billingCity || client.billing_city,
-    client.billingState || client.billing_state,
-    client.billingPincode || client.billing_pincode,
-  ].filter(Boolean).join(", ");
+  if (!isPortalRoute && !selectedContractId) {
+    return (
+      <ClientContractsList
+        clientId={clientId}
+        clientName={client.name}
+        contracts={contracts}
+        fallbackStartDate={client.contractStartDate || client.contract_start_date || ""}
+        fallbackEndDate={client.contractEndDate || client.contract_end_date || ""}
+        onOpenContract={(contractId) => navigate(`/clients/${clientId}/contracts/${encodeURIComponent(contractId)}`)}
+        onCreated={(created) => navigate(`/clients/${clientId}/contracts/${encodeURIComponent(created.contractId)}`)}
+      />
+    );
+  }
+
+  if (selectedContractId && !contract) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 bg-white text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Contract not found</h2>
+        <p className="text-sm text-gray-500">This contract ID is not saved for this client.</p>
+        <button
+          type="button"
+          onClick={() => navigate(`/clients/${clientId}/contracts`)}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Back to Contracts
+        </button>
+      </div>
+    );
+  }
 
   return (
     <ContractDetailView
+      key={`${clientId}-${contract?.contractId || selectedContractId || "portal-contract"}`}
       contractId={contract?.contractId || ""}
       contractTitle={contract?.contractTitle || "Client Contract"}
       clientId={clientId}
@@ -1797,12 +1864,12 @@ export default function ClientContractsRoute() {
       clientPhone={client.phone || client.mobile || ""}
       clientGstin={client.gstin || client.gstin_number || ""}
       clientAddress={address}
-      contractStartDate={client.contractStartDate || client.contract_start_date || ""}
-      contractEndDate={client.contractEndDate || client.contract_end_date || ""}
+      contractStartDate={contract?.startDate ?? client.contractStartDate ?? client.contract_start_date ?? ""}
+      contractEndDate={contract?.endDate ?? client.contractEndDate ?? client.contract_end_date ?? ""}
       clientCurrency={client.currency || ""}
       clientPaymentTerms={client.payment_terms || ""}
       clientStatus={client.status || ""}
-      onBack={() => navigate(isPortalRoute ? "/portal/dashboard" : `/clients/${clientId}`)}
+      onBack={() => navigate(isPortalRoute ? "/portal/dashboard" : `/clients/${clientId}/contracts`)}
     />
   );
 }
