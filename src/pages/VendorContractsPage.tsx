@@ -11,6 +11,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import { hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 import { getVendorById, getVendors, type StoredVendor } from "@/lib/vendorDataStore";
+import VendorContractsList, {
+  type VendorContractBasics,
+} from "@/pages/VendorContractsList";
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
 type ContractStatus = "Active" | "Expired" | "Expiring Soon" | "Archived";
@@ -764,6 +767,8 @@ function VendorContractDetailPage({
   onBack,
   onUpdate,
   blankView = false,
+  readOnly = false,
+  editOnOpen = false,
 }: {
   contract: Contract;
   vendorName: string;
@@ -771,10 +776,14 @@ function VendorContractDetailPage({
   onBack: () => void;
   onUpdate: (contract: Contract) => void;
   blankView?: boolean;
+  readOnly?: boolean;
+  editOnOpen?: boolean;
 }) {
   const contractMenu = useDropdown();
   const navigate = useNavigate();
   const [editingSection, setEditingSection] = useState<VendorContractEditConfig | null>(null);
+  const autoEditOpened = useRef(false);
+  const editOverviewRef = useRef<() => void>(() => undefined);
   const actualVendorName = vendor?.name || vendorName || contract.contacts.vendor || "Vendor";
   const vendorAddress = blankView ? "" : [
     vendor?.addressLine1,
@@ -786,7 +795,7 @@ function VendorContractDetailPage({
   ].filter(Boolean).join(", ") || vendor?.address || "—";
   const details = contract.details || {};
   const detail = (key: string, fallback = "") => blankView ? "" : details[key] || fallback;
-  const editAction = (action: () => void) => action;
+  const editAction = (action: () => void) => readOnly ? undefined : action;
   const daysRemaining = !blankView && contract.endDate
     ? Math.max(0, Math.ceil((new Date(contract.endDate).getTime() - Date.now()) / 86400000))
     : null;
@@ -926,6 +935,13 @@ function VendorContractDetailPage({
     }),
   );
 
+  editOverviewRef.current = editOverview;
+  useEffect(() => {
+    if (!editOnOpen || readOnly || autoEditOpened.current) return;
+    autoEditOpened.current = true;
+    editOverviewRef.current();
+  }, [editOnOpen, readOnly]);
+
   const editContacts = () => openSectionEditor(
     "Edit Key Contacts",
     [
@@ -1002,7 +1018,7 @@ function VendorContractDetailPage({
 
   return (
     <div className="flex min-h-full flex-col bg-gray-50">
-      {editingSection && (
+      {editingSection && !readOnly && (
         <VendorContractEditModal config={editingSection} onClose={() => setEditingSection(null)} />
       )}
       <header className="relative border-b border-gray-100 bg-white">
@@ -1061,6 +1077,12 @@ function VendorContractDetailPage({
             <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="mb-2 rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold tracking-widest text-blue-600">CONTRACT</span>
               <h1 className="mb-3 text-lg font-bold text-gray-900">{blankView ? "" : contract.name || "Vendor Contract"}</h1>
+              {readOnly && (
+                <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                  <Archive size={13} />
+                  Archived · Read only
+                </span>
+              )}
               <p className="mb-2 text-[11px] text-gray-400">Between</p>
               <div className="mb-4 flex items-center gap-3">
                 <div className="rounded border border-yellow-200 bg-yellow-50 px-2 py-1 text-[11px] font-medium text-yellow-800">
@@ -1275,9 +1297,9 @@ function VendorContractDetailPage({
                 <VendorContractInfoRow label="Support Plan" value={detail("supportPlan", contract.type === "SLA" || contract.type === "AMC" ? contract.type : "")} />
                 <VendorContractInfoRow label="Support Hours" value={detail("supportHours")} />
                 <VendorContractInfoRow label="Response SLA" value={detail("responseSLA", contract.terms.slaUptime)} />
-                <button type="button" onClick={() => navigate("/support/create", { state: { vendorId: vendor?.id, vendorName: actualVendorName, contractId: contract.id } })} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-500 px-3 py-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                {!readOnly && <button type="button" onClick={() => navigate("/support/create", { state: { vendorId: vendor?.id, vendorName: actualVendorName, contractId: contract.id } })} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-500 px-3 py-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                   <Headphones size={13} /> Create Support Ticket
-                </button>
+                </button>}
               </div>
             </VendorContractSection>
 
@@ -1296,7 +1318,7 @@ function VendorContractDetailPage({
 
             <VendorContractSection title="Reminders" onEdit={editAction(() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }]))}>
               {blankView ? <div className="h-8" /> : detail("reminders") ? <div className="space-y-2">{parseContractRows(detail("reminders"), 2).map((row, index) => <div key={index} className="flex items-center gap-2 text-[10px] text-gray-600"><Calendar size={12} className="text-gray-400" /><span>{row[0]}</span><span className="ml-auto font-medium">{row[1]}</span></div>)}</div> : <div className="space-y-2 text-[10px] text-gray-600"><div className="flex items-center gap-2"><Calendar size={12} className="text-gray-400" /><span>{contract.renewalReminder || "Renewal reminder"}</span></div><div className="flex items-center gap-2"><Clock size={12} className="text-gray-400" /><span>{contract.endDate || "No due date set"}</span></div></div>}
-              {!blankView && <button type="button" onClick={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])} className="mt-4 w-full text-center text-[10px] font-medium text-blue-600 hover:underline">View All Reminders</button>}
+               {!blankView && !readOnly && <button type="button" onClick={() => editDetails("Edit Reminders", [{ key: "reminders", label: "Reminder | Date (one per line)", type: "textarea" }])} className="mt-4 w-full text-center text-[10px] font-medium text-blue-600 hover:underline">View All Reminders</button>}
             </VendorContractSection>
           </div>
         </div>
@@ -1373,23 +1395,26 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   const [initialContracts] = useState(() => readContracts(scope));
   const [contracts, setContracts] = useState(initialContracts);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(
-    () => initialContracts.find(contract => contract.status !== "Archived") ?? null
+    () => scoped ? null : initialContracts.find(contract => contract.status !== "Archived") ?? null
   );
-  const [blankDetailView, setBlankDetailView] = useState(scoped);
-  const [showScopedContractList, setShowScopedContractList] = useState(false);
+  const [blankDetailView, setBlankDetailView] = useState(false);
+  const [showScopedContractList, setShowScopedContractList] = useState(scoped);
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [showAddContract, setShowAddContract] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [editOnOpenContractId, setEditOnOpenContractId] = useState<string | null>(null);
   const topMenu = useDropdown();
 
   useEffect(() => {
     const refresh = () => setContracts(readContracts(scope));
     const scopedContracts = readContracts(scope);
     setContracts(scopedContracts);
-    setSelectedContract(scopedContracts.find(contract => contract.status !== "Archived") ?? null);
-    setBlankDetailView(scoped);
-    setShowScopedContractList(false);
+    setSelectedContract(scoped ? null : scopedContracts.find(contract => contract.status !== "Archived") ?? null);
+    setBlankDetailView(false);
+    setShowScopedContractList(scoped);
+    setShowArchived(false);
+    setEditOnOpenContractId(null);
     window.addEventListener("vendorContractsUpdated", refresh);
     window.addEventListener("storage", refresh);
     return () => {
@@ -1417,6 +1442,48 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
     }
   };
 
+  const handleCreateScopedContract = (basics: VendorContractBasics) => {
+    const created: Contract = {
+      ...createBlankVendorContract(),
+      id: basics.id,
+      name: basics.name,
+      startDate: basics.startDate,
+      endDate: basics.endDate,
+      status: "Active",
+    };
+    setContracts(prev => {
+      const next = [created, ...prev];
+      persistContracts(scope, next);
+      return next;
+    });
+    setSelectedContract(created);
+    setBlankDetailView(false);
+    setShowScopedContractList(false);
+    setShowArchived(false);
+    setEditOnOpenContractId(null);
+  };
+
+  const handleArchiveScopedContract = (contractId: string) => {
+    setContracts(prev => {
+      const next = prev.map(contract =>
+        contract.id === contractId
+          ? { ...contract, status: "Archived" as ContractStatus }
+          : contract
+      );
+      persistContracts(scope, next);
+      return next;
+    });
+  };
+
+  const openScopedContract = (contractId: string, edit = false) => {
+    const contract = contracts.find(item => item.id === contractId);
+    if (!contract) return;
+    setSelectedContract(contract);
+    setBlankDetailView(false);
+    setShowScopedContractList(false);
+    setEditOnOpenContractId(edit ? contractId : null);
+  };
+
   const handleUpdateContract = (updated: Contract) => {
     const originalId = selectedContract?.id;
     const requestedId = updated.id?.trim();
@@ -1441,6 +1508,7 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
     setSelectedContract(record);
     setBlankDetailView(false);
     setShowScopedContractList(false);
+    setEditOnOpenContractId(null);
   };
 
   const activeContracts = contracts.filter(c => c.status !== "Archived");
@@ -1463,18 +1531,38 @@ export default function VendorContractsPage(scope: VendorScope = {}) {
   if (editingContract) {
     return <AddContractPage onCancel={() => setEditingContract(null)} contract={editingContract} onSave={handleSaveContract} vendor={vendorRecord} />;
   }
+  if (scoped && showScopedContractList) {
+    return (
+      <div className="min-h-full bg-[#f8fafc] p-4 sm:p-5">
+        <VendorContractsList
+          vendorName={scope.vendorName || vendorRecord?.name || "Vendor"}
+          contracts={contracts}
+          showArchived={showArchived}
+          onCreate={handleCreateScopedContract}
+          onOpen={contractId => openScopedContract(contractId)}
+          onEdit={contractId => openScopedContract(contractId, true)}
+          onArchive={handleArchiveScopedContract}
+          onToggleArchived={() => setShowArchived(current => !current)}
+        />
+      </div>
+    );
+  }
   if (selectedContract || (scoped && !showScopedContractList)) {
     return (
       <VendorContractDetailPage
+        key={`${scope.vendorId || "vendor"}-${selectedContract?.id || "blank"}`}
         contract={selectedContract ?? createBlankVendorContract()}
         vendorName={scope.vendorName || vendorRecord?.name || selectedContract?.contacts.vendor || ""}
         vendor={vendorRecord}
         onBack={() => {
           setSelectedContract(null);
           setShowScopedContractList(true);
+          setEditOnOpenContractId(null);
         }}
         onUpdate={handleUpdateContract}
         blankView={blankDetailView}
+        readOnly={selectedContract?.status === "Archived"}
+        editOnOpen={selectedContract?.id === editOnOpenContractId}
       />
     );
   }

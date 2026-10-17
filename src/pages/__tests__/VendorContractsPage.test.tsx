@@ -66,7 +66,7 @@ describe("Vendor contract detail page", () => {
     expect(screen.getByRole("button", { name: "Create Support Ticket" })).toBeTruthy();
   });
 
-  it("hides saved values until edited, then persists section changes", () => {
+  it("shows saved values in the contract overview and persists section changes", () => {
     const storageKey = "nido_vendor_contracts_V-TEST";
     const savedContract = {
       id: "CONTRACT-SECRET",
@@ -105,11 +105,13 @@ describe("Vendor contract detail page", () => {
 
     renderVendorContractsPage({ vendorId: "V-TEST", vendorName: "Test Vendor" });
 
+    expect(screen.getByRole("button", { name: "CONTRACT-SECRET" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "CONTRACT-SECRET" }));
     expect(screen.getByRole("heading", { name: "Contract Overview" })).toBeTruthy();
-    expect(screen.queryByText("Secret Contract Title")).toBeNull();
-    expect(screen.queryByText("Hidden contract purpose")).toBeNull();
-    expect(screen.queryByText("Hidden Vendor Contact")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Contract actions" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Secret Contract Title" })).toBeTruthy();
+    expect(screen.getByText("Hidden contract purpose")).toBeTruthy();
+    expect(screen.getAllByText("Hidden Vendor Contact").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Contract actions" })).toBeTruthy();
     for (const section of [
       "Contract Overview",
       "2. Response & Resolution Targets",
@@ -144,21 +146,108 @@ describe("Vendor contract detail page", () => {
     expect(saved[0].details.purpose).toBe("Updated purpose");
   });
 
-  it("allows a new contract to be created from the blank vendor detail layout", () => {
+  it("adds a vendor contract from the list and opens its overview", () => {
     const storageKey = "nido_vendor_contracts_V-EMPTY";
     renderVendorContractsPage({ vendorId: "V-EMPTY", vendorName: "Empty Vendor" });
 
-    expect(screen.getByRole("heading", { name: "Contract Overview" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Contracts" })).toBeTruthy();
+    expect(screen.getByText("No contracts yet")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "All Contracts" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Contract Overview" }));
-    fireEvent.change(screen.getByLabelText("Contract Name"), {
+    fireEvent.click(screen.getByRole("button", { name: "Vendor contract list actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add Contract" }));
+    fireEvent.change(screen.getByLabelText("Contract name"), {
       target: { value: "New Vendor Agreement" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    fireEvent.change(screen.getByLabelText("Start date"), {
+      target: { value: "2026-11-01" },
+    });
+    fireEvent.change(screen.getByLabelText("End date"), {
+      target: { value: "2027-10-31" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create Contract" }));
 
     expect(screen.getByRole("heading", { name: "New Vendor Agreement" })).toBeTruthy();
     const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
     expect(saved).toHaveLength(1);
     expect(saved[0].id).toMatch(/^CT-\d{4}-\d{3}$/);
+    expect(saved[0]).toMatchObject({ startDate: "2026-11-01", endDate: "2027-10-31" });
+  });
+
+  it("archives a vendor contract and opens its archived details read-only", () => {
+    const storageKey = "nido_vendor_contracts_V-ARCHIVE";
+    localStorage.setItem(storageKey, JSON.stringify([{
+      id: "CT-2026-ARCH",
+      name: "Archived Vendor Agreement",
+      type: "Supply Agreement",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      value: "₹20,000",
+      paymentTerms: "Net 30",
+      status: "Active",
+      autoRenewal: false,
+      renewalReminder: "30 Days Before Expiry",
+      expiryIn: null,
+      contacts: {
+        owner: "Owner",
+        vendor: "Vendor Contact",
+        vendorPhone: "1111111111",
+        procurement: "Procurement",
+        procurementPhone: "2222222222",
+      },
+      terms: {
+        priceValidity: "Till Dec 31, 2026",
+        deliveryTerm: "FOB",
+        warrantyPeriod: "1 Year",
+        slaUptime: "99%",
+        penaltyClause: "Applicable",
+        governingLaw: "India",
+      },
+      details: { purpose: "Archived details remain available" },
+    }]));
+
+    renderVendorContractsPage({ vendorId: "V-ARCHIVE", vendorName: "Archive Vendor" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive CT-2026-ARCH" }));
+    expect(JSON.parse(localStorage.getItem(storageKey) || "[]")[0].status).toBe("Archived");
+    expect(screen.queryByRole("button", { name: "CT-2026-ARCH" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Vendor contract list actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archived Contracts (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "CT-2026-ARCH" }));
+
+    expect(screen.getByText("Archived · Read only")).toBeTruthy();
+    expect(screen.getByText("Archived details remain available")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit Contract Overview" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit 1. Commercial Terms" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create Support Ticket" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to Contracts" }));
+    expect(screen.getByRole("heading", { name: "Archived Contracts" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "CT-2026-ARCH" })).toBeTruthy();
+  });
+
+  it("opens the detail overview editor from the vendor list Edit action", () => {
+    const storageKey = "nido_vendor_contracts_V-EDIT";
+    localStorage.setItem(storageKey, JSON.stringify([{
+      id: "CT-2026-EDIT",
+      name: "Editable Agreement",
+      type: "Supply Agreement",
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+      value: "₹20,000",
+      paymentTerms: "Net 30",
+      status: "Active",
+      autoRenewal: false,
+      renewalReminder: "30 Days Before Expiry",
+      expiryIn: null,
+      contacts: { owner: "Owner", vendor: "Vendor", vendorPhone: "", procurement: "Procurement", procurementPhone: "" },
+      terms: { priceValidity: "", deliveryTerm: "", warrantyPeriod: "", slaUptime: "", penaltyClause: "", governingLaw: "" },
+      details: {},
+    }]));
+
+    renderVendorContractsPage({ vendorId: "V-EDIT", vendorName: "Edit Vendor" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit CT-2026-EDIT" }));
+
+    expect(screen.getByRole("heading", { name: "Edit Contract Overview" })).toBeTruthy();
   });
 });
