@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
@@ -52,6 +52,8 @@ interface ContractDetailViewProps {
   clientCurrency?: string;
   clientPaymentTerms?: string;
   clientStatus?: string;
+  readOnly?: boolean;
+  editOnOpen?: boolean;
   onBack: () => void;
 }
 
@@ -195,19 +197,21 @@ function MetaCell({ icon, label, value }: { icon: React.ReactNode; label: string
   );
 }
 
-function SectionCard({ title, children, onEdit }: { title: string; children: React.ReactNode; onEdit: () => void }) {
+function SectionCard({ title, children, onEdit }: { title: string; children: React.ReactNode; onEdit?: () => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden relative">
       <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
         <h3 className="text-xs font-bold text-gray-800">{title}</h3>
-        <button
-          onClick={onEdit}
-          aria-label={`Edit ${title}`}
-          className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
-          data-testid={`edit-${title.replace(/\s+/g, "-").toLowerCase()}`}
-        >
-          <PenLine size={14} />
-        </button>
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            aria-label={`Edit ${title}`}
+            className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
+            data-testid={`edit-${title.replace(/\s+/g, "-").toLowerCase()}`}
+          >
+            <PenLine size={14} />
+          </button>
+        )}
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -284,6 +288,8 @@ export function ContractDetailView({
   clientCurrency,
   clientPaymentTerms,
   clientStatus,
+  readOnly = false,
+  editOnOpen = false,
   onBack,
 }: ContractDetailViewProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -404,6 +410,8 @@ export function ContractDetailView({
   const [contractHydrated, setContractHydrated] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState("");
   const initialSaveSkipped = useRef(false);
+  const autoEditOpened = useRef(false);
+  const openOverviewEditRef = useRef<() => void>(() => undefined);
   const [activeContractTitle, setActiveContractTitle] = useState(contractTitle || "Client Contract");
   const [contractStartDateValue, setContractStartDateValue] = useState(contractStartDate || "");
   const [contractEndDateValue, setContractEndDateValue] = useState(contractEndDate || "");
@@ -510,7 +518,7 @@ export function ContractDetailView({
   }, [clientId, contractId, contractTitle, clientName, clientContactName, clientEmail, clientPhone, clientCurrency, clientPaymentTerms, contractStartDate, contractEndDate]);
 
   useEffect(() => {
-    if (!clientId || !contractHydrated) return;
+    if (!clientId || !contractHydrated || readOnly) return;
     if (!initialSaveSkipped.current) {
       initialSaveSkipped.current = true;
       return;
@@ -543,6 +551,7 @@ export function ContractDetailView({
   }, [
     clientId,
     contractId,
+    readOnly,
     activeContractTitle,
     contractHydrated,
     contractStartDateValue,
@@ -612,6 +621,13 @@ export function ContractDetailView({
       },
     });
   };
+
+  openOverviewEditRef.current = openOverviewEdit;
+  useEffect(() => {
+    if (!editOnOpen || readOnly || !contractHydrated || autoEditOpened.current) return;
+    autoEditOpened.current = true;
+    openOverviewEditRef.current();
+  }, [editOnOpen, readOnly, contractHydrated]);
 
   const openResponseTargetsEdit = () => {
     const flat: Record<string, string> = {};
@@ -1144,7 +1160,7 @@ export function ContractDetailView({
 
   return (
     <div className="min-h-full bg-gray-50 flex flex-col relative">
-      {editModalConfig && (
+      {editModalConfig && !readOnly && (
         <EditModal
           title={editModalConfig.title}
           fields={editModalConfig.fields}
@@ -1223,6 +1239,12 @@ export function ContractDetailView({
             <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="text-[10px] border border-blue-300 text-blue-600 px-2 py-0.5 rounded tracking-widest font-semibold mb-2 bg-blue-50">CONTRACT</span>
               <h2 className="text-lg font-bold text-gray-900 mb-3">{activeContractTitle || "SaaS & Services Agreement"}</h2>
+              {readOnly && (
+                <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                  <Archive size={13} />
+                  Archived · Read only
+                </span>
+              )}
               <p className="text-[11px] text-gray-400 mb-2">Between</p>
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[11px] font-medium px-2 py-1 rounded">
@@ -1294,7 +1316,7 @@ export function ContractDetailView({
 
           {/* LEFT COLUMN */}
           <div className="space-y-4">
-            <SectionCard title="Contract Overview" onEdit={openOverviewEdit}>
+            <SectionCard title="Contract Overview" onEdit={readOnly ? undefined : openOverviewEdit}>
               <div className="space-y-3">
                 <div className="flex justify-between border-b border-gray-100 pb-2">
                   <span className="text-[11px] text-gray-500 w-32 shrink-0">Contract Purpose</span>
@@ -1407,7 +1429,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="2. Response & Resolution Targets" onEdit={openResponseTargetsEdit}>
+            <SectionCard title="2. Response & Resolution Targets" onEdit={readOnly ? undefined : openResponseTargetsEdit}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
@@ -1437,7 +1459,7 @@ export function ContractDetailView({
 
           {/* MIDDLE COLUMN */}
           <div className="space-y-4">
-            <SectionCard title="1. Commercial Terms" onEdit={openCommercialEdit}>
+            <SectionCard title="1. Commercial Terms" onEdit={readOnly ? undefined : openCommercialEdit}>
               <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                 <div className="flex justify-between border-b border-gray-100 pb-2">
                   <span className="text-[11px] text-gray-500">Agreement Type</span>
@@ -1478,7 +1500,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="3. Services Covered" onEdit={openServicesCoveredEdit}>
+            <SectionCard title="3. Services Covered" onEdit={readOnly ? undefined : openServicesCoveredEdit}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
@@ -1503,7 +1525,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="5. Data Security & Compliance" onEdit={openDataSecurityEdit}>
+            <SectionCard title="5. Data Security & Compliance" onEdit={readOnly ? undefined : openDataSecurityEdit}>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
                 {dataSecurity.map((item, i) => (
                   <div key={i} className="flex flex-col items-center justify-center p-2 bg-gray-50 rounded-lg border border-gray-100 text-center gap-2">
@@ -1517,7 +1539,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="6. Confidentiality Clause" onEdit={openConfidentialityEdit}>
+            <SectionCard title="6. Confidentiality Clause" onEdit={readOnly ? undefined : openConfidentialityEdit}>
               <div className="flex gap-4">
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                   <ShieldCheck size={20} className="text-blue-500" />
@@ -1539,7 +1561,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="7. Support & Escalation Matrix" onEdit={openSupportMatrixEdit}>
+            <SectionCard title="7. Support & Escalation Matrix" onEdit={readOnly ? undefined : openSupportMatrixEdit}>
               <div className="overflow-hidden rounded-lg border border-gray-200">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
@@ -1566,7 +1588,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="8. Renewal & Termination" onEdit={openRenewalTermEdit}>
+            <SectionCard title="8. Renewal & Termination" onEdit={readOnly ? undefined : openRenewalTermEdit}>
               <div className="grid grid-cols-3 gap-3">
                 {renewalTerm.map((item, i) => (
                   <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-100">
@@ -1582,7 +1604,7 @@ export function ContractDetailView({
 
           {/* RIGHT COLUMN */}
           <div className="space-y-4">
-            <SectionCard title="2. Subscription & Licensing" onEdit={openSubscriptionEdit}>
+            <SectionCard title="2. Subscription & Licensing" onEdit={readOnly ? undefined : openSubscriptionEdit}>
               <div className="space-y-3">
                 <div className="flex justify-between border-b border-gray-100 pb-2">
                   <span className="text-[11px] text-gray-500">User Licensing</span>
@@ -1611,7 +1633,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="4. SLA Commitments" onEdit={openSLAEdit}>
+            <SectionCard title="4. SLA Commitments" onEdit={readOnly ? undefined : openSLAEdit}>
               <div className="overflow-hidden rounded-lg border border-gray-200 mb-2">
                 <table className="w-full text-left">
                   <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
@@ -1632,7 +1654,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="Renewal Information" onEdit={openRenewalInfoEdit}>
+            <SectionCard title="Renewal Information" onEdit={readOnly ? undefined : openRenewalInfoEdit}>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[11px] text-gray-600">
@@ -1660,7 +1682,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="Support Information" onEdit={openSupportInfoEdit}>
+            <SectionCard title="Support Information" onEdit={readOnly ? undefined : openSupportInfoEdit}>
               <div className="space-y-3 mb-4">
                 <div className="flex justify-between border-b border-gray-100 pb-2">
                   <span className="text-[11px] text-gray-500">Support Plan</span>
@@ -1681,7 +1703,7 @@ export function ContractDetailView({
               </button>
             </SectionCard>
 
-            <SectionCard title="Key Contacts" onEdit={openKeyContactsEdit}>
+            <SectionCard title="Key Contacts" onEdit={readOnly ? undefined : openKeyContactsEdit}>
               <div className="space-y-4">
                 {/* Apex */}
                 <div>
@@ -1765,7 +1787,7 @@ export function ContractDetailView({
               </div>
             </SectionCard>
 
-            <SectionCard title="Reminders" onEdit={openRemindersEdit}>
+            <SectionCard title="Reminders" onEdit={readOnly ? undefined : openRemindersEdit}>
               <div className="space-y-3 mb-4">
                 {reminders.map((r, i) => (
                   <div key={i} className="flex items-center justify-between">
@@ -1791,7 +1813,9 @@ export function ContractDetailView({
 export default function ClientContractsRoute() {
   const { id, contractId: selectedContractId } = useParams<{ id: string; contractId: string }>();
   const { user } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
   const clientId = id || user?.clientId || "";
   const client = getClients().find((item) => item.id === clientId);
   const contracts = getClientContracts(clientId);
@@ -1831,7 +1855,11 @@ export default function ClientContractsRoute() {
         fallbackStartDate={client.contractStartDate || client.contract_start_date || ""}
         fallbackEndDate={client.contractEndDate || client.contract_end_date || ""}
         onOpenContract={(contractId) => navigate(`/clients/${clientId}/contracts/${encodeURIComponent(contractId)}`)}
+        onEditContract={(contractId) => navigate(`/clients/${clientId}/contracts/${encodeURIComponent(contractId)}?edit=true`)}
         onCreated={(created) => navigate(`/clients/${clientId}/contracts/${encodeURIComponent(created.contractId)}`)}
+        showArchived={searchParams.get("view") === "archived"}
+        onShowArchived={() => navigate(`/clients/${clientId}/contracts?view=archived`)}
+        onShowActive={() => navigate(`/clients/${clientId}/contracts`)}
       />
     );
   }
@@ -1869,7 +1897,11 @@ export default function ClientContractsRoute() {
       clientCurrency={client.currency || ""}
       clientPaymentTerms={client.payment_terms || ""}
       clientStatus={client.status || ""}
-      onBack={() => navigate(isPortalRoute ? "/portal/dashboard" : `/clients/${clientId}/contracts`)}
+      readOnly={Boolean(contract?.archivedAt)}
+      editOnOpen={searchParams.get("edit") === "true" && !contract?.archivedAt}
+      onBack={() => navigate(isPortalRoute
+        ? "/portal/dashboard"
+        : `/clients/${clientId}/contracts${contract?.archivedAt ? "?view=archived" : ""}`)}
     />
   );
 }

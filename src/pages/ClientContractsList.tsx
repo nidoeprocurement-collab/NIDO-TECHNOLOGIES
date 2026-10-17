@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from "react";
-import { CalendarDays, ChevronRight, FileText, Plus, X } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Archive, CalendarDays, ChevronRight, FileText, MoreVertical, Pencil, Plus, X } from "lucide-react";
 import {
+  archiveClientContract,
+  getClientContracts,
   saveClientContract,
   type ClientContractRecord,
 } from "@/lib/clientDataStore";
@@ -9,10 +11,14 @@ interface ClientContractsListProps {
   clientId: string;
   clientName: string;
   contracts: ClientContractRecord[];
+  showArchived?: boolean;
   fallbackStartDate?: string;
   fallbackEndDate?: string;
   onOpenContract: (contractId: string) => void;
+  onEditContract: (contractId: string) => void;
   onCreated: (contract: ClientContractRecord) => void;
+  onShowArchived: () => void;
+  onShowActive: () => void;
 }
 
 function dateLabel(value?: string): string {
@@ -38,20 +44,35 @@ export default function ClientContractsList({
   clientId,
   clientName,
   contracts,
+  showArchived = false,
   fallbackStartDate,
   fallbackEndDate,
   onOpenContract,
+  onEditContract,
   onCreated,
+  onShowArchived,
+  onShowActive,
 }: ClientContractsListProps) {
+  const [allContracts, setAllContracts] = useState(contracts);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [contractId, setContractId] = useState("");
   const [contractTitle, setContractTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    setAllContracts(contracts);
+  }, [contracts]);
+
+  const visibleContracts = allContracts.filter(contract => Boolean(contract.archivedAt) === showArchived);
+  const archivedCount = allContracts.filter(contract => Boolean(contract.archivedAt)).length;
+  const activeCount = allContracts.length - archivedCount;
+
   const openDialog = () => {
-    setContractId(suggestedContractId(contracts));
+    setMenuOpen(false);
+    setContractId(suggestedContractId(allContracts));
     setContractTitle("");
     setStartDate("");
     setEndDate("");
@@ -67,7 +88,7 @@ export default function ClientContractsList({
       setError("Enter a contract ID and contract name.");
       return;
     }
-    if (contracts.some(contract => contract.contractId.toLowerCase() === normalizedId.toLowerCase())) {
+    if (allContracts.some(contract => contract.contractId.toLowerCase() === normalizedId.toLowerCase())) {
       setError("A contract with this ID already exists for this client.");
       return;
     }
@@ -86,50 +107,93 @@ export default function ClientContractsList({
       updatedAt: new Date().toISOString(),
     };
     saveClientContract(created);
+    setAllContracts(getClientContracts(clientId));
     setDialogOpen(false);
     onCreated(created);
+  };
+
+  const archiveContract = (contract: ClientContractRecord) => {
+    if (archiveClientContract(clientId, contract.contractId)) {
+      setAllContracts(getClientContracts(clientId));
+    }
   };
 
   return (
     <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5" aria-label={`${clientName} contracts`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Contracts</h2>
+          <h2 className="text-base font-semibold text-gray-900">{showArchived ? "Archived Contracts" : "Contracts"}</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {contracts.length} contract{contracts.length === 1 ? "" : "s"} for {clientName}
+            {visibleContracts.length} contract{visibleContracts.length === 1 ? "" : "s"} for {clientName}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openDialog}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          Add Contract
-        </button>
-      </div>
-
-      {contracts.length === 0 ? (
-        <div className="flex flex-col items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-5 py-12 text-center">
-          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-            <FileText size={21} />
-          </div>
-          <h3 className="text-sm font-semibold text-gray-900">No contracts yet</h3>
-          <p className="mt-1 max-w-sm text-sm text-gray-500">
-            Add a contract to record its terms, service details, contacts, renewals, and reminders.
-          </p>
+        <div className="relative">
           <button
             type="button"
-            onClick={openDialog}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+            aria-label="Contract list actions"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(open => !open)}
+            className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
           >
-            <Plus size={15} />
-            Add your first contract
+            <MoreVertical size={18} />
           </button>
+          {menuOpen && (
+            <div role="menu" className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={openDialog}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus size={15} className="text-gray-400" />
+                Add Contract
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  showArchived ? onShowActive() : onShowArchived();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                {showArchived
+                  ? `Active Contracts (${activeCount})`
+                  : `Archived Contracts (${archivedCount})`}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {visibleContracts.length === 0 ? (
+        <div className="flex flex-col items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-5 py-12 text-center">
+          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+            {showArchived ? <Archive size={21} /> : <FileText size={21} />}
+          </div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            {showArchived ? "No archived contracts" : "No contracts yet"}
+          </h3>
+          <p className="mt-1 max-w-sm text-sm text-gray-500">
+            {showArchived
+              ? "Archived contracts will appear here and can be opened in read-only mode."
+              : "Add a contract to record its terms, service details, contacts, renewals, and reminders."}
+          </p>
+          {!showArchived && (
+            <button
+              type="button"
+              onClick={openDialog}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+            >
+              <Plus size={15} />
+              Add your first contract
+            </button>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[660px] border-collapse text-left">
+          <table className={`w-full ${showArchived ? "min-w-[660px]" : "min-w-[820px]"} border-collapse text-left`}>
             <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-4 py-3">Contract ID</th>
@@ -137,10 +201,11 @@ export default function ClientContractsList({
                 <th className="px-4 py-3">Start date</th>
                 <th className="px-4 py-3">End date</th>
                 <th className="px-4 py-3">Last updated</th>
+                {!showArchived && <th className="px-4 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {contracts.map(contract => (
+              {visibleContracts.map(contract => (
                 <tr key={`${contract.clientId}-${contract.contractId}`} className="bg-white hover:bg-blue-50/40">
                   <td className="px-4 py-3">
                     <button
@@ -165,6 +230,30 @@ export default function ClientContractsList({
                       : "—"}
                     <ChevronRight size={15} className="ml-2 inline text-gray-400" />
                   </td>
+                  {!showArchived && (
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Edit ${contract.contractId}`}
+                          onClick={() => onEditContract(contract.contractId)}
+                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          <Pencil size={13} />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Archive ${contract.contractId}`}
+                          onClick={() => archiveContract(contract)}
+                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-700 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                        >
+                          <Archive size={13} />
+                          Archive
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

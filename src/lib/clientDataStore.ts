@@ -169,6 +169,7 @@ export interface ClientContractRecord {
   contractTitle: string;
   startDate?: string;
   endDate?: string;
+  archivedAt?: string;
   data: Record<string, unknown>;
   updatedAt: string;
 }
@@ -289,9 +290,30 @@ export function saveClientContract(contract: ClientContractRecord): void {
     item.clientId === contract.clientId && item.contractId === contract.contractId
   );
   if (existingIndex >= 0) {
-    all[existingIndex] = contract;
+    const existing = all[existingIndex];
+    all[existingIndex] = existing.archivedAt && !contract.archivedAt
+      ? { ...contract, archivedAt: existing.archivedAt }
+      : contract;
   } else {
     all.push(contract);
   }
   write(CONTRACTS_KEY, all);
+}
+
+export function archiveClientContract(clientId: string, contractId: string): boolean {
+  const all = read<ClientContractRecord[]>(CONTRACTS_KEY, []);
+  const existingIndex = all.findIndex((item) =>
+    item.clientId === clientId && item.contractId === contractId
+  );
+  if (existingIndex < 0) return false;
+
+  const now = new Date().toISOString();
+  const contract = all[existingIndex];
+  all[existingIndex] = {
+    ...contract,
+    archivedAt: contract.archivedAt || now,
+    updatedAt: now,
+  };
+  write(CONTRACTS_KEY, all);
+  return true;
 }

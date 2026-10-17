@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ContractDetailView } from "@/pages/ClientContractsPage";
-import { getClientContract } from "@/lib/clientDataStore";
+import { getClientContract, saveClientContract } from "@/lib/clientDataStore";
 
 const emptyListEditors = [
   ["3. Services Covered", "Enter service name"],
@@ -47,13 +47,15 @@ const sectionSaveCases = [
   },
 ] as const;
 
-function renderEmptyContract() {
+function renderEmptyContract(options: { readOnly?: boolean; editOnOpen?: boolean } = {}) {
   return render(
     <ContractDetailView
       contractId="CONTRACT-EDIT-TEST"
       contractTitle="Contract Editor Test"
       clientId="client-contract-editor-test"
       clientName="Editor Test Client"
+      readOnly={options.readOnly}
+      editOnOpen={options.editOnOpen}
       onBack={() => undefined}
     />,
   );
@@ -113,6 +115,32 @@ describe("Client contract section editors", () => {
       startDate: "2026-11-01",
       endDate: "2027-10-31",
     });
+  });
+
+  it("opens the overview editor when Edit is selected from the contract list", async () => {
+    renderEmptyContract({ editOnOpen: true });
+
+    expect(await screen.findByRole("heading", { name: "Edit Contract Overview" })).toBeTruthy();
+  });
+
+  it("shows archived contract details without edit controls or automatic saves", () => {
+    saveClientContract({
+      clientId: "client-contract-editor-test",
+      contractId: "CONTRACT-EDIT-TEST",
+      contractTitle: "Archived Agreement",
+      archivedAt: "2026-10-20T00:00:00.000Z",
+      data: { overview: { purpose: "Archived purpose" } },
+      updatedAt: "2026-10-20T00:00:00.000Z",
+    });
+
+    renderEmptyContract({ readOnly: true });
+
+    expect(screen.getByText("Archived · Read only")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit Contract Overview" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit 1. Commercial Terms" })).toBeNull();
+    expect(screen.getByText("Archived purpose")).toBeTruthy();
+    expect(getClientContract("client-contract-editor-test", "CONTRACT-EDIT-TEST")?.updatedAt)
+      .toBe("2026-10-20T00:00:00.000Z");
   });
 
   it.each(sectionSaveCases)(

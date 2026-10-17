@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  archiveClientContract,
   getClientContract,
   getClientContracts,
   getClientOrders,
@@ -81,5 +82,34 @@ describe("client order source mapping", () => {
     expect(getClientContract("client-1", "CON-2")?.contractTitle).toBe("License Agreement");
     expect(getClientContract("client-1")?.contractTitle).toBe("Updated Support Agreement");
     expect(getClientContracts("client-2")).toEqual([]);
+  });
+
+  it("archives a contract without deleting its details or losing the archived state on save", () => {
+    saveClientContract({
+      clientId: "client-archive-test",
+      contractId: "CON-ARCHIVE",
+      contractTitle: "Support Agreement",
+      data: { overview: { purpose: "Keep supporting Acme" } },
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(archiveClientContract("client-archive-test", "CON-ARCHIVE")).toBe(true);
+    const archived = getClientContract("client-archive-test", "CON-ARCHIVE");
+    expect(archived).toMatchObject({
+      archivedAt: expect.any(String),
+      data: { overview: { purpose: "Keep supporting Acme" } },
+    });
+
+    saveClientContract({
+      ...archived!,
+      contractTitle: "Updated Support Agreement",
+      archivedAt: undefined,
+    });
+
+    expect(getClientContract("client-archive-test", "CON-ARCHIVE")).toMatchObject({
+      contractTitle: "Updated Support Agreement",
+      archivedAt: expect.any(String),
+    });
+    expect(archiveClientContract("client-archive-test", "missing")).toBe(false);
   });
 });
