@@ -7,6 +7,8 @@ import {
   FileText, Activity, MessageSquare, Info, Send,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { WorkflowCheckpoint } from "@/components/workflow/WorkflowCheckpoint";
+import { getTicketAllowedTransitions, getTicketNextAction } from "@/lib/ticketWorkflow";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -603,7 +605,6 @@ export default function TicketDetailPage() {
     ta.focus();
   }
 
-  const STATUSES   = ["Open", "In Progress", "On Hold", "Resolved", "Closed"];
   const PRIORITIES = ["Low", "Medium", "High", "Critical"];
 
   return (
@@ -700,25 +701,18 @@ export default function TicketDetailPage() {
                           </button>
                           {showStatusSub && (
                             <div className="bg-muted/40 border-t border-border">
-                              {STATUSES.map(s => (
+                              {getTicketAllowedTransitions(statusLocal).map(s => (
                                 <button key={s} onClick={() => { changeStatus(s); setShowStatusSub(false); }}
                                   className={`w-full text-left px-6 py-2 text-sm hover:bg-muted/60 transition-colors ${statusLocal === s ? "text-primary font-semibold" : "text-foreground"}`}>
                                   {s}
                                 </button>
                               ))}
+                              {getTicketAllowedTransitions(statusLocal).length === 0 && (
+                                <p className="px-6 py-2 text-xs text-muted-foreground">No further status changes are available.</p>
+                              )}
                             </div>
                           )}
                         </div>
-
-                        <div className="border-t border-border my-1" />
-
-                        {/* 3. Close Ticket */}
-                        <button
-                          onClick={() => { changeStatus("Closed"); setShowMoreMenu(false); setShowStatusSub(false); }}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-muted/60 transition-colors"
-                        >
-                          Close Ticket
-                        </button>
 
                       </div>
                     </>
@@ -748,6 +742,21 @@ export default function TicketDetailPage() {
                 <p className="text-sm text-foreground">{ticketData.description}</p>
               </div>
             </div>
+          </div>
+
+          <div className="px-4 md:px-6 py-3 border-b border-border bg-background">
+            <WorkflowCheckpoint
+              title="Ticket workflow"
+              status={statusLocal}
+              ownerLabel="Client CRM / relationship owner"
+              owner={/crm/i.test(ticketData.assignedRole) ? ticketData.assignedTo : "Not recorded"}
+              nextAction={getTicketNextAction(statusLocal)}
+              note={
+                ticketData.childCount > 0
+                  ? `Review the ${ticketData.childCount} linked child ticket${ticketData.childCount === 1 ? "" : "s"} before resolving or closing the parent. Specialist work does not close the parent ticket.`
+                  : "Resolved means work is complete with evidence. Closed means the client or CRM has validated and accepted the resolution."
+              }
+            />
           </div>
 
           {/* ── Tabs ── */}

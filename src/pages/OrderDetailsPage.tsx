@@ -35,7 +35,12 @@ import {
 import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
 import { getOrderProductTypeMetadata } from "@/lib/orderProductType";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
-import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence } from "@/lib/digitalFulfillmentStatuses";
+import {
+  deriveDigitalFulfillmentStatus,
+  formatPartiallyProvisionedStatus,
+  getDigitalFulfillmentStatusIndex,
+  getDigitalFulfillmentStatusSequence,
+} from "@/lib/digitalFulfillmentStatuses";
 import { toast } from "sonner";
 import {
   appendOrderActivity,
@@ -2314,7 +2319,11 @@ function ThreeDotMenu({
     };
   }, [open]);
   const isDigitalItem = isDigitalDocumentProduct(sub);
-  const digitalStatuses = getDigitalFulfillmentStatusSequence(sub.qty);
+  const digitalStatusSequence = getDigitalFulfillmentStatusSequence(sub.qty);
+  const currentDigitalStatusIndex = getDigitalFulfillmentStatusIndex(sub.itemStatus, sub.qty);
+  const digitalStatuses = isDigitalItem
+    ? [digitalStatusSequence[currentDigitalStatusIndex >= 0 ? currentDigitalStatusIndex + 1 : 0]].filter(Boolean)
+    : [];
   const statuses = isDigitalItem
     ? digitalStatuses
     : sub.itemStatus === "Return Request Raised"
@@ -2990,6 +2999,16 @@ export default function MyOrderPage() {
       storedMasterStatus as FulfillmentStatus,
     );
   }, [order?.cartItems?.length, storedMasterStatus, subOrders]);
+  const isDigitalOnlyOrder = subOrders.length > 0 && subOrders.every(isDigitalDocumentProduct);
+  const displayedMasterStatus = isDigitalOnlyOrder
+    ? deriveDigitalFulfillmentStatus(subOrders.map(subOrder => ({
+        status: subOrder.itemStatus,
+        quantity: subOrder.qty,
+      })))
+    : masterStatus;
+  const digitalMasterStepIndex = isDigitalOnlyOrder
+    ? getDigitalFulfillmentStatusIndex(displayedMasterStatus)
+    : -1;
   const isOrderInactive = masterStatus === "Cancelled" || masterStatus === "Draft";
   // Once an order is Cancelled it is a terminal state — no further status
   // changes or processing are allowed on it.
@@ -3067,7 +3086,7 @@ export default function MyOrderPage() {
     if (isDigitalDocumentProduct(target)) {
       const currentIndex = getDigitalFulfillmentStatusIndex(target.itemStatus, target.qty);
       const nextIndex = getDigitalFulfillmentStatusIndex(status, target.qty);
-      if (nextIndex < 0 || (currentIndex >= 0 && nextIndex <= currentIndex)) return;
+      if (nextIndex < 0 || (currentIndex >= 0 && nextIndex !== currentIndex + 1)) return;
     }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
@@ -3077,37 +3096,52 @@ export default function MyOrderPage() {
       (target.itemStatus === "Delivered" && status === "Return Request Raised")
       || (currentReturnIndex >= 0 && nextReturnIndex === currentReturnIndex + 1);
     if (nextReturnIndex >= 0 && (!validReturnTransition || (status === "Return Request Raised" && !isReturnAllowed(target)))) return;
+    let savedStatus = status;
+    if (isDigitalDocumentProduct(target) && status === "Partially Provisioned") {
+      const totalQuantity = Number(target.qty);
+      const enteredQuantity = window.prompt(
+        `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
+        "",
+      );
+      if (enteredQuantity === null) return;
+      const partialStatus = formatPartiallyProvisionedStatus(Number(enteredQuantity), totalQuantity);
+      if (!partialStatus) {
+        window.alert(`Enter a whole number between 1 and ${Math.max(0, totalQuantity - 1)}.`);
+        return;
+      }
+      savedStatus = partialStatus;
+    }
     const previousStatus = target.itemStatus;
     const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
     const now = new Date();
     setSubOrders(prev => prev.map(s => s.id === subId
       ? {
           ...s,
-          itemStatus: status,
+          itemStatus: savedStatus,
           statusOwner: "order-details",
           updatedOn: now.toLocaleDateString("en-IN"),
           // The return window starts when Delivered is selected in Order Details.
           // Always refresh this timestamp when the item is marked Delivered so
           // stale/legacy timestamps cannot shorten the 72-hour window.
-          ...(status === "Delivered" ? { deliveredAt: now } : {}),
+          ...(savedStatus === "Delivered" ? { deliveredAt: now } : {}),
           ...metadata,
         }
       : s
     ));
     appendOrderActivity(
       orderId,
-      `${target.itemName} status changed from ${previousStatus} to ${status}.`,
+      `${target.itemName} status changed from ${previousStatus} to ${savedStatus}.`,
       { actor, eventType: "status-change" },
     );
     getAllPOs()
       .filter(po => po.orderId === orderId && poCoversSubOrder(po, subId))
       .forEach(po => appendPOActivity(po.poNumber, {
-        id: `activity_item_status_${po.poNumber}_${subId}_${status}_${Date.now()}`,
+        id: `activity_item_status_${po.poNumber}_${subId}_${savedStatus}_${Date.now()}`,
         author: actor,
         initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
         color: "#d97706",
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        text: `${target.itemName} status changed from ${previousStatus} to ${status}.`,
+        text: `${target.itemName} status changed from ${previousStatus} to ${savedStatus}.`,
         visibility: "Internal Note",
         kind: "status-change",
       }));
@@ -4255,14 +4289,25 @@ export default function MyOrderPage() {
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexShrink: 0 }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🚚</div>
-                <div><div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Master Order Status</div><div style={{ fontSize: 17, fontWeight: 700 }}>{masterStatus}</div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{subOrders.length} sub-order{subOrders.length !== 1 ? "s" : ""} in this order</div></div>
+                <div><div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Master Fulfillment Status</div><div style={{ fontSize: 17, fontWeight: 700 }}>{displayedMasterStatus}</div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{subOrders.length} sub-order{subOrders.length !== 1 ? "s" : ""} in this order</div></div>
               </div>
-              <Stepper currentStatus={masterStatus} orderDate={order?.orderDate} />
+              {isDigitalOnlyOrder ? (
+                <div style={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${getDigitalFulfillmentStatusSequence().length}, minmax(0, 1fr))`, gap: 6 }}>
+                  {getDigitalFulfillmentStatusSequence().map((stage, index) => (
+                    <div key={stage} style={{ minWidth: 0, textAlign: "center" }}>
+                      <div style={{ height: 4, borderRadius: 4, marginBottom: 6, background: index <= digitalMasterStepIndex ? "#2563eb" : "#e5e7eb" }} />
+                      <span style={{ display: "block", fontSize: 9.5, lineHeight: 1.25, color: index === digitalMasterStepIndex ? "#1d4ed8" : "#6b7280", fontWeight: index === digitalMasterStepIndex ? 700 : 500 }}>{stage}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Stepper currentStatus={masterStatus} orderDate={order?.orderDate} />
+              )}
             </div>
              {!isClientPortalUser && (
                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
                  <span style={{ fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
-                   Status updates automatically from sub-order and PO line-item progress.
+                    Approval and billing are separate from fulfillment. Status updates from the saved sub-order and PO line progress.
                  </span>
                </div>
              )}

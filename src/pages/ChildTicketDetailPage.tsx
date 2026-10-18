@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { loadChildTickets, StoredChildTicket } from "./CreateChildTicketPage";
+import { WorkflowCheckpoint } from "@/components/workflow/WorkflowCheckpoint";
+import { getTicketAllowedTransitions, getTicketNextAction } from "@/lib/ticketWorkflow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -377,17 +379,15 @@ export default function ChildTicketDetailPage() {
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowActions(false)} />
                   <div className="absolute right-0 top-9 z-20 w-48 bg-card border border-border rounded-xl shadow-lg py-1">
-                    {["Open", "In Progress", "On Hold", "Resolved", "Closed"].map(s => (
+                    {getTicketAllowedTransitions(statusLocal, true).map(s => (
                       <button key={s} onClick={() => { setStatusLocal(s); setShowActions(false); }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-muted/60 ${statusLocal === s ? "text-primary font-semibold" : "text-foreground"}`}>
                         {s}
                       </button>
                     ))}
-                    <div className="border-t border-border my-1" />
-                    <button onClick={() => { setStatusLocal("Closed"); setShowActions(false); }}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-muted/60">
-                      Close Ticket
-                    </button>
+                    {getTicketAllowedTransitions(statusLocal, true).length === 0 && (
+                      <p className="px-4 py-2 text-xs text-muted-foreground">No further status changes are available.</p>
+                    )}
                   </div>
                 </>
               )}
@@ -420,6 +420,15 @@ export default function ChildTicketDetailPage() {
               </div>
               <p className="text-base text-muted-foreground">{ticket.subject}</p>
             </div>
+
+            <WorkflowCheckpoint
+              title="Specialist workflow"
+              status={statusLocal}
+              ownerLabel="Assigned specialist"
+              owner={ticket.assignedTo || "Not assigned"}
+              nextAction={getTicketNextAction(statusLocal, true)}
+              note="The parent CRM remains accountable for customer communication and closure. Resolving this child ticket does not close the parent."
+            />
 
             {/* Meta row */}
             <div className="flex items-start gap-6 flex-wrap border border-border rounded-xl px-4 py-3 bg-card text-sm">

@@ -7,6 +7,8 @@ import { getServiceRequests, updateServiceRequest } from "@/lib/serviceRequestsS
 import type { StoredServiceRequest } from "@/lib/serviceRequestsStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { serviceRequestBelongsToPortalUser } from "@/lib/serviceRequestAccess";
+import { WorkflowCheckpoint } from "@/components/workflow/WorkflowCheckpoint";
+import { getServiceAllowedTransitions, getServiceNextAction } from "@/lib/serviceWorkflow";
 
 type EditableValue = string | number | boolean;
 
@@ -35,7 +37,6 @@ const HIDDEN_PAYLOAD_FIELDS = new Set([
   "status",
 ]);
 
-const STATUSES = ["Pending", "Scheduled", "Active", "In Progress", "Completed", "Cancelled", "Closed"];
 const PRIORITIES = ["Low", "Medium", "High", "Critical"];
 const DATE_FIELDS = new Set(["deliveryDate", "endDate", "prefDate", "purchaseDate", "requiredBy", "startDate"]);
 const MULTILINE_FIELDS = new Set(["description", "issueDesc", "notes", "purpose", "reason"]);
@@ -203,6 +204,11 @@ export default function EditServiceRequestPage() {
   const attachments = Array.isArray(request.payload?.attachments)
     ? request.payload.attachments.filter((name): name is string => typeof name === "string")
     : [];
+  const serviceOwner = String(
+    (request.payload as Record<string, unknown> | undefined)?.assignedTo
+      ?? (request.payload as Record<string, unknown> | undefined)?.assignedRole
+      ?? "Not assigned",
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -244,6 +250,15 @@ export default function EditServiceRequestPage() {
             </div>
           </section>
 
+          <WorkflowCheckpoint
+            title="Service workflow"
+            status={draft.status}
+            ownerLabel="Assigned specialist"
+            owner={serviceOwner}
+            nextAction={getServiceNextAction(draft.status)}
+            note="Assignment is separate from completion. Resolved requires work evidence; Closed follows client or CRM acceptance. On Hold should include a reason and review date."
+          />
+
           <section className="rounded-xl border border-gray-200 bg-white p-6">
             <h2 className="mb-5 text-base font-bold text-gray-800">Request Details</h2>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -270,7 +285,7 @@ export default function EditServiceRequestPage() {
               <label>
                 <span className={labelClass}>Status</span>
                 <select value={draft.status} onChange={(event) => updateDraft("status", event.target.value)} className={inputClass}>
-                  {Array.from(new Set([...STATUSES, draft.status])).filter(Boolean).map((status) => (
+                  {Array.from(new Set([draft.status, ...getServiceAllowedTransitions(draft.status)])).filter(Boolean).map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>

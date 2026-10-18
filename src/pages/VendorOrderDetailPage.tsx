@@ -3,7 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
-import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence } from "@/lib/digitalFulfillmentStatuses";
+import {
+  formatPartiallyProvisionedStatus,
+  deriveDigitalFulfillmentStatus,
+  getDigitalFulfillmentStatusIndex,
+  getDigitalFulfillmentStatusSequence,
+} from "@/lib/digitalFulfillmentStatuses";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
@@ -415,18 +420,31 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
   const statusSequence = digital
     ? getDigitalFulfillmentStatusSequence(quantity)
     : ITEM_STATUS_SEQUENCE;
+  const physicalNextStatus: Record<string, string> = {
+    Pending: "Processing",
+    Confirmed: "Processing",
+    Processing: "Pending Shipping",
+    "Pending Shipping": "Shipped",
+    "Partially Shipped": "Shipped",
+    Shipped: "Delivered",
+    "Partially Delivered": "Delivered",
+  };
+  const currentStatusIndex = digital
+    ? getDigitalFulfillmentStatusIndex(status, quantity)
+    : ITEM_STATUS_SEQUENCE.indexOf(baseStatus);
+  const nextStatus = digital
+    ? currentStatusIndex >= 0
+      ? statusSequence[currentStatusIndex + 1]
+      : statusSequence[0]
+    : physicalNextStatus[baseStatus];
   const itemStatuses = Array.from(new Set([
-    ...(digital ? statusSequence : ORDER_FULFILLMENT_STATUSES),
+    ...(nextStatus ? [nextStatus] : []),
     status,
     ...(allowCancel ? ["Cancelled"] : []),
   ])).filter(option =>
-    (digital || (option !== "Partially Shipped" && option !== "Partially Delivered")) &&
     (option !== "Cancelled" || allowCancel) &&
-    (option === "Cancelled" ||
-      (digital ? getDigitalFulfillmentStatusIndex(status, quantity) : ITEM_STATUS_SEQUENCE.indexOf(status)) < 0 ||
-      (digital ? getDigitalFulfillmentStatusIndex(option, quantity) : ITEM_STATUS_SEQUENCE.indexOf(option)) < 0 ||
-      (digital ? getDigitalFulfillmentStatusIndex(option, quantity) : ITEM_STATUS_SEQUENCE.indexOf(option)) >
-        (digital ? getDigitalFulfillmentStatusIndex(status, quantity) : ITEM_STATUS_SEQUENCE.indexOf(status)))
+    option !== "Partially Shipped" &&
+    option !== "Partially Delivered"
   );
 
   useEffect(() => {
@@ -880,6 +898,15 @@ export default function VendorOrderDetailPage() {
   }));
   const isDigitalOrder = hasDigitalItems && !hasPhysicalItems;
   const isMixedOrder = hasDigitalItems && hasPhysicalItems;
+  const vendorDisplayStatus = isDigitalOrder
+    ? deriveDigitalFulfillmentStatus(items.map(item => ({
+        status: item.status || "Pending",
+        quantity: item.qty,
+      })))
+    : orderStatus;
+  const digitalStageIndex = isDigitalOrder
+    ? getDigitalFulfillmentStatusIndex(vendorDisplayStatus)
+    : -1;
   const itemTableGridTemplate = isDigitalOrder
     ? "40px 1fr 160px 60px 110px 110px 140px 160px 100px"
     : "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px";
@@ -916,18 +943,33 @@ export default function VendorOrderDetailPage() {
       setUpdateTrackingItem({ id: it.id, name: it.name, tracking: it.tracking });
       return;
     }
-    setItems(prev => prev.map(it => it.id === id ? { ...it, status } : it));
+    let savedStatus = status;
+    if (digital && status === "Partially Provisioned") {
+      const totalQuantity = Number(currentItem?.qty);
+      const enteredQuantity = window.prompt(
+        `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
+        "",
+      );
+      if (enteredQuantity === null) return;
+      const partialStatus = formatPartiallyProvisionedStatus(Number(enteredQuantity), totalQuantity);
+      if (!partialStatus) {
+        window.alert(`Enter a whole number between 1 and ${Math.max(0, totalQuantity - 1)}.`);
+        return;
+      }
+      savedStatus = partialStatus;
+    }
+    setItems(prev => prev.map(it => it.id === id ? { ...it, status: savedStatus } : it));
     const po = getPOByNumber(poKey);
     const itemIndex = items.findIndex(it => it.id === id);
     if (po && itemIndex >= 0) {
       const previousStatus = po.items[itemIndex]?.status || currentItem?.status || "Pending";
-      const updatedLines = po.items.map((line, index) => index === itemIndex ? { ...line, status } : line);
+      const updatedLines = po.items.map((line, index) => index === itemIndex ? { ...line, status: savedStatus } : line);
       updatePO(poKey, {
         items: updatedLines,
       });
       setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
-      const text = `${currentItem?.name || "Item"} status changed from ${previousStatus} to ${status}.`;
-      const activity = makePOActivity(text, "status-change", `activity_item_status_${poKey}_${id}_${status}_${Date.now()}`);
+      const text = `${currentItem?.name || "Item"} status changed from ${previousStatus} to ${savedStatus}.`;
+      const activity = makePOActivity(text, "status-change", `activity_item_status_${poKey}_${id}_${savedStatus}_${Date.now()}`);
       appendPOActivity(poKey, activity);
       appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${text}`, {
         actor: activity.author,
@@ -1225,7 +1267,7 @@ export default function VendorOrderDetailPage() {
               <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
                 <span style={{ color: "#374151" }}>{initialData.poNumber}</span>
               </h1>
-              <StatusPill status={orderStatus} />
+              <StatusPill status={vendorDisplayStatus} />
               {isPOCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>PO Cancelled</span>}
               {isMasterOrderCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 600, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>Order Cancelled</span>}
             </div>
@@ -1323,12 +1365,68 @@ export default function VendorOrderDetailPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🚚</div>
               <div>
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 1 }}>Order Status</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{orderStatus}</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>Updated on Apr 17, 2026</div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 1 }}>Supplier Fulfillment Progress</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{vendorDisplayStatus}</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>Driven by the saved fulfillment status of the PO lines.</div>
               </div>
             </div>
-            <Stepper currentStatus={orderStatus} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 10, marginBottom: 16 }}>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Internal PO lifecycle</div>
+                <div style={{ marginTop: 3, fontSize: 13, fontWeight: 700 }}>
+                  {isCancelled ? "Cancelled" : isDraft ? "Draft" : "Confirmed"}
+                </div>
+              </div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Fulfillment scope</div>
+                <div style={{ marginTop: 3, fontSize: 13, fontWeight: 700 }}>
+                  {items.length} line{items.length === 1 ? "" : "s"} · {items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)} ordered units
+                </div>
+              </div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Next action</div>
+                <div style={{ marginTop: 3, fontSize: 12, lineHeight: 1.45, fontWeight: 600 }}>
+                  {isCancelled
+                    ? "No further fulfillment updates."
+                    : isDraft
+                      ? "Review the vendor, quantities and terms before confirming."
+                      : isDigitalOrder
+                        ? "Record actual provider quantities; activation depends on the product terms."
+                        : orderStatus === "Pending Shipping"
+                          ? "Record dispatch tracking before marking items shipped."
+                          : orderStatus === "Shipped" || orderStatus === "Partially Shipped"
+                            ? "Capture proof of delivery and delivered quantities."
+                            : orderStatus === "Delivered" || orderStatus === "Partially Delivered"
+                              ? "Complete acceptance under the applicable client terms."
+                              : "Advance each line only after its required work is complete."}
+                </div>
+              </div>
+            </div>
+            {isDigitalOrder ? (
+              <div>
+                <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Digital fulfillment stages</div>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${getDigitalFulfillmentStatusSequence().length}, minmax(0, 1fr))`, gap: 5 }}>
+                  {getDigitalFulfillmentStatusSequence().map((stage, index) => {
+                    const done = digitalStageIndex > index;
+                    const current = digitalStageIndex === index;
+                    return (
+                      <div key={stage} style={{ minWidth: 0, textAlign: "center" }}>
+                        <div style={{ height: 4, borderRadius: 4, marginBottom: 6, background: done || current ? "#2563eb" : "#e5e7eb" }} />
+                        <span style={{ display: "block", fontSize: 9.5, lineHeight: 1.25, color: current ? "#1d4ed8" : "#6b7280", fontWeight: current ? 700 : 500 }}>
+                          {stage}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <Stepper currentStatus={orderStatus} />
+            )}
+            <div style={{ marginTop: 12, fontSize: 11.5, color: "#6b7280" }}>
+              Invoice, payment, credit and refund states are tracked separately from fulfillment.
+              {isDigitalOrder ? " Digital provisioning counts are recorded per line; no fixed percentage is assumed." : ""}
+            </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
               {isCancelled ? (
                 <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
