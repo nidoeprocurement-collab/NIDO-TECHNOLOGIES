@@ -24,3 +24,11 @@ Orders created from either the NIDO platform or the client portal that match an 
 **Why:** Creating a Draft PO before client approval lets procurement work begin on an order that may still be rejected, and repeated approval actions must never duplicate POs.
 
 **How to apply:** Keep the gate in the shared order/approval services rather than only in a page button. Both owner approvals and client-portal approvals call the same approval action path, so both release behavior and duplicate protection stay consistent. Client-scoped workflows apply only to portal-originated orders; generic NIDO workflows still apply to platform orders for a selected client.
+
+## Operational workflow policy sign-off
+
+The NIDO operational workflow workbook is a target design, not evidence that each flow is already implemented or business-approved. Do not hardcode its proposed 72-hour return window, 2-day acceptance window, or customer-segment mapping without sign-off. Its acceptance scenarios remain unverified until staging UAT is run.
+
+**Why:** The workbook marks these as proposed decisions and its acceptance checklist as not run; guessing would change business and financial behavior.
+
+**How to apply:** Keep these values configurable or leave them unset until an authorized business owner confirms them. Report unrun UAT as unverified, not passed.

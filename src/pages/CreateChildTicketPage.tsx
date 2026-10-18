@@ -194,10 +194,9 @@ export default function CreateChildTicketPage() {
 
   const subCategories = category ? (TICKET_CATEGORIES[category] ?? []) : [];
 
-  // Check if a child already exists
-  const existingChild = parentNumber
-    ? loadChildTickets().find(c => c.parentNumber === parentNumber)
-    : undefined;
+  const existingChildren = parentNumber
+    ? loadChildTickets().filter(c => c.parentNumber === parentNumber)
+    : [];
 
   const fmtDate = (iso: string) => {
     try {
@@ -224,7 +223,17 @@ export default function CreateChildTicketPage() {
     if (!validate()) return;
     setSubmitting(true);
 
-    const number = `${parentNumber}-1`;
+    const existingTickets = loadChildTickets();
+    const prefix = `${parentNumber}-`;
+    const nextChildNumber = existingTickets
+      .filter(ticket => ticket.parentNumber === parentNumber && ticket.number.startsWith(prefix))
+      .reduce((highest, ticket) => {
+        const suffix = Number(ticket.number.slice(prefix.length));
+        return Number.isInteger(suffix) ? Math.max(highest, suffix) : highest;
+      }, 0) + 1;
+    let sequence = nextChildNumber;
+    while (existingTickets.some(ticket => ticket.number === `${prefix}${sequence}`)) sequence += 1;
+    const number = `${prefix}${sequence}`;
     const now = new Date().toISOString();
     const autoAssignment =
       resolveAutoAssignment({ department, clientId: parentRaw?.clientId })
@@ -248,8 +257,7 @@ export default function CreateChildTicketPage() {
       clientName:   parent?.clientName ?? "—",
     };
 
-    const existing = loadChildTickets().filter(c => c.number !== number);
-    saveChildTickets([ticket, ...existing]);
+    saveChildTickets([ticket, ...existingTickets]);
 
     setTimeout(() => {
       setSubmitting(false);
@@ -322,12 +330,11 @@ export default function CreateChildTicketPage() {
           </div>
         )}
 
-        {/* Already has child warning */}
-        {existingChild && (
+        {existingChildren.length > 0 && (
           <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-sm">
             <AlertCircle size={16} className="text-amber-500 shrink-0" />
             <span className="text-amber-700 dark:text-amber-300">
-              A child ticket <strong>{existingChild.number}</strong> already exists for this parent. Creating a new one will replace it.
+              This parent already has {existingChildren.length} child {existingChildren.length === 1 ? "ticket" : "tickets"}. The new child ticket will be added without replacing them.
             </span>
           </div>
         )}
@@ -530,7 +537,7 @@ export default function CreateChildTicketPage() {
                 <AlertCircle size={16} className="text-amber-500" />
                 <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300">Note</h4>
               </div>
-              <p className="text-xs text-amber-700 dark:text-amber-400">Only one child ticket can be created for a parent ticket.</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">A parent can have multiple child tickets. Closing a child ticket does not automatically close its parent.</p>
             </div>
 
             {/* What is a Child Ticket */}

@@ -4,6 +4,7 @@ import {
   getAllPOs,
   removeSubOrderFromDraftPOs,
   savePO,
+  updatePO,
   type POLineItem,
   type StoredPO,
 } from "../purchaseOrderStore";
@@ -78,6 +79,20 @@ const makePO = (
 describe("purchaseOrderStore cancellation", () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  it("cancels a Draft PO without cancelling the linked client order items", () => {
+    savePO(makePO("PO-00009", "Draft", [makeLine("SO-1", "Active item", 100)]));
+    localStorage.setItem("nido_subitems_ORDER-1", JSON.stringify({
+      "SO-1": { itemStatus: "Processing" },
+    }));
+
+    updatePO("PO-00009", { status: "Cancelled", cancelReason: "Draft PO abandoned" });
+
+    expect(getAllPOs()[0].status).toBe("Cancelled");
+    expect(JSON.parse(localStorage.getItem("nido_subitems_ORDER-1") || "{}")).toEqual({
+      "SO-1": { itemStatus: "Processing" },
+    });
   });
 
   it("removes one cancelled item from a Draft PO and recalculates the remaining PO", () => {

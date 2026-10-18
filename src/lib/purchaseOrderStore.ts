@@ -162,7 +162,11 @@ export function savePO(po: StoredPO): void {
   try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber: po.poNumber } })); } catch { /* SSR safe */ }
 }
 
-export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
+export function updatePO(
+  poNumber: string,
+  changes: Partial<StoredPO>,
+  options: { cancelLinkedItems?: boolean } = {},
+): void {
   const all = getAllPOs();
   const idx = all.findIndex((p) => p.poNumber === poNumber);
   if (idx >= 0) {
@@ -177,13 +181,13 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 
-    // When a PO is cancelled, clean up the order-level PO and vendor-selection
-    // localStorage keys and mark every covered order item inactive. A PO
-    // cancellation is terminal for those items; they must not become editable
-    // again just because the Order Details page was refreshed.
+    // A Draft PO can be cancelled independently; that must leave its client
+    // order and line items active. Non-draft PO cancellation is a linked-order
+    // cancellation and projects the terminal state to covered items.
     if (changes.status === "Cancelled") {
       const po = all[idx];
       const orderId = po.orderId;
+      const cancelLinkedItems = existing.status !== "Draft" || options.cancelLinkedItems === true;
       const subOrderIds: string[] = po.subOrderIds?.length
         ? po.subOrderIds
         : [po.subOrderId].filter(Boolean);
@@ -214,22 +218,22 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
       } catch { /* storage unavailable */ }
 
       try {
-        // Project the terminal PO state into the order-detail item state.
-        // This works for both Draft and confirmed POs and preserves the
-        // cancellation reason for the audit trail shown to the user.
-        const itemStateKey = `nido_subitems_${orderId}`;
-        const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
-        for (const subId of subOrderIds) {
-          itemState[subId] = {
-            ...(itemState[subId] || {}),
-            itemStatus: "Cancelled",
-            cancelReason: changes.cancelReason || "Purchase order cancelled",
-            tracking: null,
-            trackingOwner: undefined,
-            updatedOn: new Date().toLocaleDateString("en-IN"),
-          };
+        if (cancelLinkedItems) {
+          // Project a linked cancellation into the order-detail item state.
+          const itemStateKey = `nido_subitems_${orderId}`;
+          const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
+          for (const subId of subOrderIds) {
+            itemState[subId] = {
+              ...(itemState[subId] || {}),
+              itemStatus: "Cancelled",
+              cancelReason: changes.cancelReason || "Purchase order cancelled",
+              tracking: null,
+              trackingOwner: undefined,
+              updatedOn: new Date().toLocaleDateString("en-IN"),
+            };
+          }
+          localStorage.setItem(itemStateKey, JSON.stringify(itemState));
         }
-        localStorage.setItem(itemStateKey, JSON.stringify(itemState));
       } catch { /* storage unavailable */ }
 
       // Notify OrderDetailsPage (same tab) to sync its React state from localStorage
@@ -237,9 +241,11 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
         window.dispatchEvent(new CustomEvent("poCancelled", {
           detail: { poNumber, orderId, subOrderIds },
         }));
-        window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
-          detail: { orderId, subOrderIds, reason: changes.cancelReason || "Purchase order cancelled" },
-        }));
+        if (cancelLinkedItems) {
+          window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+            detail: { orderId, subOrderIds, reason: changes.cancelReason || "Purchase order cancelled" },
+          }));
+        }
       } catch { /* SSR safe */ }
     }
 
@@ -275,7 +281,7 @@ export function appendPOActivity(
 export function cancelDraftPOsForOrder(orderId: string, cancelReason?: string): string[] {
   const reason = cancelReason?.trim() || "Master order cancelled";
   const draftPOs = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft");
-  draftPOs.forEach(po => updatePO(po.poNumber, { status: "Cancelled", cancelReason: reason }));
+  draftPOs.forEach(po => updatePO(po.poNumber, { status: "Cancelled", cancelReason: reason }, { cancelLinkedItems: true }));
   return draftPOs.map(po => po.poNumber);
 }
 

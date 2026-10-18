@@ -1,5 +1,4 @@
 import { pool } from "../db.js";
-import { sendEmail } from "./emailService.js";
 
 const ACTIONS = new Set(["approve", "reject", "send_back", "request_changes", "delegate", "reassign", "cancel"]);
 const TERMINAL = new Set(["Approved", "Rejected", "Cancelled"]);
@@ -259,6 +258,9 @@ export async function evaluateAndCreate(payload) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      // Serialize request creation for this workflow so parallel submissions
+      // cannot both pass the duplicate-reference check.
+      await client.query("SELECT id FROM approval_workflows WHERE id=$1 FOR UPDATE", [workflow.id]);
       const existing = await client.query(
         `SELECT id FROM approval_requests
          WHERE workflow_id=$1 AND reference=$2
@@ -307,7 +309,6 @@ export async function evaluateAndCreate(payload) {
       await client.query("COMMIT");
       const request = await getRequest(requestId);
       created.push(request);
-      await notifyApprovers(payload, requestId, workflow, first);
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -377,56 +378,66 @@ function requiredApprovals(step) {
 export async function takeAction(requestId, body) {
   const action = String(body.action || "");
   if (!ACTIONS.has(action)) throw new Error("Unsupported approval action.");
-  const request = await getRequest(requestId);
-  if (!request) return null;
-  if (TERMINAL.has(request.status)) throw new Error("This approval request is already complete.");
   if (["reject", "send_back", "request_changes"].includes(action) && !String(body.comment || "").trim()) {
     throw new Error("A reason is required for this action.");
   }
   if (["delegate", "reassign"].includes(action) && !String(body.targetUserId || "").trim()) {
     throw new Error("A target user is required for delegation or reassignment.");
   }
-  const step = request.steps.find(s => Number(s.level_number) === Number(request.currentLevel));
   const actorRole = body.userRole || "";
   const actorId = body.userId || "system";
-  const sameClient = Boolean(request.clientId && body.clientId && request.clientId === String(body.clientId));
-  const clientAdmin = ["client_admin", "client_user"].includes(String(body.userType || ""))
-    && sameClient
-    && String(body.userType || "") === "client_admin";
-  const authorized = actorRole === "System Owner" ||
-    clientAdmin ||
-    (action === "cancel" && (String(actorId) === String(request.requestedBy) || actorRole === "System Admin")) ||
-    (step?.approver_type === "Role" && step.approver_role === actorRole) ||
-    (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
-    (step?.approver_type === "Department" && step.approver_role === body.userDepartment) ||
-    (["Manager", "Reporting Manager"].includes(step?.approver_type)
-      && String(request.context?.managerId || request.context?.reportingManagerId || "") === String(actorId));
-  if (!authorized) throw new Error("You are not an eligible approver for the current level.");
-
-  const priorApproverIds = new Set(
-    (request.timeline || [])
-      .filter(entry => entry.action === "approve" && String(entry.step_id) === String(step?.id))
-      .map(entry => String(entry.user_id || entry.user_name)),
-  );
-  if (action === "approve" && priorApproverIds.has(String(actorId))) {
-    throw new Error("You have already approved this approval level.");
-  }
-  const approvalCount = priorApproverIds.size + (action === "approve" ? 1 : 0);
-  const stepApprovalComplete = action === "approve" && approvalCount >= requiredApprovals(step);
-
-  let newStatus = request.status;
-  let nextLevel = request.currentLevel;
-  if (action === "approve" && stepApprovalComplete) {
-    if (request.currentLevel >= request.steps.length) newStatus = "Approved";
-    else { nextLevel += 1; newStatus = "In Progress"; }
-  } else if (action === "reject") newStatus = "Rejected";
-  else if (action === "send_back" || action === "request_changes") newStatus = "Sent Back";
-  else if (action === "delegate" || action === "reassign") newStatus = "In Progress";
-  else if (action === "cancel") newStatus = "Cancelled";
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const { rows: requestRows } = await client.query(
+      `${requestSelect()} WHERE r.id=$1 FOR UPDATE OF r`,
+      [requestId],
+    );
+    if (!requestRows[0]) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const request = mapRequest(requestRows[0]);
+    const [{ rows: timeline }, { rows: steps }] = await Promise.all([
+      client.query("SELECT * FROM approval_actions WHERE request_id=$1 ORDER BY created_at ASC, id ASC", [requestId]),
+      client.query("SELECT * FROM approval_request_steps WHERE request_id=$1 ORDER BY level_number ASC", [requestId]),
+    ]);
+    request.timeline = timeline;
+    request.steps = steps;
+    if (TERMINAL.has(request.status)) throw new Error("This approval request is already complete.");
+    const step = steps.find(s => Number(s.level_number) === Number(request.currentLevel));
+    const sameClient = Boolean(request.clientId && body.clientId && request.clientId === String(body.clientId));
+    const clientAdmin = String(body.userType || "") === "client_admin" && sameClient;
+    const authorized = actorRole === "System Owner" ||
+      clientAdmin ||
+      (action === "cancel" && (String(actorId) === String(request.requestedBy) || actorRole === "System Admin")) ||
+      (step?.approver_type === "Role" && step.approver_role === actorRole) ||
+      (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
+      (step?.approver_type === "Department" && step.approver_role === body.userDepartment) ||
+      (["Manager", "Reporting Manager"].includes(step?.approver_type)
+        && String(request.context?.managerId || request.context?.reportingManagerId || "") === String(actorId));
+    if (!authorized) throw new Error("You are not an eligible approver for the current level.");
+
+    const priorApproverIds = new Set(
+      timeline
+        .filter(entry => entry.action === "approve" && String(entry.step_id) === String(step?.id))
+        .map(entry => String(entry.user_id || entry.user_name)),
+    );
+    if (action === "approve" && priorApproverIds.has(String(actorId))) {
+      throw new Error("You have already approved this approval level.");
+    }
+    const approvalCount = priorApproverIds.size + (action === "approve" ? 1 : 0);
+    const stepApprovalComplete = action === "approve" && approvalCount >= requiredApprovals(step);
+    let newStatus = request.status;
+    let nextLevel = request.currentLevel;
+    if (action === "approve" && stepApprovalComplete) {
+      if (request.currentLevel >= steps.length) newStatus = "Approved";
+      else { nextLevel += 1; newStatus = "In Progress"; }
+    } else if (action === "reject") newStatus = "Rejected";
+    else if (action === "send_back" || action === "request_changes") newStatus = "Sent Back";
+    else if (action === "delegate" || action === "reassign") newStatus = "In Progress";
+    else if (action === "cancel") newStatus = "Cancelled";
+
     if (action === "approve" && !stepApprovalComplete) {
       await client.query(
         "UPDATE approval_request_steps SET status='Pending', decided_by=NULL, decided_at=NULL WHERE id=$1",
@@ -462,7 +473,7 @@ export async function takeAction(requestId, body) {
       await client.query("UPDATE approval_requests SET current_level=$2, status=$3, due_at=$4 WHERE id=$1", [requestId, nextLevel, newStatus, due]);
     } else {
       await client.query(
-        "UPDATE approval_requests SET status=$2, completed_at=CASE WHEN $2 IN ('Approved','Rejected') THEN now() ELSE completed_at END WHERE id=$1",
+        "UPDATE approval_requests SET status=$2, completed_at=CASE WHEN $2 IN ('Approved','Rejected','Cancelled') THEN now() ELSE completed_at END WHERE id=$1",
         [requestId, newStatus],
       );
     }
@@ -512,24 +523,4 @@ export async function workflowHistory(workflowId) {
     [workflowId],
   );
   return rows;
-}
-
-async function notifyApprovers(payload, requestId, workflow, level) {
-  const recipients = Array.isArray(payload.approverEmails)
-    ? payload.approverEmails.filter(email => typeof email === "string" && email.includes("@"))
-    : [];
-  if (!recipients.length) return;
-  await Promise.all(recipients.map(to => sendEmail({
-    templateKey: "approval_request",
-    to,
-    variables: {
-      user_name: level.approverRole || "approver",
-      order_number: payload.reference || requestId,
-      amount: payload.amount == null ? "" : `₹${Number(payload.amount).toLocaleString("en-IN")}`,
-      portal_url: payload.portalUrl || "/configuration/workflows",
-    },
-    triggerModule: `approval:${workflow.module}`,
-    sentBy: payload.requestedBy || "system",
-    dedupeKey: `approval-request:${requestId}:${to}`,
-  }).catch(error => console.warn("[approval] notification queued failed:", error.message))));
 }
