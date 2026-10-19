@@ -420,6 +420,7 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
   const statusSequence = digital
     ? getDigitalFulfillmentStatusSequence(quantity)
     : ITEM_STATUS_SEQUENCE;
+  const canPartiallyProvision = Number.isInteger(Number(quantity)) && Number(quantity) > 1;
   const physicalNextStatus: Record<string, string> = {
     Pending: "Processing",
     Confirmed: "Processing",
@@ -434,7 +435,9 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
     : ITEM_STATUS_SEQUENCE.indexOf(baseStatus);
   const nextStatus = digital
     ? currentStatusIndex >= 0
-      ? statusSequence[currentStatusIndex + 1]
+      ? statusSequence.slice(currentStatusIndex + 1).find(stage =>
+        stage !== "Partially Provisioned" || canPartiallyProvision
+      )
       : statusSequence[0]
     : physicalNextStatus[baseStatus];
   const itemStatuses = Array.from(new Set([
@@ -946,6 +949,10 @@ export default function VendorOrderDetailPage() {
     let savedStatus = status;
     if (digital && status === "Partially Provisioned") {
       const totalQuantity = Number(currentItem?.qty);
+      if (!Number.isInteger(totalQuantity) || totalQuantity < 2) {
+        window.alert("Partial provisioning is only available when at least two licenses were ordered. For a single license, select Provisioned when it is complete.");
+        return;
+      }
       const enteredQuantity = window.prompt(
         `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
         "",
