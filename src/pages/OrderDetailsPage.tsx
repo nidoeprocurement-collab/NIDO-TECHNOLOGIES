@@ -2321,8 +2321,12 @@ function ThreeDotMenu({
   const isDigitalItem = isDigitalDocumentProduct(sub);
   const digitalStatusSequence = getDigitalFulfillmentStatusSequence(sub.qty);
   const currentDigitalStatusIndex = getDigitalFulfillmentStatusIndex(sub.itemStatus, sub.qty);
+  const canPartiallyProvision = Number.isInteger(Number(sub.qty)) && Number(sub.qty) > 1;
   const digitalStatuses = isDigitalItem
-    ? [digitalStatusSequence[currentDigitalStatusIndex >= 0 ? currentDigitalStatusIndex + 1 : 0]].filter(Boolean)
+    ? [digitalStatusSequence
+        .slice(currentDigitalStatusIndex >= 0 ? currentDigitalStatusIndex + 1 : 0)
+        .find(status => status !== "Partially Provisioned" || canPartiallyProvision)]
+        .filter(Boolean)
     : [];
   const statuses = isDigitalItem
     ? digitalStatuses
@@ -3086,7 +3090,11 @@ export default function MyOrderPage() {
     if (isDigitalDocumentProduct(target)) {
       const currentIndex = getDigitalFulfillmentStatusIndex(target.itemStatus, target.qty);
       const nextIndex = getDigitalFulfillmentStatusIndex(status, target.qty);
-      if (nextIndex < 0 || (currentIndex >= 0 && nextIndex !== currentIndex + 1)) return;
+      const canPartiallyProvision = Number.isInteger(Number(target.qty)) && Number(target.qty) > 1;
+      const expectedNextStatus = getDigitalFulfillmentStatusSequence(target.qty)
+        .slice(currentIndex >= 0 ? currentIndex + 1 : 0)
+        .find(stage => stage !== "Partially Provisioned" || canPartiallyProvision);
+      if (nextIndex < 0 || status !== expectedNextStatus) return;
     }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
@@ -3099,6 +3107,10 @@ export default function MyOrderPage() {
     let savedStatus = status;
     if (isDigitalDocumentProduct(target) && status === "Partially Provisioned") {
       const totalQuantity = Number(target.qty);
+      if (!Number.isInteger(totalQuantity) || totalQuantity < 2) {
+        window.alert("Partial provisioning is only available when at least two licenses were ordered. For a single license, select Provisioned when it is complete.");
+        return;
+      }
       const enteredQuantity = window.prompt(
         `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
         "",
