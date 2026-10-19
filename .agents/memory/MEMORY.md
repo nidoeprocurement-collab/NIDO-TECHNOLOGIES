@@ -15,4 +15,5 @@
 - [Approval engine adapter](approval-engine-local-mode.md) — approval UI/service contracts support local persistence now and a future backend switch via one environment flag.
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
+- [Digital fulfillment status authority](digital-fulfillment-status-authority.md) — Order Details cannot advance beyond the saved status on its linked confirmed PO line.
 - [Client contract archive behavior](client-contract-archive.md) — archived contracts remain viewable from the archive list, but their details are read-only.

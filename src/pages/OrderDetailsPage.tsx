@@ -2287,6 +2287,7 @@ function ThreeDotMenu({
   onRequestPickupScheduled,
   onRequestPickupDone,
   statusUpdatesEnabled,
+  poDigitalStatus,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const [statusWarning, setStatusWarning] = useState<{ status: string; reason: string } | null>(null);
@@ -2349,6 +2350,13 @@ function ThreeDotMenu({
     if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
      if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
      if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
+    if (isDigitalItem) {
+      const poStatusIndex = getDigitalFulfillmentStatusIndex(poDigitalStatus || "", sub.qty);
+      const requestedIndex = getDigitalFulfillmentStatusIndex(status, sub.qty);
+      if (poStatusIndex < requestedIndex) {
+        return `Update this item to ${status} in PO Details first.`;
+      }
+    }
     const currentIndex = isDigitalItem
       ? getDigitalFulfillmentStatusIndex(sub.itemStatus, sub.qty)
       : ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
@@ -2629,6 +2637,15 @@ function getCanonicalPOForSubOrder(pos: any[], subOrderOrId: string | any): any 
       if (rank !== 0) return rank;
       return String(b.createdOn || "").localeCompare(String(a.createdOn || ""));
     })[0] || null;
+}
+
+function getDigitalPOFulfillmentStatus(po: any, subOrder: any): string {
+  if (!po || !isConfirmedPO(po)) return "";
+  const line = findPOLineForSubOrder(po, subOrder.id, subOrder);
+  const status = String(line?.status || "").trim();
+  return !status || ["pending", "confirmed"].includes(status.toLowerCase())
+    ? "Processing"
+    : status;
 }
 
 function getCancelledPOForSubOrder(pos: any[], subOrderId: string, subOrder?: any): any | null {
@@ -3095,6 +3112,13 @@ export default function MyOrderPage() {
         .slice(currentIndex >= 0 ? currentIndex + 1 : 0)
         .find(stage => stage !== "Partially Provisioned" || canPartiallyProvision);
       if (nextIndex < 0 || status !== expectedNextStatus) return;
+      const orderPOs = getAllPOs().filter(po => po.orderId === orderId);
+      const linkedPO = getCanonicalPOForSubOrder(orderPOs, target);
+      const poStatusIndex = getDigitalFulfillmentStatusIndex(
+        getDigitalPOFulfillmentStatus(linkedPO, target),
+        target.qty,
+      );
+      if (!linkedPO || poStatusIndex < nextIndex) return;
     }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
@@ -3111,17 +3135,27 @@ export default function MyOrderPage() {
         window.alert("Partial provisioning is only available when at least two licenses were ordered. For a single license, select Provisioned when it is complete.");
         return;
       }
-      const enteredQuantity = window.prompt(
-        `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
-        "",
+      const linkedPO = getCanonicalPOForSubOrder(
+        getAllPOs().filter(po => po.orderId === orderId),
+        target,
       );
-      if (enteredQuantity === null) return;
-      const partialStatus = formatPartiallyProvisionedStatus(Number(enteredQuantity), totalQuantity);
-      if (!partialStatus) {
-        window.alert(`Enter a whole number between 1 and ${Math.max(0, totalQuantity - 1)}.`);
-        return;
+      const poLineStatus = String(findPOLineForSubOrder(linkedPO, target.id, target)?.status || "");
+      const savedPartial = poLineStatus.match(/^Partially Provisioned\s*\((\d+)\/(\d+)\)$/i);
+      if (savedPartial && Number(savedPartial[2]) === totalQuantity) {
+        savedStatus = poLineStatus;
+      } else {
+        const enteredQuantity = window.prompt(
+          `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
+          "",
+        );
+        if (enteredQuantity === null) return;
+        const partialStatus = formatPartiallyProvisionedStatus(Number(enteredQuantity), totalQuantity);
+        if (!partialStatus) {
+          window.alert(`Enter a whole number between 1 and ${Math.max(0, totalQuantity - 1)}.`);
+          return;
+        }
+        savedStatus = partialStatus;
       }
-      savedStatus = partialStatus;
     }
     const previousStatus = target.itemStatus;
     const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
@@ -4411,6 +4445,9 @@ export default function MyOrderPage() {
                     );
                     const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id, sub);
                     const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub);
+                    const poDigitalStatus = subIsDigital
+                      ? getDigitalPOFulfillmentStatus(canonicalPO, sub)
+                      : "";
                     const cancelledLine = allOrderPOs.some((po: any) =>
                       po.items?.some((line: any) =>
                         line.subOrderId === sub.id &&
@@ -4651,6 +4688,7 @@ export default function MyOrderPage() {
                             onUpdateStatus={s => updateStatus(sub.id, s)}
                             onRequestShipped={() => requestShipped(sub.id)}
                             canMarkShipped={canMarkShipped}
+                            poDigitalStatus={poDigitalStatus}
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
