@@ -4,6 +4,7 @@
 
 import { getPrefix } from "./configService";
 import type { ProductCommercialTerms } from "./productCommercialTerms";
+import { syncMasterOrderFulfillmentStatus } from "./orderFulfillmentStatus";
 
 export interface PODocument {
   id: string;
@@ -135,6 +136,60 @@ export function isPOConfirmed(po: Pick<StoredPO, "status"> | null | undefined): 
   return Boolean(status) && status !== "draft" && status !== "cancelled" && status !== "rejected";
 }
 
+function syncPOFulfillmentToClientOrder(po: StoredPO): void {
+  if (typeof window === "undefined" || !po.orderId || !isPOConfirmed(po) || !po.items?.length) return;
+  const key = `nido_subitems_${po.orderId}`;
+  let itemStates: Record<string, any> = {};
+  try {
+    itemStates = JSON.parse(localStorage.getItem(key) || "{}");
+  } catch {
+    itemStates = {};
+  }
+
+  const changedSubOrderIds: string[] = [];
+  const updatedOn = new Date().toLocaleDateString("en-IN");
+  po.items.forEach((line, index) => {
+    const subOrderId = line.subOrderId || po.subOrderIds?.[index] || "";
+    if (!subOrderId) return;
+    const existing = itemStates[subOrderId] || {};
+    const rawStatus = String(line.status || "").trim();
+    const itemStatus = !rawStatus || ["pending", "confirmed"].includes(rawStatus.toLowerCase())
+      ? "Processing"
+      : rawStatus;
+    if (existing.itemStatus === "Cancelled" && itemStatus !== "Cancelled") return;
+    if (
+      ["Return Request Raised", "Pickup Scheduled", "Pickup Done"].includes(existing.itemStatus) &&
+      itemStatus === "Delivered"
+    ) return;
+
+    const updated = {
+      ...existing,
+      itemStatus,
+      statusOwner: "purchase-order",
+      updatedOn,
+      ...(line.tracking !== undefined ? {
+        tracking: line.tracking,
+        trackingOwner: line.tracking ? "purchase-order" : undefined,
+      } : {}),
+      ...(line.referenceNumber !== undefined ? { referenceNumber: line.referenceNumber } : {}),
+      ...(line.serialNumber !== undefined ? { serialNumber: line.serialNumber } : {}),
+    };
+    if (JSON.stringify(updated) !== JSON.stringify(existing)) {
+      itemStates[subOrderId] = updated;
+      changedSubOrderIds.push(subOrderId);
+    }
+  });
+
+  if (changedSubOrderIds.length) {
+    localStorage.setItem(key, JSON.stringify(itemStates));
+    window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+      detail: { orderId: po.orderId, subOrderIds: changedSubOrderIds },
+    }));
+  }
+  // Keep the order-list summary aligned even when Order Details is not open.
+  syncMasterOrderFulfillmentStatus(po.orderId);
+}
+
 const STORAGE_KEY = "nido_all_purchase_orders";
 
 export function getAllPOs(): StoredPO[] {
@@ -158,6 +213,7 @@ export function savePO(po: StoredPO): void {
     all.unshift(po);
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  syncPOFulfillmentToClientOrder(po);
   // Notify any listening page (e.g. PurchaseOrdersPage) to refresh
   try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber: po.poNumber } })); } catch { /* SSR safe */ }
 }
@@ -249,6 +305,9 @@ export function updatePO(
       } catch { /* SSR safe */ }
     }
 
+    if (changes.status !== "Cancelled" && (changes.status !== undefined || changes.items !== undefined)) {
+      syncPOFulfillmentToClientOrder(all[idx]);
+    }
     try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber } })); } catch { /* SSR safe */ }
   }
 }

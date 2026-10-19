@@ -95,6 +95,36 @@ describe("purchaseOrderStore cancellation", () => {
     });
   });
 
+  it("projects confirmed PO line progress into the linked order and My Orders status", () => {
+    const orderId = "ORDER-DIGITAL-1";
+    const subOrderId = "SO-DIGITAL-1";
+    const line = {
+      ...makeLine(subOrderId, "Digital license", 100),
+      qty: 4,
+      productType: "Digital SaaS",
+    } as POLineItem;
+    savePO(makePO("PO-DIGITAL-1", "Draft", [line], orderId));
+    localStorage.setItem("nido_my_orders", JSON.stringify([{
+      id: orderId,
+      status: "Processing",
+      cartItems: [{ subOrderId, productType: "Digital SaaS", quantity: 4 }],
+    }]));
+    localStorage.setItem(`nido_subitems_${orderId}`, JSON.stringify({
+      [subOrderId]: { itemStatus: "Processing" },
+    }));
+
+    updatePO("PO-DIGITAL-1", { status: "Confirmed" });
+    const confirmedPO = getAllPOs()[0];
+    updatePO("PO-DIGITAL-1", {
+      items: confirmedPO.items.map(item => ({ ...item, status: "Provisioning" })),
+    });
+
+    expect(JSON.parse(localStorage.getItem(`nido_subitems_${orderId}`) || "{}")[subOrderId].itemStatus)
+      .toBe("Provisioning");
+    expect(JSON.parse(localStorage.getItem("nido_my_orders") || "[]")[0].status)
+      .toBe("Provisioning");
+  });
+
   it("removes one cancelled item from a Draft PO and recalculates the remaining PO", () => {
     const firstLine = makeLine("SO-1", "Cancelled item", 100);
     const remainingLine = makeLine("SO-2", "Remaining item", 50);

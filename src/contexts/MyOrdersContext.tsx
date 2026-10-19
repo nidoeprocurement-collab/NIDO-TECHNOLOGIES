@@ -13,6 +13,11 @@ import { appendOrderActivityOnce, getActivityActor } from "../lib/orderActivityS
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
   | "Processing"
+  | "Provisioning"
+  | "Partially Provisioned"
+  | "Provisioned"
+  | "Activated"
+  | "Completed"
   | "Pending Shipping"
   | "Partially Shipped"
   | "Shipped"

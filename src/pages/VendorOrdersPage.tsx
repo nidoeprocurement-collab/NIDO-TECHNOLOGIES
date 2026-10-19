@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
 import { getAllPOs, getPODisplayStatus, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
+import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import { getProcurementSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
@@ -29,7 +30,10 @@ interface Order {
   items: string;
 }
 
-const LEGACY_PO_STATUSES: OrderStatus[] = ["Pending", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
+const LEGACY_PO_STATUSES: OrderStatus[] = [
+  "Pending", "Processing", "Provisioning", "Partially Provisioned", "Provisioned",
+  "Activated", "Completed", "Shipped", "Delivered", "Closed", "Cancelled",
+];
 const PAGE_SIZE = 10;
 
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
@@ -77,7 +81,7 @@ function storedPOToOrder(po: StoredPO): Order {
     vendor:    po.vendorName,
     date:      hasValidDate ? createdDate.toISOString().split("T")[0] : "",
     dateStr:   hasValidDate ? createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : po.createdOnDisplay || "—",
-    status:    getPODisplayStatus(po.status),
+    status:    derivePOFulfillmentStatus(po),
     amount:    po.grandTotal,
     amountStr: fmtINR(po.grandTotal),
     client:    "",

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  deriveOrderFulfillmentStatus,
+  derivePOFulfillmentStatus,
   deriveMasterOrderFulfillmentStatus,
   syncMasterOrderFulfillmentStatus,
 } from "@/lib/orderFulfillmentStatus";
@@ -43,5 +45,28 @@ describe("master order fulfillment status", () => {
     expect(savedOrders[0].status).toBe("Partially Delivered");
     expect(events).toHaveLength(1);
     expect(events[0].detail).toEqual({ orderId, status: "Partially Delivered" });
+  });
+
+  it("shows digital fulfillment progress on PO and master-order summaries", () => {
+    const line = {
+      subOrderId: "SO-DIGITAL-1",
+      productType: "Digital SaaS",
+      qty: 4,
+      status: "Partially Provisioned (2/4)",
+    };
+    expect(deriveOrderFulfillmentStatus([line])).toBe("Partially Provisioned");
+    expect(derivePOFulfillmentStatus({ status: "Confirmed", items: [line] })).toBe("Partially Provisioned");
+    expect(deriveOrderFulfillmentStatus([{ ...line, status: "Activated" }])).toBe("Activated");
+
+    const orderId = "ORD-DIGITAL-1";
+    localStorage.setItem("nido_my_orders", JSON.stringify([{
+      id: orderId,
+      status: "Processing",
+      cartItems: [{ ...line, status: undefined }],
+    }]));
+    localStorage.setItem(`nido_subitems_${orderId}`, JSON.stringify({
+      [line.subOrderId]: { itemStatus: line.status },
+    }));
+    expect(syncMasterOrderFulfillmentStatus(orderId)).toBe("Partially Provisioned");
   });
 });

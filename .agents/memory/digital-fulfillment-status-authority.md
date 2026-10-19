@@ -3,8 +3,8 @@ name: Digital fulfillment status authority
 description: The linked PO line is the source of truth for digital fulfillment progress.
 ---
 
-Order Details must not let a digital item advance beyond the status saved on its linked confirmed PO line. After the PO line reaches that stage, Order Details may catch up; partial provisioning must reuse the exact completed quantity already recorded on the PO. A single-unit order cannot be partially provisioned.
+The linked confirmed PO line is the source of truth for digital progress. Order Details must not advance beyond it, and Vendor Orders and My Orders summaries must reflect the same saved line status. Partial provisioning must reuse the exact completed quantity recorded on the PO. A single-unit order cannot be partially provisioned.
 
-**Why:** The user explicitly requires the PO detail status to be updated before the same fulfillment status can be applied in Order Details, to prevent the two views from diverging.
+**Why:** The user explicitly requires PO-first status changes and consistent statuses across PO details, Order Details, Vendor Orders, and My Orders so the views do not diverge.
 
-**How to apply:** Keep the check in both the visible Order Details status menu and its update handler. Compare normalized digital stages so saved partial quantities still match their stage, and copy the PO's partial count rather than prompting for a second value.
+**How to apply:** Keep the check in both the visible Order Details status menu and its update handler. Project saved PO line progress into linked order items and derive list summaries from those items. Compare normalized digital stages so saved partial quantities still match their stage, and copy the PO's partial count rather than prompting for a second value.

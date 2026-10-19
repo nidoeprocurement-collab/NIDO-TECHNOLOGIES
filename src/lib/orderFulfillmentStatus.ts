@@ -1,3 +1,6 @@
+import { deriveDigitalFulfillmentStatus } from "./digitalFulfillmentStatuses";
+import { isDigitalDocumentProduct } from "./productDocumentRules";
+
 export type FulfillmentStatus =
   | "Pending"
   | "Processing"
@@ -6,6 +9,11 @@ export type FulfillmentStatus =
   | "Shipped"
   | "Partially Delivered"
   | "Delivered"
+  | "Provisioning"
+  | "Partially Provisioned"
+  | "Provisioned"
+  | "Activated"
+  | "Completed"
   | "Cancelled";
 
 const ORDERS_KEY = "nido_my_orders";
@@ -25,7 +33,7 @@ function isReturnWorkflow(status: unknown): boolean {
 }
 
 function isDeliveryComplete(status: unknown): boolean {
-  return isDelivered(status) || isReturnWorkflow(status);
+  return isDelivered(status) || isReturnWorkflow(status) || normalize(status) === "completed";
 }
 
 function isShipped(status: unknown): boolean {
@@ -76,6 +84,46 @@ export function deriveMasterOrderFulfillmentStatus(
     : deriveFulfillmentStatus(statuses, fallback);
 }
 
+/** Aggregate physical and digital line progress into a status suitable for order lists. */
+export function deriveOrderFulfillmentStatus(
+  lines: Array<Record<string, any>>,
+  fallback: FulfillmentStatus = "Processing",
+): FulfillmentStatus {
+  const active = lines.filter(line => !isCancelled(line?.status));
+  if (lines.length > 0 && active.length === 0) return "Cancelled";
+  if (active.length === 0) return fallback;
+
+  const digital = active.filter(isDigitalDocumentProduct);
+  const physical = active.filter(line => !isDigitalDocumentProduct(line));
+  if (!physical.length) {
+    return deriveDigitalFulfillmentStatus(digital.map(line => ({
+      status: String(line.status || "Pending"),
+      quantity: line.quantity ?? line.qty ?? 1,
+    }))) as FulfillmentStatus;
+  }
+  const physicalStatuses = physical.map(line => line.status);
+  const physicalStatus = deriveMasterOrderFulfillmentStatus(physicalStatuses, fallback);
+  if (!digital.length) return physicalStatus;
+
+  const digitalStatus = deriveDigitalFulfillmentStatus(digital.map(line => ({
+    status: String(line.status || "Pending"),
+    quantity: line.quantity ?? line.qty ?? 1,
+  }))) as FulfillmentStatus;
+  const physicalComplete = physicalStatuses.every(status => isDeliveryComplete(status));
+  if (physicalComplete && digitalStatus === "Completed") return "Completed";
+  if (physicalComplete) return digitalStatus;
+  if (digitalStatus === "Completed") return physicalStatus;
+
+  const combinedStatus = deriveMasterOrderFulfillmentStatus(
+    [...physicalStatuses, ...digital.map(line => line.status)],
+    fallback,
+  );
+  // Keep visible digital progress when the physical part is still processing.
+  return combinedStatus === "Processing" && digitalStatus !== "Processing"
+    ? digitalStatus
+    : combinedStatus;
+}
+
 function readJson<T>(key: string, fallback: T): T {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) || "");
@@ -112,14 +160,18 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
   const saved = readJson<Record<string, any>>(`nido_subitems_${orderId}`, {});
   const items = Array.isArray(order.cartItems) ? order.cartItems : [];
 
-  const statuses = items.map((item: any, index: number) => {
+  const lines = items.map((item: any, index: number) => {
     const subOrderId = item?.subOrderId || `SO-${orderId}-${String(index + 1).padStart(3, "0")}`;
     const storedStatus = saved[subOrderId]?.itemStatus;
-    return storedStatus || "Processing";
+    return {
+      ...item,
+      status: storedStatus || "Processing",
+      quantity: item?.quantity ?? item?.qty ?? 1,
+    };
   });
 
-  const nextStatus = deriveMasterOrderFulfillmentStatus(
-    statuses,
+  const nextStatus = deriveOrderFulfillmentStatus(
+    lines,
     (order.status as FulfillmentStatus) || "Processing",
   );
   if (order.status !== nextStatus) {
@@ -147,10 +199,17 @@ export function derivePOFulfillmentStatus(po: any): FulfillmentStatus {
       ? "Processing"
       : (po?.status || "Processing") as FulfillmentStatus;
   }
-  const statuses = lines.map(line => lineStatus(line, po));
-  const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
-  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDeliveryComplete(status));
-  return hasPendingShipping && !hasShipmentProgress
-    ? "Pending Shipping"
-    : deriveFulfillmentStatus(statuses, "Processing");
+  const statuses = lines.map(line => {
+    const status = lineStatus(line, po);
+    const effectiveStatus = isDigitalDocumentProduct(line)
+      && ["pending", "confirmed"].includes(normalize(status))
+      ? "Processing"
+      : status;
+    return {
+      ...line,
+      status: effectiveStatus,
+      quantity: line.qty ?? line.quantity ?? 1,
+    };
+  });
+  return deriveOrderFulfillmentStatus(statuses, "Processing");
 }

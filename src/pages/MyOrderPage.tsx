@@ -15,6 +15,11 @@ import { normalizeOrdersForList } from "@/lib/orderListData";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Provisioning:          { bg: "#eef2ff", color: "#4338ca", border: "#c7d2fe" },
+  "Partially Provisioned": { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  Provisioned:           { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Activated:             { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Completed:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   "Pending Shipping":    { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" },
   "Partially Shipped":   { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   Shipped:               { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
@@ -25,7 +30,8 @@ const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: str
 };
 
 const ALL_STATUSES: OrderStatus[] = [
-  "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
+  "Processing", "Provisioning", "Partially Provisioned", "Provisioned", "Activated", "Completed",
+  "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
 ];
 
 // ALL_TABS is now derived inside the component from live orders
@@ -453,7 +459,10 @@ export default function MyOrderPage() {
 
   // Derive tab counts from live orders
   const ALL_TABS = useMemo(() => {
-    const statuses: OrderStatus[] = ["Draft", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled"];
+    const statuses: OrderStatus[] = [
+      "Draft", "Processing", "Provisioning", "Partially Provisioned", "Provisioned", "Activated", "Completed",
+      "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled",
+    ];
     return [
        { key: "All Orders", label: "All Orders", count: visibleOrders.length },
        ...statuses.map(s => ({ key: s, label: s, count: visibleOrders.filter(o => o.status === s).length })),
