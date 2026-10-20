@@ -1524,7 +1524,17 @@ function DocRowMenu({ onDownload, onRemove }) {
   );
 }
 
-function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: string; locked?: boolean; auditNote?: OrderNote | null }) {
+function DocumentsNotesTab({
+  orderId,
+  locked = false,
+  auditNote,
+  onDocumentActivity,
+}: {
+  orderId: string;
+  locked?: boolean;
+  auditNote?: OrderNote | null;
+  onDocumentActivity?: (text: string) => void;
+}) {
   const { user, isClientPortalUser } = useAuth();
   const { orders } = useMyOrders();
   const notesKey = `nido_notes_${orderId}`;
@@ -1657,6 +1667,7 @@ function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: st
       setDocFeedback({ type: "error", message: "The document could not be saved because browser storage is unavailable or full." });
       return false;
     }
+    onDocumentActivity?.(`Document uploaded: ${doc.name || "Untitled document"} (${doc.type || "Document"}).`);
 
     if (protectedDetails) {
       try {
@@ -1708,6 +1719,7 @@ function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: st
     document.body.appendChild(link);
     link.click();
     link.remove();
+    onDocumentActivity?.(`Document downloaded: ${doc.name || "document"} (${doc.type || "Document"}).`);
     return true;
   };
 
@@ -2960,7 +2972,7 @@ export default function MyOrderPage() {
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
   const [documentsAuditNote, setDocumentsAuditNote] = useState<OrderNote | null>(null);
 
-  const queueDocumentsAuditNote = (text: string) => {
+  const queueDocumentsAuditNote = (text: string, kind: "activity" | "status-change" = "status-change") => {
     const now = new Date();
     const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -2971,7 +2983,7 @@ export default function MyOrderPage() {
       date,
       text: `${text}\n\nActioned by: ${actor}\nActioned on: ${date}`,
       visibility: "External Note",
-      kind: "status-change",
+      kind,
     });
   };
 
@@ -5005,7 +5017,12 @@ export default function MyOrderPage() {
             are visible to the client but only the owner platform can upload
             or remove them. */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
-            <DocumentsNotesTab orderId={orderId} locked={documentsLocked} auditNote={documentsAuditNote} />
+            <DocumentsNotesTab
+              orderId={orderId}
+              locked={documentsLocked}
+              auditNote={documentsAuditNote}
+              onDocumentActivity={(text) => queueDocumentsAuditNote(text, "activity")}
+            />
         </div>
       </div>
 

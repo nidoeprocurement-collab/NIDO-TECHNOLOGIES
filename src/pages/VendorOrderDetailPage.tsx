@@ -1096,8 +1096,48 @@ export default function VendorOrderDetailPage() {
     });
 
   };
+  const recordDocumentActivity = (action: "uploaded" | "downloaded", doc: any) => {
+    const activity = makePOActivity(
+      `Document ${action}: ${doc.name || "Untitled document"} (${doc.type || "Document"}).`,
+      "activity",
+      `activity_document_${action}_${poKey}_${doc.id || Date.now()}${action === "downloaded" ? `_${Date.now()}` : ""}`,
+    );
+    if (getPOByNumber(poKey)) {
+      appendPOActivity(poKey, activity);
+    } else {
+      setNotes(prev => [activity, ...prev]);
+    }
+  };
+  const handleUploadDocument = (doc: any) => {
+    const nextDocuments = [...documents, doc];
+    if (getPOByNumber(poKey)) updatePO(poKey, { documents: nextDocuments });
+    setDocuments(nextDocuments);
+    recordDocumentActivity("uploaded", doc);
+  };
+  const handleDownloadDocument = (doc: any) => {
+    if (doc?.dataUrl) {
+      const link = document.createElement("a");
+      link.href = doc.dataUrl;
+      link.download = doc.name || "document";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      recordDocumentActivity("downloaded", doc);
+    } else {
+      const currentPO = getPOByNumber(poKey);
+      if (!currentPO) {
+        alert(`Downloading: ${doc.name}`);
+        return;
+      }
+      void downloadPOPdf(currentPO)
+        .then(() => recordDocumentActivity("downloaded", doc))
+        .catch(console.warn);
+    }
+  };
   const handleDeleteDoc = (id: string) => {
-    setDocuments(prev => prev.filter(d => d.id !== id));
+    const nextDocuments = documents.filter(doc => doc.id !== id);
+    if (getPOByNumber(poKey)) updatePO(poKey, { documents: nextDocuments });
+    setDocuments(nextDocuments);
   };
   const handleDeleteNote = (id: string) => {
     const nextNotes = notes.filter(n => n.id !== id);
@@ -1695,20 +1735,7 @@ export default function VendorOrderDetailPage() {
                     <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
                     <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
                     <DocActionsMenu
-                      onDownload={() => {
-                        if ((doc as any).dataUrl) {
-                          const a = document.createElement("a");
-                          a.href = (doc as any).dataUrl;
-                          a.download = doc.name;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                        } else if (realPO) {
-                          downloadPOPdf(realPO).catch(console.warn);
-                        } else {
-                          alert(`Downloading: ${doc.name}`);
-                        }
-                      }}
+                      onDownload={() => handleDownloadDocument(doc)}
                       onDelete={() => handleDeleteDoc(doc.id)}
                     />
                   </div>
@@ -1855,7 +1882,7 @@ export default function VendorOrderDetailPage() {
       )}
       {showUploadDocument && (
         <UploadDocumentModal
-          onSave={doc => setDocuments(prev => [...prev, doc])}
+          onSave={handleUploadDocument}
           onClose={() => setShowUploadDocument(false)}
         />
       )}
