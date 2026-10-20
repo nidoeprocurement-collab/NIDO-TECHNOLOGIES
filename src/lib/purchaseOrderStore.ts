@@ -237,16 +237,25 @@ export function updatePO(
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 
-    // A Draft PO can be cancelled independently; that must leave its client
-    // order and line items active. Non-draft PO cancellation is a linked-order
-    // cancellation and projects the terminal state to covered items.
+    // Cancelling a PO never implicitly cancels its sub-orders. Confirmed POs
+    // reopen their active lines for vendor reassignment; an explicit
+    // sub-order/master-order cancellation remains terminal.
     if (changes.status === "Cancelled") {
       const po = all[idx];
       const orderId = po.orderId;
-      const cancelLinkedItems = existing.status !== "Draft" || options.cancelLinkedItems === true;
+      const allLinesCancelled = Boolean(po.items?.length) && po.items.every(
+        line => String(line.status || "").toLowerCase() === "cancelled",
+      );
+      const cancelLinkedItems = options.cancelLinkedItems === true || allLinesCancelled;
       const subOrderIds: string[] = po.subOrderIds?.length
         ? po.subOrderIds
         : [po.subOrderId].filter(Boolean);
+      const cancelledLineIds = new Set<string>();
+      (po.items || []).forEach((line, index) => {
+        if (String(line.status || "").toLowerCase() !== "cancelled") return;
+        const subId = line.subOrderId || po.subOrderIds?.[index];
+        if (subId) cancelledLineIds.add(subId);
+      });
 
       try {
         // Remove createdPOs entries for these sub-orders
@@ -274,21 +283,22 @@ export function updatePO(
       } catch { /* storage unavailable */ }
 
       try {
-        if (cancelLinkedItems) {
-          // Project a linked cancellation into the order-detail item state.
+        if (cancelLinkedItems || existing.status !== "Draft") {
           const itemStateKey = `nido_subitems_${orderId}`;
           const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
           for (const subId of subOrderIds) {
+            const itemCancelled = cancelLinkedItems || cancelledLineIds.has(subId);
             itemState[subId] = {
               ...(itemState[subId] || {}),
-              itemStatus: "Cancelled",
-              cancelReason: changes.cancelReason || "Purchase order cancelled",
+              itemStatus: itemCancelled ? "Cancelled" : "Pending",
+              cancelReason: itemCancelled ? changes.cancelReason || "Purchase order cancelled" : undefined,
               tracking: null,
               trackingOwner: undefined,
               updatedOn: new Date().toLocaleDateString("en-IN"),
             };
           }
           localStorage.setItem(itemStateKey, JSON.stringify(itemState));
+          syncMasterOrderFulfillmentStatus(orderId);
         }
       } catch { /* storage unavailable */ }
 
@@ -297,9 +307,14 @@ export function updatePO(
         window.dispatchEvent(new CustomEvent("poCancelled", {
           detail: { poNumber, orderId, subOrderIds },
         }));
-        if (cancelLinkedItems) {
+        if (cancelLinkedItems || existing.status !== "Draft") {
           window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
-            detail: { orderId, subOrderIds, reason: changes.cancelReason || "Purchase order cancelled" },
+            detail: {
+              orderId,
+              subOrderIds,
+              reason: changes.cancelReason || "Purchase order cancelled",
+              reopenedSubOrderIds: subOrderIds.filter(subId => !cancelLinkedItems && !cancelledLineIds.has(subId)),
+            },
           }));
         }
       } catch { /* SSR safe */ }
