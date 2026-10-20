@@ -1265,6 +1265,8 @@ function UploadDocModal({
   onSave,
   recipientOptions = [],
   onClose,
+  initialType = "",
+  initialDescription = "",
 }: {
   onSave: (
     doc: any,
@@ -1272,9 +1274,11 @@ function UploadDocModal({
   ) => boolean | Promise<boolean>;
   recipientOptions?: Array<{ value: string; label: string }>;
   onClose: () => void;
+  initialType?: string;
+  initialDescription?: string;
 }) {
   const [file, setFile] = useState(null);
-  const [form, setForm] = useState({ type: "", description: "" });
+  const [form, setForm] = useState({ type: initialType, description: initialDescription });
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -1336,7 +1340,9 @@ function UploadDocModal({
     >
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", minHeight: "100%", width: "100%", display: "flex", flexDirection: "column" }}>
         <div style={{ position: "sticky", top: 0, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 32px", background: "#fff", borderBottom: "1px solid #e5e7eb" }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>Upload Document</span>
+          <span style={{ fontSize: 15, fontWeight: 700 }}>
+            {initialType === "License" ? "Upload Licence / Key File" : "Upload Document"}
+          </span>
           <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ width: "100%", maxWidth: 960, boxSizing: "border-box", margin: "0 auto", padding: "32px", flex: 1 }}>
@@ -1349,7 +1355,7 @@ function UploadDocModal({
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg"
+              accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg,.lic,.license,.key,.txt"
               style={{ display: "none" }}
               onClick={e => e.stopPropagation()}
               onChange={e => handleFile((e.target.files as any)[0])}
@@ -1367,7 +1373,7 @@ function UploadDocModal({
               <>
                 <div style={{ fontSize: 28, marginBottom: 8, color: "#9ca3af" }}>⬆</div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "#374151" }}>Click to upload or drag & drop</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>PDF, XLSX, DOCX, PNG, JPG supported</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>PDF, XLSX, DOCX, PNG, JPG, LIC, KEY, TXT supported</div>
               </>
             )}
           </div>
@@ -1530,11 +1536,13 @@ function DocumentsNotesTab({
   locked = false,
   auditNote,
   onDocumentActivity,
+  licenseUploadRequest,
 }: {
   orderId: string;
   locked?: boolean;
   auditNote?: OrderNote | null;
   onDocumentActivity?: (text: string) => void;
+  licenseUploadRequest?: { id: number; itemName: string } | null;
 }) {
   const { user, isClientPortalUser } = useAuth();
   const { orders } = useMyOrders();
@@ -1578,6 +1586,17 @@ function DocumentsNotesTab({
   const [protectedDocument, setProtectedDocument] = useState<any | null>(null);
   const [docSearch, setDocSearch] = useState("");
   const [docFeedback, setDocFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [uploadPreset, setUploadPreset] = useState<{ type: string; description: string } | null>(null);
+
+  useEffect(() => {
+    if (!licenseUploadRequest || locked || isClientPortalUser) return;
+    setDocFeedback(null);
+    setUploadPreset({
+      type: "License",
+      description: `Licence/key file for ${licenseUploadRequest.itemName}`,
+    });
+    setShowUpload(true);
+  }, [licenseUploadRequest?.id, locked, isClientPortalUser]);
 
   // Reload docs/notes when the order changes, and persist on every change so
   // both stay in sync between the owner platform and the client portal.
@@ -1921,7 +1940,15 @@ function DocumentsNotesTab({
           </div>
         ))}
       </div>
-       {!locked && showUpload && <UploadDocModal onSave={handleSaveDocument} recipientOptions={recipientOptions} onClose={() => setShowUpload(false)} />}
+       {!locked && showUpload && (
+         <UploadDocModal
+           onSave={handleSaveDocument}
+           recipientOptions={recipientOptions}
+           initialType={uploadPreset?.type || ""}
+           initialDescription={uploadPreset?.description || ""}
+           onClose={() => { setShowUpload(false); setUploadPreset(null); }}
+         />
+       )}
       {protectedDocument && (
         <PasswordDialog
           title="Password required"
@@ -2972,6 +2999,8 @@ export default function MyOrderPage() {
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
   const [documentsAuditNote, setDocumentsAuditNote] = useState<OrderNote | null>(null);
+  const [provisionedUploadPrompt, setProvisionedUploadPrompt] = useState<{ subId: string; itemName: string } | null>(null);
+  const [licenseUploadRequest, setLicenseUploadRequest] = useState<{ id: number; itemName: string } | null>(null);
 
   const queueDocumentsAuditNote = (text: string, kind: "activity" | "status-change" = "status-change") => {
     const now = new Date();
@@ -3204,6 +3233,9 @@ export default function MyOrderPage() {
         visibility: "Internal Note",
         kind: "status-change",
       }));
+    if (savedStatus === "Provisioned" && previousStatus !== "Provisioned" && !isClientPortalUser) {
+      setProvisionedUploadPrompt({ subId, itemName: target.itemName });
+    }
   };
 
   const handleRaiseReturn = (subId: string, reason: string, details: string) => {
@@ -5086,6 +5118,7 @@ export default function MyOrderPage() {
               orderId={orderId}
               locked={documentsLocked}
               auditNote={documentsAuditNote}
+              licenseUploadRequest={licenseUploadRequest}
               onDocumentActivity={(text) => queueDocumentsAuditNote(text, "activity")}
             />
         </div>
@@ -5137,6 +5170,50 @@ export default function MyOrderPage() {
           onSubmit={details => handlePickupDone(pickupDoneTarget, details)}
           onClose={() => setPickupDoneTarget(null)}
         />
+      )}
+      {provisionedUploadPrompt && (
+        <div
+          role="presentation"
+          onClick={() => setProvisionedUploadPrompt(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 1300, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="provisioned-upload-title"
+            aria-describedby="provisioned-upload-description"
+            onClick={event => event.stopPropagation()}
+            style={{ width: "100%", maxWidth: 440, background: "#fff", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,0.24)", overflow: "hidden" }}
+          >
+            <div style={{ padding: "20px 22px 14px" }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }} id="provisioned-upload-title">
+                Upload the licence / key file
+              </div>
+              <div id="provisioned-upload-description" style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.5, color: "#4b5563" }}>
+                <strong>{provisionedUploadPrompt.itemName}</strong> is now marked Provisioned. Upload the licence or product-key file so it is saved with this order.
+              </div>
+            </div>
+            <div style={{ padding: "12px 22px 18px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid #f3f4f6", background: "#fafafa" }}>
+              <button
+                type="button"
+                onClick={() => setProvisionedUploadPrompt(null)}
+                style={{ padding: "9px 14px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLicenseUploadRequest({ id: Date.now(), itemName: provisionedUploadPrompt.itemName });
+                  setProvisionedUploadPrompt(null);
+                }}
+                style={{ padding: "9px 14px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+              >
+                Upload licence / key
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
