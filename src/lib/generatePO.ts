@@ -10,6 +10,7 @@ import { numberToWords } from './quotePdfGenerator';
 import type { StoredPO } from './purchaseOrderStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
 import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
+import { getProductConfigurationEntries, getProductSpecLines } from './productConfiguration';
 
 // ── Colour palette (identical to invoicePdf) ─────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -317,13 +318,16 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       const gst = taxable * (itemGstRate / 100);
       const amount = taxable + gst;
       const taxRateLabel = `${itemGstRate}%\nIGST`;
-      const specLine = li.specs && li.specs.length > 0 ? li.specs[0] : '';
+      const productSpecs = getProductSpecLines(li.specs, li.configuration);
+      const specLine = productSpecs.length > 0 ? productSpecs[0] : '';
       let itemCell = li.item;
       if (specLine) itemCell += `\n${specLine}`;
-      if (li.configuration && Object.keys(li.configuration).length > 0) {
-        itemCell += `\nConfiguration: ${Object.entries(li.configuration)
-          .map(([label, value]) => `${label.replace(/-\d+$/, "")}: ${value}`)
-          .join(" · ")}`;
+      const configurationEntries = getProductConfigurationEntries(li.configuration);
+      if (configurationEntries.length > 0) {
+        itemCell += `\nConfiguration:\n${configurationEntries.map(([label, value]) => `${label}: ${value}`).join("\n")}`;
+      }
+      if (li.configurationPriceAdjustment) {
+        itemCell += `\nOption adjustment / unit: Rs. ${fmt2(li.configurationPriceAdjustment)}`;
       }
       if (li.referenceNumber) itemCell += `\nRef/Model No: ${li.referenceNumber}`;
       if (li.commercialTerms) itemCell += `\n${getCommercialTermsLines(li.commercialTerms).join('\n')}`;

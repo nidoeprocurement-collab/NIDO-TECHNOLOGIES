@@ -71,6 +71,8 @@ function CartProductImage({
   );
 }
 import { formatCurrency } from "@/lib/formatters";
+import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
+import { getProductSpecLines } from "@/lib/productConfiguration";
 import {
   getProductType,
   getTenureBilling,
@@ -468,7 +470,7 @@ export default function CartPage() {
                      : (item.moq > 0 ? item.moq : 1);
                    const tenureBilling = getTenureBilling(productType);
 
-                  const specChips = item.specs.slice(0, 5).map(parseSpec);
+                  const specChips = getProductSpecLines(item.specs, item.configuration).slice(0, 5).map(parseSpec);
 
                    return (
                      <div key={item.id} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? "bg-white" : "bg-white"}`}>
@@ -525,15 +527,11 @@ export default function CartPage() {
                                   <span className="font-medium text-gray-600">Category:</span> {item.category}
                                 </span>
                               )}
-                            {item.configuration && Object.keys(item.configuration).length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
-                                <span className="font-medium text-gray-600">Configuration:</span>
-                                {Object.entries(item.configuration).map(([label, value]) => (
-                                  <span key={label}>{label.replace(/-\d+$/, "")}: <strong className="font-semibold text-gray-700">{value}</strong></span>
-                                ))}
-                              </div>
-                            )}
                             </div>
+                            <ProductConfigurationSummary
+                              configuration={item.configuration}
+                              priceAdjustment={item.configurationPriceAdjustment}
+                            />
 
                             {/* Spec chips */}
                             {specChips.length > 0 && (

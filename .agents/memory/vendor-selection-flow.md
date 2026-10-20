@@ -4,9 +4,11 @@ description: Architecture of the refactored procurement workflow — client sele
 ---
 
 ## Rule
-Vendor selection is required before add-to-cart and is snapshotted onto the CartItem. The master order may still change that selection while its PO is Draft; once a PO is confirmed, the vendor is locked and must be changed through procurement cancellation/recreation.
+Vendor selection is required before add-to-cart and is snapshotted onto the CartItem. The master order may change that selection while its PO is Draft. A confirmed PO locks the selection; it must first be cancelled from Vendor Order Details, after which an active sub-order can be assigned a replacement vendor or cancelled.
 
-**Why:** The pre-cart snapshot keeps pricing, stock, and lead time deterministic, while the Draft window supports correction before procurement commits the vendor.
+**Why:** The pre-cart snapshot keeps pricing, stock, and lead time deterministic, while the Draft window supports correction before procurement commits the vendor. Cancelling the supplier PO must not silently cancel the customer’s order item.
+
+**How to apply:** Keep PO lifecycle status in the shared store. When a PO is cancelled, reopen only active covered sub-orders, clear their old vendor allocation, and offer vendor reselection or explicit sub-order cancellation in Order Details.
 
 ## Key Data Flow
 

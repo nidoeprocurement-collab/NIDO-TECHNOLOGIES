@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { ProductCommercialTerms } from '@/lib/productCommercialTerms';
+import { formatConfigurationLabel } from '@/lib/productConfiguration';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 
@@ -69,9 +70,10 @@ const CART_STORAGE_KEY = 'nido_cart_v1';
 
 function getConfigurationKey(configuration?: Record<string, string>): string {
   if (!configuration) return '';
-  return Object.keys(configuration)
-    .sort()
-    .map(key => `${key}=${configuration[key]}`)
+  return Object.entries(configuration)
+    .map(([key, value]) => [formatConfigurationLabel(key).toLowerCase(), value] as [string, string])
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
     .join('&');
 }
 

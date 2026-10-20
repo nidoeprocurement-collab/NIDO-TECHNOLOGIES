@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
+import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -224,21 +225,16 @@ export default function OrderConfirmationPage() {
               {items.length > 0 ? (
                 items.map((item, i) => (
                   <div key={i} className="flex justify-between text-sm gap-3">
-                    <span className="text-gray-700 flex-1 min-w-0">
+                    <div className="text-gray-700 flex-1 min-w-0">
                       <span className="truncate block">{item.name}</span>
                       {item.quantity > 1 && (
                         <span className="text-xs text-gray-400">Qty: {item.quantity}</span>
                       )}
-                        {item.configuration && Object.keys(item.configuration).length > 0 && (
-                          <span className="mt-1 block text-xs text-gray-500">
-                            {Object.entries(item.configuration).map(([label, value]) => (
-                              <span key={label} className="mr-2 inline-block">
-                                {label.replace(/-\d+$/, "")}: <strong className="font-medium text-gray-700">{value}</strong>
-                              </span>
-                            ))}
-                          </span>
-                        )}
-                    </span>
+                      <ProductConfigurationSummary
+                        configuration={item.configuration}
+                        priceAdjustment={item.configurationPriceAdjustment}
+                      />
+                    </div>
                     <span className="text-gray-800 font-medium shrink-0">
                       {(() => {
                         if (typeof item.checkoutUnitPriceInclusive === "number") {

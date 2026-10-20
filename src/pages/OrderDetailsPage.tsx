@@ -13,6 +13,7 @@ import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
+import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import {
   calculateRemainingOrderPricing,
   getOrderLineUnitPriceInclusive,
@@ -3317,6 +3318,7 @@ export default function MyOrderPage() {
     ) return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
+    if (targetPOs.some(isConfirmedPO)) return;
     if (targetPOs.some((po) => hasPOItemShipmentStarted(po, subId, target))) return;
 
     // Draft POs have not committed stock yet. Release the cancelled item's
@@ -3416,11 +3418,12 @@ export default function MyOrderPage() {
     if (!allocations.length) return;
     const currentSubOrder = subOrders.find(sub => sub.id === subId);
     const currentPOs = getAllPOs().filter(po => po.orderId === orderId);
-    // A cancelled item and a confirmed PO are terminal/locked states. This
-    // guard protects against a stale modal submitting after the row changed.
+    const cancelledPO = getCancelledPOForSubOrder(currentPOs, subId, currentSubOrder);
+    // Explicitly cancelled items and active confirmed POs stay locked. A
+    // cancelled PO itself is different: its active order lines can be sourced
+    // again after the cancellation is recorded.
     if (
       currentSubOrder?.itemStatus === "Cancelled" ||
-      getCancelledPOForSubOrder(currentPOs, subId, currentSubOrder) ||
       isConfirmedPO(getCanonicalPOForSubOrder(currentPOs, currentSubOrder || subId))
     ) return;
 
@@ -3430,6 +3433,7 @@ export default function MyOrderPage() {
     const vendorName = vendor?.name || meta.vendorName || primary.vendorId;
     const previousSubOrder = subOrders.find(sub => sub.id === subId);
     const wasCancelled = previousSubOrder?.itemStatus === "Cancelled";
+    const needsReplacementPO = Boolean(cancelledPO) && !wasCancelled;
     setSubOrders(prev => prev.map(sub => sub.id === subId
       ? {
           ...sub,
@@ -3689,10 +3693,10 @@ export default function MyOrderPage() {
         savePO(replacementPO);
         refreshDraftPOPdf(replacementPO);
       }
-    } else if (wasCancelled && previousSubOrder) {
-      // A cancelled line may belong to a confirmed PO, so it cannot be
-      // redirected in place. Keep the old cancelled line for its audit trail
-      // and create a fresh Draft PO for the replacement vendor.
+    } else if ((wasCancelled || needsReplacementPO) && previousSubOrder) {
+      // A cancelled sub-order or cancelled PO is retained for audit history.
+      // Create a fresh Draft PO for the replacement vendor rather than
+      // changing the cancelled procurement record.
       const unitPrice = Number(meta.unitPrice || String(previousSubOrder.unitPrice || "").replace(/[^\d.-]/g, "") || 0);
       const qty = Number(previousSubOrder.qty || 0);
       const gstPct = getEffectiveTaxPctForCategory(previousSubOrder.category);
@@ -4070,6 +4074,46 @@ export default function MyOrderPage() {
     // PO state is read from the shared store; cancelling a PO is handled from
     // its detail page. Refresh this view after that action instead of trying
     // to mutate derived vendor maps that no longer have their own state.
+    setPoRefreshKey(k => k + 1);
+  };
+
+  const handleRejectDraftPO = (po: StoredPO) => {
+    const currentPO = getAllPOs().find(candidate => candidate.poNumber === po.poNumber);
+    if (!currentPO || currentPO.status !== "Draft") return;
+
+    (currentPO.items || []).forEach((line, index) => {
+      if (String(line.status || "").toLowerCase() === "cancelled") return;
+      const subOrderId = line.subOrderId || currentPO.subOrderIds?.[index] || currentPO.subOrderId;
+      const subOrder = subOrders.find(item => item.id === subOrderId);
+      const productCode = line.productCode || subOrder?.productCode;
+      const quantity = Number(line.qty || subOrder?.qty || 0);
+      if (currentPO.vendorId && productCode && quantity > 0) {
+        releaseVendorReservation(
+          currentPO.vendorId,
+          productCode,
+          quantity,
+          `Draft PO ${currentPO.poNumber} rejected`,
+        );
+      }
+    });
+
+    const reason = "Rejected by admin";
+    const actor = getActivityActor("System Owner");
+    const activity = createActivityNote(
+      `Purchase Order ${currentPO.poNumber} status changed from ${currentPO.status} to Cancelled. Reason: ${reason}.`,
+      { actor, eventType: "status-change", id: `activity_po_rejected_${currentPO.poNumber}_${Date.now()}` },
+    );
+    updatePO(currentPO.poNumber, { status: "Cancelled", cancelReason: reason });
+    appendPOActivity(currentPO.poNumber, {
+      ...activity,
+      initials: activity.initials || "SY",
+      color: activity.color || "#d97706",
+    });
+    appendOrderActivity(currentPO.orderId, activity.text, {
+      actor,
+      eventType: "status-change",
+      id: activity.id,
+    });
     setPoRefreshKey(k => k + 1);
   };
 
@@ -4460,16 +4504,15 @@ export default function MyOrderPage() {
                     const poDigitalStatus = subIsDigital
                       ? getDigitalPOFulfillmentStatus(canonicalPO, sub)
                       : "";
-                    const cancelledLine = allOrderPOs.some((po: any) =>
-                      po.items?.some((line: any) =>
-                        line.subOrderId === sub.id &&
-                        String(line.status || "").toLowerCase() === "cancelled",
-                      ),
-                    );
-                    const itemCancelled = isSubOrderCancelled || Boolean(cancelledPO) || cancelledLine;
+                    const canonicalLine = canonicalPO
+                      ? findPOLineForSubOrder(canonicalPO, sub.id, sub)
+                      : undefined;
+                    const cancelledLine = String(canonicalLine?.status || "").toLowerCase() === "cancelled";
+                    const itemCancelled = isSubOrderCancelled || cancelledLine;
                     const subPOs = canonicalPO ? [canonicalPO] : [];
                     const hasPO = subPOs.length > 0;
                     const hasConfirmedPO = subPOs.some(isConfirmedPO);
+                    const cancelledPONeedsResolution = Boolean(cancelledPO) && !hasPO && !itemCancelled;
                     const canMarkShipped = !itemCancelled && subPOs.some((po: any) => isPOItemShipped(po, sub.id));
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
@@ -4495,6 +4538,10 @@ export default function MyOrderPage() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
+                            <ProductConfigurationSummary
+                              configuration={sub.configuration}
+                              priceAdjustment={sub.configurationPriceAdjustment}
+                            />
                             {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Reference No: {sub.referenceNumber}</div>}
                             {sub.serialNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Serial No: {sub.serialNumber}</div>}
                           </div>
@@ -4517,6 +4564,37 @@ export default function MyOrderPage() {
                                </div>
                                 <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
                               </div>
+                          ) : cancelledPONeedsResolution ? (
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                  {(cancelledPO?.vendorName || "V")[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>
+                                    {cancelledPO?.vendorName || "Previous vendor"}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#991b1b" }}>PO Cancelled</div>
+                                </div>
+                              </div>
+                              <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>
+                                Select a replacement vendor or cancel this sub-order.
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
+                                <button
+                                  onClick={() => setVendorTarget(sub)}
+                                  style={{ padding: "4px 7px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                                >
+                                  Select Vendor
+                                </button>
+                                <button
+                                  onClick={() => setCancelTarget(sub.id)}
+                                  style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                                >
+                                  Cancel Sub Order
+                                </button>
+                              </div>
+                            </div>
                           ) : hasPO ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                               {subPOs.map((po: any) => (
@@ -4601,6 +4679,13 @@ export default function MyOrderPage() {
                         <div style={{ minWidth: 0 }}>
                           {isSubOrderCancelled ? (
                             <span style={{ fontSize: 12, color: "#9ca3af" }}>---</span>
+                          ) : cancelledPONeedsResolution ? (
+                            <button
+                              onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)}
+                              style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
+                            >
+                              {cancelledPO.poNumber} · Cancelled ↗
+                            </button>
                           ) : hasPO ? (
                             // Show every vendor covered by this PO. Draft POs
                             // can still be redirected before procurement
@@ -4668,7 +4753,7 @@ export default function MyOrderPage() {
                              >
                                Raise Return Request
                              </button>
-                            ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) && !hasShipmentStarted ? (
+                            ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) && !hasShipmentStarted && !hasConfirmedPO ? (
                             <button
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
@@ -4704,7 +4789,7 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
-                             cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
+                             cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !hasConfirmedPO && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
@@ -4798,7 +4883,7 @@ export default function MyOrderPage() {
                     <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
                       {draftPOs.length > 0
                         ? `${draftPOs.length} Draft PO${draftPOs.length !== 1 ? "s" : ""} pending your confirmation. Confirm to lock the vendor and send; Reject to cancel this PO.`
-                        : "The order was cancelled. The associated Draft PO records are preserved as cancelled history."}
+                      : "Cancelled POs remain here as history. Resolve affected items from Sub Orders / Items by selecting a replacement vendor or cancelling the sub-order."}
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                       {visiblePOs.map(po => {
@@ -4836,16 +4921,11 @@ export default function MyOrderPage() {
                                   <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{li.item}</div>
                                   {li.sku && <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 1 }}>SKU: {li.sku}</div>}
                                   {li.hsnCode && <div style={{ fontSize: 10.5, color: "#9ca3af" }}>HSN: {li.hsnCode} · GST {li.gstPct ?? 18}%</div>}
-                                  {li.configuration && Object.keys(li.configuration).length > 0 && (
-                                    <div style={{ marginTop: 5, padding: "6px 8px", borderRadius: 6, background: "#f5f3ff", color: "#5b21b6", fontSize: 10.5 }}>
-                                      <strong>Selected configuration</strong>
-                                      <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 10px" }}>
-                                        {Object.entries(li.configuration).map(([label, value]) => (
-                                          <span key={label}>{label.replace(/-\d+$/, "")}: <strong>{value}</strong></span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
+                                  <ProductConfigurationSummary
+                                    configuration={li.configuration}
+                                    priceAdjustment={li.configurationPriceAdjustment}
+                                    className="rounded-md bg-violet-50 px-2 py-1"
+                                  />
                                   {li.commercialTerms && (
                                     <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px", fontSize: 10.5, color: "#6b7280" }}>
                                       <span>Pricing Model: <strong style={{ color: "#374151" }}>{li.commercialTerms.pricingModel}</strong></span>
@@ -4879,25 +4959,7 @@ export default function MyOrderPage() {
                           {!isOrderInactive && !isCancelledPO && (
                             <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
                               <button
-                                onClick={() => {
-                                  const actor = getActivityActor("System Owner");
-                                  const activity = createActivityNote(
-                                    `Purchase Order ${po.poNumber} status changed from ${po.status} to Cancelled. Reason: Rejected by admin.`,
-                                    { actor, eventType: "status-change", id: `activity_po_rejected_${po.poNumber}_${Date.now()}` },
-                                  );
-                                  updatePO(po.poNumber, { status: "Cancelled", cancelReason: "Rejected by admin" });
-                                  appendPOActivity(po.poNumber, {
-                                    ...activity,
-                                    initials: activity.initials || "SY",
-                                    color: activity.color || "#d97706",
-                                  });
-                                  appendOrderActivity(po.orderId, activity.text, {
-                                    actor,
-                                    eventType: "status-change",
-                                    id: activity.id,
-                                  });
-                                  setCreatedPOs(p => ({ ...p }));
-                                }}
+                                onClick={() => handleRejectDraftPO(po)}
                                 style={{ padding: "7px 16px", border: "1px solid #fca5a5", borderRadius: 7, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}
                               >
                                 Reject
@@ -4993,6 +5055,9 @@ export default function MyOrderPage() {
                             <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", color: "#991b1b", fontSize: 12.5, fontStyle: "italic" }}>
                               This purchase order is cancelled and can no longer be edited or confirmed.
                               {po.cancelReason ? ` Reason: ${po.cancelReason}` : ""}
+                              <div style={{ marginTop: 5, color: "#6b7280", fontStyle: "normal" }}>
+                                Re-source affected items or cancel them from the Sub Orders / Items tab.
+                              </div>
                             </div>
                           )}
                         </div>

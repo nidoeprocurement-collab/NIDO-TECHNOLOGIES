@@ -237,9 +237,10 @@ export function updatePO(
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 
-    // Cancelling a PO never implicitly cancels its sub-orders. Confirmed POs
-    // reopen their active lines for vendor reassignment; an explicit
-    // sub-order/master-order cancellation remains terminal.
+    // A PO cancellation is recorded globally, but does not itself cancel the
+    // customer sub-orders. Active lines return to Pending with the old vendor
+    // allocation cleared so Order Details can source them again. Explicit
+    // sub-order/master-order cancellations remain terminal.
     if (changes.status === "Cancelled") {
       const po = all[idx];
       const orderId = po.orderId;
@@ -283,23 +284,29 @@ export function updatePO(
       } catch { /* storage unavailable */ }
 
       try {
-        if (cancelLinkedItems || existing.status !== "Draft") {
-          const itemStateKey = `nido_subitems_${orderId}`;
-          const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
-          for (const subId of subOrderIds) {
-            const itemCancelled = cancelLinkedItems || cancelledLineIds.has(subId);
-            itemState[subId] = {
-              ...(itemState[subId] || {}),
-              itemStatus: itemCancelled ? "Cancelled" : "Pending",
-              cancelReason: itemCancelled ? changes.cancelReason || "Purchase order cancelled" : undefined,
-              tracking: null,
-              trackingOwner: undefined,
-              updatedOn: new Date().toLocaleDateString("en-IN"),
-            };
-          }
-          localStorage.setItem(itemStateKey, JSON.stringify(itemState));
-          syncMasterOrderFulfillmentStatus(orderId);
+        const itemStateKey = `nido_subitems_${orderId}`;
+        const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
+        for (const subId of subOrderIds) {
+          const itemCancelled = cancelLinkedItems || cancelledLineIds.has(subId);
+          itemState[subId] = {
+            ...(itemState[subId] || {}),
+            itemStatus: itemCancelled ? "Cancelled" : "Pending",
+            cancelReason: itemCancelled ? changes.cancelReason || "Purchase order cancelled" : "",
+            tracking: null,
+            trackingOwner: undefined,
+            updatedOn: new Date().toLocaleDateString("en-IN"),
+            ...(itemCancelled ? {} : {
+              selectedVendorId: null,
+              selectedVendorName: "",
+              vendorSelectionMeta: null,
+              stockAllocations: [],
+              referenceNumber: "",
+              serialNumber: "",
+            }),
+          };
         }
+        localStorage.setItem(itemStateKey, JSON.stringify(itemState));
+        syncMasterOrderFulfillmentStatus(orderId);
       } catch { /* storage unavailable */ }
 
       // Notify OrderDetailsPage (same tab) to sync its React state from localStorage
@@ -307,16 +314,14 @@ export function updatePO(
         window.dispatchEvent(new CustomEvent("poCancelled", {
           detail: { poNumber, orderId, subOrderIds },
         }));
-        if (cancelLinkedItems || existing.status !== "Draft") {
-          window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
-            detail: {
-              orderId,
-              subOrderIds,
-              reason: changes.cancelReason || "Purchase order cancelled",
-              reopenedSubOrderIds: subOrderIds.filter(subId => !cancelLinkedItems && !cancelledLineIds.has(subId)),
-            },
-          }));
-        }
+        window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+          detail: {
+            orderId,
+            subOrderIds,
+            reason: changes.cancelReason || "Purchase order cancelled",
+            reopenedSubOrderIds: subOrderIds.filter(subId => !cancelLinkedItems && !cancelledLineIds.has(subId)),
+          },
+        }));
       } catch { /* SSR safe */ }
     }
 

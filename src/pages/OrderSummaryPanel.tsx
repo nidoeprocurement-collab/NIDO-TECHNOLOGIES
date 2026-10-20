@@ -5,6 +5,7 @@ import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { calculateCartPricing } from "@/lib/cartPricing";
+import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 
 function formatPrice(n: number) {
   return formatCurrency(n, undefined, { decimals: 0 });
@@ -68,6 +69,10 @@ export default function OrderSummaryPanel({
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-800 leading-snug line-clamp-1">{item.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity}</p>
+                    <ProductConfigurationSummary
+                      configuration={item.configuration}
+                      priceAdjustment={item.configurationPriceAdjustment}
+                    />
                   </div>
                   <p className="text-xs font-semibold text-gray-900 shrink-0">
                      {formatPrice(cartPricing.lines[index].checkoutUnitPriceInclusive * item.quantity)}

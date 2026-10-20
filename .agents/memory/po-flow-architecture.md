@@ -86,18 +86,25 @@ when a Draft vendor change is saved.
 **Why:** Older grouped PO records can otherwise lose the PO number in the
 sub-order table and silently skip the corresponding Draft PO update.
 
-## Cancellation boundary
+## PO cancellation and vendor re-selection
 
-Cancelling a PO is terminal for every covered order item. The cancellation must
-persist both the PO status and the order-item projection, so Order Details can
-show the cancelled PO state and must not offer vendor reselection.
+Rejecting a Draft PO from Order Details cancels the PO globally and returns its
+active sub-orders to Pending with the old vendor allocation cleared. A
+confirmed PO cannot be cancelled from Order Details; it can be cancelled from
+Vendor Order Details. That cancellation is also global, and active covered
+sub-orders return to Pending so Order Details can offer a replacement vendor or
+explicit sub-order cancellation. Explicitly cancelled lines and master-order
+cancellations remain terminal.
 
-**Why:** A vendor detail page can be open separately from Order Details; changing
-only that page's local state leaves the master order editable after cancellation.
+**Why:** Cancelling a supplier commitment must not silently cancel the
+customer's order item, but a confirmed commitment must not be bypassed from the
+master-order screen.
 
-**How to apply:** Any Draft or confirmed PO cancellation must update the shared
-PO store, project `itemStatus: "Cancelled"` for all covered sub-orders, and
-dispatch the order-item refresh event.
+**How to apply:** Persist every PO cancellation through `updatePO()`. Release
+Draft reservations when rejecting from Order Details; restore committed vendor
+stock when cancelling a confirmed PO from its detail page. Project the updated
+item state and refresh event to Order Details, where active cancelled-PO lines
+can be reassigned or cancelled.
 
 ## Vendor shipment vs. customer-facing status
 

@@ -19,8 +19,8 @@ export default function ProductConfigurationSummary({
       {entries.length > 0 && (
         <>
           <p className="font-medium text-gray-600">Configuration</p>
-          {entries.map(([label, value]) => (
-            <p key={`${label}-${value}`}>
+          {entries.map(([label, value], index) => (
+            <p key={`${label}-${value}-${index}`}>
               <span className="font-medium text-gray-600">{label}:</span> {value}
             </p>
           ))}

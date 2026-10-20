@@ -22,6 +22,8 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
+import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
+import { getProductSpecLines } from "@/lib/productConfiguration";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -509,21 +511,13 @@ import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
                               <img src={item.image} alt={item.name} className="w-14 h-14 object-cover rounded-lg border border-gray-100 shrink-0" />
                               <div>
                                 <p className="font-medium text-sm text-gray-900 mb-1">{item.name}</p>
-                                <p className="text-xs text-gray-400">{Array.isArray(item.specs) ? item.specs.join(" • ") : ""}</p>
+                                <p className="text-xs text-gray-400">{getProductSpecLines(item.specs, item.configuration).join(" • ")}</p>
                                 <p className="text-xs text-gray-400 mt-1">MOQ: {item.moq}</p>
-                                {item.configuration && Object.keys(item.configuration).length > 0 && (
-                                  <div className="mt-2 rounded-md bg-violet-50 px-2.5 py-2 text-xs text-violet-900">
-                                    <p className="mb-1 font-semibold">Selected configuration</p>
-                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
-                                      {Object.entries(item.configuration).map(([label, value]) => (
-                                        <span key={label}>{label.replace(/-\d+$/, "")}: <strong>{value}</strong></span>
-                                      ))}
-                                    </div>
-                                    {!!item.configurationPriceAdjustment && (
-                                      <p className="mt-1 text-violet-700">Configuration price adjustment: {formatPrice(item.configurationPriceAdjustment)}</p>
-                                    )}
-                                  </div>
-                                )}
+                                <ProductConfigurationSummary
+                                  configuration={item.configuration}
+                                  priceAdjustment={item.configurationPriceAdjustment}
+                                  className="mt-2 rounded-md bg-violet-50 px-2.5 py-2"
+                                />
                               </div>
                             </div>
                           </td>
