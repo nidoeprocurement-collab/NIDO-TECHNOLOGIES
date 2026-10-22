@@ -18,8 +18,13 @@ import {
   calculateRemainingOrderPricing,
   getOrderLineUnitPriceInclusive,
 } from "@/lib/orderPricing";
-import { formatCurrency } from "@/lib/formatters";
+import { convertCurrency, formatCurrency, getCurrencySymbol } from "@/lib/formatters";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { getCartTaxRate } from "@/lib/vendorCartPricing";
+import {
+  calculateOrderDetailsLinePricing,
+  type OrderDetailsDiscountType,
+} from "@/lib/orderDetailsLinePricing";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
@@ -2558,49 +2563,87 @@ function Field({ label, value }) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: string, poNumber: string) {
-  return (cartItems || []).map((item: any, idx: number) => ({
-    num: idx + 1,
-    // New orders carry a stable generated ID. The legacy fallback intentionally
-    // retains the historical SO- value for existing stored orders.
-    id: item.subOrderId || `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
-    itemName: item.name,
-    image: item.image || "",
-    sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
-    category: item.category || "General",
-    specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
-    productCode: item.productCode || "",
-    referenceNumber: "",
-    serialNumber: "",
-    // Vendor snapshot — set at add-to-cart time by the client's vendor selection.
-    selectedVendorId: item.selectedVendorId || null,
-    selectedVendorName: item.selectedVendorName || null,
-    vendorName: item.selectedVendorName || "—",
-    vendorInitial: item.selectedVendorName ? item.selectedVendorName[0].toUpperCase() : "—",
-    vendorColor: item.selectedVendorId ? "#2563eb" : "#9ca3af",
-    poNumber: poNumber,
-    qty: item.quantity,
-    unitPrice: formatCurrency(getOrderLineUnitPriceInclusive(item)),
-    total: formatCurrency(getOrderLineUnitPriceInclusive(item) * Number(item.quantity || 0)),
-    requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
-    itemStatus: "Pending",
-    updatedOn: orderDate,
-    deliveredAt: null,
-    tracking: null,
-    stockAllocations: item.vendorAllocations || [],
-    productType: item.productType,
-    physicalType: item.physicalType,
-    fulfillmentType: item.fulfillmentType,
-    configuration: item.configuration && typeof item.configuration === "object" ? { ...item.configuration } : undefined,
-    configurationPriceAdjustment: Number(item.configurationPriceAdjustment || 0),
-    commercialTerms: item.commercialTerms || (
-      item.productType || item.physicalType || item.fulfillmentType
-        ? getProductCommercialTerms(
-            item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : ""),
-            { moq: item.moq, leadTime: item.leadTime, stock: item.totalStock },
-          )
-        : undefined
-    ),
-  }));
+  return (cartItems || []).map((item: any, idx: number) => {
+    const taxRate = typeof item.checkoutGstRate === "number" && Number.isFinite(item.checkoutGstRate)
+      ? item.checkoutGstRate
+      : getCartTaxRate(item) ?? getEffectiveTaxPctForCategory(item.category || "");
+    const unitPriceInclusive = getOrderLineUnitPriceInclusive(item);
+    const unitPriceExclGst = typeof item.checkoutUnitPriceExclGst === "number" && Number.isFinite(item.checkoutUnitPriceExclGst)
+      ? Math.max(0, item.checkoutUnitPriceExclGst)
+      : typeof item.clientSellingPriceExclGst === "number" && Number.isFinite(item.clientSellingPriceExclGst)
+        ? Math.max(0, item.clientSellingPriceExclGst)
+        : unitPriceInclusive * 100 / (100 + taxRate);
+
+    return {
+      num: idx + 1,
+      // New orders carry a stable generated ID. The legacy fallback intentionally
+      // retains the historical SO- value for existing stored orders.
+      id: item.subOrderId || `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
+      itemName: item.name,
+      image: item.image || "",
+      sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
+      category: item.category || "General",
+      specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
+      productCode: item.productCode || "",
+      referenceNumber: "",
+      serialNumber: "",
+      // Vendor snapshot — set at add-to-cart time by the client's vendor selection.
+      selectedVendorId: item.selectedVendorId || null,
+      selectedVendorName: item.selectedVendorName || null,
+      vendorName: item.selectedVendorName || "—",
+      vendorInitial: item.selectedVendorName ? item.selectedVendorName[0].toUpperCase() : "—",
+      vendorColor: item.selectedVendorId ? "#2563eb" : "#9ca3af",
+      poNumber: poNumber,
+      qty: item.quantity,
+      unitPrice: formatCurrency(unitPriceInclusive),
+      unitPriceExclGst,
+      taxRate,
+      total: formatCurrency(unitPriceInclusive * Number(item.quantity || 0)),
+      requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
+      itemStatus: "Pending",
+      updatedOn: orderDate,
+      deliveredAt: null,
+      tracking: null,
+      stockAllocations: item.vendorAllocations || [],
+      productType: item.productType,
+      physicalType: item.physicalType,
+      fulfillmentType: item.fulfillmentType,
+      configuration: item.configuration && typeof item.configuration === "object" ? { ...item.configuration } : undefined,
+      configurationPriceAdjustment: Number(item.configurationPriceAdjustment || 0),
+      commercialTerms: item.commercialTerms || (
+        item.productType || item.physicalType || item.fulfillmentType
+          ? getProductCommercialTerms(
+              item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : ""),
+              { moq: item.moq, leadTime: item.leadTime, stock: item.totalStock },
+            )
+          : undefined
+      ),
+    };
+  });
+}
+
+type OrderDetailsLineDiscount = { type: OrderDetailsDiscountType; value: number };
+
+function parseOrderDetailsLineDiscounts(rawValue: string | null): Record<string, OrderDetailsLineDiscount> {
+  try {
+    const saved: unknown = JSON.parse(rawValue || "{}");
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+
+    const discounts: Record<string, OrderDetailsLineDiscount> = {};
+    Object.entries(saved).forEach(([subOrderId, value]) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return;
+      const entry = value as Record<string, unknown>;
+      if (entry.type !== "percentage" && entry.type !== "amount") return;
+      const parsedValue = Number(entry.value);
+      discounts[subOrderId] = {
+        type: entry.type,
+        value: Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0,
+      };
+    });
+    return discounts;
+  } catch {
+    return {};
+  }
 }
 
 function isPhysicalProduct(sub: any): boolean {
@@ -3026,6 +3069,43 @@ export default function MyOrderPage() {
   const itemStateKey = `nido_subitems_${orderId}`;
   const loadItemState = (): Record<string, any> => {
     try { return JSON.parse(localStorage.getItem(itemStateKey) || "{}"); } catch { return {}; }
+  };
+  const lineDiscountsKey = `nido_order_details_line_discounts_${orderId}`;
+  const loadLineDiscounts = () => parseOrderDetailsLineDiscounts(localStorage.getItem(lineDiscountsKey));
+  const [lineDiscounts, setLineDiscounts] = useState(loadLineDiscounts);
+  const [lineDiscountsOrderId, setLineDiscountsOrderId] = useState(orderId);
+  useEffect(() => {
+    setLineDiscounts(loadLineDiscounts());
+    setLineDiscountsOrderId(orderId);
+  }, [orderId]);
+  useEffect(() => {
+    if (lineDiscountsOrderId !== orderId) return;
+    try {
+      localStorage.setItem(lineDiscountsKey, JSON.stringify(lineDiscounts));
+    } catch {
+      toast.error("Unable to save the order line discounts.");
+    }
+  }, [lineDiscounts, lineDiscountsKey, lineDiscountsOrderId, orderId]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== lineDiscountsKey) return;
+      setLineDiscounts(parseOrderDetailsLineDiscounts(event.newValue));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [lineDiscountsKey]);
+  const updateLineDiscount = (
+    subOrderId: string,
+    update: Partial<OrderDetailsLineDiscount>,
+  ) => {
+    setLineDiscounts((current) => ({
+      ...current,
+      [subOrderId]: {
+        type: current[subOrderId]?.type || "percentage",
+        value: current[subOrderId]?.value || 0,
+        ...update,
+      },
+    }));
   };
   const applyItemState = (base: any[], saved: Record<string, any>) =>
     base.map(s => {
@@ -4175,13 +4255,17 @@ export default function MyOrderPage() {
     : (isDigitalOrder
       ? ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "VENDOR", "ACTIONS"]
       : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
+  const unitPriceColumnIndex = isClientPortalUser ? 4 : 5;
+  if (!isDigitalOrder) {
+    subOrdersColumns.splice(unitPriceColumnIndex + 1, 0, "DISCOUNT", "TAX");
+  }
   if (isDigitalOrder) {
     const quantityIndex = isClientPortalUser ? 3 : 4;
     subOrdersColumns[quantityIndex] = DIGITAL_PRODUCT_HEADERS.quantity;
     subOrdersColumns[quantityIndex + 1] = DIGITAL_PRODUCT_HEADERS.tenure;
     subOrdersColumns.splice(quantityIndex + 2, 0, DIGITAL_PRODUCT_HEADERS.provisioning);
   } else if (isMixedOrder) {
-    const insertAt = (isClientPortalUser ? 3 : 4) + 2;
+    const insertAt = (isClientPortalUser ? 3 : 4) + 2 + 2;
     subOrdersColumns.splice(
       insertAt,
       0,
@@ -4194,7 +4278,7 @@ export default function MyOrderPage() {
   // instead of creating a second horizontal scrollbar. Long values are
   // wrapped inside their own tracks below, which keeps status and vendor
   // content from bleeding into adjacent columns.
-  const subOrdersColTemplate = isClientPortalUser
+  const subOrdersColTemplateBase = isClientPortalUser
     ? (isDigitalOrder
       ? "28px 110px minmax(0,2fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.25fr) 48px"
       : isMixedOrder
@@ -4205,6 +4289,13 @@ export default function MyOrderPage() {
       : isMixedOrder
         ? "28px 105px minmax(0,1.7fr) 72px 38px minmax(0,.7fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.15fr) 48px"
         : "28px 105px minmax(0,1.8fr) 72px 48px minmax(0,.8fr) 72px minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.1fr) 48px");
+  const subOrdersColTemplate = isDigitalOrder
+    ? subOrdersColTemplateBase
+    : (() => {
+        const columns = subOrdersColTemplateBase.split(" ");
+        columns.splice(unitPriceColumnIndex + 1, 0, "minmax(70px,.85fr)", "minmax(78px,.9fr)");
+        return columns.join(" ");
+      })();
   const subOrdersColGap = 6;
 
   const billingAddress = [
@@ -4541,6 +4632,14 @@ export default function MyOrderPage() {
                       : undefined;
                     const cancelledLine = String(canonicalLine?.status || "").toLowerCase() === "cancelled";
                     const itemCancelled = isSubOrderCancelled || cancelledLine;
+                    const lineDiscount = lineDiscounts[sub.id] || { type: "percentage" as const, value: 0 };
+                    const linePricing = calculateOrderDetailsLinePricing({
+                      unitPriceExclGst: Number(sub.unitPriceExclGst) || 0,
+                      quantity: Number(sub.qty) || 0,
+                      taxRate: Number(sub.taxRate) || 0,
+                      discountType: lineDiscount.type,
+                      discountValue: lineDiscount.value,
+                    });
                     const subPOs = canonicalPO ? [canonicalPO] : [];
                     const hasPO = subPOs.length > 0;
                     const hasConfirmedPO = subPOs.some(isConfirmedPO);
@@ -4652,8 +4751,99 @@ export default function MyOrderPage() {
                             ? "—"
                             : isDigitalOrder
                             ? subPresentation.tenureBilling
-                            : sub.unitPrice}
+                             : formatCurrency(Number(sub.unitPriceExclGst) || 0)}
                        </div>
+                        {!isDigitalOrder && (
+                          <>
+                            <div style={{ minWidth: 0 }}>
+                              {isMixedOrder && subIsDigital ? (
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                              ) : isClientPortalUser ? (
+                                <span style={{ fontSize: 11.5, color: "#374151" }}>
+                                  {lineDiscount.value > 0
+                                    ? lineDiscount.type === "percentage"
+                                      ? `${lineDiscount.value}%`
+                                      : formatCurrency(lineDiscount.value)
+                                    : "—"}
+                                </span>
+                              ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={lineDiscount.type === "percentage" ? 100 : convertCurrency(linePricing.grossPreTax)}
+                                    step="0.01"
+                                    aria-label={`Discount for ${sub.itemName}`}
+                                    title="A fixed amount discounts the full line before tax."
+                                    value={
+                                      lineDiscount.type === "amount"
+                                        ? convertCurrency(lineDiscount.value) || ""
+                                        : lineDiscount.value || ""
+                                    }
+                                    disabled={isOrderInactive || itemCancelled}
+                                    onChange={(event) => {
+                                      const entered = Math.max(0, Number.parseFloat(event.target.value) || 0);
+                                      const max = lineDiscount.type === "percentage"
+                                        ? 100
+                                        : linePricing.grossPreTax;
+                                      const baseValue = lineDiscount.type === "amount"
+                                        ? entered / Math.max(convertCurrency(1), Number.EPSILON)
+                                        : entered;
+                                      updateLineDiscount(sub.id, { value: Math.min(baseValue, max) });
+                                    }}
+                                    style={{
+                                      boxSizing: "border-box",
+                                      width: "100%",
+                                      minWidth: 0,
+                                      padding: "4px 5px",
+                                      border: "1px solid #d1d5db",
+                                      borderRadius: 5,
+                                      fontSize: 11,
+                                      fontFamily: "inherit",
+                                    }}
+                                  />
+                                  <select
+                                    aria-label={`Discount type for ${sub.itemName}`}
+                                    value={lineDiscount.type}
+                                    disabled={isOrderInactive || itemCancelled}
+                                    onChange={(event) => updateLineDiscount(sub.id, {
+                                      type: event.target.value as OrderDetailsDiscountType,
+                                      value: 0,
+                                    })}
+                                    style={{
+                                      boxSizing: "border-box",
+                                      width: "100%",
+                                      minWidth: 0,
+                                      padding: "3px 4px",
+                                      border: "1px solid #d1d5db",
+                                      borderRadius: 5,
+                                      background: "#fff",
+                                      fontSize: 10.5,
+                                      fontFamily: "inherit",
+                                    }}
+                                  >
+                                    <option value="percentage">%</option>
+                                    <option value="amount">{getCurrencySymbol()}</option>
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ minWidth: 0, overflowWrap: "break-word" }}>
+                              {isMixedOrder && subIsDigital ? (
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                              ) : (
+                                <>
+                                  <div style={{ fontSize: 11.5, color: "#374151" }}>
+                                    {formatCurrency(linePricing.taxAmount)}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#9ca3af" }}>
+                                    {Number(sub.taxRate) || 0}% GST
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
                        {isMixedOrder && (
                          <>
                            <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>
@@ -4672,7 +4862,9 @@ export default function MyOrderPage() {
                            {subPresentation.provisioningTime}
                          </div>
                        )}
-                      <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>
+                        {formatCurrency(linePricing.total)}
+                      </div>
                       <div style={{ minWidth: 0, overflow: "hidden" }}>
                         <StatusPill status={sub.itemStatus} compact />
                         <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div>
@@ -4838,7 +5030,59 @@ export default function MyOrderPage() {
                 const cancelledSubOrderIds = new Set(
                   subOrders.filter((sub) => sub.itemStatus === "Cancelled").map((sub) => sub.id),
                 );
-                const pricing = calculateRemainingOrderPricing(order, cancelledSubOrderIds);
+                const basePricing = calculateRemainingOrderPricing(order, cancelledSubOrderIds);
+                const activeLinePricing = subOrders
+                  .filter((sub) => !cancelledSubOrderIds.has(sub.id))
+                  .map((sub) => {
+                    const discount = lineDiscounts[sub.id] || { type: "percentage" as const, value: 0 };
+                    return {
+                      rate: Number(sub.taxRate) || 0,
+                      pricing: calculateOrderDetailsLinePricing({
+                        unitPriceExclGst: Number(sub.unitPriceExclGst) || 0,
+                        quantity: Number(sub.qty) || 0,
+                        taxRate: Number(sub.taxRate) || 0,
+                        discountType: discount.type,
+                        discountValue: discount.value,
+                      }),
+                    };
+                  });
+                const hasDiscount = activeLinePricing.some(({ pricing: line }) => line.discountAmount > 0);
+                const pricing = hasDiscount
+                  ? (() => {
+                      const grouped = new Map<number, { taxable: number; gst: number }>();
+                      activeLinePricing.forEach(({ rate, pricing: line }) => {
+                        const current = grouped.get(rate) || { taxable: 0, gst: 0 };
+                        current.taxable += line.preTaxSubtotal;
+                        current.gst += line.taxAmount;
+                        grouped.set(rate, current);
+                      });
+                      const slabs = [...grouped.entries()]
+                        .sort(([left], [right]) => left - right)
+                        .map(([rate, amounts]) => ({
+                          rate,
+                          taxable: Math.round(amounts.taxable),
+                          gst: Math.round(amounts.gst),
+                        }));
+                      const preTaxSubtotal = slabs.reduce((total, slab) => total + slab.taxable, 0);
+                      const totalGst = slabs.reduce((total, slab) => total + slab.gst, 0);
+                      const platformFee = order?.checkoutPricingSnapshot
+                        ? preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100
+                        : basePricing.platformFee;
+                      return {
+                        ...basePricing,
+                        slabs,
+                        preTaxSubtotal,
+                        totalGst,
+                        platformFee,
+                        grandTotal:
+                          preTaxSubtotal +
+                          totalGst +
+                          basePricing.shippingDeliveryFee +
+                          platformFee +
+                          basePricing.otherAdjustments,
+                      };
+                    })()
+                  : basePricing;
                 const fmt = (n: number) => formatCurrency(n);
                 return (
                   <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
