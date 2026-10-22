@@ -58,6 +58,8 @@ export interface OrderCartItem {
   checkoutUnitPriceExclGst?: number;
   /** GST rate used for the saved customer checkout price. */
   checkoutGstRate?: number;
+  /** Combined percentage discount shown on the cart line at checkout. */
+  cartDiscountPct?: number;
   hsnSnapshot?: string;
   vendorRating?: number;
   /** Cloud/service configuration selected before the item was added to cart. */

@@ -202,6 +202,8 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
       const today = now.toISOString().split("T")[0];
       const itemsSnapshot = cart.map((i, index) => ({
         ...i,
+        cartDiscountPct:
+          cartPricing.lines[index].slabDiscountPct + cartPricing.lines[index].clientDiscountPct,
         checkoutUnitPriceInclusive: cartPricing.lines[index].checkoutUnitPriceInclusive,
         checkoutUnitPriceExclGst: cartPricing.lines[index].checkoutUnitPriceExclGst,
         checkoutGstRate: cartPricing.lines[index].taxRate,
@@ -310,6 +312,7 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
           checkoutUnitPriceInclusive: i.checkoutUnitPriceInclusive,
           checkoutUnitPriceExclGst: i.checkoutUnitPriceExclGst,
           checkoutGstRate: i.checkoutGstRate,
+          cartDiscountPct: i.cartDiscountPct,
           hsnSnapshot: i.hsnSnapshot,
           vendorRating: i.vendorRating,
           configuration: i.configuration,
