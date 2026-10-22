@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import { StatusBadge } from "./ClientUsersPage";
 import ClientPricingSettingsPanel from "./ClientPricingSettingsTabsPanel";
 import { getPortalRoles, getPortalUsersByClient, updatePortalUser, type PortalUser } from "@/lib/portalUserStore";
+import {
+  getClientGeneralSettings,
+  saveClientGeneralSettings,
+  type ClientGeneralSettings,
+} from "@/lib/clientConfigurationStore";
 
 type InviteUser = {
   id: string;
@@ -30,13 +36,30 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
   const [configTab, setConfigTab] = useState("General");
   const configTabs = ["General", "Price Setting", "Invite Users"];
 
-  const [notifications, setNotifications] = useState({
-    emailOrders: true,
-    emailServices: true,
-    sms: false,
-  });
+  const [savedNotifications, setSavedNotifications] = useState<ClientGeneralSettings>(
+    () => getClientGeneralSettings(clientId),
+  );
+  const [notifications, setNotifications] = useState<ClientGeneralSettings>(
+    () => getClientGeneralSettings(clientId),
+  );
+
+  useEffect(() => {
+    const saved = getClientGeneralSettings(clientId);
+    setSavedNotifications(saved);
+    setNotifications(saved);
+  }, [clientId]);
+
+  const hasUnsavedGeneralChanges =
+    JSON.stringify(notifications) !== JSON.stringify(savedNotifications);
+
   const toggle = (key: keyof typeof notifications) =>
     setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const saveGeneralSettings = () => {
+    saveClientGeneralSettings(clientId, notifications);
+    setSavedNotifications(notifications);
+    toast.success("Client settings saved");
+  };
 
   // Invite Users state
   const [inviteSearch, setInviteSearch] = useState("");
@@ -128,15 +151,9 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
           {/* API Settings */}
           <div className="pb-5 border-b border-gray-100">
             <p className="text-xs font-semibold text-blue-600 mb-3">API Settings</p>
-            <label className="block text-xs text-gray-600 mb-1.5">API Key</label>
-            <input
-              type="password"
-              defaultValue="supersecretapikey1234"
-              className="w-full px-2 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono tracking-widest text-gray-700"
-            />
-            <button className="mt-3 px-2 py-1.5 text-xs border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
-              Regenerate API Key
-            </button>
+            <p className="text-xs text-gray-500">
+              API key management is not configured for this client.
+            </p>
           </div>
 
           {/* Notifications */}
@@ -163,14 +180,23 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
               Archive Client
             </button>
           </div>
+
+          <div className="mt-5 flex justify-end border-t border-gray-100 pt-4">
+            <button
+              type="button"
+              onClick={saveGeneralSettings}
+              disabled={!hasUnsavedGeneralChanges}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save Changes
+            </button>
+          </div>
         </div>
       )}
 
-      {configTab === "Price Setting" && (
-        <div className="flex flex-col">
+      <div className={configTab === "Price Setting" ? "flex flex-col" : "hidden"}>
           <ClientPricingSettingsPanel clientId={clientId} />
-        </div>
-      )}
+      </div>
 
       {configTab === "Invite Users" && (
         <div className="flex flex-col gap-4" onClick={() => setInviteRoleOpen(false)}>

@@ -35,6 +35,13 @@ All platform config (org info, theme, localization, procurement defaults, notifi
 4. All `subscribeToConfig()` listeners (OrganizationContext, I18nProvider) pick up the change
 5. Components re-render with new values — no page reload required
 
+## Client detail configuration save behavior
+Edits in Client Details → Configuration → General and Price Setting remain local drafts until the user clicks Save Changes. General settings save per client; the three pricing subtabs share a save action that commits only changed pricing, slab, and market-price data. Switching among these subtabs must not persist edits.
+
+**Why:** Client configuration changes must not take effect before the user explicitly confirms them.
+
+**How to apply:** Keep client detail configuration inputs in draft state, compare against saved snapshots, and call the relevant store writers only from Save Changes.
+
 ## Provider order in App.tsx
 ConfigProvider → ThemeProvider → I18nProvider → ... → OrganizationProvider
 ThemeProvider and I18nProvider must be inside ConfigProvider.

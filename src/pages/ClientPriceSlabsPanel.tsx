@@ -3,11 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Plus, X } from 'lucide-react';
-import {
-  getClientPriceSlabs,
-  saveClientPriceSlabs,
-  type PriceSlab,
-} from '@/lib/priceEngineStore';
+import type { PriceSlab } from '@/lib/priceEngineStore';
 import { getMasterCatalogCategories } from '@/lib/catalogStore';
 
 /** Always "All Products" first, then live categories from master catalog. */
@@ -27,12 +23,20 @@ function emptySlab(): PriceSlab {
   };
 }
 
-export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }) {
-  const [slabs, setSlabs] = useState<PriceSlab[]>(() => getClientPriceSlabs(clientId));
+export default function ClientPriceSlabsPanel({
+  clientId,
+  slabs,
+  onChange,
+}: {
+  clientId: string;
+  slabs: PriceSlab[];
+  onChange: (slabs: PriceSlab[]) => void;
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<PriceSlab | null>(null);
+  const [originalSlab, setOriginalSlab] = useState<PriceSlab | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [applyToOptions, setApplyToOptions] = useState<string[]>(buildApplyToOptions);
+  const draft = slabs.find((slab) => slab.id === editingId) ?? null;
 
   // Re-build options whenever master catalog changes
   useEffect(() => {
@@ -42,33 +46,42 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
   }, []);
 
   useEffect(() => {
-    setSlabs(getClientPriceSlabs(clientId));
     setEditingId(null);
-    setDraft(null);
+    setOriginalSlab(null);
     setIsNew(false);
   }, [clientId]);
 
-  const persist = (next: PriceSlab[]) => {
-    setSlabs(next);
-    saveClientPriceSlabs(clientId, next);
-  };
+  const updateSlab = (id: string, patch: Partial<PriceSlab>) =>
+    onChange(slabs.map((slab) => slab.id === id ? { ...slab, ...patch } : slab));
 
   const startAdd = () => {
     const slab = emptySlab();
-    setDraft(slab);
+    onChange([...slabs, slab]);
     setEditingId(slab.id);
+    setOriginalSlab(null);
     setIsNew(true);
   };
 
   const startEdit = (slab: PriceSlab) => {
-    setDraft({ ...slab });
+    setOriginalSlab({ ...slab });
     setEditingId(slab.id);
     setIsNew(false);
   };
 
   const cancelEdit = () => {
+    if (isNew && editingId) {
+      onChange(slabs.filter((slab) => slab.id !== editingId));
+    } else if (originalSlab) {
+      onChange(slabs.map((slab) => slab.id === originalSlab.id ? originalSlab : slab));
+    }
     setEditingId(null);
-    setDraft(null);
+    setOriginalSlab(null);
+    setIsNew(false);
+  };
+
+  const finishEdit = () => {
+    setEditingId(null);
+    setOriginalSlab(null);
     setIsNew(false);
   };
 
@@ -83,23 +96,17 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
     ) {
       return;
     }
-    if (isNew) {
-      persist([...slabs, draft]);
-    } else {
-      persist(slabs.map((s) => (s.id === draft.id ? draft : s)));
-    }
-    cancelEdit();
+    finishEdit();
   };
 
-  const removeSlab = (id: string) => {
-    persist(slabs.filter((s) => s.id !== id));
-  };
+  const removeSlab = (id: string) => onChange(slabs.filter((slab) => slab.id !== id));
 
-  const toggleStatus = (id: string) => {
-    persist(
-      slabs.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s))
-    );
-  };
+  const toggleStatus = (id: string) =>
+    onChange(slabs.map((slab) => (
+      slab.id === id
+        ? { ...slab, status: slab.status === 'Active' ? 'Inactive' : 'Active' }
+        : slab
+    )));
 
   return (
     <div className="mt-6">
@@ -132,7 +139,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     <td className="px-4 py-2">
                       <Input
                         value={draft.name}
-                        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                        onChange={(e) => updateSlab(draft.id, { name: e.target.value })}
                         placeholder="Slab name"
                         className="h-8 text-xs bg-white"
                       />
@@ -140,31 +147,31 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     <td className="px-4 py-2">
                       <Input
                         type="number"
-                          value={draft.minQty || ""}
-                        onChange={(e) => setDraft({ ...draft, minQty: parseInt(e.target.value) || 0 })}
+                        value={draft.minQty || ""}
+                        onChange={(e) => updateSlab(draft.id, { minQty: parseInt(e.target.value) || 0 })}
                         className="h-8 text-xs w-20 bg-white"
                       />
                     </td>
                     <td className="px-4 py-2">
                       <Input
                         type="number"
-                          value={draft.maxQty || ""}
-                        onChange={(e) => setDraft({ ...draft, maxQty: parseInt(e.target.value) || 0 })}
+                        value={draft.maxQty || ""}
+                        onChange={(e) => updateSlab(draft.id, { maxQty: parseInt(e.target.value) || 0 })}
                         className="h-8 text-xs w-20 bg-white"
                       />
                     </td>
                     <td className="px-4 py-2">
                       <Input
                         type="number"
-                          value={draft.discountPct || ""}
-                        onChange={(e) => setDraft({ ...draft, discountPct: parseFloat(e.target.value) || 0 })}
+                        value={draft.discountPct || ""}
+                        onChange={(e) => updateSlab(draft.id, { discountPct: parseFloat(e.target.value) || 0 })}
                         className="h-8 text-xs w-20 bg-white"
                       />
                     </td>
                     <td className="px-4 py-2">
                       <select
                         value={draft.applyTo}
-                        onChange={(e) => setDraft({ ...draft, applyTo: e.target.value })}
+                        onChange={(e) => updateSlab(draft.id, { applyTo: e.target.value })}
                         className="h-8 text-xs border border-gray-300 rounded px-2 bg-white"
                       >
                           <option value="">Select category</option>
@@ -178,7 +185,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-3">
-                        <button onClick={saveDraft} className="text-blue-600 hover:underline text-xs font-medium">Save</button>
+                        <button onClick={saveDraft} className="text-blue-600 hover:underline text-xs font-medium">Done</button>
                         <button onClick={cancelEdit} className="text-gray-400 hover:text-gray-600">
                           <X size={14} />
                         </button>
@@ -201,7 +208,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                   <td className="px-4 py-2 text-gray-500">{slab.applyTo}</td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => toggleStatus(slab.id)}
+              onClick={() => toggleStatus(slab.id)}
                       className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${
                         slab.status === 'Active'
                           ? 'bg-green-50 text-green-600 border-green-200'
@@ -227,7 +234,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                   <Input
                     autoFocus
                     value={draft.name}
-                    onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    onChange={(e) => updateSlab(draft.id, { name: e.target.value })}
                     placeholder="Slab name"
                     className="h-8 text-xs bg-white"
                   />
@@ -235,31 +242,31 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                 <td className="px-4 py-2">
                   <Input
                     type="number"
-                      value={draft.minQty || ""}
-                    onChange={(e) => setDraft({ ...draft, minQty: parseInt(e.target.value) || 0 })}
+                    value={draft.minQty || ""}
+                    onChange={(e) => updateSlab(draft.id, { minQty: parseInt(e.target.value) || 0 })}
                     className="h-8 text-xs w-20 bg-white"
                   />
                 </td>
                 <td className="px-4 py-2">
                   <Input
                     type="number"
-                      value={draft.maxQty || ""}
-                    onChange={(e) => setDraft({ ...draft, maxQty: parseInt(e.target.value) || 0 })}
+                    value={draft.maxQty || ""}
+                    onChange={(e) => updateSlab(draft.id, { maxQty: parseInt(e.target.value) || 0 })}
                     className="h-8 text-xs w-20 bg-white"
                   />
                 </td>
                 <td className="px-4 py-2">
                   <Input
                     type="number"
-                      value={draft.discountPct || ""}
-                    onChange={(e) => setDraft({ ...draft, discountPct: parseFloat(e.target.value) || 0 })}
+                    value={draft.discountPct || ""}
+                    onChange={(e) => updateSlab(draft.id, { discountPct: parseFloat(e.target.value) || 0 })}
                     className="h-8 text-xs w-20 bg-white"
                   />
                 </td>
                 <td className="px-4 py-2">
                   <select
                     value={draft.applyTo}
-                    onChange={(e) => setDraft({ ...draft, applyTo: e.target.value })}
+                    onChange={(e) => updateSlab(draft.id, { applyTo: e.target.value })}
                     className="h-8 text-xs border border-gray-300 rounded px-2 bg-white"
                   >
                       <option value="">Select category</option>
@@ -273,7 +280,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                 </td>
                 <td className="px-4 py-2">
                   <div className="flex items-center gap-3">
-                    <button onClick={saveDraft} className="text-blue-600 hover:underline text-xs font-medium">Save</button>
+                    <button onClick={saveDraft} className="text-blue-600 hover:underline text-xs font-medium">Done</button>
                     <button onClick={cancelEdit} className="text-gray-400 hover:text-gray-600">
                       <X size={14} />
                     </button>

@@ -6,15 +6,19 @@ import {
   computeClientFinalPrice,
   getAllProductPricing,
   getClientCommonSettings,
+  getClientPriceSlabs,
   getRetailMarketPrices,
   resolveClientProfitPct,
   saveClientCommonSettings,
+  saveClientPriceSlabs,
   saveRetailMarketPrices,
   type ClientCommonSettings,
+  type PriceSlab,
 } from "@/lib/priceEngineStore";
 import { getClientCatalog } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
+import { toast } from "sonner";
 
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -39,13 +43,24 @@ interface MarketRow {
 export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId: string }) {
   const [activeTab, setActiveTab] = useState<PricingTab>("Profit & Pricing Rules");
   const [settings, setSettings] = useState<ClientCommonSettings>(() => getClientCommonSettings(clientId));
+  const [savedSettings, setSavedSettings] = useState<ClientCommonSettings>(() => getClientCommonSettings(clientId));
   const [retailPrices, setRetailPrices] = useState<Record<string, number>>(() => getRetailMarketPrices());
+  const [savedRetailPrices, setSavedRetailPrices] = useState<Record<string, number>>(() => getRetailMarketPrices());
+  const [slabs, setSlabs] = useState<PriceSlab[]>(() => getClientPriceSlabs(clientId));
+  const [savedSlabs, setSavedSlabs] = useState<PriceSlab[]>(() => getClientPriceSlabs(clientId));
   const [assignedProducts, setAssignedProducts] = useState<{ code: string; name: string; category: string }[]>([]);
 
   useEffect(() => {
     setActiveTab("Profit & Pricing Rules");
-    setSettings(getClientCommonSettings(clientId));
-    setRetailPrices(getRetailMarketPrices());
+    const nextSettings = getClientCommonSettings(clientId);
+    const nextRetailPrices = getRetailMarketPrices();
+    const nextSlabs = getClientPriceSlabs(clientId);
+    setSettings(nextSettings);
+    setSavedSettings(nextSettings);
+    setRetailPrices(nextRetailPrices);
+    setSavedRetailPrices(nextRetailPrices);
+    setSlabs(nextSlabs);
+    setSavedSlabs(nextSlabs);
 
     const catalog = getClientCatalog(clientId);
     const masterProducts = getCatalogProducts();
@@ -63,9 +78,41 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
     field: K,
     value: ClientCommonSettings[K],
   ) => {
-    const next = { ...settings, [field]: value };
-    setSettings(next);
-    saveClientCommonSettings(clientId, next);
+    setSettings((current) => ({ ...current, [field]: value }));
+  };
+
+  const hasUnsavedChanges =
+    JSON.stringify(settings) !== JSON.stringify(savedSettings) ||
+    JSON.stringify(retailPrices) !== JSON.stringify(savedRetailPrices) ||
+    JSON.stringify(slabs) !== JSON.stringify(savedSlabs);
+
+  const saveChanges = () => {
+    const slabsChanged = JSON.stringify(slabs) !== JSON.stringify(savedSlabs);
+    const hasInvalidSlab = slabsChanged && slabs.some((slab) =>
+      !slab.name.trim() ||
+      slab.minQty < 1 ||
+      slab.maxQty < slab.minQty ||
+      slab.discountPct <= 0 ||
+      !slab.applyTo,
+    );
+    if (hasInvalidSlab) {
+      toast.error("Complete each price slab before saving.");
+      return;
+    }
+
+    if (JSON.stringify(settings) !== JSON.stringify(savedSettings)) {
+      saveClientCommonSettings(clientId, settings);
+      setSavedSettings(settings);
+    }
+    if (JSON.stringify(retailPrices) !== JSON.stringify(savedRetailPrices)) {
+      saveRetailMarketPrices(retailPrices);
+      setSavedRetailPrices(retailPrices);
+    }
+    if (slabsChanged) {
+      saveClientPriceSlabs(clientId, slabs);
+      setSavedSlabs(slabs);
+    }
+    toast.success("Price settings saved");
   };
 
   const marketRows = useMemo<MarketRow[]>(() => {
@@ -101,11 +148,8 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
     });
   }, [assignedProducts, clientId, retailPrices, settings]);
 
-  const updateRetailPrice = (code: string, value: number) => {
-    const next = { ...retailPrices, [code]: value };
-    setRetailPrices(next);
-    saveRetailMarketPrices(next);
-  };
+  const updateRetailPrice = (code: string, value: number) =>
+    setRetailPrices((current) => ({ ...current, [code]: value }));
 
   return (
     <div className="space-y-4">
@@ -283,7 +327,24 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
         </div>
       )}
 
-      {activeTab === "Slab Name" && <ClientPriceSlabsPanel clientId={clientId} />}
+      {activeTab === "Slab Name" && (
+        <ClientPriceSlabsPanel
+          clientId={clientId}
+          slabs={slabs}
+          onChange={setSlabs}
+        />
+      )}
+
+      <div className="flex justify-end border-t border-gray-100 pt-4">
+        <button
+          type="button"
+          onClick={saveChanges}
+          disabled={!hasUnsavedChanges}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Save Changes
+        </button>
+      </div>
     </div>
   );
 }
