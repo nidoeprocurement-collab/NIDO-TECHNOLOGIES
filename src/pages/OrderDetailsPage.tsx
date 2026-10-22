@@ -4591,10 +4591,21 @@ export default function MyOrderPage() {
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
+              <style>{`
+                .order-details-suborders-grid > * {
+                  align-self: stretch;
+                  box-sizing: border-box;
+                  border-right: 1px solid #e5e7eb;
+                  padding-right: 6px;
+                }
+                .order-details-suborders-grid > *:last-child {
+                  border-right: none;
+                }
+              `}</style>
               {/* Keep the table fluid so it fits the page without a horizontal
                   scrollbar. Long content wraps inside its own grid track. */}
               <div style={{ width: "100%", overflow: "visible" }}>
-                <div style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+                <div className="order-details-suborders-grid" style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
                   {subOrdersColumns.map((h, headerIndex) => (
                     <div
                       key={h}
@@ -4651,7 +4662,7 @@ export default function MyOrderPage() {
                   const subAllocs = vendorAllocations?.[sub.id];
                   const isMultiVendor = subAllocs && subAllocs.length > 1;
                   return (
-                    <div key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", boxSizing: "border-box", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                    <div className="order-details-suborders-grid" key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", boxSizing: "border-box", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
