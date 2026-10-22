@@ -122,6 +122,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [notification, setNotification] = useState("");
+  const organizationAccess = getCurrentOrganizationName(clientId, clientName);
 
   const [form, setForm] = useState({
     employeeId: "",
@@ -134,7 +135,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
     gender: "",
     joiningDate: "",
     role: getPortalRoles(clientId || "").find(item => item.status === "active")?.name || "",
-    orgAccess: getCurrentOrganizationName(clientId, clientName),
+    orgAccess: organizationAccess,
     dataVisibility: "All Data",
     locationAccess: "All Locations",
     status: "Active",
@@ -143,41 +144,6 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
-
-  const [availableClients, setAvailableClients] = useState(() =>
-    getOrganizationOptions(getClients(), [getCurrentOrganizationName(clientId, clientName)]),
-  );
-  useEffect(() => {
-    const refreshClients = () => setAvailableClients(getOrganizationOptions(getClients(), [
-      getCurrentOrganizationName(clientId, clientName),
-    ]));
-    refreshClients();
-    window.addEventListener("nidoClientsUpdated", refreshClients);
-    return () => window.removeEventListener("nidoClientsUpdated", refreshClients);
-  }, []);
-
-  const handleOrganizationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (e.target.value !== "__add_new__") {
-      setForm((p) => ({ ...p, orgAccess: e.target.value }));
-      return;
-    }
-    const name = window.prompt("Enter the new client name");
-    if (!name?.trim()) return;
-    const trimmedName = name.trim();
-    const existing = availableClients.find(client => client.name.toLowerCase() === trimmedName.toLowerCase());
-    if (existing) {
-      setForm((p) => ({ ...p, orgAccess: existing.name }));
-      return;
-    }
-    const newClient = {
-      id: `CI-${Date.now()}`,
-      name: trimmedName,
-      status: "active",
-    };
-    addClient(newClient);
-    setAvailableClients(getClients());
-    setForm((p) => ({ ...p, orgAccess: newClient.name }));
-  };
 
   // Permissions
   // Client users only receive permissions for modules available in their
@@ -228,6 +194,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   const disabledCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
 
   const handleCreate = () => {
+    const formValues = { ...form, orgAccess: organizationAccess };
     const requiredFields: Array<[keyof typeof form, string]> = [
       ["employeeId", "Employee ID"],
       ["fullName", "Full Name"],
@@ -237,7 +204,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
       ["orgAccess", "Organization Access"],
     ];
     const missing = requiredFields
-      .filter(([key]) => !form[key].trim())
+      .filter(([key]) => !formValues[key].trim())
       .map(([, label]) => label);
 
     if (missing.length > 0) {
@@ -284,7 +251,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
         reportingManager: form.reportingManager.trim(),
         gender: form.gender,
         joiningDate: form.joiningDate,
-        orgAccess: form.orgAccess,
+        orgAccess: organizationAccess,
         dataVisibility: form.dataVisibility,
         locationAccess: form.locationAccess,
         expenseForm: { ...expenseForm },
@@ -459,13 +426,12 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                     </div>
                     <div>
                       <label className={labelCls}>Organization Access <span className="text-red-400">*</span></label>
-                      <select value={form.orgAccess} onChange={handleOrganizationChange} className={inputCls + " appearance-none text-gray-500"}>
-                        <option value="">Select organization</option>
-                        {availableClients.map(client => (
-                          <option key={client.id} value={client.name}>{client.name}</option>
-                        ))}
-                        <option value="__add_new__">＋ Add New Client</option>
-                      </select>
+                      <input
+                        type="text"
+                        value={organizationAccess}
+                        disabled
+                        className={disabledCls}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
