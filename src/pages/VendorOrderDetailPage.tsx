@@ -194,24 +194,63 @@ function DocIcon({ ext }: { ext: string }) {
 }
 
 // ── Update Tracking Modal ─────────────────────────────────────────────────────
-function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName: string; tracking: any; onSave: (t: any) => void; onClose: () => void }) {
+function UpdateTrackingModal({
+  itemName,
+  tracking,
+  referenceNumber,
+  serialNumber,
+  onSave,
+  onClose,
+}: {
+  itemName: string;
+  tracking: any;
+  referenceNumber: string;
+  serialNumber: string;
+  onSave: (shipment: any) => void;
+  onClose: () => void;
+}) {
   const [form, setForm] = useState({
     number: tracking?.number || "",
     carrier: tracking?.carrier || "",
     note: tracking?.note || "",
     link: tracking?.link || "Track Package",
+    referenceNumber: referenceNumber || "",
+    serialNumber: serialNumber || "",
   });
+  const canSave = Boolean(
+    form.referenceNumber.trim() &&
+    form.serialNumber.trim() &&
+    (form.number.trim() || form.carrier.trim()),
+  );
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 460, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>Update Tracking Info</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Complete Shipment Details</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{itemName}</div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+              Reference No., Serial No., and a tracking number or carrier are required.
+            </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {([
+            ["referenceNumber", "Reference No"],
+            ["serialNumber", "Serial No"],
+          ] as const).map(([key, label]) => (
+            <div key={key}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label} *</label>
+              <input
+                value={form[key]}
+                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                placeholder={`Enter ${label.toLowerCase()}`}
+                required
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+            </div>
+          ))}
           {([
             ["number", "Tracking Number", "e.g. 1Z999AA1234567890"],
             ["carrier", "Carrier", "e.g. UPS, FedEx, DHL"],
@@ -232,15 +271,15 @@ function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
           <button
             onClick={() => {
-              if (!form.number.trim() && !form.carrier.trim()) return;
+              if (!canSave) return;
               onSave({ ...form, link: form.link || "Track Package" });
               onClose();
             }}
-            disabled={!form.number.trim() && !form.carrier.trim()}
+            disabled={!canSave}
             data-confirmation-skip=""
-            style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: form.number.trim() || form.carrier.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: form.number.trim() || form.carrier.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+            style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: canSave ? "#2563eb" : "#93c5fd", color: "#fff", cursor: canSave ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
           >
-            Save Tracking
+            Save &amp; Mark Shipped
           </button>
         </div>
       </div>
@@ -834,7 +873,13 @@ export default function VendorOrderDetailPage() {
   const [noteVisibility, setNoteVisibility] = useState("Internal Note");
   const [cancelled, setCancelled] = useState(false);
   const [poCancelReason, setPoCancelReason] = useState<string>(() => getPOByNumber(poKey)?.cancelReason || "");
-  const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
+  const [updateTrackingItem, setUpdateTrackingItem] = useState<{
+    id: string;
+    name: string;
+    tracking: any;
+    referenceNumber: string;
+    serialNumber: string;
+  } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
   const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
 
@@ -945,7 +990,13 @@ export default function VendorOrderDetailPage() {
     if (status === "Shipped") {
       const it = currentItem;
       if (!it) return;
-      setUpdateTrackingItem({ id: it.id, name: it.name, tracking: it.tracking });
+      setUpdateTrackingItem({
+        id: it.id,
+        name: it.name,
+        tracking: it.tracking,
+        referenceNumber: it.referenceNumber || "",
+        serialNumber: it.serialNumber || "",
+      });
       return;
     }
     let savedStatus = status;
@@ -1020,62 +1071,38 @@ export default function VendorOrderDetailPage() {
     }
     setPendingItemCancel(null);
   };
-  const handleItemFieldChange = (id: string, field: "referenceNumber" | "serialNumber", value: string) => {
-    if (isCancelled) return;
-    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
-
-    const currentRealPO = getPOByNumber(poKey);
-    if (!currentRealPO) return;
-    const itemIndex = items.findIndex(it => it.id === id);
-    if (itemIndex < 0) return;
-
-    const updatedItems = currentRealPO.items.map((li, index) =>
-      index === itemIndex ? { ...li, [field]: value } : li
-    );
-    const changes: Partial<StoredPO> = { items: updatedItems };
-    const updatedLine = updatedItems[itemIndex];
-    if (
-      currentRealPO.subOrderId === updatedLine?.subOrderId ||
-      (!currentRealPO.items.length && currentRealPO.item)
-    ) {
-      changes[field] = value;
-    }
-    updatePO(poKey, changes);
-
-    // Project vendor-entered item identifiers into Order Details immediately.
-    const subOrderId = updatedLine?.subOrderId || currentRealPO.subOrderId;
-    if (!subOrderId || !currentRealPO.orderId) return;
-    try {
-      const itemStateKey = `nido_subitems_${currentRealPO.orderId}`;
-      const saved = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
-      saved[subOrderId] = { ...(saved[subOrderId] || {}), [field]: value };
-      localStorage.setItem(itemStateKey, JSON.stringify(saved));
-      window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
-        detail: { orderId: currentRealPO.orderId, subOrderIds: [subOrderId] },
-      }));
-    } catch {
-      /* storage unavailable */
-    }
-  };
   const handleDeleteItem = (id: string) => {
     if (isCancelled) return;
     setItems(prev => prev.filter(it => it.id !== id));
   };
-  const handleUpdateTracking = (id: string, tracking: any) => {
+  const handleUpdateTracking = (id: string, shipment: any) => {
     if (isCancelled) return;
     const currentItem = items.find(item => item.id === id);
     if (!currentItem || isDigitalDocumentProduct(currentItem)) return;
-    const normalizedTracking = tracking?.number?.trim() || tracking?.carrier?.trim() ? tracking : null;
+    const referenceNumber = String(shipment?.referenceNumber || "").trim();
+    const serialNumber = String(shipment?.serialNumber || "").trim();
+    const trackingDetails = {
+      number: String(shipment?.number || "").trim(),
+      carrier: String(shipment?.carrier || "").trim(),
+      note: String(shipment?.note || "").trim(),
+      link: shipment?.link || "Track Package",
+    };
+    if (
+      !referenceNumber ||
+      !serialNumber ||
+      (!trackingDetails.number && !trackingDetails.carrier)
+    ) return;
+    const normalizedTracking = trackingDetails;
     const itemIndex = items.findIndex(it => it.id === id);
     const updatedItems = items.map(it => it.id === id
-      ? { ...it, tracking: normalizedTracking, status: normalizedTracking ? "Shipped" : it.status }
+      ? { ...it, referenceNumber, serialNumber, tracking: normalizedTracking, status: "Shipped" }
       : it);
     setItems(updatedItems);
 
     const po = getPOByNumber(poKey);
     if (!po || itemIndex < 0) return;
     const updatedLines = po.items.map((line, index) => index === itemIndex
-      ? { ...line, tracking: normalizedTracking, status: normalizedTracking ? "Shipped" : line.status }
+      ? { ...line, referenceNumber, serialNumber, tracking: normalizedTracking, status: "Shipped" }
       : line);
     const activeLines = updatedLines.filter(line => line.status !== "Cancelled");
     const trackedCount = activeLines.filter(line => Boolean(line.tracking?.number?.trim() || line.tracking?.carrier?.trim())).length;
@@ -1083,7 +1110,21 @@ export default function VendorOrderDetailPage() {
       ? (po.status === "Draft" ? "Draft" : "Processing")
       : trackedCount === activeLines.length ? "Shipped" : "Partially Shipped";
     updatePO(poKey, { items: updatedLines, status: shipmentStatus as StoredPO["status"] });
-     setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
+    setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
+    const subOrderId = updatedLines[itemIndex]?.subOrderId || po.subOrderIds?.[itemIndex] || po.subOrderId;
+    if (subOrderId && po.orderId) {
+      try {
+        const itemStateKey = `nido_subitems_${po.orderId}`;
+        const saved = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
+        saved[subOrderId] = { ...(saved[subOrderId] || {}), referenceNumber, serialNumber };
+        localStorage.setItem(itemStateKey, JSON.stringify(saved));
+        window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+          detail: { orderId: po.orderId, subOrderIds: [subOrderId] },
+        }));
+      } catch {
+        /* storage unavailable */
+      }
+    }
     const previousStatus = currentItem.status;
     const activity = makePOActivity(
       `${currentItem.name} status changed from ${previousStatus} to ${normalizedTracking ? "Shipped" : previousStatus}. Tracking details were ${normalizedTracking ? "recorded" : "cleared"}.`,
@@ -1567,26 +1608,18 @@ export default function VendorOrderDetailPage() {
                        </div>
                      )}
                      <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxWidth: 240 }}>
-                       <label style={{ display: "block", fontSize: 10.5, color: "#6b7280" }}>
-                         Reference No
-                         <input
-                           value={item.referenceNumber || ""}
-                           onChange={e => handleItemFieldChange(item.id, "referenceNumber", e.target.value)}
-                           disabled={isCancelled}
-                           placeholder="Reference No"
-                           style={{ width: "100%", marginTop: 2, padding: "5px 7px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 11.5, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: isCancelled ? "#f9fafb" : "#fff" }}
-                         />
-                       </label>
-                       <label style={{ display: "block", fontSize: 10.5, color: "#6b7280" }}>
-                         Serial No
-                         <input
-                           value={item.serialNumber || ""}
-                           onChange={e => handleItemFieldChange(item.id, "serialNumber", e.target.value)}
-                           disabled={isCancelled}
-                           placeholder="Serial No"
-                           style={{ width: "100%", marginTop: 2, padding: "5px 7px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 11.5, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: isCancelled ? "#f9fafb" : "#fff" }}
-                         />
-                       </label>
+                        <div style={{ fontSize: 10.5, color: "#6b7280" }}>
+                          Reference No
+                          <div style={{ marginTop: 2, fontSize: 11.5, color: "#374151", overflowWrap: "anywhere" }}>
+                            {String(item.referenceNumber || "").trim() || "—"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "#6b7280" }}>
+                          Serial No
+                          <div style={{ marginTop: 2, fontSize: 11.5, color: "#374151", overflowWrap: "anywhere" }}>
+                            {String(item.serialNumber || "").trim() || "—"}
+                          </div>
+                        </div>
                     </div>
                     <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 4 }}>View more</button>
                   </div>
@@ -1629,7 +1662,13 @@ export default function VendorOrderDetailPage() {
                   {!isDigitalDocumentProduct(item) && !isCancelled && item.status === "Shipped" && (
                     <div style={{ marginTop: 7 }}>
                       <button
-                        onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
+                        onClick={() => setUpdateTrackingItem({
+                          id: item.id,
+                          name: item.name,
+                          tracking: item.tracking,
+                          referenceNumber: item.referenceNumber || "",
+                          serialNumber: item.serialNumber || "",
+                        })}
                         style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
                       >
                         Update
@@ -1873,7 +1912,9 @@ export default function VendorOrderDetailPage() {
         <UpdateTrackingModal
           itemName={updateTrackingItem.name}
           tracking={updateTrackingItem.tracking}
-          onSave={t => handleUpdateTracking(updateTrackingItem.id, t)}
+          referenceNumber={updateTrackingItem.referenceNumber}
+          serialNumber={updateTrackingItem.serialNumber}
+          onSave={shipment => handleUpdateTracking(updateTrackingItem.id, shipment)}
           onClose={() => setUpdateTrackingItem(null)}
         />
       )}

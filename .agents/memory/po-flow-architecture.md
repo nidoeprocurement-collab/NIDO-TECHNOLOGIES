@@ -67,17 +67,11 @@ The Vendor Order Details header also shows Pending Shipping when any active PO l
 
 **How to apply:** Derive the vendor PO display status from line statuses with Pending Shipping precedence only before shipped/delivered progress.
 
-Vendor-entered Reference No and Serial No are stored on each PO line and mirrored into the order’s sub-order state so Order Details can display them under the product name.
+Reference No and Serial No are entered in the shipment-details popup when a vendor marks a physical PO line Shipped. Both are required before saving; the saved values display read-only in the PO item details and remain mirrored into the order’s sub-order state.
 
-**Why:** Vendor Order Details and Order Details use separate local persistence areas; updating only the PO leaves the customer-facing item details stale.
+**Why:** The user asked to collect both identifiers as part of the Shipped action and show them in item details, rather than maintaining separate inline edit fields.
 
-**How to apply:** When adding vendor-entered item identifiers, update both the shared PO line and `nido_subitems_<orderId>`, then emit the existing sub-order refresh event.
-
-Vendor Order Details owns editing Reference No and Serial No; Order Details renders both as separate read-only rows below the item name.
-
-**Why:** Identifier changes belong to the vendor PO workflow, while the order view should present the saved values consistently without allowing a second edit path.
-
-**How to apply:** Keep the edit controls on the vendor detail page only and preserve both fields when Order Details persists sub-order state.
+**How to apply:** Pre-fill existing values in the shipment popup, require both before enabling Save & Mark Shipped, save them with the PO line’s tracking/status, mirror them to `nido_subitems_<orderId>`, and keep the item-details display read-only. Preserve the existing tracking requirement.
 
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
