@@ -1575,7 +1575,18 @@ export default function VendorOrderDetailPage() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+          <style>{`
+            .vendor-po-items-grid > * {
+              align-self: stretch;
+              box-sizing: border-box;
+              border-right: 1px solid #e5e7eb;
+              padding-right: 6px;
+            }
+            .vendor-po-items-grid > *:last-child {
+              border-right: none;
+            }
+          `}</style>
+          <div className="vendor-po-items-grid" style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
             {(isDigitalOrder
               ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "ACTIONS"]
               : isMixedOrder
@@ -1587,7 +1598,7 @@ export default function VendorOrderDetailPage() {
             <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
           )}
           {filteredItems.map((item, idx) => (
-            <div key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div className="vendor-po-items-grid" key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
