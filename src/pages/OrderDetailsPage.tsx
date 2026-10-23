@@ -2323,7 +2323,6 @@ function ThreeDotMenu({
   sub,
   onUpdateStatus,
   onRequestShipped,
-  canMarkShipped,
   onRequestDelivered,
   onCancel,
   cancelEnabled,
@@ -2333,7 +2332,6 @@ function ThreeDotMenu({
   onRequestPickupScheduled,
   onRequestPickupDone,
   statusUpdatesEnabled,
-  poDigitalStatus,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const [statusWarning, setStatusWarning] = useState<{ status: string; reason: string } | null>(null);
@@ -2387,22 +2385,15 @@ function ThreeDotMenu({
               "Pending",
               "Processing",
               "Pending Shipping",
-              ...(canMarkShipped ? ["Shipped"] : []),
+              "Shipped",
               ...(sub.itemStatus === "Shipped" ? ["Delivered"] : []),
               ...(sub.itemStatus === "Delivered" && canRaiseReturn && returnAllowed ? ["Return Request Raised"] : []),
             ];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
-    if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
+    if (!statusUpdatesEnabled) return "Status updates are unavailable for a cancelled item or order.";
      if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
      if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
-    if (isDigitalItem) {
-      const poStatusIndex = getDigitalFulfillmentStatusIndex(poDigitalStatus || "", sub.qty);
-      const requestedIndex = getDigitalFulfillmentStatusIndex(status, sub.qty);
-      if (poStatusIndex < requestedIndex) {
-        return `Update this item to ${status} in PO Details first.`;
-      }
-    }
     const currentIndex = isDigitalItem
       ? getDigitalFulfillmentStatusIndex(sub.itemStatus, sub.qty)
       : ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
@@ -2412,12 +2403,9 @@ function ThreeDotMenu({
     if (currentIndex >= 0 && nextIndex >= 0 && nextIndex <= currentIndex) {
       return "Item statuses can only move forward. Complete the previous status first.";
     }
-    if ((status === "Shipped" || status === "Delivered") && !canMarkShipped) {
-      return "Update this item to Shipped in its PO first by adding tracking in Vendor Order Detail.";
-    }
     return null;
   };
-  const canAdvanceStatus = statuses.length > 0;
+  const canAdvanceStatus = statuses.length > 0 && statusUpdatesEnabled;
   const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (open) {
@@ -2453,7 +2441,7 @@ function ThreeDotMenu({
             <button
               aria-disabled={!canAdvanceStatus}
               title={!statusUpdatesEnabled
-                ? "Confirm a purchase order first to enable item status updates."
+                ? "Status updates are unavailable for a cancelled item or order."
                 : statuses.length === 0
                   ? "This item is already at its final status."
                   : undefined}
@@ -2466,7 +2454,7 @@ function ThreeDotMenu({
             >
               <span>🔄</span> Update Status
               {!statusUpdatesEnabled
-                ? <span style={{ marginLeft: "auto", fontSize: 10 }}>PO pending</span>
+                ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Inactive</span>
                 : statuses.length === 0
                   ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Complete</span>
                   : <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span>}
@@ -2710,15 +2698,6 @@ function getCanonicalPOForSubOrder(pos: any[], subOrderOrId: string | any): any 
     })[0] || null;
 }
 
-function getDigitalPOFulfillmentStatus(po: any, subOrder: any): string {
-  if (!po || !isConfirmedPO(po)) return "";
-  const line = findPOLineForSubOrder(po, subOrder.id, subOrder);
-  const status = String(line?.status || "").trim();
-  return !status || ["pending", "confirmed"].includes(status.toLowerCase())
-    ? "Processing"
-    : status;
-}
-
 function getCancelledPOForSubOrder(pos: any[], subOrderId: string, subOrder?: any): any | null {
   return pos
     .filter(po =>
@@ -2772,26 +2751,6 @@ function getDraftPOAggregate(items: POLineItem[]): Partial<StoredPO> {
     cgstAmt: sgstAmt,
     grandTotal: subtotal + sgstAmt + sgstAmt,
   };
-}
-
-function isPOItemShipped(po: any, subOrderId: string): boolean {
-  if (!poCoversSubOrder(po, subOrderId)) return false;
-  const matchingLine = (po.items || []).find((line: any) => line.subOrderId === subOrderId);
-  if (matchingLine) {
-    const trackingSaved = Boolean(
-      matchingLine.tracking?.number ||
-      matchingLine.tracking?.trackingNumber ||
-      matchingLine.tracking?.carrier,
-    );
-    return matchingLine.status === "Delivered" || (matchingLine.status === "Shipped" && trackingSaved);
-  }
-  return po.status === "Delivered" || (
-    po.status === "Shipped" && Boolean(
-      po.tracking?.number ||
-      po.tracking?.trackingNumber ||
-      po.tracking?.carrier,
-    )
-  );
 }
 
 function hasPOItemShipmentStarted(po: any, subOrderId: string, subOrder?: any): boolean {
@@ -2851,34 +2810,6 @@ function isConfirmedPO(po: any): boolean {
   // Only a PO with an explicit non-draft status has been generated/issued.
   // Incomplete legacy records must not lock the customer order.
   return Boolean(status) && status !== "draft" && status !== "cancelled" && status !== "rejected";
-}
-
-// Client-created sub-orders wait in Pending until their vendor PO is confirmed.
-// Keep this reconciliation tolerant of older saved orders that were initialized
-// as Processing before the PO confirmation gate was added.
-function reconcileSubOrderStatuses(subOrders: any[], orderId: string): any[] {
-  let orderPOs: any[] = [];
-  try {
-    orderPOs = getAllPOs().filter(po => po.orderId === orderId);
-  } catch {
-    orderPOs = [];
-  }
-  const confirmedPOs = orderPOs.filter(isConfirmedPO);
-  const updatedOn = new Date().toLocaleDateString("en-IN");
-
-  return subOrders.map(sub => {
-    if (sub.itemStatus === "Cancelled" || sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered") {
-      return sub;
-    }
-    const hasConfirmedPO = confirmedPOs.some(po => poCoversSubOrder(po, sub.id));
-    if (hasConfirmedPO && (sub.itemStatus === "Pending" || sub.itemStatus === "Confirmed")) {
-      return { ...sub, itemStatus: "Processing", updatedOn };
-    }
-    if (!hasConfirmedPO && sub.itemStatus === "Processing") {
-      return { ...sub, itemStatus: "Pending", updatedOn };
-    }
-    return sub;
-  });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -3065,6 +2996,9 @@ export default function MyOrderPage() {
       return {
         ...s,
         ...savedState,
+        // Keep previously projected PO progress as the current order-side
+        // snapshot; future PO fulfillment updates no longer overwrite it.
+        statusOwner: savedState.statusOwner === "purchase-order" ? "order-details" : savedState.statusOwner,
         // Tracking entered on the vendor/PO page is not part of the
         // customer-facing projection. Only Order Details-owned tracking is
         // allowed to render here.
@@ -3075,7 +3009,7 @@ export default function MyOrderPage() {
 
   const [subOrders, setSubOrders] = useState(() =>
     order?.cartItems?.length
-      ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
+      ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
       : []
   );
   const storedMasterStatus = String(order?.status || "Processing");
@@ -3173,10 +3107,9 @@ export default function MyOrderPage() {
     [subOrders]
   );
   const updateStatus = (subId: string, status: string, metadata: Record<string, any> = {}) => {
-    if (!hasConfirmedOrderPO || isOrderInactive) return;
-    if (status === "Shipped" && !getAllPOs().some(po => po.orderId === orderId && isPOItemShipped(po, subId))) return;
+    if (isOrderInactive) return;
     const target = subOrders.find(s => s.id === subId);
-    if (!target) return;
+    if (!target || target.itemStatus === "Cancelled") return;
     if (isDigitalDocumentProduct(target)) {
       const currentIndex = getDigitalFulfillmentStatusIndex(target.itemStatus, target.qty);
       const nextIndex = getDigitalFulfillmentStatusIndex(status, target.qty);
@@ -3185,13 +3118,6 @@ export default function MyOrderPage() {
         .slice(currentIndex >= 0 ? currentIndex + 1 : 0)
         .find(stage => stage !== "Partially Provisioned" || canPartiallyProvision);
       if (nextIndex < 0 || status !== expectedNextStatus) return;
-      const orderPOs = getAllPOs().filter(po => po.orderId === orderId);
-      const linkedPO = getCanonicalPOForSubOrder(orderPOs, target);
-      const poStatusIndex = getDigitalFulfillmentStatusIndex(
-        getDigitalPOFulfillmentStatus(linkedPO, target),
-        target.qty,
-      );
-      if (!linkedPO || poStatusIndex < nextIndex) return;
     }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
@@ -3208,27 +3134,17 @@ export default function MyOrderPage() {
         window.alert("Partial provisioning is only available when at least two licenses were ordered. For a single license, select Provisioned when it is complete.");
         return;
       }
-      const linkedPO = getCanonicalPOForSubOrder(
-        getAllPOs().filter(po => po.orderId === orderId),
-        target,
+      const enteredQuantity = window.prompt(
+        `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
+        "",
       );
-      const poLineStatus = String(findPOLineForSubOrder(linkedPO, target.id, target)?.status || "");
-      const savedPartial = poLineStatus.match(/^Partially Provisioned\s*\((\d+)\/(\d+)\)$/i);
-      if (savedPartial && Number(savedPartial[2]) === totalQuantity) {
-        savedStatus = poLineStatus;
-      } else {
-        const enteredQuantity = window.prompt(
-          `Enter the actual number of licenses provisioned (1–${Math.max(0, totalQuantity - 1)}).`,
-          "",
-        );
-        if (enteredQuantity === null) return;
-        const partialStatus = formatPartiallyProvisionedStatus(Number(enteredQuantity), totalQuantity);
-        if (!partialStatus) {
-          window.alert(`Enter a whole number between 1 and ${Math.max(0, totalQuantity - 1)}.`);
-          return;
-        }
-        savedStatus = partialStatus;
+      if (enteredQuantity === null) return;
+      const partialStatus = formatPartiallyProvisionedStatus(Number(enteredQuantity), totalQuantity);
+      if (!partialStatus) {
+        window.alert(`Enter a whole number between 1 and ${Math.max(0, totalQuantity - 1)}.`);
+        return;
       }
+      savedStatus = partialStatus;
     }
     const previousStatus = target.itemStatus;
     const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
@@ -3305,7 +3221,7 @@ export default function MyOrderPage() {
   };
 
   const requestShipped = (subId: string) => {
-    if (!hasConfirmedOrderPO || isOrderInactive) return;
+    if (isOrderInactive) return;
     const target = subOrders.find(sub => sub.id === subId);
     if (!target || isDigitalDocumentProduct(target)) return;
     setPendingShippedTarget(subId);
@@ -3850,7 +3766,7 @@ export default function MyOrderPage() {
     if (!order) return;
     setSubOrders(
       order.cartItems?.length
-        ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
+        ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
         : []
     );
     // Run whenever orderId changes (navigation between orders) or order first resolves
@@ -3939,7 +3855,6 @@ export default function MyOrderPage() {
   useEffect(() => {
     const refresh = () => {
       setPoRefreshKey(k => k + 1);
-      setSubOrders(prev => reconcileSubOrderStatuses(applyItemState(prev, loadItemState()), orderId));
     };
     const onStorage = (e: StorageEvent) => {
       if (e.key === "nido_all_purchase_orders") refresh();
@@ -4586,9 +4501,6 @@ export default function MyOrderPage() {
                     );
                     const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id, sub);
                     const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub);
-                    const poDigitalStatus = subIsDigital
-                      ? getDigitalPOFulfillmentStatus(canonicalPO, sub)
-                      : "";
                     const canonicalLine = canonicalPO
                       ? findPOLineForSubOrder(canonicalPO, sub.id, sub)
                       : undefined;
@@ -4608,7 +4520,6 @@ export default function MyOrderPage() {
                     const hasPO = subPOs.length > 0;
                     const hasConfirmedPO = subPOs.some(isConfirmedPO);
                     const cancelledPONeedsResolution = Boolean(cancelledPO) && !hasPO && !itemCancelled;
-                    const canMarkShipped = !itemCancelled && subPOs.some((po: any) => isPOItemShipped(po, sub.id));
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
@@ -4910,8 +4821,6 @@ export default function MyOrderPage() {
                             sub={sub}
                             onUpdateStatus={s => updateStatus(sub.id, s)}
                             onRequestShipped={() => requestShipped(sub.id)}
-                            canMarkShipped={canMarkShipped}
-                            poDigitalStatus={poDigitalStatus}
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
@@ -4920,7 +4829,7 @@ export default function MyOrderPage() {
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
                              onRequestPickupDone={() => setPickupDoneTarget(sub.id)}
-                            statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}
+                            statusUpdatesEnabled={!isOrderInactive && !itemCancelled}
                           />
                         </div>
                       )}

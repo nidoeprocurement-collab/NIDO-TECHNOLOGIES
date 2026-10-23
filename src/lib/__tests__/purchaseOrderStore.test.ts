@@ -81,7 +81,7 @@ describe("purchaseOrderStore cancellation", () => {
     localStorage.clear();
   });
 
-  it("cancels a Draft PO without cancelling the linked client order items", () => {
+  it("returns an active order item to Pending when its Draft PO is cancelled", () => {
     savePO(makePO("PO-00009", "Draft", [makeLine("SO-1", "Active item", 100)]));
     localStorage.setItem("nido_subitems_ORDER-1", JSON.stringify({
       "SO-1": { itemStatus: "Processing" },
@@ -90,12 +90,12 @@ describe("purchaseOrderStore cancellation", () => {
     updatePO("PO-00009", { status: "Cancelled", cancelReason: "Draft PO abandoned" });
 
     expect(getAllPOs()[0].status).toBe("Cancelled");
-    expect(JSON.parse(localStorage.getItem("nido_subitems_ORDER-1") || "{}")).toEqual({
-      "SO-1": { itemStatus: "Processing" },
-    });
+    const itemState = JSON.parse(localStorage.getItem("nido_subitems_ORDER-1") || "{}")["SO-1"];
+    expect(itemState.itemStatus).toBe("Pending");
+    expect(itemState.cancelReason).toBe("");
   });
 
-  it("projects confirmed PO line progress into the linked order and My Orders status", () => {
+  it("keeps PO fulfillment progress separate from order and My Orders statuses", () => {
     const orderId = "ORDER-DIGITAL-1";
     const subOrderId = "SO-DIGITAL-1";
     const line = {
@@ -119,10 +119,11 @@ describe("purchaseOrderStore cancellation", () => {
       items: confirmedPO.items.map(item => ({ ...item, status: "Provisioning" })),
     });
 
+    expect(getAllPOs()[0].items[0].status).toBe("Provisioning");
     expect(JSON.parse(localStorage.getItem(`nido_subitems_${orderId}`) || "{}")[subOrderId].itemStatus)
-      .toBe("Provisioning");
+      .toBe("Processing");
     expect(JSON.parse(localStorage.getItem("nido_my_orders") || "[]")[0].status)
-      .toBe("Provisioning");
+      .toBe("Processing");
   });
 
   it("removes one cancelled item from a Draft PO and recalculates the remaining PO", () => {

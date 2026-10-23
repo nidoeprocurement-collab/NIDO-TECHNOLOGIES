@@ -106,24 +106,23 @@ stock when cancelling a confirmed PO from its detail page. Project the updated
 item state and refresh event to Order Details, where active cancelled-PO lines
 can be reassigned or cancelled.
 
-## Vendor shipment vs. customer-facing status
+## Independent PO and Order fulfillment statuses
 
-Vendor Order Details owns PO-line fulfillment and tracking. It must not write a
-customer-facing sub-order `itemStatus` when a vendor marks a line as shipped or
-delivered. Order Details may expose its own Shipped or Delivered action only
-after the matching PO line has the corresponding vendor fulfillment progress;
-Shipped still requires saved tracking, and the customer-facing status changes
-only when that action is selected there. Tracking is projected only after that
-same vendor shipment-save event.
+Vendor Order Details owns PO-line fulfillment and tracking. Order Details owns
+customer-facing sub-order fulfillment and tracking. Normal status changes do not
+project between the two pages or gate progress on the other page; physical
+Order Details shipping still collects its own tracking, and digital partial
+quantities are entered independently. The cancellation rules above remain an
+intentional exception.
 
-**Why:** Vendor shipment confirmation is a prerequisite for the customer/order
-status transition, not the transition itself. Sharing the vendor status directly
-made Order Details appear Shipped before the order owner confirmed it.
+**Why:** The user requested that PO Details and Order Details statuses be
+updated independently, while choosing to retain existing cancellation and
+stock-release safeguards.
 
-**How to apply:** Persist the vendor result on the PO item (`status` and
-tracking), use `isPOItemShipped` to unlock Order Details’ Shipped action, and
-keep `nido_subitems_<orderId>.itemStatus` owned by Order Details. Do not copy PO
-tracking into the sub-order projection for ordinary vendor edits.
+**How to apply:** Persist each status in its own record. Do not copy PO status
+into `nido_subitems_<orderId>`, recalculate order summaries from PO updates, or
+require PO progress before Order Details can advance. Keep cancellation-only
+cascades and derive the master order status from Order Details item state.
 
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)

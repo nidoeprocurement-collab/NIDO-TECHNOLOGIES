@@ -136,7 +136,7 @@ export function isPOConfirmed(po: Pick<StoredPO, "status"> | null | undefined): 
   return Boolean(status) && status !== "draft" && status !== "cancelled" && status !== "rejected";
 }
 
-function syncPOFulfillmentToClientOrder(po: StoredPO): void {
+function syncPOIdentifiersToClientOrder(po: StoredPO): void {
   if (typeof window === "undefined" || !po.orderId || !isPOConfirmed(po) || !po.items?.length) return;
   const key = `nido_subitems_${po.orderId}`;
   let itemStates: Record<string, any> = {};
@@ -147,30 +147,12 @@ function syncPOFulfillmentToClientOrder(po: StoredPO): void {
   }
 
   const changedSubOrderIds: string[] = [];
-  const updatedOn = new Date().toLocaleDateString("en-IN");
   po.items.forEach((line, index) => {
     const subOrderId = line.subOrderId || po.subOrderIds?.[index] || "";
     if (!subOrderId) return;
     const existing = itemStates[subOrderId] || {};
-    const rawStatus = String(line.status || "").trim();
-    const itemStatus = !rawStatus || ["pending", "confirmed"].includes(rawStatus.toLowerCase())
-      ? "Processing"
-      : rawStatus;
-    if (existing.itemStatus === "Cancelled" && itemStatus !== "Cancelled") return;
-    if (
-      ["Return Request Raised", "Pickup Scheduled", "Pickup Done"].includes(existing.itemStatus) &&
-      itemStatus === "Delivered"
-    ) return;
-
     const updated = {
       ...existing,
-      itemStatus,
-      statusOwner: "purchase-order",
-      updatedOn,
-      ...(line.tracking !== undefined ? {
-        tracking: line.tracking,
-        trackingOwner: line.tracking ? "purchase-order" : undefined,
-      } : {}),
       ...(line.referenceNumber !== undefined ? { referenceNumber: line.referenceNumber } : {}),
       ...(line.serialNumber !== undefined ? { serialNumber: line.serialNumber } : {}),
     };
@@ -186,8 +168,6 @@ function syncPOFulfillmentToClientOrder(po: StoredPO): void {
       detail: { orderId: po.orderId, subOrderIds: changedSubOrderIds },
     }));
   }
-  // Keep the order-list summary aligned even when Order Details is not open.
-  syncMasterOrderFulfillmentStatus(po.orderId);
 }
 
 const STORAGE_KEY = "nido_all_purchase_orders";
@@ -213,7 +193,7 @@ export function savePO(po: StoredPO): void {
     all.unshift(po);
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  syncPOFulfillmentToClientOrder(po);
+  syncPOIdentifiersToClientOrder(po);
   // Notify any listening page (e.g. PurchaseOrdersPage) to refresh
   try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber: po.poNumber } })); } catch { /* SSR safe */ }
 }
@@ -326,7 +306,7 @@ export function updatePO(
     }
 
     if (changes.status !== "Cancelled" && (changes.status !== undefined || changes.items !== undefined)) {
-      syncPOFulfillmentToClientOrder(all[idx]);
+      syncPOIdentifiersToClientOrder(all[idx]);
     }
     try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber } })); } catch { /* SSR safe */ }
   }

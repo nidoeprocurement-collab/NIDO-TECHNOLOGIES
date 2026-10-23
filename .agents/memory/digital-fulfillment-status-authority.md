@@ -1,10 +1,10 @@
 ---
-name: Digital fulfillment status authority
-description: The linked PO line is the source of truth for digital fulfillment progress.
+name: Independent digital fulfillment statuses
+description: Digital fulfillment progress is recorded separately in PO Details and Order Details.
 ---
 
-The linked confirmed PO line is the source of truth for digital progress. Order Details must not advance beyond it, and Vendor Orders and My Orders summaries must reflect the same saved line status. Partial provisioning must reuse the exact completed quantity recorded on the PO. A single-unit order cannot be partially provisioned.
+Digital status in PO Details belongs to the PO line; customer-facing digital status in Order Details belongs to the order item. Normal fulfillment updates must not project between the two or gate progress on the other page. Partial provisioning quantities are entered independently on each page. A single-unit order cannot be partially provisioned.
 
-**Why:** The user explicitly requires PO-first status changes and consistent statuses across PO details, Order Details, Vendor Orders, and My Orders so the views do not diverge.
+**Why:** The user requested independent PO Details and Order Details statuses while keeping existing cancellation safeguards.
 
-**How to apply:** Keep the check in both the visible Order Details status menu and its update handler. Project saved PO line progress into linked order items and derive list summaries from those items. Compare normalized digital stages so saved partial quantities still match their stage, and copy the PO's partial count rather than prompting for a second value.
+**How to apply:** Validate each page's own status sequence and persist it to its own record. Do not copy PO fulfillment status into Order Details or block Order Details progress based on PO status. Keep cancellation-specific safeguards as the documented exception.
