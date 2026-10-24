@@ -22,8 +22,6 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
-import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
-import { getProductSpecLines } from "@/lib/productConfiguration";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -197,6 +195,45 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
       platformFee,
       grandTotal: totalAmount,
     } = cartPricing;
+    const orderItemRows = cart.map((item, index) => {
+      const linePricing = cartPricing.lines[index];
+      const unitPriceExclTax = linePricing?.checkoutUnitPriceExclGst ?? item.priceNum;
+      const baseUnitPrice = linePricing
+        ? linePricing.taxRate > 0
+          ? linePricing.baseUnitPriceInclusive * 100 / (100 + linePricing.taxRate)
+          : linePricing.baseUnitPriceInclusive
+        : item.priceNum;
+      const taxableAmount = unitPriceExclTax * item.quantity;
+      const taxAmount = linePricing
+        ? Math.max(0, (linePricing.checkoutUnitPriceInclusive - linePricing.checkoutUnitPriceExclGst) * item.quantity)
+        : 0;
+      const totalAmount = (linePricing?.checkoutUnitPriceInclusive ?? item.priceNum) * item.quantity;
+      const discountAmount = linePricing
+        ? linePricing.combinedDiscountPerUnitExclGst * item.quantity
+        : 0;
+
+      return {
+        item,
+        baseUnitPrice,
+        unitPriceExclTax,
+        taxableAmount,
+        taxRate: linePricing?.taxRate ?? 0,
+        taxAmount,
+        totalAmount,
+        discountAmount,
+        discountPct: linePricing?.combinedDiscountPct ?? 0,
+      };
+    });
+    const orderItemTotals = orderItemRows.reduce(
+      (totals, row) => ({
+        quantity: totals.quantity + row.item.quantity,
+        discountAmount: totals.discountAmount + row.discountAmount,
+        taxableAmount: totals.taxableAmount + row.taxableAmount,
+        taxAmount: totals.taxAmount + row.taxAmount,
+        totalAmount: totals.totalAmount + row.totalAmount,
+      }),
+      { quantity: 0, discountAmount: 0, taxableAmount: 0, taxAmount: 0, totalAmount: 0 },
+    );
     const handlePlaceOrder = async () => {
       const now = new Date();
       const today = now.toISOString().split("T")[0];
@@ -486,7 +523,7 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
               </div>
 
               {/* Order Items */}
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
                   <h2 className="font-semibold text-gray-900">Order Items ({cart.length})</h2>
                   <button onClick={() => navigate(cartPath)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
@@ -497,76 +534,97 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                   <div className="py-12 text-center text-gray-400 text-sm">No items in cart</div>
                 ) : (
                   <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
+                  <table className="w-full min-w-[1040px] table-fixed border-collapse">
+                    <colgroup>
+                      <col style={{ width: "27%" }} />
+                      <col style={{ width: "10%" }} />
+                      <col style={{ width: "10%" }} />
+                      <col style={{ width: "12%" }} />
+                      <col style={{ width: "6%" }} />
+                      <col style={{ width: "11%" }} />
+                      <col style={{ width: "7%" }} />
+                      <col style={{ width: "9%" }} />
+                      <col style={{ width: "8%" }} />
+                    </colgroup>
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3 border-r border-gray-200">Item</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Unit Price (Excl. Tax)</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Qty</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Discount</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Tax</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3">Total</th>
+                      <tr className="bg-gray-100 border-b border-gray-300">
+                        <th className="text-left text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Item</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Base Unit<br />Price</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Discount</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Unit Price<br />(Excl. Tax)</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Qty</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Taxable<br />Amount</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Tax<br />Rate</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3 border-r border-gray-300">Tax<br />Amount</th>
+                        <th className="text-center text-[11px] font-semibold text-gray-800 uppercase tracking-wide px-2 py-3">Total<br />Amount</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {cart.map((item, index) => {
-                        const linePricing = cartPricing.lines[index];
-                        const unitPriceExclTax = linePricing?.checkoutUnitPriceExclGst ?? item.priceNum;
-                        const baseUnitPriceExclTax = linePricing
-                          ? linePricing.taxRate > 0
-                            ? linePricing.baseUnitPriceInclusive * 100 / (100 + linePricing.taxRate)
-                            : linePricing.baseUnitPriceInclusive
-                          : item.priceNum;
-                        const lineTotal = (linePricing?.checkoutUnitPriceInclusive ?? item.priceNum) * item.quantity;
-                        const discountSavings = linePricing
-                          ? linePricing.combinedDiscountPerUnitExclGst * item.quantity
-                          : 0;
-                        const hasDiscount = Boolean(linePricing && linePricing.combinedDiscountPct > 0);
-                        const lineTax = linePricing
-                          ? Math.max(0, (linePricing.checkoutUnitPriceInclusive - linePricing.checkoutUnitPriceExclGst) * item.quantity)
-                          : 0;
+                      {orderItemRows.map((row) => {
+                        const { item, baseUnitPrice, unitPriceExclTax, taxableAmount, taxRate, taxAmount, totalAmount, discountAmount, discountPct } = row;
+                        const hasDiscount = discountPct > 0;
                         return (
-                        <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                          <td className="py-4 px-2 border-r border-gray-200">
-                            <div className="flex items-start gap-3">
-                              <img src={item.image} alt={item.name} className="w-14 h-14 object-cover rounded-lg border border-gray-100 shrink-0" />
-                              <div>
-                                <p className="font-medium text-sm text-gray-900 mb-1">{item.name}</p>
-                                <p className="text-xs text-gray-400">{getProductSpecLines(item.specs, item.configuration).join(" • ")}</p>
-                                <p className="text-xs text-gray-400 mt-1">MOQ: {item.moq}</p>
-                                <ProductConfigurationSummary
-                                  configuration={item.configuration}
-                                  priceAdjustment={item.configurationPriceAdjustment}
-                                  className="mt-2 rounded-md bg-violet-50 px-2.5 py-2"
-                                />
-                              </div>
+                        <tr key={item.id} className="border-b border-gray-300 last:border-0">
+                          <td className="py-3 px-2 border-r border-gray-300 align-middle">
+                            <div className="flex items-center gap-3">
+                              <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded-lg border border-gray-200 shrink-0" />
+                              <p className="font-medium text-sm leading-snug text-gray-900">{item.name}</p>
                             </div>
                           </td>
-                          <td className="py-4 px-3 align-top text-sm font-medium text-gray-900 border-r border-gray-200">
-                            {hasDiscount && linePricing && (
-                              <div className="text-xs text-gray-400 line-through">{formatPrice(baseUnitPriceExclTax)}</div>
-                            )}
-                            <div>{formatPrice(unitPriceExclTax)}</div>
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">
+                            {formatPrice(baseUnitPrice)}
                           </td>
-                          <td className="py-4 px-3 align-top text-sm text-gray-700 border-r border-gray-200">{item.quantity}</td>
-                          <td className="py-4 px-3 align-top border-r border-gray-200">
-                            {hasDiscount && linePricing ? (
-                              <span className="text-sm font-medium text-green-700">
-                                {Number(linePricing.combinedDiscountPct.toFixed(2))}% ({formatPrice(discountSavings)})
-                              </span>
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle">
+                            {hasDiscount ? (
+                              <div className="text-sm font-medium leading-snug text-green-800">
+                                <div>{Number(discountPct.toFixed(2))}%</div>
+                                <div>({formatPrice(discountAmount)})</div>
+                              </div>
                             ) : (
                               <span className="text-sm text-gray-400">—</span>
                             )}
                           </td>
-                          <td className="py-4 px-3 align-top text-sm text-gray-700 border-r border-gray-200">
-                            <div>{formatPrice(lineTax)}</div>
-                            {linePricing && <div className="text-[11px] text-gray-400">{linePricing.taxRate}%</div>}
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">
+                            {formatPrice(unitPriceExclTax)}
                           </td>
-                          <td className="py-4 px-3 align-top text-sm font-semibold text-gray-900">{formatPrice(lineTotal)}</td>
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">{item.quantity}</td>
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">
+                            {formatPrice(taxableAmount)}
+                          </td>
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">
+                            {taxRate}%
+                          </td>
+                          <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">
+                            {formatPrice(taxAmount)}
+                          </td>
+                          <td className="py-3 px-2 text-center align-middle text-sm font-semibold text-gray-900">
+                            {formatPrice(totalAmount)}
+                          </td>
                         </tr>
                         );
                       })}
                     </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-100 border-t border-gray-300">
+                        <td className="py-2 px-2 border-r border-gray-300 text-sm font-semibold text-gray-900">Total</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">—</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">
+                          {formatPrice(orderItemTotals.discountAmount)}
+                        </td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">—</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">{orderItemTotals.quantity}</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">
+                          {formatPrice(orderItemTotals.taxableAmount)}
+                        </td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">—</td>
+                        <td className="py-2 px-2 border-r border-gray-300 text-center text-sm font-semibold text-gray-900">
+                          {formatPrice(orderItemTotals.taxAmount)}
+                        </td>
+                        <td className="py-2 px-2 text-center text-sm font-semibold text-gray-900">
+                          {formatPrice(orderItemTotals.totalAmount)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                   </div>
                 )}
