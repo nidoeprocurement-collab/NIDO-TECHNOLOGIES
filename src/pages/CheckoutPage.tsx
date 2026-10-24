@@ -339,8 +339,8 @@ import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
                         }
 
                         return (
-                          <div className="min-h-screen bg-white px-2 py-6">
-                            <div className="max-w-6xl mx-auto">
+                          <div className="min-h-screen w-full min-w-0 bg-white py-6">
+                            <div className="w-full min-w-0">
                               {/* Breadcrumb */}
                               <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
                                 <button onClick={() => navigate(catalogPath)} className="hover:text-blue-600">Home</button>
@@ -361,7 +361,7 @@ import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
 
                               <CheckoutStepper current={1} />
 
-                              <div className="flex gap-2 items-start">
+                              <div className="flex flex-col lg:flex-row gap-[2mm] items-stretch lg:items-start">
                                 {/* Left */}
                                 <div className="flex-1 min-w-0 space-y-4">
                                   {requiresDeliveryDetails ? (

@@ -43,7 +43,7 @@ export default function OrderSummaryPanel({
     ? `-${formatPrice(totalDiscountAmount)} (${Number(totalDiscountPct.toFixed(2))}%)`
     : "—";
   return (
-    <div className="w-72 shrink-0 space-y-4">
+    <div className="w-full lg:w-72 shrink-0 space-y-4">
       {/* Order Summary card */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
