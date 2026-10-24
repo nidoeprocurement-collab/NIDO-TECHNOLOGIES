@@ -4142,15 +4142,15 @@ export default function MyOrderPage() {
   // content from bleeding into adjacent columns.
   const subOrdersColTemplateBase = isClientPortalUser
     ? (isDigitalOrder
-      ? "28px 110px minmax(0,2fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) 48px"
+      ? "28px 110px minmax(0,2.15fr) 38px minmax(0,.72fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) 104px"
       : isMixedOrder
-        ? "28px 100px minmax(0,1.8fr) 48px minmax(0,.8fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) 48px"
-        : "28px 100px minmax(0,2fr) 48px minmax(0,.8fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.2fr) 48px")
+        ? "28px 100px minmax(0,2fr) 44px minmax(0,.72fr) 38px minmax(0,.75fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) 104px"
+        : "28px 100px minmax(0,2.2fr) 44px minmax(0,.72fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.2fr) 104px")
     : (isDigitalOrder
-      ? "28px 110px minmax(0,1.8fr) 72px 38px minmax(0,.85fr) minmax(0,1fr) 72px minmax(0,1.25fr) minmax(0,1.2fr) 48px"
+      ? "28px 110px minmax(0,1.95fr) 72px 38px minmax(0,.72fr) minmax(0,1fr) 72px minmax(0,1.25fr) minmax(0,1.2fr) 104px"
       : isMixedOrder
-        ? "28px 105px minmax(0,1.7fr) 72px 38px minmax(0,.8fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr) 48px"
-        : "28px 105px minmax(0,1.8fr) 72px 48px minmax(0,.8fr) 72px minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.1fr) 48px");
+        ? "28px 105px minmax(0,1.85fr) 72px 38px minmax(0,.72fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr) 104px"
+        : "28px 105px minmax(0,1.95fr) 72px 44px minmax(0,.72fr) 72px minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.1fr) 104px");
   const subOrdersColTemplate = subOrdersColTemplateBase;
   const subOrdersColGap = 6;
 
@@ -4453,6 +4453,15 @@ export default function MyOrderPage() {
                   box-sizing: border-box;
                   border-right: 1px solid #e5e7eb;
                   padding-right: 6px;
+                  min-width: 0;
+                }
+                .order-details-suborders-header > * {
+                  padding-top: 10px;
+                  padding-bottom: 10px;
+                }
+                .order-details-suborders-row > * {
+                  padding-top: 16px;
+                  padding-bottom: 16px;
                 }
                 .order-details-suborders-grid > *:last-child {
                   border-right: none;
@@ -4461,7 +4470,7 @@ export default function MyOrderPage() {
               {/* Keep the table fluid so it fits the page without a horizontal
                   scrollbar. Long content wraps inside its own grid track. */}
               <div style={{ width: "100%", overflow: "visible" }}>
-                <div className="order-details-suborders-grid" style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+                <div className="order-details-suborders-grid order-details-suborders-header" style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "0 20px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
                   {subOrdersColumns.map((h, headerIndex) => (
                     <div
                       key={h}
@@ -4514,7 +4523,7 @@ export default function MyOrderPage() {
                   const subAllocs = vendorAllocations?.[sub.id];
                   const isMultiVendor = subAllocs && subAllocs.length > 1;
                   return (
-                    <div className="order-details-suborders-grid" key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", boxSizing: "border-box", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                    <div className="order-details-suborders-grid order-details-suborders-row" key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "0 20px", boxSizing: "border-box", alignItems: "stretch", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
