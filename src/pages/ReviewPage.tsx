@@ -501,7 +501,7 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3">Item</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Unit Price</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Unit Price (Excl. Tax)</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Discount</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Qty</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Tax</th>
@@ -511,7 +511,13 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                     <tbody>
                       {cart.map((item, index) => {
                         const linePricing = cartPricing.lines[index];
-                        const unitPrice = linePricing?.checkoutUnitPriceInclusive ?? item.priceNum;
+                        const unitPriceExclTax = linePricing?.checkoutUnitPriceExclGst ?? item.priceNum;
+                        const baseUnitPriceExclTax = linePricing
+                          ? linePricing.taxRate > 0
+                            ? linePricing.baseUnitPriceInclusive * 100 / (100 + linePricing.taxRate)
+                            : linePricing.baseUnitPriceInclusive
+                          : item.priceNum;
+                        const lineTotal = (linePricing?.checkoutUnitPriceInclusive ?? item.priceNum) * item.quantity;
                         const discountSavings = linePricing
                           ? linePricing.combinedDiscountPerUnitExclGst * item.quantity
                           : 0;
@@ -538,9 +544,9 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                           </td>
                           <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">
                             {hasDiscount && linePricing && (
-                              <div className="text-xs text-gray-400 line-through">{formatPrice(linePricing.baseUnitPriceInclusive)}</div>
+                              <div className="text-xs text-gray-400 line-through">{formatPrice(baseUnitPriceExclTax)}</div>
                             )}
-                            <div>{formatPrice(unitPrice)}</div>
+                            <div>{formatPrice(unitPriceExclTax)}</div>
                           </td>
                           <td className="py-4 pr-4 align-top">
                             {hasDiscount && linePricing ? (
@@ -559,7 +565,7 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                             <div>{formatPrice(lineTax)}</div>
                             {linePricing && <div className="text-[11px] text-gray-400">{linePricing.taxRate}%</div>}
                           </td>
-                          <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(unitPrice * item.quantity)}</td>
+                          <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(lineTotal)}</td>
                         </tr>
                         );
                       })}
