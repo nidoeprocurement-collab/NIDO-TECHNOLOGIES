@@ -94,6 +94,11 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PageMetaProvider } from "@/contexts/PageMetaContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
+import {
+  AccessDeniedPage,
+  ClerkSignInPage,
+  ClerkSignUpPage,
+} from "@/components/auth/ClerkAuthPages";
 import ActionConfirmationGuard from "@/components/shared/ActionConfirmationGuard";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
@@ -198,9 +203,6 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
-const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
-const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
 const ClientPortalReportsPage = lazy(() => import("@/pages/ClientPortalReportsPage"));
 const ClientPortalApprovalsPage = lazy(() => import("@/pages/ClientPortalApprovalsPage"));
@@ -338,7 +340,7 @@ function RootRedirect() {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, accessDenied } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -347,6 +349,10 @@ function AppRoutes() {
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (accessDenied) {
+    return <AccessDeniedPage />;
   }
 
   return (
@@ -359,42 +365,16 @@ function AppRoutes() {
     >
       <Routes>
         <Route
-          path="/login"
-          element={
-            isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <PageErrorBoundary
-                title="Login failed to load"
-                resetKey={location.pathname}
-              >
-                <LoginPage />
-              </PageErrorBoundary>
-            )
-          }
+          path="/sign-in/*"
+          element={isAuthenticated ? <Navigate to="/" replace /> : <ClerkSignInPage />}
         />
         <Route
-          path="/forgot-password"
-          element={
-            <PageErrorBoundary
-              title="Forgot password page failed to load"
-              resetKey={location.pathname}
-            >
-              <ForgotPasswordPage />
-            </PageErrorBoundary>
-          }
+          path="/sign-up/*"
+          element={isAuthenticated ? <Navigate to="/" replace /> : <ClerkSignUpPage />}
         />
-        <Route
-          path="/reset-password"
-          element={
-            <PageErrorBoundary
-              title="Reset password page failed to load"
-              resetKey={location.pathname}
-            >
-              <ResetPasswordPage />
-            </PageErrorBoundary>
-          }
-        />
+        <Route path="/login" element={<Navigate to="/sign-in" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/sign-in" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/sign-in" replace />} />
         <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
         <Route path="/preview-product" element={<ProductPreviewPage />} />
         <Route

@@ -50,3 +50,8 @@ externalPort = 3001
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["node", "./dist/index.cjs"]
+
+[userenv]
+
+[userenv.shared]
+NIDO_INITIAL_OWNER_EMAIL = "nidoeprocurment@gmail.com"

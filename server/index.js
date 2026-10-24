@@ -3,12 +3,23 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
+import { clerkMiddleware } from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
+import authRouter from "./routes/auth.js";
 import emailRouter from "./routes/email.js";
 import quotesRouter from "./routes/quotes.js";
 import exchangeRatesRouter from "./routes/exchangeRates.js";
 import approvalsRouter from "./routes/approvals.js";
 import autoAssignmentRouter from "./routes/autoAssignment.js";
 import { migrate } from "./migrate.js";
+import {
+  clerkPrincipalMiddleware,
+} from "./auth/clerkPrincipal.js";
+import {
+  CLERK_PROXY_PATH,
+  clerkProxyMiddleware,
+  getClerkProxyHost,
+} from "./middlewares/clerkProxyMiddleware.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -26,8 +37,29 @@ async function main() {
   }
 
   const app = express();
+  app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
   app.use(express.json({ limit: "10mb" }));
+  app.use(
+    clerkMiddleware((req) => ({
+      publishableKey: publishableKeyFromHost(
+        getClerkProxyHost(req) || "",
+        process.env.CLERK_PUBLISHABLE_KEY,
+      ),
+    })),
+  );
+  app.use(clerkPrincipalMiddleware);
+  app.use("/api", (req, res, next) => {
+    if (req.path.startsWith("/auth/")) return next();
+    if (!req.clerkUserId) {
+      return res.status(401).json({ error: "unauthenticated" });
+    }
+    if (!req.authenticatedUser) {
+      return res.status(403).json({ error: "account_not_provisioned" });
+    }
+    return next();
+  });
 
+  app.use("/api/auth", authRouter);
   app.use("/api/email", emailRouter);
   app.use("/api/quotes", quotesRouter);
   app.use("/api/exchange-rates", exchangeRatesRouter);
