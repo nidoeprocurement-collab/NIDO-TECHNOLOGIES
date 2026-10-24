@@ -4807,32 +4807,30 @@ export default function MyOrderPage() {
                     <div style={{ width: 300 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                         <span style={{ fontSize: 13.5, color: "#6b7280" }}>Sub-total (excl. GST)</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.preTaxSubtotal)}</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.subtotalBeforeDiscount)}</span>
                       </div>
-                      {pricing.slabs.map(sl => (
-                        <div key={sl.rate} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>GST ({sl.rate}%)</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(sl.gst)}</span>
-                        </div>
-                      ))}
-                      {pricing.slabs.length === 0 && (
+                      {pricing.discountAmount > 0.005 && (
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>GST</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.totalGst)}</span>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Discount</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500, color: "#15803d" }}>-{fmt(pricing.discountAmount)}</span>
                         </div>
                       )}
-                      {pricing.shippingDeliveryFee > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Shipping / delivery</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.shippingDeliveryFee)}</span>
-                        </div>
-                      )}
-                      {pricing.platformFee > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Platform fee</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.platformFee)}</span>
-                        </div>
-                      )}
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>CGST</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.cgstAmount)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>SGST</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.sgstAmount)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>Shipping / delivery</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.shippingDeliveryFee)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>Platform fee</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.platformFee)}</span>
+                      </div>
                       {Math.abs(pricing.otherAdjustments) > 0.005 && (
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                           <span style={{ fontSize: 13.5, color: "#6b7280" }}>Legacy price adjustment</span>
@@ -4840,7 +4838,7 @@ export default function MyOrderPage() {
                         </div>
                       )}
                       <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-                        <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>Total Amount</span>
                         <span style={{ fontSize: 15, fontWeight: 800 }}>{fmt(pricing.grandTotal)}</span>
                       </div>
                     </div>

@@ -5,6 +5,7 @@ import { getCartTaxRate, getCartUnitPriceInclusive } from "./vendorCartPricing";
 export interface OrderPricingItem {
   priceNum: number;
   quantity?: number;
+  cartDiscountPct?: number;
   clientId?: string;
   category?: string;
   selectedVendorId?: string;
@@ -13,6 +14,7 @@ export interface OrderPricingItem {
   gstSnapshot?: number;
   subOrderId?: string;
   checkoutUnitPriceInclusive?: number;
+  checkoutUnitPriceExclGst?: number;
   checkoutGstRate?: number;
 }
 
@@ -34,7 +36,11 @@ export interface OrderPricingSource {
 export interface OrderPricingBreakdown {
   slabs: ReturnType<typeof computeCartGST>["slabs"];
   preTaxSubtotal: number;
+  discountAmount: number;
+  subtotalBeforeDiscount: number;
   totalGst: number;
+  cgstAmount: number;
+  sgstAmount: number;
   shippingDeliveryFee: number;
   platformFee: number;
   otherAdjustments: number;
@@ -100,6 +106,21 @@ export function calculateRemainingOrderPricing(
       };
     }),
   );
+  const discountAmount = Math.round(activeItems.reduce((sum, item) => {
+    const discountPct = Math.max(0, Math.min(99.99, Number(item.cartDiscountPct) || 0));
+    if (discountPct <= 0) return sum;
+    const rate = hasCheckoutSnapshots
+      ? item.checkoutGstRate!
+      : getCartTaxRate(item) ?? getEffectiveTaxPctForCategory(item.category || "");
+    const discountedUnitExclGst =
+      typeof item.checkoutUnitPriceExclGst === "number" && Number.isFinite(item.checkoutUnitPriceExclGst)
+        ? Math.max(0, item.checkoutUnitPriceExclGst)
+        : getOrderLineUnitPriceInclusive(item) * 100 / (100 + rate);
+    const discountedLineExclGst = discountedUnitExclGst * Math.max(0, Number(item.quantity) || 0);
+    return sum + discountedLineExclGst * discountPct / (100 - discountPct);
+  }, 0) * 100) / 100;
+  const cgstAmount = Math.round((gst.totalGst / 2) * 100) / 100;
+  const sgstAmount = Math.round((gst.totalGst - cgstAmount) * 100) / 100;
 
   if (hasCheckoutSnapshots && order.checkoutPricingSnapshot) {
     const shippingDeliveryFee = activeItems.length
@@ -113,7 +134,11 @@ export function calculateRemainingOrderPricing(
     return {
       slabs: gst.slabs,
       preTaxSubtotal: gst.preTaxSubtotal,
+      discountAmount,
+      subtotalBeforeDiscount: gst.preTaxSubtotal + discountAmount,
       totalGst: gst.totalGst,
+      cgstAmount,
+      sgstAmount,
       shippingDeliveryFee,
       platformFee,
       otherAdjustments: 0,
@@ -126,7 +151,11 @@ export function calculateRemainingOrderPricing(
     return {
       slabs: gst.slabs,
       preTaxSubtotal: gst.preTaxSubtotal,
+      discountAmount,
+      subtotalBeforeDiscount: gst.preTaxSubtotal + discountAmount,
       totalGst: gst.totalGst,
+      cgstAmount,
+      sgstAmount,
       shippingDeliveryFee: 0,
       platformFee: 0,
       otherAdjustments: grandTotal - gst.preTaxSubtotal - gst.totalGst,
@@ -155,7 +184,11 @@ export function calculateRemainingOrderPricing(
   return {
     slabs: gst.slabs,
     preTaxSubtotal: gst.preTaxSubtotal,
+    discountAmount,
+    subtotalBeforeDiscount: gst.preTaxSubtotal + discountAmount,
     totalGst: gst.totalGst,
+    cgstAmount,
+    sgstAmount,
     shippingDeliveryFee: 0,
     platformFee: 0,
     otherAdjustments: grandTotal - gst.preTaxSubtotal - gst.totalGst,

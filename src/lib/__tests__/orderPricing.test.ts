@@ -39,7 +39,11 @@ describe("calculateRemainingOrderPricing", () => {
     );
 
     expect(remaining.preTaxSubtotal).toBe(100);
+    expect(remaining.subtotalBeforeDiscount).toBe(100);
+    expect(remaining.discountAmount).toBe(0);
     expect(remaining.totalGst).toBe(20);
+    expect(remaining.cgstAmount).toBe(10);
+    expect(remaining.sgstAmount).toBe(10);
     expect(remaining.shippingDeliveryFee).toBe(10);
     expect(remaining.platformFee).toBe(5);
     expect(remaining.grandTotal).toBe(135);
@@ -63,7 +67,11 @@ describe("calculateRemainingOrderPricing", () => {
     }, new Set());
 
     expect(remaining.preTaxSubtotal).toBe(100);
+    expect(remaining.discountAmount).toBe(0);
+    expect(remaining.subtotalBeforeDiscount).toBe(100);
     expect(remaining.totalGst).toBe(20);
+    expect(remaining.cgstAmount).toBe(10);
+    expect(remaining.sgstAmount).toBe(10);
     expect(remaining.platformFee).toBe(7);
     expect(remaining.grandTotal).toBe(127);
   });
@@ -99,5 +107,30 @@ describe("calculateRemainingOrderPricing", () => {
     );
 
     expect(remaining.grandTotal).toBe(236);
+  });
+
+  it("shows the pre-discount subtotal and discount from saved checkout line snapshots", () => {
+    const pricing = calculateRemainingOrderPricing({
+      id: "ORD-300",
+      totalAmountNum: 216,
+      checkoutPricingSnapshot: { shippingDeliveryFee: 0, platformFee: 0 },
+      cartItems: [{
+        id: 1,
+        priceNum: 120,
+        quantity: 2,
+        category: "Hardware",
+        cartDiscountPct: 10,
+        checkoutUnitPriceInclusive: 108,
+        checkoutUnitPriceExclGst: 90,
+        checkoutGstRate: 20,
+      }],
+    }, new Set());
+
+    expect(pricing.preTaxSubtotal).toBe(180);
+    expect(pricing.discountAmount).toBe(20);
+    expect(pricing.subtotalBeforeDiscount).toBe(200);
+    expect(pricing.cgstAmount).toBe(18);
+    expect(pricing.sgstAmount).toBe(18);
+    expect(pricing.grandTotal).toBe(216);
   });
 });
