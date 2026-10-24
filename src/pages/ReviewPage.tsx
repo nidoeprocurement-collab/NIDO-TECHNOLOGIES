@@ -500,12 +500,12 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                   <table className="w-full min-w-[900px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3">Item</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Unit Price (Excl. Tax)</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Discount</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Qty</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Tax</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-6">Total</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3 border-r border-gray-200">Item</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Unit Price (Excl. Tax)</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Qty</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Discount</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3 border-r border-gray-200">Tax</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3">Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -526,8 +526,8 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                           ? Math.max(0, (linePricing.checkoutUnitPriceInclusive - linePricing.checkoutUnitPriceExclGst) * item.quantity)
                           : 0;
                         return (
-                        <tr key={item.id} className="border-b border-gray-50 last:border-0">
-                          <td className="py-4 px-6">
+                        <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                          <td className="py-4 px-2 border-r border-gray-200">
                             <div className="flex items-start gap-3">
                               <img src={item.image} alt={item.name} className="w-14 h-14 object-cover rounded-lg border border-gray-100 shrink-0" />
                               <div>
@@ -542,30 +542,27 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">
+                          <td className="py-4 px-3 align-top text-sm font-medium text-gray-900 border-r border-gray-200">
                             {hasDiscount && linePricing && (
                               <div className="text-xs text-gray-400 line-through">{formatPrice(baseUnitPriceExclTax)}</div>
                             )}
                             <div>{formatPrice(unitPriceExclTax)}</div>
                           </td>
-                          <td className="py-4 pr-4 align-top">
+                          <td className="py-4 px-3 align-top text-sm text-gray-700 border-r border-gray-200">{item.quantity}</td>
+                          <td className="py-4 px-3 align-top border-r border-gray-200">
                             {hasDiscount && linePricing ? (
-                              <div className="space-y-1">
-                                <div className="text-xs font-medium text-green-700">{Number(linePricing.combinedDiscountPct.toFixed(2))}%</div>
-                                {discountSavings > 0 && (
-                                  <div className="text-[11px] text-gray-500">Save {formatPrice(discountSavings)} before tax</div>
-                                )}
-                              </div>
+                              <span className="text-sm font-medium text-green-700">
+                                {Number(linePricing.combinedDiscountPct.toFixed(2))}% ({formatPrice(discountSavings)})
+                              </span>
                             ) : (
-                              <span className="text-xs text-gray-400">No discount</span>
+                              <span className="text-sm text-gray-400">—</span>
                             )}
                           </td>
-                          <td className="py-4 pr-4 align-top text-sm text-gray-700">{item.quantity}</td>
-                          <td className="py-4 pr-4 align-top text-sm text-gray-700">
+                          <td className="py-4 px-3 align-top text-sm text-gray-700 border-r border-gray-200">
                             <div>{formatPrice(lineTax)}</div>
                             {linePricing && <div className="text-[11px] text-gray-400">{linePricing.taxRate}%</div>}
                           </td>
-                          <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(lineTotal)}</td>
+                          <td className="py-4 px-3 align-top text-sm font-semibold text-gray-900">{formatPrice(lineTotal)}</td>
                         </tr>
                         );
                       })}
