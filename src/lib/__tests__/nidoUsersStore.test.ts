@@ -70,6 +70,8 @@ describe("NIDO users live store", () => {
   });
 
   it("does not seed or retain legacy demo users", () => {
+    // This test covers legacy cleanup, not the separate one-time reference-user import.
+    localStorage.setItem("nido_users_imported_reference", "users-reference-v1");
     localStorage.setItem("nido_config_users", JSON.stringify([
       {
         id: "user-2",

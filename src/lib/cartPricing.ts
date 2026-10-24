@@ -21,12 +21,16 @@ export interface CartPricingLine {
   preClientDiscountUnitPriceInclusive: number;
   checkoutUnitPriceInclusive: number;
   checkoutUnitPriceExclGst: number;
+  slabDiscountPerUnitExclGst: number;
+  clientDiscountPerUnitExclGst: number;
 }
 
 export interface CartPricingSummary {
   lines: CartPricingLine[];
   slabs: GstSlab[];
   totalGst: number;
+  preSlabDiscountSubtotal: number;
+  slabDiscountAmount: number;
   preTaxSubtotal: number;
   preClientDiscountSubtotal: number;
   clientDiscountAmount: number;
@@ -57,6 +61,14 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
       taxRate > 0
         ? checkoutUnitPriceInclusive * 100 / (100 + taxRate)
         : checkoutUnitPriceInclusive;
+    const baseUnitPriceExclGst =
+      taxRate > 0
+        ? baseUnitPriceInclusive * 100 / (100 + taxRate)
+        : baseUnitPriceInclusive;
+    const preClientDiscountUnitPriceExclGst =
+      taxRate > 0
+        ? preClientDiscountUnitPriceInclusive * 100 / (100 + taxRate)
+        : preClientDiscountUnitPriceInclusive;
 
     return {
       taxRate,
@@ -66,9 +78,18 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
       preClientDiscountUnitPriceInclusive,
       checkoutUnitPriceInclusive,
       checkoutUnitPriceExclGst,
+      slabDiscountPerUnitExclGst: Math.max(0, baseUnitPriceExclGst - preClientDiscountUnitPriceExclGst),
+      clientDiscountPerUnitExclGst: Math.max(0, preClientDiscountUnitPriceExclGst - checkoutUnitPriceExclGst),
     };
   });
 
+  const beforeSlabDiscount = computeCartGST(
+    items.map((item, index) => ({
+      inclusiveAmount: lines[index].baseUnitPriceInclusive * item.quantity,
+      category: item.category,
+      taxRate: lines[index].taxRate,
+    })),
+  );
   const effectiveGst = computeCartGST(
     items.map((item, index) => ({
       inclusiveAmount: lines[index].checkoutUnitPriceInclusive * item.quantity,
@@ -95,6 +116,8 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
     lines,
     slabs: effectiveGst.slabs,
     totalGst: effectiveGst.totalGst,
+    preSlabDiscountSubtotal: beforeSlabDiscount.preTaxSubtotal,
+    slabDiscountAmount: Math.max(0, beforeSlabDiscount.preTaxSubtotal - beforeClientDiscount.preTaxSubtotal),
     preTaxSubtotal: effectiveGst.preTaxSubtotal,
     preClientDiscountSubtotal: beforeClientDiscount.preTaxSubtotal,
     clientDiscountAmount: Math.max(0, beforeClientDiscount.preTaxSubtotal - effectiveGst.preTaxSubtotal),

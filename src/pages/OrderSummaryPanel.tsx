@@ -31,13 +31,22 @@ export default function OrderSummaryPanel({
   const {
     slabs: gstSlabs,
     totalGst,
-    preTaxSubtotal,
-    preClientDiscountSubtotal: subtotal,
+    preSlabDiscountSubtotal,
+    slabDiscountAmount,
+    preTaxSubtotal: discountedSubtotal,
     clientDiscountAmount,
     shippingDeliveryFee,
     platformFee,
     grandTotal: total,
   } = cartPricing;
+  const slabDiscountRates = [...new Set(cartPricing.lines
+    .map(line => line.slabDiscountPct)
+    .filter(rate => rate > 0))].sort((a, b) => b - a);
+  const clientDiscountRates = [...new Set(cartPricing.lines
+    .map(line => line.clientDiscountPct)
+    .filter(rate => rate > 0))].sort((a, b) => b - a);
+  const slabDiscountLabel = `Volume / quantity discount${slabDiscountRates.length ? ` (${slabDiscountRates.map(rate => `${rate}%`).join(", ")})` : ""}`;
+  const clientDiscountLabel = `Client discount${clientDiscountRates.length ? ` (${clientDiscountRates.map(rate => `${rate}%`).join(", ")})` : ""}`;
   return (
     <div className="w-72 shrink-0 space-y-4">
       {/* Order Summary card */}
@@ -82,15 +91,21 @@ export default function OrderSummaryPanel({
             </div>
             <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
+                <span className="text-gray-500">Items Subtotal</span>
+                <span className="font-medium text-gray-900">{formatPrice(preSlabDiscountSubtotal)}</span>
               </div>
-               {clientDiscountAmount > 0 && (
-                 <div className="flex justify-between">
-                   <span className="text-gray-500">Client Discount</span>
-                   <span className="font-medium text-green-600">-{formatPrice(clientDiscountAmount)}</span>
-                 </div>
-               )}
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-500">{slabDiscountLabel}</span>
+                <span className="font-medium text-green-600">{slabDiscountAmount > 0 ? `-${formatPrice(slabDiscountAmount)}` : "—"}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-500">{clientDiscountLabel}</span>
+                <span className="font-medium text-green-600">{clientDiscountAmount > 0 ? `-${formatPrice(clientDiscountAmount)}` : "—"}</span>
+              </div>
+              <div className="flex justify-between border-t border-gray-100 pt-2">
+                <span className="text-gray-500">Subtotal after discounts</span>
+                <span className="font-medium text-gray-900">{formatPrice(discountedSubtotal)}</span>
+              </div>
               {gstSlabs.map(sl => (
                 <div key={sl.rate} className="flex justify-between">
                   <span className="text-gray-500">GST ({sl.rate}%)</span>
@@ -127,13 +142,37 @@ export default function OrderSummaryPanel({
                 <span className="font-medium text-gray-900">{totalQty}</span>
               </div>
               <div className="border-t border-gray-100 pt-2 flex justify-between">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
+                <span className="text-gray-500">Items Subtotal</span>
+                <span className="font-medium text-gray-900">{formatPrice(preSlabDiscountSubtotal)}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-500">{slabDiscountLabel}</span>
+                <span className="font-medium text-green-600">{slabDiscountAmount > 0 ? `-${formatPrice(slabDiscountAmount)}` : "—"}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-500">{clientDiscountLabel}</span>
+                <span className="font-medium text-green-600">{clientDiscountAmount > 0 ? `-${formatPrice(clientDiscountAmount)}` : "—"}</span>
+              </div>
+              <div className="flex justify-between border-t border-gray-100 pt-2">
+                <span className="text-gray-500">Subtotal after discounts</span>
+                <span className="font-medium text-gray-900">{formatPrice(discountedSubtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">GST</span>
                 <span className="font-medium text-gray-900">{formatPrice(totalGst)}</span>
               </div>
+              {shippingDeliveryFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Shipping / Delivery Fee</span>
+                  <span className="font-medium text-gray-900">{formatPrice(shippingDeliveryFee)}</span>
+                </div>
+              )}
+              {platformFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Platform Fee</span>
+                  <span className="font-medium text-gray-900">{formatPrice(platformFee)}</span>
+                </div>
+              )}
               <div className="border-t border-gray-100 pt-2 flex justify-between">
                 <span className="font-semibold text-gray-900">Total Amount</span>
                 <span className="font-bold text-gray-900 text-base">{formatPrice(total)}</span>

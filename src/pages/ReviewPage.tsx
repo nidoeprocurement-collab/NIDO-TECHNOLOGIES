@@ -494,19 +494,27 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                 {cart.length === 0 ? (
                   <div className="py-12 text-center text-gray-400 text-sm">No items in cart</div>
                 ) : (
-                  <table className="w-full">
+                  <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3">Item</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Price</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Unit Price</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Discount Applied</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Qty</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-6">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {cart.map((item, index) => {
-                        const unitPrice =
-                          cartPricing.lines[index]?.checkoutUnitPriceInclusive ?? item.priceNum;
+                        const linePricing = cartPricing.lines[index];
+                        const unitPrice = linePricing?.checkoutUnitPriceInclusive ?? item.priceNum;
+                        const discountSavings = linePricing
+                          ? (linePricing.slabDiscountPerUnitExclGst + linePricing.clientDiscountPerUnitExclGst) * item.quantity
+                          : 0;
+                        const hasDiscount = Boolean(
+                          linePricing && (linePricing.slabDiscountPct > 0 || linePricing.clientDiscountPct > 0),
+                        );
                         return (
                         <tr key={item.id} className="border-b border-gray-50 last:border-0">
                           <td className="py-4 px-6">
@@ -524,7 +532,29 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">{formatPrice(unitPrice)}</td>
+                          <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">
+                            {hasDiscount && linePricing && (
+                              <div className="text-xs text-gray-400 line-through">{formatPrice(linePricing.baseUnitPriceInclusive)}</div>
+                            )}
+                            <div>{formatPrice(unitPrice)}</div>
+                          </td>
+                          <td className="py-4 pr-4 align-top">
+                            {hasDiscount && linePricing ? (
+                              <div className="space-y-1">
+                                {linePricing.slabDiscountPct > 0 && (
+                                  <div className="text-xs font-medium text-green-700">Volume {linePricing.slabDiscountPct}%</div>
+                                )}
+                                {linePricing.clientDiscountPct > 0 && (
+                                  <div className="text-xs font-medium text-green-700">Client {linePricing.clientDiscountPct}%</div>
+                                )}
+                                {discountSavings > 0 && (
+                                  <div className="text-[11px] text-gray-500">Save {formatPrice(discountSavings)} before GST</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">No discount</span>
+                            )}
+                          </td>
                           <td className="py-4 pr-4 align-top text-sm text-gray-700">{item.quantity}</td>
                           <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(unitPrice * item.quantity)}</td>
                         </tr>
@@ -532,6 +562,7 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
 
