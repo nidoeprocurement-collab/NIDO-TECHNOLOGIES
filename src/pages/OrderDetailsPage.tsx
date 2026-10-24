@@ -4121,17 +4121,13 @@ export default function MyOrderPage() {
     : (isDigitalOrder
       ? ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "VENDOR", "ACTIONS"]
       : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
-  const unitPriceColumnIndex = isClientPortalUser ? 4 : 5;
-  if (!isDigitalOrder) {
-    subOrdersColumns.splice(unitPriceColumnIndex + 1, 0, "DISCOUNT", "TAX");
-  }
   if (isDigitalOrder) {
     const quantityIndex = isClientPortalUser ? 3 : 4;
     subOrdersColumns[quantityIndex] = DIGITAL_PRODUCT_HEADERS.quantity;
     subOrdersColumns[quantityIndex + 1] = DIGITAL_PRODUCT_HEADERS.tenure;
     subOrdersColumns.splice(quantityIndex + 2, 0, DIGITAL_PRODUCT_HEADERS.provisioning);
   } else if (isMixedOrder) {
-    const insertAt = (isClientPortalUser ? 3 : 4) + 2 + 2;
+    const insertAt = subOrdersColumns.indexOf("TOTAL");
     subOrdersColumns.splice(
       insertAt,
       0,
@@ -4146,22 +4142,16 @@ export default function MyOrderPage() {
   // content from bleeding into adjacent columns.
   const subOrdersColTemplateBase = isClientPortalUser
     ? (isDigitalOrder
-      ? "28px 110px minmax(0,2fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.25fr) 48px"
+      ? "28px 110px minmax(0,2fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) 48px"
       : isMixedOrder
-        ? "28px 100px minmax(0,1.8fr) 48px 38px minmax(0,.7fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) 48px"
-        : "28px 100px minmax(0,2fr) 48px minmax(0,.8fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 48px")
+        ? "28px 100px minmax(0,1.8fr) 48px minmax(0,.8fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) 48px"
+        : "28px 100px minmax(0,2fr) 48px minmax(0,.8fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.2fr) 48px")
     : (isDigitalOrder
       ? "28px 110px minmax(0,1.8fr) 72px 38px minmax(0,.85fr) minmax(0,1fr) 72px minmax(0,1.25fr) minmax(0,1.2fr) 48px"
       : isMixedOrder
-        ? "28px 105px minmax(0,1.7fr) 72px 38px minmax(0,.7fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.15fr) 48px"
+        ? "28px 105px minmax(0,1.7fr) 72px 38px minmax(0,.8fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr) 48px"
         : "28px 105px minmax(0,1.8fr) 72px 48px minmax(0,.8fr) 72px minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.1fr) 48px");
-  const subOrdersColTemplate = isDigitalOrder
-    ? subOrdersColTemplateBase
-    : (() => {
-        const columns = subOrdersColTemplateBase.split(" ");
-        columns.splice(unitPriceColumnIndex + 1, 0, "minmax(70px,.85fr)", "minmax(78px,.9fr)");
-        return columns.join(" ");
-      })();
+  const subOrdersColTemplate = subOrdersColTemplateBase;
   const subOrdersColGap = 6;
 
   const billingAddress = [
@@ -4513,9 +4503,7 @@ export default function MyOrderPage() {
                         unitPriceExclGst * (1 + (Number(sub.taxRate) || 0) / 100),
                     );
                     const lineQuantity = Math.max(0, Number(sub.qty) || 0);
-                    const lineTaxAmount = Math.max(0, (unitPriceInclusive - unitPriceExclGst) * lineQuantity);
                     const lineTotal = unitPriceInclusive * lineQuantity;
-                    const cartDiscountPct = Math.max(0, Number(sub.cartDiscountPct) || 0);
                     const subPOs = canonicalPO ? [canonicalPO] : [];
                     const hasPO = subPOs.length > 0;
                     const hasConfirmedPO = subPOs.some(isConfirmedPO);
@@ -4628,35 +4616,6 @@ export default function MyOrderPage() {
                             ? subPresentation.tenureBilling
                               : formatCurrency(unitPriceExclGst)}
                        </div>
-                        {!isDigitalOrder && (
-                          <>
-                            <div style={{ minWidth: 0 }}>
-                              {isMixedOrder && subIsDigital ? (
-                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
-                              ) : cartDiscountPct > 0 ? (
-                                <span style={{ fontSize: 11.5, color: "#374151" }}>
-                                  {`${Number(cartDiscountPct.toFixed(2))}%`}
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: 11.5, color: "#9ca3af" }}>—</span>
-                              )}
-                            </div>
-                            <div style={{ minWidth: 0, overflowWrap: "break-word" }}>
-                              {isMixedOrder && subIsDigital ? (
-                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
-                              ) : (
-                                <>
-                                  <div style={{ fontSize: 11.5, color: "#374151" }}>
-                                    {formatCurrency(lineTaxAmount)}
-                                  </div>
-                                  <div style={{ fontSize: 10, color: "#9ca3af" }}>
-                                    {Number(sub.taxRate) || 0}% GST
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </>
-                        )}
                        {isMixedOrder && (
                          <>
                            <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>
