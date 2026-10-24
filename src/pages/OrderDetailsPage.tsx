@@ -4811,6 +4811,9 @@ export default function MyOrderPage() {
                 );
                 const pricing = calculateRemainingOrderPricing(order, cancelledSubOrderIds);
                 const fmt = (n: number) => formatCurrency(n);
+                const splitTaxPercentages = [...new Set(
+                  pricing.slabs.map(({ rate }) => Number((rate / 2).toFixed(2))),
+                )].map((rate) => `${rate}%`).join(", ") || "0%";
                 return (
                   <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
                     <div style={{ width: 300 }}>
@@ -4825,11 +4828,11 @@ export default function MyOrderPage() {
                         </div>
                       )}
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>CGST</span>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>CGST ({splitTaxPercentages})</span>
                         <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.cgstAmount)}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>SGST</span>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>SGST ({splitTaxPercentages})</span>
                         <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.sgstAmount)}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
