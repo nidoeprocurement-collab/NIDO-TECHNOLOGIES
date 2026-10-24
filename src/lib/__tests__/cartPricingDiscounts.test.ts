@@ -6,7 +6,7 @@ describe("cart pricing discount breakdown", () => {
     localStorage.clear();
   });
 
-  it("separates quantity and client discounts while keeping checkout price unchanged", () => {
+  it("combines quantity and client discounts while keeping checkout price unchanged", () => {
     localStorage.setItem("nido_price_engine_client_settings", JSON.stringify({
       "client-1": { discountPct: 5 },
     }));
@@ -47,8 +47,11 @@ describe("cart pricing discount breakdown", () => {
       slabDiscountPerUnitExclGst: 10,
       clientDiscountPerUnitExclGst: 4.5,
     });
+    expect(pricing.lines[0].combinedDiscountPct).toBeCloseTo(14.5, 10);
     expect(pricing.preSlabDiscountSubtotal).toBe(200);
     expect(pricing.slabDiscountAmount).toBe(20);
+    expect(pricing.totalDiscountAmount).toBe(29);
+    expect(pricing.totalDiscountPct).toBeCloseTo(14.5, 10);
     expect(pricing.preClientDiscountSubtotal).toBe(180);
     expect(pricing.clientDiscountAmount).toBe(9);
     expect(pricing.preTaxSubtotal).toBe(171);

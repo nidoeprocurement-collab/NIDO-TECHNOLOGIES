@@ -23,6 +23,8 @@ export interface CartPricingLine {
   checkoutUnitPriceExclGst: number;
   slabDiscountPerUnitExclGst: number;
   clientDiscountPerUnitExclGst: number;
+  combinedDiscountPct: number;
+  combinedDiscountPerUnitExclGst: number;
 }
 
 export interface CartPricingSummary {
@@ -31,6 +33,8 @@ export interface CartPricingSummary {
   totalGst: number;
   preSlabDiscountSubtotal: number;
   slabDiscountAmount: number;
+  totalDiscountAmount: number;
+  totalDiscountPct: number;
   preTaxSubtotal: number;
   preClientDiscountSubtotal: number;
   clientDiscountAmount: number;
@@ -80,6 +84,10 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
       checkoutUnitPriceExclGst,
       slabDiscountPerUnitExclGst: Math.max(0, baseUnitPriceExclGst - preClientDiscountUnitPriceExclGst),
       clientDiscountPerUnitExclGst: Math.max(0, preClientDiscountUnitPriceExclGst - checkoutUnitPriceExclGst),
+      combinedDiscountPct: baseUnitPriceExclGst > 0
+        ? Math.max(0, (baseUnitPriceExclGst - checkoutUnitPriceExclGst) / baseUnitPriceExclGst * 100)
+        : 0,
+      combinedDiscountPerUnitExclGst: Math.max(0, baseUnitPriceExclGst - checkoutUnitPriceExclGst),
     };
   });
 
@@ -111,6 +119,10 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
     : { discountPct: 0, shippingDeliveryFee: 0, platformFeePct: 0 };
   const platformFee = (effectiveGst.preTaxSubtotal * clientPricing.platformFeePct) / 100;
   const shippingDeliveryFee = clientPricing.shippingDeliveryFee;
+  const totalDiscountAmount = Math.max(
+    0,
+    beforeSlabDiscount.preTaxSubtotal - effectiveGst.preTaxSubtotal,
+  );
 
   return {
     lines,
@@ -118,6 +130,10 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
     totalGst: effectiveGst.totalGst,
     preSlabDiscountSubtotal: beforeSlabDiscount.preTaxSubtotal,
     slabDiscountAmount: Math.max(0, beforeSlabDiscount.preTaxSubtotal - beforeClientDiscount.preTaxSubtotal),
+    totalDiscountAmount,
+    totalDiscountPct: beforeSlabDiscount.preTaxSubtotal > 0
+      ? totalDiscountAmount / beforeSlabDiscount.preTaxSubtotal * 100
+      : 0,
     preTaxSubtotal: effectiveGst.preTaxSubtotal,
     preClientDiscountSubtotal: beforeClientDiscount.preTaxSubtotal,
     clientDiscountAmount: Math.max(0, beforeClientDiscount.preTaxSubtotal - effectiveGst.preTaxSubtotal),

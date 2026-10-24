@@ -443,6 +443,9 @@ export default function CartPage() {
                   const slabPrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
                   const effectivePrice = clientDiscountPct > 0 ? slabPrice * (1 - clientDiscountPct / 100) : slabPrice;
                    const hasDiscount = discountPct > 0 || clientDiscountPct > 0;
+                    const combinedDiscountPct = vendorInclusivePrice > 0
+                      ? Math.max(0, (vendorInclusivePrice - effectivePrice) / vendorInclusivePrice * 100)
+                      : 0;
                   const inclusiveTotal = effectivePrice * item.quantity;
                   const gstRate        = taxRate;
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
@@ -549,7 +552,7 @@ export default function CartPage() {
                             {(discountPct > 0 || clientDiscountPct > 0) && (
                               <div className="mt-1.5">
                                 <span className="text-[10px] font-semibold text-green-700 bg-green-100 border border-green-200 rounded-full px-2 py-0.5">
-                                  {discountPct + clientDiscountPct}% discount applied
+                                  {Number(combinedDiscountPct.toFixed(2))}% discount applied
                                 </span>
                               </div>
                             )}
