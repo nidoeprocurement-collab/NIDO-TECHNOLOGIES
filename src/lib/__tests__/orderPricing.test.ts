@@ -45,6 +45,29 @@ describe("calculateRemainingOrderPricing", () => {
     expect(remaining.grandTotal).toBe(135);
   });
 
+  it("uses a fixed platform fee from new checkout snapshots", () => {
+    const remaining = calculateRemainingOrderPricing({
+      id: "ORD-101",
+      checkoutPricingSnapshot: {
+        shippingDeliveryFee: 0,
+        platformFee: 7,
+      },
+      cartItems: [{
+        id: 1,
+        priceNum: 120,
+        checkoutUnitPriceInclusive: 120,
+        checkoutGstRate: 20,
+        quantity: 1,
+        category: "Hardware",
+      }],
+    }, new Set());
+
+    expect(remaining.preTaxSubtotal).toBe(100);
+    expect(remaining.totalGst).toBe(20);
+    expect(remaining.platformFee).toBe(7);
+    expect(remaining.grandTotal).toBe(127);
+  });
+
   it("preserves legacy order totals by allocating them in proportion to saved line values", () => {
     const order = {
       id: "ORD-200",

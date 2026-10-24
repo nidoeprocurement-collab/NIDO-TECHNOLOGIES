@@ -466,8 +466,11 @@ export default function InvoiceFormPage() {
           return sum + unitPrice * (Number(ci.quantity) || 0);
         }, 0);
         setShippingCharges(Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0));
+        const snapshotPlatformFee = order.checkoutPricingSnapshot.platformFee;
         setAdjustment(
-          invoiceSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100,
+          typeof snapshotPlatformFee === 'number' && Number.isFinite(snapshotPlatformFee)
+            ? Math.max(0, snapshotPlatformFee)
+            : invoiceSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100,
         );
       } else if (isFullOrderInvoice) {
         setShippingCharges(Number((order as any).shippingCharges) || 0);

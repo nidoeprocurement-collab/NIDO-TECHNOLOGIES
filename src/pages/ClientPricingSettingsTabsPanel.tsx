@@ -223,17 +223,16 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
             </div>
 
             <div>
-              <Label className="text-[11px] font-medium text-gray-600">Platform Fee</Label>
+              <Label className="text-[11px] font-medium text-gray-600">Platform Fee (₹)</Label>
               <div className="mt-1 flex items-center gap-1">
+                <span className="text-xs text-gray-400">₹</span>
                 <Input
                   type="number"
                   min={0}
-                  max={100}
-                    value={settings.platformFeePct || ""}
-                  onChange={(event) => updateField("platformFeePct", Math.min(100, Math.max(0, parseFloat(event.target.value) || 0)))}
+                  value={settings.platformFee || ""}
+                  onChange={(event) => updateField("platformFee", Math.max(0, parseFloat(event.target.value) || 0))}
                   className="h-8 bg-white text-xs"
                 />
-                <span className="text-xs text-gray-400">%</span>
               </div>
             </div>
           </div>
@@ -241,7 +240,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
           <div className="mt-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[10px] text-gray-500">
             <Info size={12} className="shrink-0 text-gray-400" />
             <span>
-              Profit Margin is included in the Shop price. Discount, Shipping / Delivery, and Platform Fee are added separately in Cart.
+              Profit Margin is included in the Shop price. Discount, Shipping / Delivery, and the fixed rupee Platform Fee are added separately in Cart.
             </span>
           </div>
 

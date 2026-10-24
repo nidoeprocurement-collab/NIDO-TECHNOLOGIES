@@ -66,7 +66,7 @@ export interface ClientCommonSettings {
   profitPct: number;
   discountPct: number;
   shippingDeliveryFee: number;
-  platformFeePct: number;
+  platformFee: number;
   roundOff: 'none' | 'nearest' | 'up' | 'down';
 }
 
@@ -76,11 +76,15 @@ const DEFAULT_CLIENT_SETTINGS: ClientCommonSettings = {
   profitPct: 0,
   discountPct: 0,
   shippingDeliveryFee: 0,
-  platformFeePct: 0,
+  platformFee: 0,
   roundOff: 'none',
 };
 
-function getAllClientSettings(): Record<string, ClientCommonSettings> {
+type StoredClientCommonSettings = Partial<ClientCommonSettings> & {
+  platformFeePct?: number;
+};
+
+function getAllClientSettings(): Record<string, StoredClientCommonSettings> {
   try {
     const raw = localStorage.getItem(CLIENT_SETTINGS_KEY);
     if (raw) return JSON.parse(raw);
@@ -92,7 +96,15 @@ function getAllClientSettings(): Record<string, ClientCommonSettings> {
 
 export function getClientCommonSettings(clientId: string): ClientCommonSettings {
   const all = getAllClientSettings();
-  return { ...DEFAULT_CLIENT_SETTINGS, ...(all[clientId] || {}) };
+  const stored = all[clientId] || {};
+  const { platformFeePct: legacyPlatformFeePct, ...currentSettings } = stored;
+  return {
+    ...DEFAULT_CLIENT_SETTINGS,
+    ...currentSettings,
+    // Preserve saved numeric values when upgrading the old percentage setting
+    // to a fixed rupee amount.
+    platformFee: Math.max(0, Number(currentSettings.platformFee ?? legacyPlatformFeePct) || 0),
+  };
 }
 
 export function saveClientCommonSettings(clientId: string, settings: ClientCommonSettings): void {
@@ -109,7 +121,7 @@ export function saveClientCommonSettings(clientId: string, settings: ClientCommo
 export interface ClientCartPricingSettings {
   discountPct: number;
   shippingDeliveryFee: number;
-  platformFeePct: number;
+  platformFee: number;
 }
 
 /** Checkout-only adjustments configured for one client in Price Settings. */
@@ -118,7 +130,7 @@ export function getClientCartPricingSettings(clientId: string): ClientCartPricin
   return {
     discountPct: Math.max(0, settings.discountPct || 0),
     shippingDeliveryFee: Math.max(0, settings.shippingDeliveryFee || 0),
-    platformFeePct: Math.max(0, settings.platformFeePct || 0),
+    platformFee: Math.max(0, settings.platformFee || 0),
   };
 }
 

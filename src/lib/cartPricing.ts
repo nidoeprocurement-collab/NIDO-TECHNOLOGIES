@@ -39,7 +39,6 @@ export interface CartPricingSummary {
   preClientDiscountSubtotal: number;
   clientDiscountAmount: number;
   shippingDeliveryFee: number;
-  platformFeePct: number;
   platformFee: number;
   grandTotal: number;
 }
@@ -116,8 +115,8 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
   const primaryClientId = items.find((item) => item.clientId)?.clientId || "";
   const clientPricing = primaryClientId
     ? getClientCartPricingSettings(primaryClientId)
-    : { discountPct: 0, shippingDeliveryFee: 0, platformFeePct: 0 };
-  const platformFee = (effectiveGst.preTaxSubtotal * clientPricing.platformFeePct) / 100;
+    : { discountPct: 0, shippingDeliveryFee: 0, platformFee: 0 };
+  const platformFee = clientPricing.platformFee;
   const shippingDeliveryFee = clientPricing.shippingDeliveryFee;
   const totalDiscountAmount = Math.max(
     0,
@@ -138,7 +137,6 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
     preClientDiscountSubtotal: beforeClientDiscount.preTaxSubtotal,
     clientDiscountAmount: Math.max(0, beforeClientDiscount.preTaxSubtotal - effectiveGst.preTaxSubtotal),
     shippingDeliveryFee,
-    platformFeePct: clientPricing.platformFeePct,
     platformFee,
     grandTotal: effectiveGst.preTaxSubtotal + effectiveGst.totalGst + shippingDeliveryFee + platformFee,
   };

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { calculateCartPricing } from "@/lib/cartPricing";
+import { getClientCommonSettings } from "@/lib/priceEngineStore";
 
 describe("cart pricing discount breakdown", () => {
   beforeEach(() => {
@@ -8,7 +9,7 @@ describe("cart pricing discount breakdown", () => {
 
   it("combines quantity and client discounts while keeping checkout price unchanged", () => {
     localStorage.setItem("nido_price_engine_client_settings", JSON.stringify({
-      "client-1": { discountPct: 5 },
+      "client-1": { discountPct: 5, platformFee: 25 },
     }));
     localStorage.setItem("nido_price_engine_client_slabs", JSON.stringify({
       "client-1": [{
@@ -55,5 +56,15 @@ describe("cart pricing discount breakdown", () => {
     expect(pricing.preClientDiscountSubtotal).toBe(180);
     expect(pricing.clientDiscountAmount).toBe(9);
     expect(pricing.preTaxSubtotal).toBe(171);
+    expect(pricing.platformFee).toBe(25);
+    expect(pricing.grandTotal).toBe(pricing.preTaxSubtotal + pricing.totalGst + 25);
+  });
+
+  it("migrates a saved legacy platform fee value to a fixed rupee amount", () => {
+    localStorage.setItem("nido_price_engine_client_settings", JSON.stringify({
+      "client-legacy": { platformFeePct: 7 },
+    }));
+
+    expect(getClientCommonSettings("client-legacy").platformFee).toBe(7);
   });
 });

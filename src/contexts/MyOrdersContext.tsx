@@ -117,7 +117,9 @@ export interface MyOrder {
   /** Checkout fees needed to recalculate the remaining total after line cancellation. */
   checkoutPricingSnapshot?: {
     shippingDeliveryFee: number;
-    platformFeePct: number;
+    platformFee?: number;
+    /** Legacy checkout snapshots stored the platform fee as a percentage. */
+    platformFeePct?: number;
   };
   // Payment & delivery captured at checkout
   paymentMethod?: string;

@@ -15,13 +15,13 @@ import {
   getRecommendedVendor,
   type VendorStockAllocation,
 } from "@/lib/priceEngineStore";
-import { calculateCartPricing } from "@/lib/cartPricing";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } from "@/lib/taxEngine";
 import { getCartTaxRate, getCartUnitPriceExclGst, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
+import OrderSummaryPanel from "./OrderSummaryPanel";
 
 function CartProductImage({
   src,
@@ -336,18 +336,6 @@ export default function CartPage() {
       setProductTab("physical");
     }
   }, [digitalCartItems.length, physicalCartItems.length, productTab]);
-
-  const cartPricing = calculateCartPricing(cart);
-  const {
-    slabs: gstSlabs,
-    totalGst,
-    preTaxSubtotal,
-    clientDiscountAmount,
-    platformFee,
-    shippingDeliveryFee,
-    preClientDiscountSubtotal: subtotal,
-    grandTotal,
-  } = cartPricing;
 
   const visibleCount = 4;
   const maxScroll = Math.max(0, suggested.length - visibleCount);
@@ -692,48 +680,8 @@ export default function CartPage() {
         </div>
 
         {/* ── Right: Order Summary ──────────────────────────────────────── */}
-        <div className="w-full lg:w-80 lg:shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white p-5 space-y-5 lg:sticky lg:top-0 lg:h-fit min-h-0 lg:min-h-screen">
-
-          {/* Order Summary */}
-          <div>
-            <h2 className="font-bold text-gray-900 text-lg mb-4">Order Summary</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal ({totalItems} Item{totalItems !== 1 ? "s" : ""})</span>
-                <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
-              </div>
-              {clientDiscountAmount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Client Discount</span>
-                  <span className="font-semibold text-green-600">-{formatPrice(clientDiscountAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-500">Total GST</span>
-                <span className="font-semibold text-gray-900">{formatPrice(totalGst)}</span>
-              </div>
-              {shippingDeliveryFee > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Shipping / Delivery Fee</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(shippingDeliveryFee)}</span>
-                </div>
-              )}
-              {platformFee > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Platform Fee</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(platformFee)}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-gray-100 mt-4 pt-4 mb-1">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-gray-900 text-base">Grand Total</span>
-                <span className="font-bold text-blue-600 text-xl">{formatPrice(grandTotal)}</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Inclusive of all taxes</p>
-            </div>
-          </div>
+        <div className="w-full lg:w-80 lg:shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white p-4 space-y-5 lg:sticky lg:top-0 lg:h-fit min-h-0 lg:min-h-screen">
+          <OrderSummaryPanel showItemList={false} showEditCartButton={false} />
 
           {/* Proceed to Checkout */}
           <button

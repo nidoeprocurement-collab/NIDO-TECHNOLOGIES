@@ -13,8 +13,10 @@ function formatPrice(n: number) {
 
 export default function OrderSummaryPanel({
   showItemList = true,
+  showEditCartButton = true,
 }: {
   showItemList?: boolean;
+  showEditCartButton?: boolean;
 }) {
   useI18n();
   const navigate = useNavigate();
@@ -54,13 +56,15 @@ export default function OrderSummaryPanel({
           <>
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500">{totalItems} Items in Cart</span>
-              <button
-                 onClick={() => navigate(`${shopBasePath}/cart`)}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-              >
-                <Pencil size={11} />
-                Edit Cart
-              </button>
+              {showEditCartButton && (
+                <button
+                  onClick={() => navigate(`${shopBasePath}/cart`)}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                >
+                  <Pencil size={11} />
+                  Edit Cart
+                </button>
+              )}
             </div>
             <div className="space-y-3 mb-4">
               {cart.map((item, index) => (
@@ -165,15 +169,17 @@ export default function OrderSummaryPanel({
                 <span className="font-bold text-gray-900 text-base">{formatPrice(total)}</span>
               </div>
             </div>
-            <div className="flex items-center justify-between mb-0">
-              <button
-                 onClick={() => navigate(`${shopBasePath}/cart`)}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-              >
-                <Pencil size={11} />
-                Edit Cart
-              </button>
-            </div>
+            {showEditCartButton && (
+              <div className="flex items-center justify-between mb-0">
+                <button
+                  onClick={() => navigate(`${shopBasePath}/cart`)}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                >
+                  <Pencil size={11} />
+                  Edit Cart
+                </button>
+              </div>
+            )}
           </>
         )}
 

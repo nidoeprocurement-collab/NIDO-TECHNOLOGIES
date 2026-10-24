@@ -18,7 +18,8 @@ export interface OrderPricingItem {
 
 export interface OrderPricingSnapshot {
   shippingDeliveryFee: number;
-  platformFeePct: number;
+  platformFee?: number;
+  platformFeePct?: number;
 }
 
 export interface OrderPricingSource {
@@ -104,8 +105,10 @@ export function calculateRemainingOrderPricing(
     const shippingDeliveryFee = activeItems.length
       ? Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0)
       : 0;
-    const platformFee =
-      (gst.preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0)) / 100;
+    const snapshotPlatformFee = order.checkoutPricingSnapshot.platformFee;
+    const platformFee = typeof snapshotPlatformFee === "number" && Number.isFinite(snapshotPlatformFee)
+      ? Math.max(0, snapshotPlatformFee)
+      : (gst.preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0)) / 100;
     const grandTotal = gst.preTaxSubtotal + gst.totalGst + shippingDeliveryFee + platformFee;
     return {
       slabs: gst.slabs,

@@ -264,7 +264,7 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
         totalAmountNum: totalAmount,
         checkoutPricingSnapshot: {
           shippingDeliveryFee,
-          platformFeePct: cartPricing.platformFeePct,
+          platformFee: cartPricing.platformFee,
         },
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
