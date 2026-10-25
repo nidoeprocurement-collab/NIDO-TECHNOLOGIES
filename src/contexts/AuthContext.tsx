@@ -9,7 +9,6 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { useClerk, useUser } from '@clerk/react';
 import {
   getImpersonationSession,
   startImpersonation as createImpersonationSession,
@@ -35,7 +34,7 @@ interface AuthContextType {
   user: User | null;
   /** The identity that authenticated, never the impersonated effective user. */
   currentAuthenticatedUser: User | null;
-  /** Kept for older components; local credentials no longer establish sessions. */
+  /** Local prototype session; stored in this browser only. */
   login: (user: User) => void;
   logout: () => void;
   isLoading: boolean;
@@ -76,73 +75,17 @@ function parseProfile(value: unknown): User | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { isLoaded: clerkLoaded, isSignedIn, user: clerkUser } = useUser();
-  const { signOut } = useClerk();
-  const [authenticatedProfile, setAuthenticatedProfile] = useState<User | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
+  const [authenticatedProfile, setAuthenticatedProfile] = useState<User | null>(() => {
+    try {
+      return parseProfile(JSON.parse(localStorage.getItem('nido_user') || 'null'));
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [impersonationSession, setImpersonationSession] =
     useState<ImpersonationSession | null>(null);
-
-  useEffect(() => {
-    if (!clerkLoaded) {
-      setIsLoading(true);
-      return;
-    }
-
-    if (!isSignedIn || !clerkUser) {
-      setAuthenticatedProfile(null);
-      setAccessDenied(false);
-      setImpersonationSession(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('nido_user');
-      }
-      setIsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    setAccessDenied(false);
-
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(async (response) => {
-        if (!response.ok) {
-          if (!cancelled) {
-            setAuthenticatedProfile(null);
-            setAccessDenied(true);
-          }
-          return null;
-        }
-        return parseProfile(await response.json());
-      })
-      .then((profile) => {
-        if (cancelled || !profile) {
-          if (!cancelled && !accessDenied) {
-            setAuthenticatedProfile(null);
-            setAccessDenied(true);
-          }
-          return;
-        }
-        setAuthenticatedProfile(profile);
-        setAccessDenied(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAuthenticatedProfile(null);
-          setAccessDenied(true);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clerkLoaded, isSignedIn, clerkUser?.id]);
 
   useEffect(() => {
     if (!authenticatedProfile) {
@@ -164,9 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [authenticatedProfile?.id, authenticatedProfile?.userType]);
 
-  const login = useCallback((_userData: User) => {
-    // Authentication is controlled by Clerk; this deliberately cannot create a
-    // session from localStorage or a browser-supplied user object.
+  const login = useCallback((userData: User) => {
+    const profile = parseProfile({ ...userData, role: userData.role || '' });
+    if (!profile) return;
+    localStorage.setItem('nido_user', JSON.stringify(profile));
+    setAuthenticatedProfile(profile);
+    setAccessDenied(false);
   }, []);
 
   const logout = useCallback(() => {
@@ -177,8 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('nido_user');
     }
-    void signOut({ redirectUrl: '/sign-in' });
-  }, [impersonationSession, signOut]);
+  }, [impersonationSession]);
 
   const originalUser = authenticatedProfile;
   const effectiveUser = impersonationSession?.impersonatedUser ?? originalUser;

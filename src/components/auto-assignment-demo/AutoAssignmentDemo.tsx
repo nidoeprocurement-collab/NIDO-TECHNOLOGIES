@@ -25,11 +25,12 @@ import {
 } from "./model";
 import { getNidoAssignmentEmployees, NIDO_ROLES_EVENT, NIDO_USERS_EVENT } from "./platformEmployees";
 import {
-  autoAssignmentApi,
+  getLiveAssignmentConfig,
+  saveLiveAssignmentConfig,
   type AssignmentConfig,
   type AssignmentRosterEmployee,
   type AssignmentTierConfig,
-} from "@/lib/autoAssignmentApi";
+} from "@/lib/liveAssignmentStore";
 
 function statusMessageFor(error: unknown) {
   return error instanceof Error && error.name === "QuotaExceededError"
@@ -37,7 +38,7 @@ function statusMessageFor(error: unknown) {
     : "Browser storage is unavailable. This update is visible in this tab only; it was not saved.";
 }
 
-function toServerRoster(employees: Employee[]): AssignmentRosterEmployee[] {
+function toLocalRoster(employees: Employee[]): AssignmentRosterEmployee[] {
   return employees.map((employee) => ({
     id: employee.id,
     name: employee.name,
@@ -48,14 +49,14 @@ function toServerRoster(employees: Employee[]): AssignmentRosterEmployee[] {
   }));
 }
 
-function toServerConfig(
+function toLocalConfig(
   enabled: boolean,
   tiers: Record<ClientTier, TierConfig>,
   employees: Employee[],
 ): { enabled: boolean; tiers: AssignmentTierConfig[]; employees: AssignmentRosterEmployee[] } {
   return {
     enabled,
-    employees: toServerRoster(employees),
+    employees: toLocalRoster(employees),
     tiers: CLIENT_TIERS.map((tier) => {
       const config = tiers[tier];
       const sequenceIds = config.sequence
@@ -91,7 +92,7 @@ function toServerConfig(
   };
 }
 
-function fromServerConfig(
+function fromLocalConfig(
   config: AssignmentConfig,
   employees: Employee[],
   history: DemoState["history"],
@@ -123,7 +124,7 @@ function fromServerConfig(
   };
 }
 
-function hasSavedServerConfig(config: AssignmentConfig): boolean {
+function hasSavedLocalConfig(config: AssignmentConfig): boolean {
   return config.updatedBy !== "system" || config.tiers.some((tier) =>
     tier.enabled || tier.employees.length > 0 || Boolean(tier.fallbackEmployeeId),
   );
@@ -133,7 +134,6 @@ export default function AutoAssignmentDemo() {
   const [employees, setEmployees] = useState<Employee[]>(() => getNidoAssignmentEmployees());
   const [boot] = useState(() => loadDemoState(employees));
   const employeesRef = useRef(employees);
-  const initialHistoryRef = useRef(boot.state.history);
   const [state, setState] = useState<DemoState>(boot.state);
   const [simulationState, setSimulationState] = useState<DemoState>(boot.state);
   const [draft, setDraft] = useState(() => ({
@@ -183,38 +183,23 @@ export default function AutoAssignmentDemo() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    autoAssignmentApi.getConfig()
-      .then((config) => {
-        if (!active) return;
-        if (!hasSavedServerConfig(config)) {
-          setNeedsPersistence(true);
-          setNotice("No live assignment rules have been saved yet. Review the tiers and save to apply them to new client orders.");
-          setNoticeKind("warning");
-          return;
-        }
-        setState((current) => fromServerConfig(config, employeesRef.current, current.history));
-        setDraft(() => {
-          const live = fromServerConfig(config, employeesRef.current, initialHistoryRef.current);
-          return { enabled: live.enabled, tiers: { ...live.tiers } };
-        });
-        setSimulationState((current) => fromServerConfig(config, employeesRef.current, current.history));
-        setNeedsPersistence(false);
-        setNotice("Live order-assignment rules loaded from the server.");
-        setNoticeKind("success");
-      })
-      .catch((error) => {
-        if (!active) return;
-        setNeedsPersistence(true);
-        setNotice(error instanceof Error
-          ? `Could not load live assignment rules: ${error.message}`
-          : "Could not load live assignment rules. Check the connection and retry.");
-        setNoticeKind("error");
-      })
-      .finally(() => {
-        if (active) setConfigLoading(false);
+    const config = getLiveAssignmentConfig();
+    if (config && hasSavedLocalConfig(config)) {
+      setState((current) => fromLocalConfig(config, employeesRef.current, current.history));
+      setDraft((current) => {
+        const local = fromLocalConfig(config, employeesRef.current, []);
+        return { enabled: local.enabled, tiers: { ...local.tiers } };
       });
-    return () => { active = false; };
+      setSimulationState((current) => fromLocalConfig(config, employeesRef.current, current.history));
+      setNeedsPersistence(false);
+      setNotice("Local assignment rules loaded. They apply only to this browser.");
+      setNoticeKind("success");
+    } else {
+      setNeedsPersistence(true);
+      setNotice("No local assignment rules have been saved yet. Save rules to use them for orders in this browser.");
+      setNoticeKind("warning");
+    }
+    setConfigLoading(false);
   }, []);
 
   const configDirty = draft.enabled !== state.enabled || CLIENT_TIERS.some((tier) =>
@@ -254,22 +239,22 @@ export default function AutoAssignmentDemo() {
   const saveConfiguration = async () => {
     setSaving(true);
     try {
-      const saved = await autoAssignmentApi.saveConfig(
-        toServerConfig(draft.enabled, draft.tiers, employees),
+      const saved = saveLiveAssignmentConfig(
+        toLocalConfig(draft.enabled, draft.tiers, employees),
       );
-      const next = fromServerConfig(saved, employees, simulationState.history);
+      const next = fromLocalConfig(saved, employees, simulationState.history);
       const nextDraft = { enabled: next.enabled, tiers: { ...next.tiers } };
       setState(next);
       setDraft(nextDraft);
       setSimulationState((current) => ({ ...current, enabled: next.enabled, tiers: next.tiers }));
       setNeedsPersistence(false);
-      setNotice("Live assignment rules saved. Newly placed client orders will use these tier settings.");
+      setNotice("Assignment rules saved in this browser. New orders here will use these tier settings.");
       setNoticeKind("success");
     } catch (error) {
       setNeedsPersistence(true);
       setNotice(error instanceof Error
-        ? `Live assignment rules could not be saved: ${error.message}`
-        : "Live assignment rules could not be saved. Check the connection and try again.");
+        ? `Assignment rules could not be saved: ${error.message}`
+        : "Assignment rules could not be saved in this browser.");
       setNoticeKind("error");
     } finally {
       setSaving(false);

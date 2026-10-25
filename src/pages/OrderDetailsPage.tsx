@@ -5,7 +5,7 @@ import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
-import { sendEmail } from "@/lib/emailApi";
+import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";

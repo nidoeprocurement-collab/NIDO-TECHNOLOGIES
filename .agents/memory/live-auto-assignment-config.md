@@ -1,10 +1,10 @@
 ---
-name: Live auto-assignment configuration
-description: Operational tier rules for new orders and the separate browser-only assignment test bench.
+name: Local auto-assignment configuration
+description: Tier rules for order assignment and the isolated browser-only test bench.
 ---
 
-Keep real-order assignment rules and their round-robin position in shared server persistence. The mock-order test bench and its history are local-only and must never advance or overwrite the live rotation.
+Real-order tier rules and round-robin position are stored in the current browser. Keep the test bench and its sample history separate so simulations do not advance operational assignment rotation.
 
-**Why:** Client orders are assigned by the server; browser-only settings cannot control that flow, and demo activity must not change operational assignments.
+**Why:** The user requested a local-only prototype with no backend connections; order creation must therefore assign using the same browser's saved rules.
 
-**How to apply:** Any change to tier configuration must be read and saved through the operational assignment service. Keep simulations and demo history isolated from real-order assignment state.
+**How to apply:** Save and resolve live rules in browser storage. Do not describe browser-side assignments as secure or shared across users/devices. Keep simulations and demo history isolated from real-order assignment state.

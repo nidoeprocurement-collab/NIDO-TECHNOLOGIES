@@ -1,10 +1,10 @@
 ---
 name: Platform data storage
-description: The selected shared database and preservation requirements for platform data migration.
+description: The platform currently runs as a browser-only prototype with no shared database connection.
 ---
 
-Use Replit PostgreSQL as the shared source of truth for persistent platform data. Preserve existing records until their migration is verified.
+Keep application persistence local to the browser. Do not reconnect PostgreSQL or add server-side data APIs unless the user explicitly requests a production backend. Existing database records were not deleted when the application connection was removed.
 
-**Why:** The user selected Replit PostgreSQL for shared platform data.
+**Why:** The user requested removal of backend/API code and selected a local-only prototype.
 
-**How to apply:** New persistent features should use the shared Replit database. Migrate existing data without deleting the source, and enforce tenant and role permissions on the server.
+**How to apply:** New prototype features should use browser storage and clearly disclose that data is device-local and not secure. If production functionality is requested later, treat secure server authentication, tenant isolation, shared persistence, and authorization as a separate design task.

@@ -67,34 +67,7 @@ export interface ApprovalRequest {
   clientName?: string;
 }
 
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  let session: Record<string, any> = {};
-  try {
-    session = JSON.parse(localStorage.getItem("nido_user") || "{}") || {};
-  } catch {
-    // The backend will reject protected operations when no role is available.
-  }
-  const response = await fetch(`/api/approvals${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(session.role ? { "x-nido-role": session.role } : {}),
-      ...(session.id ? { "x-nido-user-id": session.id } : {}),
-      ...(session.clientId ? { "x-nido-client-id": session.clientId } : {}),
-      ...(session.userType ? { "x-nido-user-type": session.userType } : {}),
-      ...(options?.headers || {}),
-    },
-    ...options,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.success === false) throw new Error(payload.error || "Approval service unavailable.");
-  return payload.data as T;
-}
-
-// The approval UI can be exercised before the database is connected.  The
-// public functions below intentionally keep the same shapes as the API
-// service, so switching to the backend later only requires setting
-// VITE_APPROVAL_BACKEND=true.
-const USE_APPROVAL_BACKEND = import.meta.env.VITE_APPROVAL_BACKEND === "true";
+// Approval workflows and requests are stored locally in this browser.
 const LOCAL_APPROVAL_KEY = "nido_local_approval_engine";
 
 type LocalWorkflowHistory = {
@@ -521,51 +494,31 @@ async function localGetApprovalWorkflowHistory(id: string) {
 }
 
 export async function loadApprovalBootstrap() {
-  return USE_APPROVAL_BACKEND
-    ? api<{ workflows: ApprovalWorkflow[]; requests: ApprovalRequest[]; stats: Record<string, number> }>("/bootstrap")
-    : localLoadApprovalBootstrap();
+  return localLoadApprovalBootstrap();
 }
 
 export async function saveApprovalWorkflow(workflow: Partial<ApprovalWorkflow> & { name: string; module: string }, editingId?: string) {
-  return USE_APPROVAL_BACKEND
-    ? api<ApprovalWorkflow>(editingId ? `/workflows/${editingId}` : "/workflows", {
-      method: editingId ? "PUT" : "POST",
-      body: JSON.stringify(workflow),
-    })
-    : localSaveApprovalWorkflow(workflow, editingId);
+  return localSaveApprovalWorkflow(workflow, editingId);
 }
 
 export async function setApprovalWorkflowStatus(id: string, status: ApprovalWorkflow["status"], updatedBy: string) {
-  return USE_APPROVAL_BACKEND
-    ? api<ApprovalWorkflow>(`/workflows/${id}/status`, { method: "POST", body: JSON.stringify({ status, updatedBy }) })
-    : localSetApprovalWorkflowStatus(id, status, updatedBy);
+  return localSetApprovalWorkflowStatus(id, status, updatedBy);
 }
 
 export async function duplicateApprovalWorkflow(id: string, createdBy: string) {
-  return USE_APPROVAL_BACKEND
-    ? api<ApprovalWorkflow>(`/workflows/${id}/duplicate`, {
-      method: "POST",
-      body: JSON.stringify({ createdBy, actorRole: currentRole() }),
-    })
-    : localDuplicateApprovalWorkflow(id, createdBy);
+  return localDuplicateApprovalWorkflow(id, createdBy);
 }
 
 export async function deleteApprovalWorkflow(id: string) {
-  if (USE_APPROVAL_BACKEND) return api<void>(`/workflows/${id}`, { method: "DELETE" });
   return localDeleteApprovalWorkflow(id);
 }
 
 export async function createApprovalRequest(payload: Record<string, unknown>) {
-  return USE_APPROVAL_BACKEND
-    ? api<ApprovalRequest[]>("/requests/evaluate", { method: "POST", body: JSON.stringify(payload) })
-    : localCreateApprovalRequest(payload);
+  return localCreateApprovalRequest(payload);
 }
 
 export async function actOnApprovalRequest(id: string, payload: Record<string, unknown>) {
-  const updated = USE_APPROVAL_BACKEND
-    ? api<ApprovalRequest>(`/requests/${id}/action`, { method: "POST", body: JSON.stringify(payload) })
-    : localActOnApprovalRequest(id, payload);
-  const request = await updated;
+  const request = await localActOnApprovalRequest(id, payload);
   const latestTimeline = Array.isArray(request.timeline) ? request.timeline[request.timeline.length - 1] : null;
   const actor = String(latestTimeline?.user_name || "System");
   if (request.module === "Order" && latestTimeline) {
@@ -611,17 +564,9 @@ export async function cancelApprovalRequestsForReference(
 }
 
 export async function getApprovalRequest(id: string) {
-  return USE_APPROVAL_BACKEND ? api<ApprovalRequest>(`/requests/${id}`) : localGetApprovalRequest(id);
+  return localGetApprovalRequest(id);
 }
 
 export async function getApprovalWorkflowHistory(id: string) {
-  return USE_APPROVAL_BACKEND ? api<unknown[]>(`/workflows/${id}/history`) : localGetApprovalWorkflowHistory(id);
-}
-
-function currentRole(): string {
-  try {
-    return JSON.parse(localStorage.getItem("nido_user") || "null")?.role || "";
-  } catch {
-    return "";
-  }
+  return localGetApprovalWorkflowHistory(id);
 }

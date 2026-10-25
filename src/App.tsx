@@ -94,11 +94,7 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PageMetaProvider } from "@/contexts/PageMetaContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
-import {
-  AccessDeniedPage,
-  ClerkSignInPage,
-  ClerkSignUpPage,
-} from "@/components/auth/ClerkAuthPages";
+import { AccessDeniedPage } from "@/components/auth/AuthPages";
 import ActionConfirmationGuard from "@/components/shared/ActionConfirmationGuard";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
@@ -204,6 +200,8 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
 }
 
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const EmailUnavailablePage = lazy(() => import("@/pages/EmailUnavailablePage"));
 const ClientPortalReportsPage = lazy(() => import("@/pages/ClientPortalReportsPage"));
 const ClientPortalApprovalsPage = lazy(() => import("@/pages/ClientPortalApprovalsPage"));
 const ClientApprovalWorkflowsPage = lazy(() => import("@/pages/ClientApprovalWorkflowsPage"));
@@ -241,9 +239,6 @@ const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
 const ConfigurationHubPage = lazy(() => import("@/pages/ConfigurationHubPage"));
 const AutoAssignmentPage = lazy(() => import("@/pages/AutoAssignmentPage"));
-const EmailConfigurationPage = lazy(() => import("@/pages/EmailConfigurationPage"));
-const EmailTemplatesPage = lazy(() => import("@/pages/EmailTemplatesPage"));
-const EmailLogsPage = lazy(() => import("@/pages/EmailLogsPage"));
 const GeneralSettingsTab = lazy(
   () => import("@/components/configuration/GeneralSettingsTab"),
 );
@@ -357,6 +352,13 @@ function AppRoutes() {
   }
 
   return (
+    <>
+    <div
+      role="note"
+      className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-900"
+    >
+      Local-only prototype: sign-in and data stay in this browser and are not protected for production.
+    </div>
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-screen bg-background">
@@ -367,15 +369,15 @@ function AppRoutes() {
       <Routes>
         <Route
           path="/sign-in/*"
-          element={isAuthenticated ? <Navigate to="/" replace /> : <ClerkSignInPage />}
+          element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
         />
+        <Route path="/sign-up/*" element={<Navigate to="/login" replace />} />
         <Route
-          path="/sign-up/*"
-          element={isAuthenticated ? <Navigate to="/" replace /> : <ClerkSignUpPage />}
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
         />
-        <Route path="/login" element={<Navigate to="/sign-in" replace />} />
-        <Route path="/forgot-password" element={<Navigate to="/sign-in" replace />} />
-        <Route path="/reset-password" element={<Navigate to="/sign-in" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/login" replace />} />
         <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
         <Route path="/preview-product" element={<ProductPreviewPage />} />
         <Route
@@ -637,15 +639,15 @@ function AppRoutes() {
           <Route path="configuration/nido-users" element={<UserRolesTab />} />
           <Route
             path="configuration/email-settings"
-            element={<EmailConfigurationPage />}
+            element={<EmailUnavailablePage />}
           />
           <Route
             path="configuration/email-templates"
-            element={<EmailTemplatesPage />}
+            element={<EmailUnavailablePage />}
           />
           <Route
             path="configuration/email-logs"
-            element={<EmailLogsPage />}
+            element={<EmailUnavailablePage />}
           />
           <Route
             path="configuration/order-statuses"
@@ -1269,6 +1271,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </>
   );
 }
 

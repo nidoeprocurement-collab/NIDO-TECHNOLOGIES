@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "bash", "python-3.12", "postgresql-16"]
+modules = ["nodejs-20", "web", "bash", "python-3.12"]
 [agent]
 expertMode = true
 stack = "FULLSTACK_JS"
@@ -31,30 +31,15 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev:full"
+args = "npm run dev"
 waitForPort = 5000
-
-[[ports]]
-localPort = 4173
-externalPort = 3002
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 5001
-externalPort = 3001
-
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["node", "./dist/index.cjs"]
+run = ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5000"]
 
-[userenv]
-
-[userenv.shared]
-NIDO_INITIAL_OWNER_EMAIL = "nidoeprocurment@gmail.com"
-
-[userenv.production]
-VITE_CLERK_PROXY_URL = "/api/__clerk"

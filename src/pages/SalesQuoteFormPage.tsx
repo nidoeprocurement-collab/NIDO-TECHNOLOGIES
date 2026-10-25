@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, ArrowLeft, Trash2, Save, Send, Paperclip, X, Loader2 } from 'lucide-react';
+import { Plus, ArrowLeft, Trash2, Save, Paperclip, X, Loader2 } from 'lucide-react';
 import { getClients, type StoredClient } from '@/lib/clientStore';
 import { getCatalogProducts, type CatalogProduct } from '@/lib/catalogStore';
 import { getProductCategoryTaxMap } from '@/lib/taxEngine';
 import { saveQuote, getQuoteById, generateQuoteNumber, type StoredQuote, type QuoteLineItem, type SupportingDoc } from '@/lib/quoteStore';
-import { generateQuotePdfBase64 } from '@/lib/quotePdfGenerator';
-import { loadConfig } from '@/lib/configService';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function todayISO(): string { return new Date().toISOString().split('T')[0]; }
@@ -266,7 +264,7 @@ export default function SalesQuoteFormPage() {
   };
 
   // ── Action button state ───────────────────────────────────────────────────────
-  const [saving, setSaving] = useState<'draft' | 'send' | null>(null);
+  const [saving, setSaving] = useState<'draft' | 'local' | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'warn' | 'error' } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'warn' | 'error' = 'success') => {
@@ -289,44 +287,13 @@ export default function SalesQuoteFormPage() {
     }
   };
 
-  const handleSaveAndSend = async () => {
+  const handleSaveDraftInLocalMode = async () => {
     if (!clientSearch.trim()) { showToast('Please select a client.', 'error'); return; }
-    if (emails.length === 0) { showToast('Add at least one email recipient.', 'error'); return; }
-    setSaving('send');
+    setSaving('local');
     try {
-      const q = buildQuote('Sent to Client');
-      // Generate PDF
-      let pdfBase64 = '';
-      try { pdfBase64 = await generateQuotePdfBase64(q); } catch { /* pdf failure is non-fatal */ }
-
-      // Save quote first
+      const q = buildQuote('Draft');
       saveQuote(q);
-
-      // Try sending email
-      const cfg = loadConfig();
-      try {
-        const res = await fetch('/api/quotes/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: emails,
-            quoteNumber: q.quoteNumber,
-            clientName: q.clientName,
-            grandTotal: q.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-            pdfBase64,
-            companyName: cfg.organization.companyName,
-            senderEmail: cfg.organization.email,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`Quote sent to ${emails.join(', ')}`);
-        } else {
-          showToast(`Quote saved. Email not sent: ${data.error}`, 'warn');
-        }
-      } catch {
-        showToast('Quote saved as "Sent to Client". Could not reach email server.', 'warn');
-      }
+      showToast('Quote saved as a draft. Email delivery is unavailable in local-only mode.', 'warn');
 
       setTimeout(() => navigate('/sales/quotes'), 1200);
     } catch {
@@ -701,12 +668,12 @@ export default function SalesQuoteFormPage() {
             Save as Draft
           </button>
           <button
-            onClick={handleSaveAndSend}
+            onClick={handleSaveDraftInLocalMode}
             disabled={saving !== null}
             className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm disabled:opacity-60"
           >
-            {saving === 'send' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            Save & Send
+            {saving === 'local' ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Save Draft (Email unavailable)
           </button>
           <button onClick={() => navigate('/sales/quotes')} className="px-5 py-2 text-gray-600 dark:text-gray-400 font-medium hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
             Cancel

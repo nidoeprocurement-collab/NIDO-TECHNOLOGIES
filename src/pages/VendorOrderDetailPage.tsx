@@ -11,7 +11,7 @@ import {
 } from "@/lib/digitalFulfillmentStatuses";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
-import { sendEmail } from "@/lib/emailApi";
+import { sendEmail } from "@/lib/emailUnavailable";
 import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import { getProductSpecLines } from "@/lib/productConfiguration";

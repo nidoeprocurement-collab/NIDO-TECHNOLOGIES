@@ -38,7 +38,7 @@ import {
   type StoredReportCenterSchedule,
 } from "@/lib/reportCenterStore";
 import { createReportExportAttachment, downloadReportExport } from "@/lib/reportExport";
-import { sendEmail } from "@/lib/emailApi";
+import { sendEmail } from "@/lib/emailUnavailable";
 import { loadConfig } from "@/lib/configService";
 import { toast } from "@/hooks/use-toast";
 import { reportCenterDisplayColumn } from "@/lib/reportHeaderUtils";

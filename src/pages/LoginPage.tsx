@@ -30,16 +30,6 @@ async function captureLoginContext(): Promise<LoginContextResult> {
     device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
   };
 
-  try {
-    const response = await fetch('/api/client-context');
-    if (response.ok) {
-      const data = await response.json() as { ip?: string };
-      context.ip = data.ip;
-    }
-  } catch {
-    // The authentication flow still works if the context endpoint is unavailable.
-  }
-
   if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
     return { context, locationGranted: false };
   }

@@ -4,13 +4,15 @@ A modern procurement management frontend built with React, TypeScript, and Vite.
 
 ## How to run
 
-The app starts automatically via the **Start application** workflow, which runs:
+The local-only app starts via the **Start application** workflow, which runs:
 
 ```bash
-npm run dev:full
+npm run dev
 ```
 
-The full-stack dev server listens on port **5000** and is accessible in the Replit preview pane.
+Vite listens on port **5000** and is accessible in the Replit preview pane. The
+project has no application server, API, Clerk connection, or PostgreSQL connection.
+The prototype stores data in this browser's local storage.
 
 ## Replit import notes
 
@@ -19,10 +21,9 @@ lightweight:
 
 1. Install the locked dependencies with `pnpm install --frozen-lockfile` (do not
    regenerate the lockfile or migrate the project to another package manager).
-2. Run the existing **Start application** workflow; it uses
-   `npm run dev:full` on port 5000.
-3. Do not add database or email secrets unless the email features are needed.
-   The main application works without them.
+2. Run the existing **Start application** workflow; it uses `npm run dev` on
+   port 5000.
+3. Do not add database, Clerk, or email credentials to this local-only prototype.
 4. Avoid asking an Agent to rebuild or broadly analyze the imported project
    when the goal is only to run it. Ask for specific changes instead.
 
@@ -93,15 +94,14 @@ all point here — do not add a second Users or Roles page; extend this one.
   every admin route (not `/portal/*`) is checked against `hasPermission(moduleKey, 'view')`
   before rendering; unauthorized access shows `AccessDeniedPage`.
 
-## Client user-management audit status
+## Local-only prototype boundary
 
-The client-user-management audit was completed without changing the existing
-authentication or data architecture. The current project is a frontend/localStorage
-prototype: `src/lib/portalUserStore.ts`, `src/lib/clientStore.ts`,
-`src/contexts/OrdersContext.tsx`, and `src/lib/purchaseOrderStore.ts` do not have
-server-side persistence or tenant authorization. The backend currently provides
-email and quote routes only; `server/migrate.js` has no user, client, session,
-invitation, permission, or audit-log schema.
+Authentication, configuration, procurement data, approval workflows, and
+assignment rules run in the browser and persist to local storage. They are not
+shared between browsers and are not secure authorization boundaries. Email
+delivery, server-managed sessions, APIs, and PostgreSQL persistence are not
+available in this prototype. Do not enter real customer, payment, or confidential
+business data.
 
 Existing portal user, role, and address pages are now reachable at:
 
@@ -109,14 +109,10 @@ Existing portal user, role, and address pages are now reachable at:
 - `/portal/roles`
 - `/portal/addresses`
 
-Remaining production corrections must be continued as a separate, explicit task:
-add secure server-side authentication, password handling, client-user APIs,
-invitation/password-reset flows, status enforcement, audit logging, and backend
-client isolation. Do not create a second authentication or user-management
-system; extend the existing files and preserve the current portal and procurement
-flows.
+Before production use, add an intentionally designed secure backend, server-side
+authentication and authorization, shared persistence, tenant isolation, audit
+logging, and real email delivery. The current browser-only sign-in and role checks
+can be changed from developer tools and must not be treated as security controls.
 
-For future imports, treat this section and the uploaded NIDO permanent rules as
-the handoff. Inspect only the relevant files for the requested continuation;
-do not repeat a broad project audit or reinstall dependencies unless explicitly
-requested.
+The uploaded procurement-flow specification remains a product reference; it does
+not change this local-only security boundary.

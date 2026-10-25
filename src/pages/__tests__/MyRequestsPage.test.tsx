@@ -10,11 +10,6 @@ import {
   getServiceRequests,
 } from "@/lib/serviceRequestsStore";
 
-vi.mock("@clerk/react", () => ({
-  useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
-  useClerk: () => ({ signOut: async () => undefined }),
-}));
-
 function LocationProbe() {
   const { pathname } = useLocation();
   return <output data-testid="current-path">{pathname}</output>;
