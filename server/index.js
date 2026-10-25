@@ -12,6 +12,7 @@ import quotesRouter from "./routes/quotes.js";
 import exchangeRatesRouter from "./routes/exchangeRates.js";
 import approvalsRouter from "./routes/approvals.js";
 import autoAssignmentRouter from "./routes/autoAssignment.js";
+import platformDataRouter from "./routes/platformData.js";
 import { migrate } from "./migrate.js";
 import {
   clerkPrincipalMiddleware,
@@ -67,6 +68,7 @@ async function main() {
   app.use("/api/exchange-rates", exchangeRatesRouter);
   app.use("/api/approvals", approvalsRouter);
   app.use("/api/auto-assignment", autoAssignmentRouter);
+  app.use("/api/platform-data", platformDataRouter);
   app.get("/api/client-context", (req, res) => {
     const forwardedFor = req.headers["x-forwarded-for"];
     const forwardedIp = Array.isArray(forwardedFor)
