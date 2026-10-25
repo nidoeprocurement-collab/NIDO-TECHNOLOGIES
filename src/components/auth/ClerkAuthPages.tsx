@@ -1,8 +1,9 @@
 import { SignIn, SignUp } from '@clerk/react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-function AuthLayout({ children }: { children: React.ReactNode }) {
+function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md flex-col items-center justify-center">
@@ -31,6 +32,12 @@ export function ClerkSignInPage() {
         fallbackRedirectUrl="/"
         forceRedirectUrl="/"
       />
+      <p className="mt-4 text-center text-sm text-slate-600">
+        Need an account?{" "}
+        <Link to="/sign-up" className="font-medium text-blue-600 hover:text-blue-700">
+          Create one
+        </Link>
+      </p>
     </AuthLayout>
   );
 }
@@ -48,6 +55,12 @@ export function ClerkSignUpPage() {
         fallbackRedirectUrl="/"
         forceRedirectUrl="/"
       />
+      <p className="mt-4 text-center text-sm text-slate-600">
+        Already have an account?{" "}
+        <Link to="/sign-in" className="font-medium text-blue-600 hover:text-blue-700">
+          Sign in
+        </Link>
+      </p>
     </AuthLayout>
   );
 }

@@ -46,14 +46,14 @@ export default function GeneralSettingsPage() {
   // `config` is the last-saved (committed) snapshot — what the rest of the
   // app sees.  `draft` is the local working copy shown in this form only.
   // Nothing propagates app-wide until the user clicks Save Changes.
-  const { config, commitSettings } = useConfig()
+  const { config, commitSettings, isSaving, persistenceError } = useConfig()
 
   const [draft, setDraft] = useState<GeneralSettings>(() => config)
 
   // Keep draft in sync when config changes from outside (e.g. cross-tab save).
   useEffect(() => {
-    setDraft(config)
-  }, [config])
+    if (!isDirty) setDraft(config)
+  }, [config, isDirty])
 
   useEffect(() => {
     document.title = "General Settings — " + draft.organization.displayName
@@ -67,7 +67,7 @@ export default function GeneralSettingsPage() {
   // True when the local draft differs from what is saved.
   const isDirty = JSON.stringify(draft) !== JSON.stringify(config)
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if ((org.phone && !isValidPhoneNumber(org.phone)) ||
         (org.supportPhone && !isValidPhoneNumber(org.supportPhone))) {
       toast.error("Phone numbers must contain exactly 10 digits.")
@@ -81,8 +81,16 @@ export default function GeneralSettingsPage() {
       toast.error("PAN Number must follow the format AAAAA9999A.")
       return
     }
-    commitSettings(draft)
-    toast.success("Settings saved", { description: "Changes applied across the entire platform." })
+    if (draft.prefixes.some(prefix => !prefix.label.trim() || !prefix.value.trim())) {
+      toast.error("Every document prefix needs a name and a value.")
+      return
+    }
+    try {
+      await commitSettings(draft)
+      toast.success("Settings saved", { description: "Changes applied across the entire platform." })
+    } catch {
+      toast.error("Settings could not be saved to the shared database.")
+    }
   }
 
   const handleDiscard = () => {
@@ -103,10 +111,10 @@ export default function GeneralSettingsPage() {
   }
 
   // ── Prefix helpers ──────────────────────────────────────────────────────────
-  const updatePrefix = (key: string, value: string) => {
+  const updatePrefix = (key: string, patch: Partial<PrefixEntry>) => {
     setDraft(prev => ({
       ...prev,
-      prefixes: prev.prefixes.map(p => p.key === key ? { ...p, value } : p),
+      prefixes: prev.prefixes.map(p => p.key === key ? { ...p, ...patch } : p),
     }))
   }
 
@@ -119,13 +127,6 @@ export default function GeneralSettingsPage() {
       builtIn: false,
     }
     setDraft(prev => ({ ...prev, prefixes: [...prev.prefixes, newEntry] }))
-  }
-
-  const updateCustomPrefix = (key: string, patch: Partial<PrefixEntry>) => {
-    setDraft(prev => ({
-      ...prev,
-      prefixes: prev.prefixes.map(p => p.key === key ? { ...p, ...patch } : p),
-    }))
   }
 
   const deleteCustomPrefix = (key: string) => {
@@ -175,9 +176,17 @@ export default function GeneralSettingsPage() {
               Discard
             </Button>
           )}
-          <Button onClick={handleSave} disabled={!isDirty}>
+          {persistenceError && (
+            <div
+              role="alert"
+              className="max-w-md rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+            >
+              {persistenceError}
+            </div>
+          )}
+          <Button onClick={handleSave} disabled={!isDirty || isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            Save Changes
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
@@ -467,15 +476,12 @@ export default function GeneralSettingsPage() {
                   {draft.prefixes.map(p => (
                     <tr key={p.key} className="hover:bg-slate-50/50">
                       <td className="px-3 py-2">
-                        {p.builtIn
-                          ? <span className="font-medium text-slate-800">{p.label}</span>
-                          : <Input
-                              className="h-7 text-sm"
-                              value={p.label}
-                              onChange={e => updateCustomPrefix(p.key, { label: e.target.value })}
-                              placeholder="Label"
-                            />
-                        }
+                        <Input
+                          className="h-7 text-sm"
+                          value={p.label}
+                          onChange={e => updatePrefix(p.key, { label: e.target.value })}
+                          placeholder="Label"
+                        />
                       </td>
                       <td className="px-3 py-2">
                         <Input
@@ -483,21 +489,18 @@ export default function GeneralSettingsPage() {
                           value={p.value}
                           onChange={e => {
                             const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")
-                            p.builtIn ? updatePrefix(p.key, v) : updateCustomPrefix(p.key, { value: v })
+                            updatePrefix(p.key, { value: v })
                           }}
                           placeholder="PREFIX-"
                         />
                       </td>
                       <td className="px-3 py-2">
-                        {p.builtIn
-                          ? <span className="text-slate-500">{p.description}</span>
-                          : <Input
-                              className="h-7 text-sm"
-                              value={p.description}
-                              onChange={e => updateCustomPrefix(p.key, { description: e.target.value })}
-                              placeholder="Description"
-                            />
-                        }
+                        <Input
+                          className="h-7 text-sm"
+                          value={p.description}
+                          onChange={e => updatePrefix(p.key, { description: e.target.value })}
+                          placeholder="Description"
+                        />
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-500">
                         {p.value || "—"}00001

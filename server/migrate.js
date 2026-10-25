@@ -7,7 +7,7 @@ export async function migrate() {
   if (migrated) return;
   if (!pool) {
     throw new Error(
-      "SUPABASE_DB_URL is not set — email features are disabled.",
+      "The PostgreSQL connection is unavailable — email features are disabled.",
     );
   }
 

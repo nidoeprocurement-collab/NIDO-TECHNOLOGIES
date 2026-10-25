@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import authRouter from "./routes/auth.js";
+import platformSettingsRouter from "./routes/platformSettings.js";
 import emailRouter from "./routes/email.js";
 import quotesRouter from "./routes/quotes.js";
 import exchangeRatesRouter from "./routes/exchangeRates.js";
@@ -31,7 +32,7 @@ async function main() {
     await migrate();
   } catch (err) {
     console.error(
-      "[server] email database is not reachable yet — the app will still run, but Email Configuration/Templates/Logs and email sending will return an error until SUPABASE_DB_URL is fixed:",
+      "[server] PostgreSQL is not reachable yet — the app will still run, but Email Configuration/Templates/Logs and email sending will return an error until the database connection is fixed:",
       err.message,
     );
   }
@@ -60,6 +61,7 @@ async function main() {
   });
 
   app.use("/api/auth", authRouter);
+  app.use("/api/platform-settings", platformSettingsRouter);
   app.use("/api/email", emailRouter);
   app.use("/api/quotes", quotesRouter);
   app.use("/api/exchange-rates", exchangeRatesRouter);

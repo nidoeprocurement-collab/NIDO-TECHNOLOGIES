@@ -2,10 +2,9 @@ import type { AddressDetails } from "@/lib/addressTypes";
 import { createEmptyAddress, formatAddressDetails } from "@/lib/addressTypes";
 
 // ── Centralized Configuration Service ─────────────────────────────────────────
-// Single source of truth for all platform settings.
-// Persists to localStorage. Fires a DOM event on every save so every
-// subscriber (ConfigContext, ThemeContext, I18nProvider, etc.) updates
-// automatically in real time — no page reload required.
+// Shared platform settings are stored in PostgreSQL. localStorage is the
+// per-browser cache used by synchronous consumers such as ID generators.
+// Every cache update fires an event so subscribers refresh without reloading.
 
 export const CONFIG_STORAGE_KEY = "nido_general_settings";
 export const CONFIG_CHANGED_EVENT = "nido:config-changed";
@@ -121,21 +120,21 @@ export interface GeneralSettings {
 
 export const CONFIG_DEFAULTS: GeneralSettings = {
   organization: {
-    companyName: "Nido Tech Pvt. Ltd.",
+    companyName: "Nido Tech",
     displayName: "Nido Tech",
-    gstNumber: "27AACCN1234A1Z5",
-    panNumber: "AACCN1234A",
+    gstNumber: "",
+    panNumber: "",
     cin: "",
     registeredAddress: "",
     billingAddress: "",
     billingAddressDetails: createEmptyAddress(),
     shippingAddressDetails: createEmptyAddress(),
-    phone: "+91-44-1234-5678",
+    phone: "",
     supportPhone: "",
-    email: "info@nido-tech.com",
-    supportEmail: "support@nido-tech.com",
-    website: "www.nido-tech.com",
-    industry: "Information Technology",
+    email: "",
+    supportEmail: "",
+    website: "",
+    industry: "",
     fiscalYearStart: "April",
     logoUrl: "",
     faviconUrl: "",
@@ -154,13 +153,7 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     currency: "INR (₹)",
     currencySymbol: "₹",
     baseCurrency: "INR",
-    exchangeRates: {
-      INR: 1,
-      USD: 0.010471,
-      EUR: 0.009061,
-      GBP: 0.007743,
-      AED: 0.038454,
-    },
+    exchangeRates: { INR: 1 },
     exchangeRatesUpdatedAt: "",
     numberFormat: "1,23,456.00 (Indian)",
     weekStartDay: "Monday",

@@ -88,7 +88,7 @@ import { OrdersProvider } from "@/contexts/OrdersContext";
 import { MyOrdersProvider } from "@/contexts/MyOrdersContext";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { ConfigProvider } from "@/contexts/ConfigContext";
+import { ConfigProvider, useConfig } from "@/contexts/ConfigContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PageMetaProvider } from "@/contexts/PageMetaContext";
@@ -341,9 +341,10 @@ function RootRedirect() {
 
 function AppRoutes() {
   const { isAuthenticated, isLoading, accessDenied } = useAuth();
+  const { isLoading: settingsLoading } = useConfig();
   const location = useLocation();
 
-  if (isLoading) {
+  if (isLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -1283,36 +1284,36 @@ const App = () => (
       <Sonner />
       <AlphabeticalDropdownOrdering />
       <BrowserRouter>
-        <ConfigProvider>
-        <ThemeProvider>
-          <I18nProvider>
-            <PreferencesProvider>
-              <NotificationProvider>
-                <AuthProvider>
-                  <PermissionsProvider>
-                  <EnhancedAuthProvider>
-                    <DataProvider>
-                      <CartProvider>
-                        <OrdersProvider>
-                          <MyOrdersProvider>
-                            <OrganizationProvider>
-                              <PageMetaProvider>
-                                <ActionConfirmationGuard />
-                                <AppRoutes />
-                              </PageMetaProvider>
-                            </OrganizationProvider>
-                          </MyOrdersProvider>
-                        </OrdersProvider>
-                      </CartProvider>
-                    </DataProvider>
-                  </EnhancedAuthProvider>
-                  </PermissionsProvider>
-                </AuthProvider>
-              </NotificationProvider>
-            </PreferencesProvider>
-          </I18nProvider>
-        </ThemeProvider>
-        </ConfigProvider>
+        <AuthProvider>
+          <ConfigProvider>
+            <ThemeProvider>
+              <I18nProvider>
+                <PreferencesProvider>
+                  <NotificationProvider>
+                    <PermissionsProvider>
+                      <EnhancedAuthProvider>
+                        <DataProvider>
+                          <CartProvider>
+                            <OrdersProvider>
+                              <MyOrdersProvider>
+                                <OrganizationProvider>
+                                  <PageMetaProvider>
+                                    <ActionConfirmationGuard />
+                                    <AppRoutes />
+                                  </PageMetaProvider>
+                                </OrganizationProvider>
+                              </MyOrdersProvider>
+                            </OrdersProvider>
+                          </CartProvider>
+                        </DataProvider>
+                      </EnhancedAuthProvider>
+                    </PermissionsProvider>
+                  </NotificationProvider>
+                </PreferencesProvider>
+              </I18nProvider>
+            </ThemeProvider>
+          </ConfigProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

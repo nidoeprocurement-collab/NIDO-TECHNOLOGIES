@@ -1,4 +1,5 @@
 - [Config Engine Architecture](config-engine.md) — global config context plus client detail General/Price Settings drafts that commit only on explicit Save Changes.
+- [Platform data storage](platform-data-storage.md) — use Replit PostgreSQL as the shared source of truth and preserve existing records during migration.
 - [Vendor Selection at Shop Flow](vendor-selection-flow.md) — client locks vendor on Shop page pre-cart; CartItem carries vendor snapshot; autoCreateDraftPOs() fires in addOrder(); OrderDetailsPage "Draft Purchase Orders" tab for Confirm/Reject.
 - [Live auto-assignment configuration](live-auto-assignment-config.md) — tier rules for real orders persist server-side; mock assignment history and test runs stay isolated in the browser.
 - [Report module output rules](report-workbook-view-availability.md) — keep workbook ordering; item-list columns show product names only and duplicate columns are removed.

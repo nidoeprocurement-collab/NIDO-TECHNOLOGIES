@@ -26,7 +26,7 @@ router.use(async (_req, res, next) => {
     res.status(503).json({
       success: false,
       error:
-        "Email database is not reachable. Check the SUPABASE_DB_URL secret (use the pooled connection string, not the direct one).",
+        "Email database is not reachable. Verify the PostgreSQL connection in Replit.",
       detail: err.message,
     });
   }
