@@ -55,3 +55,6 @@ run = ["node", "./dist/index.cjs"]
 
 [userenv.shared]
 NIDO_INITIAL_OWNER_EMAIL = "nidoeprocurment@gmail.com"
+
+[userenv.production]
+VITE_CLERK_PROXY_URL = "/api/__clerk"
