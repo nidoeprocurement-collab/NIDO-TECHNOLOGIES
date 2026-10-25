@@ -26,3 +26,14 @@ Fixed via `src/lib/routePermissions.ts` (path-prefix → module key map) plus
 `hasPermission(moduleKey, 'view')` per navigation and renders an Access Denied
 page otherwise. Client Portal (`/portal/*`) routes are intentionally excluded
 since they use a separate portal permission model.
+
+NIDO Users/Roles/Permissions applies only to NIDO platform users. Client portal
+roles and permissions are managed separately from each client's detail page,
+under its Users and Roles tabs.
+
+**Why:** the user explicitly clarified that client portal access must not be
+controlled by NIDO platform roles.
+
+**How to apply:** keep NIDO RBAC and per-client portal RBAC as separate
+permission systems; when changing portal access, use the client detail page's
+Users and Roles configuration.
