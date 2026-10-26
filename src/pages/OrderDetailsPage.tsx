@@ -14,6 +14,7 @@ import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
+import OrderDetailsSummaryCard from "@/pages/OrderDetailsSummaryCard";
 import {
   calculateRemainingOrderPricing,
   getOrderLineUnitPriceInclusive,
@@ -24,8 +25,6 @@ import { getCartTaxRate } from "@/lib/vendorCartPricing";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import {
   computeVendorComparisons,
-  getClientCartPricingSettings,
-  getSlabDiscountPct,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
@@ -2556,21 +2555,26 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     const taxRate = typeof item.checkoutGstRate === "number" && Number.isFinite(item.checkoutGstRate)
       ? item.checkoutGstRate
       : getCartTaxRate(item) ?? getEffectiveTaxPctForCategory(item.category || "");
-    const unitPriceInclusive = getOrderLineUnitPriceInclusive(item);
-    const unitPriceExclGst = typeof item.checkoutUnitPriceExclGst === "number" && Number.isFinite(item.checkoutUnitPriceExclGst)
-      ? Math.max(0, item.checkoutUnitPriceExclGst)
-      : typeof item.clientSellingPriceExclGst === "number" && Number.isFinite(item.clientSellingPriceExclGst)
-        ? Math.max(0, item.clientSellingPriceExclGst)
-        : unitPriceInclusive * 100 / (100 + taxRate);
     const cartDiscountPct = typeof item.cartDiscountPct === "number" && Number.isFinite(item.cartDiscountPct)
-      ? Math.max(0, item.cartDiscountPct)
-      : item.clientId
-        ? Math.max(
-            0,
-            getSlabDiscountPct(item.clientId, item.category || "", Number(item.quantity) || 0) +
-              getClientCartPricingSettings(item.clientId).discountPct,
-          )
-        : 0;
+      ? Math.max(0, Math.min(99.99, item.cartDiscountPct))
+      : 0;
+    const checkoutUnitPriceExclGst = typeof item.checkoutUnitPriceExclGst === "number" && Number.isFinite(item.checkoutUnitPriceExclGst)
+      ? Math.max(0, item.checkoutUnitPriceExclGst)
+      : null;
+    const checkoutUnitPriceInclusive = typeof item.checkoutUnitPriceInclusive === "number" && Number.isFinite(item.checkoutUnitPriceInclusive)
+      ? Math.max(0, item.checkoutUnitPriceInclusive)
+      : null;
+    const originalUnitPriceExclGst = typeof item.clientSellingPriceExclGst === "number" && Number.isFinite(item.clientSellingPriceExclGst)
+      ? Math.max(0, item.clientSellingPriceExclGst)
+      : checkoutUnitPriceExclGst !== null && cartDiscountPct > 0
+        ? checkoutUnitPriceExclGst / (1 - cartDiscountPct / 100)
+        : getOrderLineUnitPriceInclusive(item) * 100 / (100 + taxRate);
+    const unitPriceExclGst = checkoutUnitPriceExclGst
+      ?? originalUnitPriceExclGst * (1 - cartDiscountPct / 100);
+    const unitPriceInclusive = checkoutUnitPriceInclusive
+      ?? (checkoutUnitPriceExclGst !== null
+        ? checkoutUnitPriceExclGst * (1 + taxRate / 100)
+        : getOrderLineUnitPriceInclusive(item) * (1 - cartDiscountPct / 100));
 
     return {
       num: idx + 1,
@@ -2596,6 +2600,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
       unitPrice: formatCurrency(unitPriceInclusive),
       unitPriceInclusive,
       unitPriceExclGst,
+      originalUnitPriceExclGst,
       taxRate,
       cartDiscountPct,
       total: formatCurrency(unitPriceInclusive * Number(item.quantity || 0)),
@@ -4309,6 +4314,7 @@ export default function MyOrderPage() {
 
         {/* Top information cards — matched to the compact reference layout */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
+          <OrderDetailsSummaryCard order={order} subOrders={subOrders} />
           <div style={topInfoCard}>
             <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
             <Field label="Client" value={clientInfo?.name || order?.client || "—"} />
@@ -4338,29 +4344,6 @@ export default function MyOrderPage() {
             <Field label="Ordered By" value={requesterName} />
             <Field label="Ordered For" value={orderedFor} />
             <Field label="Role" value={requesterRole} />
-          </div>
-          <div style={topInfoCard}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>
-            {[
-              ["Master Order ID", orderId],
-              ["Sub Orders", String(subOrders.length)],
-              ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
-              ["Total Amount", order?.totalAmountNum != null ? formatCurrency(order.totalAmountNum) : order?.totalAmount || "—"],
-              ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
-              ["Order Note", order?.orderNotes || "No order note provided"],
-            ].map(([l, v]) => (
-              <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, color: "#6b7280", flexShrink: 0 }}>{l}</span>
-                <span style={{
-                  fontSize: 13,
-                  fontWeight: l === "Total Amount" ? 700 : 500,
-                  textAlign: "right",
-                  whiteSpace: l === "Order Note" ? "pre-wrap" : "normal",
-                  overflowWrap: "anywhere",
-                  color: l === "Order Note" && !order?.orderNotes ? "#9ca3af" : undefined,
-                }}>{v}</span>
-              </div>
-            ))}
           </div>
         </div>
 
@@ -4474,13 +4457,19 @@ export default function MyOrderPage() {
                   {subOrdersColumns.map((h, headerIndex) => (
                     <div
                       key={h}
+                      title={h === "TOTAL" ? "Total excluding GST" : undefined}
                       style={{
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         textAlign: headerIndex === subOrdersColumns.length - 1 ? "right" : "left",
                       }}
                     >
-                      {h}
+                      {h === "TOTAL" ? (
+                        <>
+                          <span>TOTAL</span>
+                          <span style={{ display: "block", fontSize: 8, letterSpacing: 0 }}>EXCL. GST</span>
+                        </>
+                      ) : h}
                     </div>
                   ))}
                 </div>
@@ -4506,13 +4495,15 @@ export default function MyOrderPage() {
                     const cancelledLine = String(canonicalLine?.status || "").toLowerCase() === "cancelled";
                     const itemCancelled = isSubOrderCancelled || cancelledLine;
                     const unitPriceExclGst = Math.max(0, Number(sub.unitPriceExclGst) || 0);
-                    const unitPriceInclusive = Math.max(
+                    const discountPct = Math.max(0, Math.min(99.99, Number(sub.cartDiscountPct) || 0));
+                    const originalUnitPriceExclGst = Math.max(
                       0,
-                      Number(sub.unitPriceInclusive) ||
-                        unitPriceExclGst * (1 + (Number(sub.taxRate) || 0) / 100),
+                      Number(sub.originalUnitPriceExclGst) ||
+                        (discountPct > 0 ? unitPriceExclGst / (1 - discountPct / 100) : unitPriceExclGst),
                     );
                     const lineQuantity = Math.max(0, Number(sub.qty) || 0);
-                    const lineTotal = unitPriceInclusive * lineQuantity;
+                    const lineTotal = unitPriceExclGst * lineQuantity;
+                    const hasDiscount = discountPct > 0 && originalUnitPriceExclGst > unitPriceExclGst;
                     const subPOs = canonicalPO ? [canonicalPO] : [];
                     const hasPO = subPOs.length > 0;
                     const hasConfirmedPO = subPOs.some(isConfirmedPO);
@@ -4527,7 +4518,6 @@ export default function MyOrderPage() {
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
-                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
                        {!isClientPortalUser && !itemCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
                          {!isClientPortalUser && itemCancelled && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Cancelled</span></div>}
                          {!isClientPortalUser && !itemCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
@@ -4541,6 +4531,11 @@ export default function MyOrderPage() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
+                            {sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>Category: {sub.category}</div>}
+                            {sub.productCode && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Product code: {sub.productCode}</div>}
+                            {Array.isArray(sub.specs) && sub.specs.filter(Boolean).map((spec: string) => (
+                              <div key={spec} style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>• {spec}</div>
+                            ))}
                             <ProductConfigurationSummary
                               configuration={sub.configuration}
                               priceAdjustment={sub.configurationPriceAdjustment}
@@ -4623,7 +4618,14 @@ export default function MyOrderPage() {
                             ? "—"
                             : isDigitalOrder
                             ? subPresentation.tenureBilling
-                              : formatCurrency(unitPriceExclGst)}
+                             : hasDiscount ? (
+                               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                 <span style={{ color: "#15803d", fontWeight: 700 }}>
+                                   {formatCurrency(unitPriceExclGst)} <span style={{ fontSize: 10.5 }}>({Number(discountPct.toFixed(2))}% off)</span>
+                                 </span>
+                                 <del style={{ color: "#9ca3af", fontSize: 11.5 }}>{formatCurrency(originalUnitPriceExclGst)}</del>
+                               </div>
+                             ) : formatCurrency(unitPriceExclGst)}
                        </div>
                        {isMixedOrder && (
                          <>
@@ -4805,58 +4807,6 @@ export default function MyOrderPage() {
                   );
                 })}
               </div>
-              {(() => {
-                const cancelledSubOrderIds = new Set(
-                  subOrders.filter((sub) => sub.itemStatus === "Cancelled").map((sub) => sub.id),
-                );
-                const pricing = calculateRemainingOrderPricing(order, cancelledSubOrderIds);
-                const fmt = (n: number) => formatCurrency(n);
-                const splitTaxPercentages = [...new Set(
-                  pricing.slabs.map(({ rate }) => Number((rate / 2).toFixed(2))),
-                )].map((rate) => `${rate}%`).join(", ") || "0%";
-                return (
-                  <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
-                    <div style={{ width: 300 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>Sub-total (excl. GST)</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.subtotalBeforeDiscount)}</span>
-                      </div>
-                      {pricing.discountAmount > 0.005 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Discount</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500, color: "#15803d" }}>-{fmt(pricing.discountAmount)}</span>
-                        </div>
-                      )}
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>CGST ({splitTaxPercentages})</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.cgstAmount)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>SGST ({splitTaxPercentages})</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.sgstAmount)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>Shipping / delivery</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.shippingDeliveryFee)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>Platform fee</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.platformFee)}</span>
-                      </div>
-                      {Math.abs(pricing.otherAdjustments) > 0.005 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Legacy price adjustment</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.otherAdjustments)}</span>
-                        </div>
-                      )}
-                      <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-                        <span style={{ fontSize: 14, fontWeight: 700 }}>Total Amount</span>
-                        <span style={{ fontSize: 15, fontWeight: 800 }}>{fmt(pricing.grandTotal)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
               <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>Showing 1 to {filtered.length} of {subOrders.length} sub orders</div>
             </>
           )}

@@ -1,10 +1,12 @@
 ---
 name: Order Details line pricing
-description: Sub Orders / Items shows pre-tax unit price and tax-inclusive total without separate discount or tax columns.
+description: Order detail rows use saved discounts, GST-exclusive line totals, and a checkout-style summary above the sub-order tabs.
 ---
 
-The Sub Orders / Items grid displays unit price before GST and a tax-inclusive line total, with no separate Discount or Tax columns. The order-level summary below that grid is separate: show pre-discount subtotal, a discount row only when the saved checkout discount is positive, separate CGST and SGST with half-rates derived from the saved GST slabs, shipping/delivery, platform fee, and total. Use saved checkout snapshots and never apply discounts twice.
+In Order Details, show product category, code, specifications, and configuration beside the product name. The unit price is the saved checkout price after discount and before GST; when a saved discount applies, show that price first, the original price struck through beneath it, and the saved discount percentage in parentheses. The item total is also before GST.
 
-**Why:** The user requested no discount/tax columns in item rows, but later requested a separate order-level pricing breakdown including conditional discounts and GST percentages.
+Place a checkout-style Order Summary card at the top-left of the information cards. It lists the order items and shows pre-discount subtotal, saved discount, after-discount subtotal, GST slabs, shipping/platform fees when present, and final total. Remove the calculation block beneath the Sub Orders / Items grid.
 
-**How to apply:** Keep the item rows concise while using saved checkout unit price, tax rate, and cart discount percentage to calculate the order summary; for mixed GST slabs, label CGST/SGST with all applicable half-rates.
+**Why:** The user asked Order Details to show checkout pricing and item detail consistently, while keeping taxes and fees out of the sub-order table footer.
+
+**How to apply:** Use saved checkout snapshots only; never infer a discount from current settings or apply it twice. Keep checkout GST and fees in the top summary, and keep the sub-order line total tax-exclusive.
