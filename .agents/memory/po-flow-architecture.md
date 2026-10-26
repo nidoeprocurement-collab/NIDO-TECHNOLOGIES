@@ -113,14 +113,17 @@ entered independently.
 **Why:** The user requested that PO Details and Order Details statuses be
 kept locked until Draft POs are confirmed, that Cancel Order remain available
 before PO creation and after all POs are cancelled, and that fulfillment stay
-independent after procurement confirmation.
+independent after procurement confirmation. The user later asked for the
+internal top-right Cancel Order control to be easier to find.
 
 **How to apply:** Persist each status in its own record. Do not copy PO status
 into `nido_subitems_<orderId>`, recalculate order summaries from PO updates, or
 copy later PO fulfillment progress into Order Details. Keep the pre-confirmation
-gate on item status changes. The master Cancel Order action is available before
-any PO is generated and again after every generated PO is cancelled; otherwise
-keep it hidden while an active PO exists.
+gate on item status changes. Show the internal Cancel Order control in the
+header unless the order is already cancelled; disable it with a visible reason
+when any PO is active or an item has shipped/delivered. Enable it only before PO
+creation or after all POs are cancelled, and before shipment. Keep it hidden in
+the client portal.
 
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)

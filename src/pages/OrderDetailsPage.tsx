@@ -2986,7 +2986,6 @@ export default function MyOrderPage() {
     () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
     [poRefreshKey, orderId],
   );
-  const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const hasDraftOrderPO = orderPOs.some(po => String(po.status || "").toLowerCase() === "draft");
   const canCancelOrderByPO = canCancelOrderByPurchaseOrders(orderPOs);
   const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
@@ -3121,6 +3120,13 @@ export default function MyOrderPage() {
   );
   const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
   const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
+  const cancelOrderUnavailableReason = !canCancelOrderByPO && hasShippedCustomerItem
+    ? "Active purchase orders and shipped or delivered items both block cancellation."
+    : !canCancelOrderByPO
+      ? "Cancel all active purchase orders before cancelling this order."
+      : hasShippedCustomerItem
+        ? "This order cannot be cancelled after an item has shipped or been delivered."
+        : "";
   const handleCancelOrder = async (reason: string) => {
     if (isOrderCancelled || !canCancelOrder) return;
     try {
@@ -4291,22 +4297,6 @@ export default function MyOrderPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}><span style={{ color: "#374151" }}>{orderId}</span></h1>
                 <StatusPill status={masterStatus} />
-                {!isClientPortalUser && !isOrderCancelled && !canCancelOrder && (
-                  <span
-                    title={statusLockedUntilPOConfirmed
-                      ? statusLockReason
-                      : hasConfirmedOrderPO
-                        ? "This order cannot be cancelled because a purchase order has already been generated."
-                        : "This order cannot be cancelled because an item has already shipped."}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 8px", border: "1px solid #e1e5eb", borderRadius: 6, background: "#f5f6f8", color: "#77808d", fontSize: 9.5, fontWeight: 600, whiteSpace: "nowrap" }}
-                  >
-                    🔒 {statusLockedUntilPOConfirmed
-                      ? "PO confirmation required — status locked"
-                      : hasConfirmedOrderPO
-                        ? "PO generated — order locked"
-                        : "Order shipped — order locked"}
-                  </span>
-                )}
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
@@ -4331,18 +4321,23 @@ export default function MyOrderPage() {
                   )}
                 </div>
               ) : (
-                !canCancelOrder ? (
-                  null
-                ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
                   <button
                     onClick={() => setPendingCancelStatus(true)}
-                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                    disabled={!canCancelOrder}
+                    title={canCancelOrder ? "Cancel this order" : cancelOrderUnavailableReason}
+                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", border: canCancelOrder ? "1px solid #ef4444" : "1px solid #d1d5db", borderRadius: 8, background: canCancelOrder ? "#fef2f2" : "#f3f4f6", color: canCancelOrder ? "#b91c1c" : "#6b7280", cursor: canCancelOrder ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13.5, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
+                    onMouseEnter={e => { if (canCancelOrder) e.currentTarget.style.background = "#fee2e2"; }}
+                    onMouseLeave={e => { if (canCancelOrder) e.currentTarget.style.background = "#fef2f2"; }}
                   >
-                    ✕ Cancel Order
+                    <span aria-hidden="true">{canCancelOrder ? "✕" : "🔒"}</span> Cancel Order
                   </button>
-                )
+                  {!canCancelOrder && (
+                    <span style={{ maxWidth: 280, textAlign: "right", color: "#6b7280", fontSize: 11, lineHeight: 1.35 }}>
+                      {cancelOrderUnavailableReason}
+                    </span>
+                  )}
+                </div>
               )
             )}
             </div>
