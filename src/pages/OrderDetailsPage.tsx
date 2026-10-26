@@ -4577,6 +4577,10 @@ export default function MyOrderPage() {
                     const hasDiscount = discountPct > 0 && originalUnitPriceExclGst > unitPriceExclGst;
                     const subPOs = canonicalPO ? [canonicalPO] : [];
                     const hasPO = subPOs.length > 0;
+                    const displayPO = cancelledPO || subPOs[0] || null;
+                    const previousVendorName = String(
+                      cancelledPO?.vendorName || subPOs[0]?.vendorName || sub.selectedVendorName || "",
+                    ).trim();
                     const hasConfirmedPO = subPOs.some(isConfirmedPO);
                     const cancelledPONeedsResolution = Boolean(cancelledPO) && !hasPO && !itemCancelled;
                   const selVendorId = selectedVendors[sub.id];
@@ -4618,34 +4622,29 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                           {itemCancelled ? (
-                             <div>
-                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                 <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                    {(cancelledPO?.vendorName || subPOs[0]?.vendorName || sub.selectedVendorName || "V")[0].toUpperCase()}
-                                 </div>
-                                 <div>
-                                   <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>
-                                      {cancelledPO?.vendorName || subPOs[0]?.vendorName || sub.selectedVendorName || "Previous vendor"}
-                                   </div>
-                                    <div style={{ fontSize: 10, color: "#991b1b" }}>PO Cancelled</div>
-                                 </div>
-                               </div>
-                                <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
-                              </div>
+                          {itemCancelled ? (
+                            <div>
+                              {displayPO?.poNumber ? (
+                                <button
+                                  onClick={() => navigate(`/vendor-orders/${displayPO.poNumber}`)}
+                                  style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
+                                >
+                                  {displayPO.poNumber} ↗
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                              )}
+                              {cancelledPO && <div style={{ fontSize: 10, color: "#991b1b", marginTop: 3 }}>PO Cancelled</div>}
+                              <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
+                            </div>
                           ) : cancelledPONeedsResolution ? (
                             <div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                  {(cancelledPO?.vendorName || "V")[0].toUpperCase()}
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>
-                                    {cancelledPO?.vendorName || "Previous vendor"}
-                                  </div>
-                                  <div style={{ fontSize: 10, color: "#991b1b" }}>PO Cancelled</div>
-                                </div>
-                              </div>
+                              <button
+                                onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)}
+                                style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
+                              >
+                                {cancelledPO.poNumber} · Cancelled ↗
+                              </button>
                               <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>
                                 Select a replacement vendor or cancel this sub-order.
                               </div>
@@ -4757,15 +4756,22 @@ export default function MyOrderPage() {
                       )}
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {isSubOrderCancelled ? (
-                            <span style={{ fontSize: 12, color: "#9ca3af" }}>---</span>
-                          ) : cancelledPONeedsResolution ? (
-                            <button
-                              onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)}
-                              style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                            >
-                              {cancelledPO.poNumber} · Cancelled ↗
-                            </button>
+                          {itemCancelled || cancelledPONeedsResolution ? (
+                            previousVendorName ? (
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
+                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                  {previousVendorName[0].toUpperCase()}
+                                </div>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>
+                                    {previousVendorName}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#9ca3af" }}>Previous vendor</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                            )
                           ) : hasPO ? (
                             // Show every vendor covered by this PO. Draft POs
                             // can still be redirected before procurement
