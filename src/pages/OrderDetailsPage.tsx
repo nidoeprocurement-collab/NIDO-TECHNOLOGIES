@@ -4319,13 +4319,13 @@ export default function MyOrderPage() {
                 <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-start", gap: 8, flexShrink: 0 }}>
               <OrderSlaNotice sla={orderSla} />
             {/* Cancel Order is available before PO creation and after all POs are cancelled. */}
             {!isClientPortalUser && (
               isOrderCancelled ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-                  <span style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
                     ✕ Order Cancelled
                   </span>
                   {order?.cancelReason && (
@@ -4341,7 +4341,7 @@ export default function MyOrderPage() {
                     onClick={() => setPendingCancelStatus(true)}
                     disabled={!canCancelOrder}
                     title={canCancelOrder ? "Cancel this order" : cancelOrderUnavailableReason}
-                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", border: canCancelOrder ? "1px solid #ef4444" : "1px solid #d1d5db", borderRadius: 8, background: canCancelOrder ? "#fef2f2" : "#f3f4f6", color: canCancelOrder ? "#b91c1c" : "#6b7280", cursor: canCancelOrder ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13.5, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 18px", border: canCancelOrder ? "1px solid #ef4444" : "1px solid #d1d5db", borderRadius: 8, background: canCancelOrder ? "#fef2f2" : "#f3f4f6", color: canCancelOrder ? "#b91c1c" : "#6b7280", cursor: canCancelOrder ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13.5, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
                     onMouseEnter={e => { if (canCancelOrder) e.currentTarget.style.background = "#fee2e2"; }}
                     onMouseLeave={e => { if (canCancelOrder) e.currentTarget.style.background = "#fef2f2"; }}
                   >
