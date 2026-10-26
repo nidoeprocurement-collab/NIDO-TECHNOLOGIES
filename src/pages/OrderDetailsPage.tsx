@@ -2542,9 +2542,9 @@ function ThreeDotMenu({
 
 function Field({ label, value }) {
   return (
-    <div style={{ marginBottom: 7 }}>
-      <div style={{ fontSize: 9.5, color: "#7b8492", marginBottom: 1 }}>{label}</div>
-      <div style={{ fontSize: 11.5, fontWeight: 600, color: "#26313f", lineHeight: 1.25, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{value}</div>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 11.5, color: "#7b8492", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 500, color: "#26313f", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{value}</div>
     </div>
   );
 }
@@ -2573,12 +2573,12 @@ function OrderSlaNotice({ sla }: { sla: SLAStatus }) {
     <div style={{ minWidth: 190, maxWidth: 260, padding: "7px 10px", display: "flex", alignItems: "flex-start", gap: 7, background: style.background, border: `1px solid ${style.border}`, borderRadius: 8, boxSizing: "border-box" }}>
       <span aria-hidden="true" style={{ width: 7, height: 7, marginTop: 4, flexShrink: 0, borderRadius: "50%", background: style.dot }} />
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, color: style.color, fontSize: 10, lineHeight: 1.2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, color: style.color, fontSize: 12, lineHeight: 1.3 }}>
           <strong style={{ whiteSpace: "nowrap" }}>{style.label}</strong>
           <span style={{ textAlign: "right" }}>{sla.label}</span>
         </div>
         {deadline && (
-          <div style={{ marginTop: 4, color: "#667085", fontSize: 9, lineHeight: 1.2 }}>
+          <div style={{ marginTop: 4, color: "#667085", fontSize: 11.5, lineHeight: 1.35 }}>
             SLA Deadline: <strong style={{ color: "#475467", fontWeight: 600 }}>{deadline}</strong>
           </div>
         )}
@@ -4351,39 +4351,39 @@ export default function MyOrderPage() {
         `}</style>
         <div className="order-details-top-info-grid">
           <div style={topInfoCard}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, color: "#344054", marginBottom: 9 }}>
-              <Building2 size={12} color="#667085" /> Billing Information
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13.5, color: "#344054", marginBottom: 10 }}>
+              <Building2 size={14} color="#667085" /> Billing Information
             </div>
             <Field label="Client" value={clientInfo?.name || order?.client || "—"} />
             <Field label="Billing Address" value={billingAddress} />
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 5, color: "#667085", fontSize: 9.5, lineHeight: 1.25, overflowWrap: "anywhere" }}>
-              <Mail size={10} style={{ marginTop: 1, flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 5, color: "#667085", fontSize: 11.5, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+              <Mail size={12} style={{ marginTop: 2, flexShrink: 0 }} />
               <span>{clientInfo?.email || "—"}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 4, color: "#667085", fontSize: 9.5, lineHeight: 1.25, overflowWrap: "anywhere" }}>
-              <Phone size={10} style={{ marginTop: 1, flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 4, color: "#667085", fontSize: 11.5, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+              <Phone size={12} style={{ marginTop: 2, flexShrink: 0 }} />
               <span>{clientInfo?.billing_phone || clientInfo?.billingPhone || clientInfo?.phone || clientInfo?.mobile || "—"}</span>
             </div>
           </div>
           <div style={topInfoCard}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, color: "#344054", marginBottom: 9 }}>
-              <Truck size={12} color="#667085" /> Shipping Information
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13.5, color: "#344054", marginBottom: 10 }}>
+              <Truck size={14} color="#667085" /> Shipping Information
             </div>
             <Field label="Address Label" value={deliveryInfo.label || "—"} />
             <Field label="Shipping Address" value={shippingAddress} />
             {deliveryInfo.phone && (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 5, color: "#667085", fontSize: 9.5, lineHeight: 1.25 }}>
-                <Phone size={10} style={{ marginTop: 1, flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 5, color: "#667085", fontSize: 11.5, lineHeight: 1.4 }}>
+                <Phone size={12} style={{ marginTop: 2, flexShrink: 0 }} />
                 <span>{deliveryInfo.phone}</span>
               </div>
             )}
-            <div style={{ marginTop: 6, color: deliveryInfo.instructions ? "#667085" : "#98a2b3", fontSize: 9.5, lineHeight: 1.25, fontStyle: "italic", overflowWrap: "anywhere" }}>
+            <div style={{ marginTop: 7, color: deliveryInfo.instructions ? "#667085" : "#98a2b3", fontSize: 11.5, lineHeight: 1.4, fontStyle: "italic", overflowWrap: "anywhere" }}>
               {deliveryInfo.instructions || "No delivery instructions provided"}
             </div>
           </div>
           <div style={topInfoCard}>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, color: "#344054", marginBottom: 9 }}>
-              <UserRound size={12} color="#667085" /> Requester Information
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13.5, color: "#344054", marginBottom: 10 }}>
+              <UserRound size={14} color="#667085" /> Requester Information
             </div>
             <Field label="Entered By" value={requesterName} />
             <Field label="Ordered For" value={orderedFor} />

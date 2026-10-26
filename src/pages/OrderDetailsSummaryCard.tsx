@@ -35,32 +35,32 @@ export default function OrderDetailsSummaryCard({
     alignItems: "baseline",
     justifyContent: "space-between",
     gap: 6,
-    marginBottom: 5,
+    marginBottom: 6,
   } as const;
   const labelStyle = {
     minWidth: 0,
     color: "#667085",
-    fontSize: 9.5,
-    lineHeight: 1.25,
+    fontSize: 11.5,
+    lineHeight: 1.35,
   } as const;
   const valueStyle = {
     flexShrink: 0,
     color: "#344054",
-    fontSize: 9.5,
+    fontSize: 11.5,
     fontWeight: 600,
-    lineHeight: 1.25,
+    lineHeight: 1.35,
     textAlign: "right" as const,
     whiteSpace: "nowrap" as const,
   };
 
   return (
     <div style={{ height: "100%", minWidth: 0, boxSizing: "border-box", background: "#fff", border: "1px solid #e0e5eb", borderRadius: 9, padding: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 9 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-          <ClipboardList size={12} color="#64748b" />
-          <h2 style={{ margin: 0, color: "#344054", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>Order Summary</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <ClipboardList size={14} color="#64748b" />
+          <h2 style={{ margin: 0, color: "#344054", fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" }}>Order Summary</h2>
         </div>
-        <span style={{ color: "#98a2b3", fontSize: 9, whiteSpace: "nowrap" }}>{order.id}</span>
+        <span style={{ color: "#98a2b3", fontSize: 10.5, whiteSpace: "nowrap" }}>{order.id}</span>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingBottom: 7, marginBottom: 7, borderBottom: "1px solid #edf0f3" }}>
@@ -92,8 +92,8 @@ export default function OrderDetailsSummaryCard({
           <span style={{ ...valueStyle, color: "#16764a" }}>{formatPrice(pricing.discountAmount)}</span>
         </div>
         <div style={{ ...rowStyle, marginBottom: 0, paddingTop: 7, borderTop: "1px solid #e4e7ec" }}>
-          <strong style={{ color: "#344054", fontSize: 10, lineHeight: 1.2 }}>Total Order Amount</strong>
-          <strong style={{ ...valueStyle, color: "#1d4ed8", fontSize: 10.5 }}>{formatPrice(pricing.grandTotal)}</strong>
+          <strong style={{ color: "#344054", fontSize: 12.5, lineHeight: 1.35 }}>Total Order Amount</strong>
+          <strong style={{ ...valueStyle, color: "#1d4ed8", fontSize: 13.5 }}>{formatPrice(pricing.grandTotal)}</strong>
         </div>
       </div>
     </div>
