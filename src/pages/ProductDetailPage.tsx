@@ -673,12 +673,12 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* ── Bottom section ── */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-2 items-start">
+        {/* ── General specifications, followed by related products ── */}
+        <div className="mt-6 space-y-6">
 
           {/* General Specifications */}
           {product.generalSpecs && product.generalSpecs.length > 0 && (
-            <div className="border border-gray-200 rounded-2xl p-6">
+            <div className="border border-gray-200 rounded-2xl p-4 sm:p-5">
               <h3 className="text-base font-semibold text-gray-900 mb-4">General Specifications</h3>
               <div className="flex flex-col">
                 {product.generalSpecs.map((gs, i) => (
@@ -696,7 +696,7 @@ export default function ProductDetailPage() {
 
           {/* Related Products */}
           {relatedProducts.length > 0 && (
-            <div>
+            <div className="pt-1">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-gray-900">Related Products</h3>
                 <button
