@@ -4201,21 +4201,19 @@ export default function MyOrderPage() {
       DIGITAL_PRODUCT_HEADERS.provisioning,
     );
   }
-  // Keep every track shrinkable so this dense table always fits the tab
-  // instead of creating a second horizontal scrollbar. Long values are
-  // wrapped inside their own tracks below, which keeps status and vendor
-  // content from bleeding into adjacent columns.
+  // Keep Status compact, reserve a readable width for the GST-exclusive total,
+  // and use the freed space to balance item, tracking, and vendor details.
   const subOrdersColTemplateBase = isClientPortalUser
     ? (isDigitalOrder
-      ? "28px 110px minmax(0,2.15fr) 38px minmax(0,.72fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) 104px"
+      ? "28px 110px minmax(0,2.2fr) 38px minmax(0,.78fr) minmax(0,1fr) minmax(0,1.2fr) 82px 88px"
       : isMixedOrder
-        ? "28px 100px minmax(0,2fr) 44px minmax(0,.72fr) 38px minmax(0,.75fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) 104px"
-        : "28px 100px minmax(0,2.2fr) 44px minmax(0,.72fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.2fr) 104px")
+        ? "28px 100px minmax(0,2fr) 44px minmax(0,.78fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,1.2fr) 82px minmax(0,1.05fr) 88px"
+        : "28px 100px minmax(0,2.2fr) 44px minmax(0,.78fr) minmax(0,1.2fr) 82px minmax(0,1.2fr) 88px")
     : (isDigitalOrder
-      ? "28px 110px minmax(0,1.95fr) 72px 38px minmax(0,.72fr) minmax(0,1fr) 72px minmax(0,1.25fr) minmax(0,1.2fr) 104px"
+      ? "28px 110px minmax(0,1.95fr) 72px 38px minmax(0,.78fr) minmax(0,1fr) 112px 82px minmax(0,1.2fr) 80px"
       : isMixedOrder
-        ? "28px 105px minmax(0,1.85fr) 72px 38px minmax(0,.72fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr) 104px"
-        : "28px 105px minmax(0,1.95fr) 72px 44px minmax(0,.72fr) 72px minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.1fr) 104px");
+        ? "28px 105px minmax(0,1.85fr) 72px 38px minmax(0,.8fr) 38px minmax(0,.8fr) minmax(0,1fr) 112px 82px minmax(0,1fr) minmax(0,1.15fr) 80px"
+        : "28px 105px minmax(0,2fr) 72px 44px minmax(0,.8fr) 112px 82px minmax(0,1.05fr) minmax(0,1.05fr) 80px");
   const subOrdersColTemplate = subOrdersColTemplateBase;
   const subOrdersColGap = 6;
 
@@ -4835,7 +4833,7 @@ export default function MyOrderPage() {
                             ) : returnOk ? (
                              <button
                                onClick={() => setReturnTarget(sub.id)}
-                               style={{ padding: "5px 10px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                               style={{ maxWidth: "100%", padding: "5px 6px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 600, fontSize: 10.5, lineHeight: 1.25, fontFamily: "inherit", whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center" }}
                              >
                                Raise Return Request
                              </button>
@@ -4844,7 +4842,7 @@ export default function MyOrderPage() {
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
                               onClick={() => setCancelTarget(sub.id)}
-                                style={{ padding: "5px 10px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: isOrderInactive ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                                style={{ maxWidth: "100%", padding: "5px 6px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: isOrderInactive ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 10.5, lineHeight: 1.25, fontFamily: "inherit", whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center" }}
                             >
                                 Cancel Item
                             </button>
