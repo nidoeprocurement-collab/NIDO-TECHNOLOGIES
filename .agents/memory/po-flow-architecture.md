@@ -125,6 +125,21 @@ when any PO is active or an item has shipped/delivered. Enable it only before PO
 creation or after all POs are cancelled, and before shipment. Keep it hidden in
 the client portal.
 
+## Order item cancellation cutoff
+
+In the Order Details sub-order Actions menu, Cancel Item stays available after
+the order is placed and after its PO is confirmed. Disable it once the matching
+PO line or PO status reaches shipment progress, including shipped, dispatched,
+delivered, or in transit. This is separate from cancelling the entire PO.
+
+**Why:** The user explicitly chose to keep item cancellation available until
+the PO is shipped, rather than disabling it at PO confirmation.
+
+**How to apply:** Determine shipment progress from both the matching PO line and
+the overall PO status. When cancelling against an unshipped confirmed PO,
+restore its allocated physical stock and retain the cancelled PO line as an
+audit trail; Draft PO cancellation releases its reservation.
+
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)
 - `₹` symbol rendered as `Rs.` in totals (standard jsPDF fonts lack the Rupee glyph U+20B9)

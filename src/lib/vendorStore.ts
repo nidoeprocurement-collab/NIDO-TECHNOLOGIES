@@ -428,6 +428,42 @@ export function restorePhysicalStock(
 }
 
 /**
+ * Restore units to a vendor after an already-confirmed PO line is cancelled
+ * before shipment. Confirmation has already converted the reservation, so
+ * restore physical stock only; reservedStock must not be increased.
+ */
+export function restoreAllocatedPhysicalStock(
+  vendorId: string,
+  masterProductCode: string,
+  qty: number,
+  reference = 'Order Item Cancelled',
+): void {
+  if (qty <= 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(p => p.masterProductCode === masterProductCode);
+  if (!product) return;
+  const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+  const newPhysical = physical + qty;
+  updateVendorProduct(vendorId, product.id, {
+    physicalStock: String(newPhysical),
+    stock: String(newPhysical),
+  }, true);
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: 'Confirmed PO Item Cancelled – Stock Restored',
+    field: 'physicalStock',
+    qtyBefore: physical,
+    qtyChanged: qty,
+    qtyAfter: newPhysical,
+    reference,
+    user: getCurrentUser(),
+  });
+}
+
+/**
  * Manual stock adjustment from the Stock Management module.
  * Stock In / Stock Out affect physicalStock only (reservedStock is untouched).
  * Stock Correction sets physicalStock to an exact value.

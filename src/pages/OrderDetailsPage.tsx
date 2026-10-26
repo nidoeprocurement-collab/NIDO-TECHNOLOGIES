@@ -10,7 +10,7 @@ import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
-import { releaseVendorReservation } from "@/lib/vendorStore";
+import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate, type SLAStatus } from "@/lib/slaUtils";
@@ -2808,15 +2808,13 @@ function hasPOItemShipmentStarted(po: any, subOrderId: string, subOrder?: any): 
   const matchingLine = (po.items || []).find((line: any) =>
     poLineMatchesSubOrder(line, subOrderId, subOrder),
   );
-  if (matchingLine) {
-    const status = String(matchingLine.status || "").toLowerCase();
-    return status.includes("shipped") ||
-      status.includes("dispatched") ||
-      status.includes("delivered") ||
-      status.includes("in transit");
-  }
+  const lineStatus = String(matchingLine?.status || "").toLowerCase();
   const poStatus = String(po.status || "").toLowerCase();
-  return poStatus.includes("shipped") ||
+  return lineStatus.includes("shipped") ||
+    lineStatus.includes("dispatched") ||
+    lineStatus.includes("delivered") ||
+    lineStatus.includes("in transit") ||
+    poStatus.includes("shipped") ||
     poStatus.includes("dispatched") ||
     poStatus.includes("delivered") ||
     poStatus.includes("in transit");
@@ -3357,7 +3355,7 @@ export default function MyOrderPage() {
   };
 
   const handleCancelItem = (subId: string, reason: string) => {
-    if (isOrderInactive || statusLockedUntilPOConfirmed) return;
+    if (isOrderInactive) return;
     const target = subOrders.find(s => s.id === subId);
     if (
       !target ||
@@ -3368,14 +3366,31 @@ export default function MyOrderPage() {
     ) return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
-    if (targetPOs.some(isConfirmedPO)) return;
     if (targetPOs.some((po) => hasPOItemShipmentStarted(po, subId, target))) return;
 
-    // Draft POs have not committed stock yet. Release the cancelled item's
-    // reservation, whether or not its editable Draft PO already exists.
-    // Preserve the legacy stock-engine path for older allocations that include
-    // a vendor product ID; current Shop allocations are keyed by product code.
-    if (!targetPOs.some(isConfirmedPO) && target.stockAllocations?.length) {
+    // Draft POs have not committed stock; release their reservation. Once a PO
+    // is confirmed, its reservation has been converted to allocated stock, so
+    // restore the vendor's physical stock when cancelling before shipment.
+    const confirmedPOs = targetPOs.filter(isConfirmedPO);
+    if (confirmedPOs.length > 0) {
+      confirmedPOs.forEach((po: any) => {
+        const line = findPOLineForSubOrder(po, subId, target);
+        const lineStatus = String(line?.status || "").toLowerCase();
+        if (!line || lineStatus === "cancelled") return;
+        const productCode = line.productCode || target.productCode;
+        const quantity = Number(line.qty || target.qty || 0);
+        if (po.vendorId && productCode && quantity > 0) {
+          restoreAllocatedPhysicalStock(
+            po.vendorId,
+            productCode,
+            quantity,
+            `Confirmed PO ${po.poNumber} item cancelled: ${subId}`,
+          );
+        }
+      });
+    } else if (target.stockAllocations?.length) {
+      // Preserve the legacy stock-engine path for older allocations that
+      // include a vendor product ID; current Shop allocations use productCode.
       const legacyAllocations = target.stockAllocations.filter((allocation: any) => allocation.vendorProductId);
       if (legacyAllocations.length) releaseStock(legacyAllocations);
       for (const allocation of target.stockAllocations) {
@@ -4872,7 +4887,7 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
-                            cancelEnabled={!isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed && !hasShipmentStarted && !hasConfirmedPO && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
+                            cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
@@ -5035,6 +5050,13 @@ export default function MyOrderPage() {
                                       setPoRefreshKey(k => k + 1);
                                       return;
                                     }
+                                      // Lock the selected vendor's quantity into
+                                      // allocated stock when this draft is confirmed.
+                                      (po.items || []).forEach((line: any) => {
+                                        if (line.productCode && po.vendorId && line.qty > 0 && String(line.status || "").toLowerCase() !== "cancelled") {
+                                          convertReservedToAllocated(po.vendorId, line.productCode, line.qty, po.poNumber);
+                                        }
+                                      });
                                      const actor = getActivityActor("System Owner");
                                      const confirmationActivity = createActivityNote(
                                        `Purchase Order ${po.poNumber} status changed from ${po.status} to Confirmed.`,
