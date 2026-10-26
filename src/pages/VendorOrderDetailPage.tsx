@@ -847,7 +847,7 @@ function storedPOToDetail(po: StoredPO) {
 export default function VendorOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orders: masterOrders } = useMyOrders();
+  const { orders: masterOrders, setOrders } = useMyOrders();
 
   const poKey = id || "PO-10034";
 
@@ -1049,9 +1049,16 @@ export default function VendorOrderDetailPage() {
       const updatedLines = po.items.map((line, index) => index === itemIndex
         ? { ...line, status: "Cancelled", cancelReason: reason, cancelSource: "vendor-po" as const }
         : line);
+      const activeLines = updatedLines.filter(line => String(line.status || "").toLowerCase() !== "cancelled");
       updatePO(poKey, {
         ...getPOAggregateAfterLineCancellation(updatedLines),
+        ...(activeLines.length === 0 ? { status: "Cancelled" as const, cancelReason: reason } : {}),
       });
+      if (activeLines.length === 0) {
+        setCancelled(true);
+        setOrderStatus("Cancelled");
+        setPoCancelReason(reason);
+      }
       if (currentLine?.productCode && po.vendorId && currentLine.qty > 0) {
         if (isPOConfirmed(po)) {
           restoreAllocatedPhysicalStock(
@@ -1071,6 +1078,22 @@ export default function VendorOrderDetailPage() {
       }
       const subOrderId = currentLine?.subOrderId || po.subOrderIds?.[itemIndex] || po.subOrderId;
       if (subOrderId) {
+        setOrders(prev => prev.map(order => order.id !== po.orderId
+          ? order
+          : {
+              ...order,
+              cartItems: order.cartItems?.map(cartItem => cartItem.subOrderId !== subOrderId
+                ? cartItem
+                : {
+                    ...cartItem,
+                    selectedVendorId: null,
+                    selectedVendorName: null,
+                    vendorAllocations: [],
+                    vendorPrice: undefined,
+                    landedCost: undefined,
+                  }),
+            }
+        ));
         reopenSubOrderForVendorSelection(po.orderId, subOrderId);
       }
       const text = `${pendingItemCancel.name} PO line changed from ${previousStatus} to Cancelled by the vendor. Reason: ${reason}`;

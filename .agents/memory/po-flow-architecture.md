@@ -85,20 +85,24 @@ sub-order table and silently skip the corresponding Draft PO update.
 Rejecting a Draft PO from Order Details cancels the PO globally and returns its
 active sub-orders to Pending with the old vendor allocation cleared. A
 confirmed PO cannot be cancelled from Order Details; it can be cancelled from
-Vendor Order Details. That cancellation is also global, and active covered
-sub-orders return to Pending so Order Details can offer a replacement vendor or
-explicit sub-order cancellation. Explicitly cancelled lines and master-order
-cancellations remain terminal.
+Vendor Order Details. Cancelling a PO line from Vendor Order Details keeps that
+line cancelled for procurement history but leaves the customer order item
+Pending, clears its vendor assignment, and offers a replacement vendor. Exclude
+the vendor that cancelled the line from replacement choices. Permanent item
+cancellation comes from the Order Details Cancel Item action; master-order
+cancellation may still cascade to every item. Whole-PO cancellation returns
+vendor-cancelled items to Pending.
 
-**Why:** Cancelling a supplier commitment must not silently cancel the
-customer's order item, but a confirmed commitment must not be bypassed from the
-master-order screen.
+**Why:** The user specified that a vendor-side line cancellation must not cancel
+the customer's item; permanent item cancellation belongs in Order Details.
 
 **How to apply:** Persist every PO cancellation through `updatePO()`. Release
-Draft reservations when rejecting from Order Details; restore committed vendor
-stock when cancelling a confirmed PO from its detail page. Project the updated
-item state and refresh event to Order Details, where active cancelled-PO lines
-can be reassigned or cancelled.
+Draft reservations when cancelling a Draft line and restore allocated vendor
+stock when cancelling a confirmed line. Mark cancellation source on PO lines so
+whole-PO cancellation can preserve customer-side item cancellations while
+reopening vendor-side cancellations. Project the updated item state and refresh
+event to Order Details, where the cancelled line remains history and can be
+re-sourced.
 
 ## Independent PO and Order fulfillment statuses
 

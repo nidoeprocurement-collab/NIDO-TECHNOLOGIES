@@ -143,6 +143,30 @@ describe("PO cancellation projection", () => {
     expect(itemState["SUB-2"].cancelReason).toBe("Customer cancelled item");
   });
 
+  it("keeps an item permanently cancelled after its vendor-cancelled PO line is explicitly cancelled in Order Details", () => {
+    const po = makePO("Confirmed", ["Cancelled", "Pending"]);
+    po.items[0].cancelSource = "vendor-po";
+    localStorage.setItem(poStorageKey, JSON.stringify([po]));
+    localStorage.setItem("nido_subitems_ORDER-CANCEL-TEST", JSON.stringify({
+      "SUB-1": { itemStatus: "Pending" },
+      "SUB-2": { itemStatus: "Processing" },
+    }));
+
+    updatePO("PO-CANCEL-TEST", {
+      items: [{ ...po.items[0], cancelSource: "order-details", cancelReason: "Customer no longer needs it" }, po.items[1]],
+    });
+    localStorage.setItem("nido_subitems_ORDER-CANCEL-TEST", JSON.stringify({
+      "SUB-1": { itemStatus: "Cancelled", cancelReason: "Customer no longer needs it" },
+      "SUB-2": { itemStatus: "Processing" },
+    }));
+    updatePO("PO-CANCEL-TEST", { status: "Cancelled", cancelReason: "Vendor PO closed" });
+
+    const itemState = JSON.parse(localStorage.getItem("nido_subitems_ORDER-CANCEL-TEST") || "{}");
+    expect(itemState["SUB-1"].itemStatus).toBe("Cancelled");
+    expect(itemState["SUB-1"].cancelReason).toBe("Customer no longer needs it");
+    expect(itemState["SUB-2"].itemStatus).toBe("Pending");
+  });
+
   it("clears only the cancelled item's vendor assignment and reopens it for reassignment", () => {
     const itemUpdate = vi.fn();
     window.addEventListener("orderSubItemsUpdated", itemUpdate);

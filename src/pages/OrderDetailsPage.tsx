@@ -3340,7 +3340,14 @@ export default function MyOrderPage() {
       RETURN_WORKFLOW_STATUSES.includes(target.itemStatus)
     ) return;
 
-    const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
+    const relatedPOs = getAllPOs().filter(po =>
+      po.orderId === orderId && (
+        po.subOrderId === subId ||
+        po.subOrderIds?.includes?.(subId) ||
+        po.items?.some((line: any) => poLineMatchesSubOrder(line, subId, target))
+      )
+    );
+    const targetPOs = relatedPOs.filter(po => poCoversSubOrder(po, subId, target));
     if (targetPOs.some((po) => hasPOItemShipmentStarted(po, subId, target))) return;
 
     // Draft POs have not committed stock; release their reservation. Once a PO
@@ -3404,6 +3411,28 @@ export default function MyOrderPage() {
         ...(activeItems.length === 0 ? { status: "Cancelled", cancelReason: reason } : {}),
       });
     });
+    // If the vendor had already cancelled this PO line, keep its audit record
+    // but change the source marker so a later PO cancellation cannot reopen an
+    // item the customer explicitly cancelled from Order Details.
+    relatedPOs
+      .filter((po: any) => !targetPOs.includes(po) && po.status !== "Draft")
+      .forEach((po: any) => {
+        let changed = false;
+        const nextItems = (po.items || []).map((line: any) => {
+          if (
+            !poLineMatchesSubOrder(line, subId, target) ||
+            String(line.status || "").toLowerCase() !== "cancelled" ||
+            line.cancelSource === "order-details"
+          ) return line;
+          changed = true;
+          return { ...line, cancelReason: reason, cancelSource: "order-details" };
+        });
+        if (changed) {
+          updatePO(po.poNumber, {
+            ...getPOAggregateAfterLineCancellation(nextItems),
+          });
+        }
+      });
 
     const cancelledSubOrderIds = new Set([
       ...subOrders.filter((sub) => sub.itemStatus === "Cancelled").map((sub) => sub.id),
@@ -3800,7 +3829,7 @@ export default function MyOrderPage() {
           initials: "SY",
           color: "#6b7280",
           date: displayDate,
-          text: `Draft PO created after ${previousSubOrder.itemName} was cancelled with the previous vendor. Replacement vendor: ${vendorName}.`,
+            text: `Draft PO created after the previous vendor PO line for ${previousSubOrder.itemName} was cancelled. Replacement vendor: ${vendorName}.`,
           visibility: "Internal Note",
         }],
       };
@@ -3862,6 +3891,10 @@ export default function MyOrderPage() {
       state[s.id] = {
         itemStatus: s.itemStatus,
         statusOwner: "order-details",
+        selectedVendorId: s.selectedVendorId ?? null,
+        selectedVendorName: s.selectedVendorName || "",
+        vendorSelectionMeta: s.vendorSelectionMeta || null,
+        stockAllocations: s.stockAllocations || [],
         tracking: s.tracking,
         trackingOwner: s.tracking ? "order-details" : undefined,
         updatedOn: s.updatedOn,
@@ -4547,9 +4580,6 @@ export default function MyOrderPage() {
                     );
                     const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id, sub);
                     const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub);
-                    const canonicalLine = canonicalPO
-                      ? findPOLineForSubOrder(canonicalPO, sub.id, sub)
-                      : undefined;
                     const itemCancelled = isSubOrderCancelled;
                     const unitPriceExclGst = Math.max(0, Number(sub.unitPriceExclGst) || 0);
                     const discountPct = Math.max(0, Math.min(99.99, Number(sub.cartDiscountPct) || 0));
@@ -4636,11 +4666,11 @@ export default function MyOrderPage() {
                                   {cancelledPO.poNumber} · {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "Cancelled" : "Item Cancelled"} ↗
                               </button>
                               <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>
-                                Select a replacement vendor or cancel this sub-order.
+                                Select a different vendor or cancel this item from Order Details.
                               </div>
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
                                 <button
-                                  onClick={() => setVendorTarget(sub)}
+                                  onClick={() => setVendorTarget({ ...sub, previousVendorId: cancelledPO.vendorId })}
                                   style={{ padding: "4px 7px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
                                 >
                                   Select Vendor
@@ -4649,7 +4679,7 @@ export default function MyOrderPage() {
                                   onClick={() => setCancelTarget(sub.id)}
                                   style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
                                 >
-                                  Cancel Sub Order
+                                  Cancel Item
                                 </button>
                               </div>
                             </div>
