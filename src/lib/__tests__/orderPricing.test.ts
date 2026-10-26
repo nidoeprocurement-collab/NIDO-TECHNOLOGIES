@@ -133,4 +133,63 @@ describe("calculateRemainingOrderPricing", () => {
     expect(pricing.sgstAmount).toBe(18);
     expect(pricing.grandTotal).toBe(216);
   });
+
+  it("keeps fractional precision through GST, discount, fees, and the displayed total", () => {
+    const inclusiveUnitPrice = 1.19;
+    const checkoutUnitPriceExclGst = inclusiveUnitPrice * 100 / 118;
+    const pricing = calculateRemainingOrderPricing({
+      id: "ORD-PRECISION",
+      checkoutPricingSnapshot: {
+        shippingDeliveryFee: 0.025,
+        platformFeePct: 1.25,
+      },
+      cartItems: [{
+        priceNum: inclusiveUnitPrice,
+        quantity: 1,
+        category: "Hardware",
+        cartDiscountPct: 12.5,
+        checkoutUnitPriceInclusive: inclusiveUnitPrice,
+        checkoutUnitPriceExclGst,
+        checkoutGstRate: 18,
+      }],
+    }, new Set());
+
+    const expectedDiscount = checkoutUnitPriceExclGst * 12.5 / 87.5;
+    const expectedGst = inclusiveUnitPrice - checkoutUnitPriceExclGst;
+    const expectedPlatformFee = checkoutUnitPriceExclGst * 1.25 / 100;
+
+    expect(pricing.preTaxSubtotal).toBeCloseTo(checkoutUnitPriceExclGst, 12);
+    expect(pricing.discountAmount).toBeCloseTo(expectedDiscount, 12);
+    expect(pricing.subtotalBeforeDiscount).toBeCloseTo(checkoutUnitPriceExclGst + expectedDiscount, 12);
+    expect(pricing.totalGst).toBeCloseTo(expectedGst, 12);
+    expect(pricing.platformFee).toBeCloseTo(expectedPlatformFee, 12);
+    expect(pricing.grandTotal).toBeCloseTo(
+      pricing.subtotalBeforeDiscount + pricing.totalGst + pricing.shippingDeliveryFee
+        + pricing.platformFee - pricing.discountAmount,
+      12,
+    );
+  });
+
+  it("removes fixed fees when every sub-order is cancelled", () => {
+    const pricing = calculateRemainingOrderPricing({
+      id: "ORD-CANCELLED",
+      totalAmountNum: 127,
+      checkoutPricingSnapshot: {
+        shippingDeliveryFee: 10,
+        platformFee: 7,
+      },
+      cartItems: [{
+        subOrderId: "SO-ORD-CANCELLED-001",
+        priceNum: 120,
+        checkoutUnitPriceInclusive: 120,
+        checkoutGstRate: 20,
+        quantity: 1,
+        category: "Hardware",
+      }],
+    }, new Set(["SO-ORD-CANCELLED-001"]));
+
+    expect(pricing.shippingDeliveryFee).toBe(0);
+    expect(pricing.platformFee).toBe(0);
+    expect(pricing.grandTotal).toBe(0);
+  });
 });

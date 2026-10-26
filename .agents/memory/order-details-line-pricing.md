@@ -7,6 +7,8 @@ In Order Details, show product category, code, specifications, and configuration
 
 Keep the four compact information cards in this order: Billing, Shipping, Requester, then Order Summary. The summary card shows sub-order count, active item quantity, pre-discount subtotal excluding GST, GST, shipping/delivery, consolidated discount, and final total; do not put an item list inside it. Keep the SLA status and deadline in a compact notice at the right side of the order header.
 
+Keep GST, discount, fee, and total calculations at full precision; round only when formatting currency for display. Show every nonzero fee or adjustment that contributes to the final total so the visible summary rows reconcile.
+
 **Why:** The user asked for the Order Details header cards and SLA notice to follow the supplied reference image, while keeping the prior checkout-pricing behavior in the sub-order rows.
 
-**How to apply:** Use saved checkout snapshots only; never infer a discount from current settings or apply it twice. Keep checkout GST and fees in the compact summary, and keep the sub-order line total tax-exclusive.
+**How to apply:** Use saved checkout snapshots only; never infer a discount from current settings or apply it twice. Keep calculations unrounded, expose contributing fees/adjustments in the summary, and keep the sub-order line total tax-exclusive.

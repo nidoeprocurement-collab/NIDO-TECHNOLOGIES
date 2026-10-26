@@ -83,7 +83,7 @@ export function calculateRemainingOrderPricing(
   const activeItems = items.filter(
     (item, index) => !cancelledSubOrderIds.has(getOrderSubOrderId(order.id, item, index)),
   );
-  const hasCheckoutSnapshots = items.length > 0 && items.every(
+  const hasCheckoutSnapshots = activeItems.length > 0 && activeItems.every(
     (item) =>
       typeof item.checkoutUnitPriceInclusive === "number" &&
       Number.isFinite(item.checkoutUnitPriceInclusive) &&
@@ -106,7 +106,7 @@ export function calculateRemainingOrderPricing(
       };
     }),
   );
-  const discountAmount = Math.round(activeItems.reduce((sum, item) => {
+  const discountAmount = activeItems.reduce((sum, item) => {
     const discountPct = Math.max(0, Math.min(99.99, Number(item.cartDiscountPct) || 0));
     if (discountPct <= 0) return sum;
     const rate = hasCheckoutSnapshots
@@ -118,18 +118,20 @@ export function calculateRemainingOrderPricing(
         : getOrderLineUnitPriceInclusive(item) * 100 / (100 + rate);
     const discountedLineExclGst = discountedUnitExclGst * Math.max(0, Number(item.quantity) || 0);
     return sum + discountedLineExclGst * discountPct / (100 - discountPct);
-  }, 0) * 100) / 100;
-  const cgstAmount = Math.round((gst.totalGst / 2) * 100) / 100;
-  const sgstAmount = Math.round((gst.totalGst - cgstAmount) * 100) / 100;
+  }, 0);
+  const cgstAmount = gst.totalGst / 2;
+  const sgstAmount = gst.totalGst - cgstAmount;
 
   if (hasCheckoutSnapshots && order.checkoutPricingSnapshot) {
     const shippingDeliveryFee = activeItems.length
       ? Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0)
       : 0;
     const snapshotPlatformFee = order.checkoutPricingSnapshot.platformFee;
-    const platformFee = typeof snapshotPlatformFee === "number" && Number.isFinite(snapshotPlatformFee)
-      ? Math.max(0, snapshotPlatformFee)
-      : (gst.preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0)) / 100;
+    const platformFee = activeItems.length === 0
+      ? 0
+      : typeof snapshotPlatformFee === "number" && Number.isFinite(snapshotPlatformFee)
+        ? Math.max(0, snapshotPlatformFee)
+        : (gst.preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0)) / 100;
     const grandTotal = gst.preTaxSubtotal + gst.totalGst + shippingDeliveryFee + platformFee;
     return {
       slabs: gst.slabs,

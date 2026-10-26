@@ -80,19 +80,35 @@ export default function OrderDetailsSummaryCard({
           <span style={valueStyle}>{formatPrice(pricing.subtotalBeforeDiscount)}</span>
         </div>
         <div style={rowStyle}>
-          <span style={labelStyle}>GST (GST)</span>
+          <span style={labelStyle}>GST</span>
           <span style={valueStyle}>{formatPrice(pricing.totalGst)}</span>
         </div>
         <div style={rowStyle}>
           <span style={labelStyle}>Shipping / delivery</span>
           <span style={valueStyle}>{formatPrice(pricing.shippingDeliveryFee)}</span>
         </div>
+        {pricing.platformFee !== 0 && (
+          <div style={rowStyle}>
+            <span style={labelStyle}>Platform fee</span>
+            <span style={valueStyle}>{formatPrice(pricing.platformFee)}</span>
+          </div>
+        )}
         <div style={{ ...rowStyle, marginBottom: 7 }}>
           <span style={labelStyle}>Consolidated Discount</span>
           <span style={{ ...valueStyle, color: "#16764a" }}>
             {pricing.discountAmount > 0 ? `-${formatPrice(pricing.discountAmount)}` : formatPrice(0)}
           </span>
         </div>
+        {pricing.otherAdjustments !== 0 && (
+          <div style={{ ...rowStyle, marginBottom: 7 }}>
+            <span style={labelStyle}>Other adjustments</span>
+            <span style={valueStyle}>
+              {pricing.otherAdjustments < 0
+                ? `-${formatPrice(Math.abs(pricing.otherAdjustments))}`
+                : formatPrice(pricing.otherAdjustments)}
+            </span>
+          </div>
+        )}
         <div style={{ ...rowStyle, marginBottom: 0, paddingTop: 7, borderTop: "1px solid #e4e7ec" }}>
           <strong style={{ color: "#344054", fontSize: 12.5, lineHeight: 1.35 }}>Total Order Amount</strong>
           <strong style={{ ...valueStyle, color: "#1d4ed8", fontSize: 13.5 }}>{formatPrice(pricing.grandTotal)}</strong>

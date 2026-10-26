@@ -7,8 +7,8 @@ import { getEffectiveTaxPctForCategory } from './taxEngine';
 
 export interface GstSlab {
   rate: number;     // GST rate %, e.g. 18
-  taxable: number;  // pre-tax amount for items at this rate (rounded)
-  gst: number;      // GST amount for this slab (rounded)
+  taxable: number;  // exact pre-tax amount for items at this rate
+  gst: number;      // exact GST amount for this slab
 }
 
 export interface CartGstResult {
@@ -46,8 +46,8 @@ export function computeCartGST(
     .sort(([a], [b]) => a - b)
     .map(([rate, { preTax, gst }]) => ({
       rate,
-      taxable: Math.round(preTax),
-      gst:     Math.round(gst),
+      taxable: preTax,
+      gst,
     }));
 
   const totalGst       = slabs.reduce((s, sl) => s + sl.gst, 0);
