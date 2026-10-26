@@ -103,20 +103,22 @@ can be reassigned or cancelled.
 ## Independent PO and Order fulfillment statuses
 
 Vendor Order Details owns PO-line fulfillment and tracking. Order Details owns
-customer-facing sub-order fulfillment and tracking. Normal status changes do not
-project between the two pages or gate progress on the other page; physical
-Order Details shipping still collects its own tracking, and digital partial
-quantities are entered independently. The cancellation rules above remain an
-intentional exception.
+customer-facing sub-order fulfillment and tracking. Before purchase orders are
+confirmed, Order Details status-changing actions remain locked until every active
+sub-order has a confirmed PO and no Draft PO is pending. After confirmation, the
+two pages' fulfillment progress remains independent; physical Order Details
+shipping still collects its own tracking, and digital partial quantities are
+entered independently.
 
 **Why:** The user requested that PO Details and Order Details statuses be
-updated independently, while choosing to retain existing cancellation and
-stock-release safeguards.
+kept locked until Draft POs are confirmed, while retaining independent
+fulfillment progress after procurement confirmation.
 
 **How to apply:** Persist each status in its own record. Do not copy PO status
 into `nido_subitems_<orderId>`, recalculate order summaries from PO updates, or
-require PO progress before Order Details can advance. Keep cancellation-only
-cascades and derive the master order status from Order Details item state.
+copy later PO fulfillment progress into Order Details. Keep the pre-confirmation
+gate on item and master-order status changes, then allow customer-facing status
+updates independently after all active items have confirmed POs.
 
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)

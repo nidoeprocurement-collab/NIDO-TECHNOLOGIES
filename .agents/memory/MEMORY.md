@@ -3,7 +3,7 @@
 - [Vendor Selection at Shop Flow](vendor-selection-flow.md) — client locks vendor on Shop page pre-cart; CartItem carries vendor snapshot; autoCreateDraftPOs() fires in addOrder(); OrderDetailsPage "Draft Purchase Orders" tab for Confirm/Reject.
 - [Local auto-assignment configuration](live-auto-assignment-config.md) — browser-local tier rules assign real orders while simulation history stays isolated.
 - [Report module output rules](report-workbook-view-availability.md) — keep workbook ordering; item-list columns show product names only and duplicate columns are removed.
-- [Purchase Order Flow Architecture](po-flow-architecture.md) — full PO creation flow: price-engine vendor selection, PDF via jsPDF, shared localStorage store, VendorOrdersPage merge strategy.
+- [Purchase Order Flow Architecture](po-flow-architecture.md) — Order Details statuses stay locked until active items have confirmed POs; PO and customer fulfillment then progress independently.
 - [Nido Tech design system](nido-design-system.md) — brand spec lives in STYLE_GUIDE.md; avoid duplicate Tailwind color keys, theme via CSS vars instead.
 - [Transaction page shell style](transactions-page-style.md) — canonical Orders-page-matching shell/card pattern for Transactions pages; avoid slate-*/dark: classes.
 - [Multi-tenant Client Portal Architecture](portal-multitenancy.md) — userType in AuthContext, portalUserStore (localStorage), ClientPortalRoute guard, /portal/* routes, provisioning flow.

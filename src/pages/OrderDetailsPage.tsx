@@ -2331,6 +2331,7 @@ function ThreeDotMenu({
   onRequestPickupScheduled,
   onRequestPickupDone,
   statusUpdatesEnabled,
+  statusLockReason,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const [statusWarning, setStatusWarning] = useState<{ status: string; reason: string } | null>(null);
@@ -2390,6 +2391,7 @@ function ThreeDotMenu({
             ];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
+    if (statusLockReason) return statusLockReason;
     if (!statusUpdatesEnabled) return "Status updates are unavailable for a cancelled item or order.";
      if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
      if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
@@ -2439,11 +2441,11 @@ function ThreeDotMenu({
           >
             <button
               aria-disabled={!canAdvanceStatus}
-              title={!statusUpdatesEnabled
+              title={statusLockReason || (!statusUpdatesEnabled
                 ? "Status updates are unavailable for a cancelled item or order."
                 : statuses.length === 0
                   ? "This item is already at its final status."
-                  : undefined}
+                  : undefined)}
               style={{
                 ...menuItemSt,
                 background: statusSub ? "#f9fafb" : "none",
@@ -2452,8 +2454,10 @@ function ThreeDotMenu({
               }}
             >
               <span>🔄</span> Update Status
-              {!statusUpdatesEnabled
-                ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Inactive</span>
+              {statusLockReason
+                ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Locked</span>
+                : !statusUpdatesEnabled
+                  ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Inactive</span>
                 : statuses.length === 0
                   ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Complete</span>
                   : <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span>}
@@ -2499,7 +2503,7 @@ function ThreeDotMenu({
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button
             disabled={!cancelEnabled}
-            title={!cancelEnabled ? "Cancellation is unavailable after shipment begins or the item is locked." : undefined}
+            title={!cancelEnabled ? statusLockReason || "Cancellation is unavailable after shipment begins or the item is locked." : undefined}
             style={{
               ...menuItemSt,
               color: cancelEnabled ? "#dc2626" : "#d1d5db",
@@ -2511,10 +2515,12 @@ function ThreeDotMenu({
             {!cancelEnabled && <span style={{ marginLeft: "auto", fontSize: 10 }}>Locked</span>}
           </button>
           {canRaiseReturn && (
-            <button style={{ ...menuItemSt, color: returnAllowed ? "#7c3aed" : "#d1d5db", cursor: returnAllowed ? "pointer" : "not-allowed" }}
-              onClick={() => { if (returnAllowed) { onRaiseReturn(); setOpen(false); } }}>
+            <button
+              title={statusLockReason || (!returnAllowed ? "The return window has expired." : undefined)}
+              style={{ ...menuItemSt, color: returnAllowed && !statusLockReason ? "#7c3aed" : "#d1d5db", cursor: returnAllowed && !statusLockReason ? "pointer" : "not-allowed" }}
+              onClick={() => { if (returnAllowed && !statusLockReason) { onRaiseReturn(); setOpen(false); } }}>
               <span>↩</span> {sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Return Request Raised" : "Raise Return Request"}
-              {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>{sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Locked" : "Expired"}</span>}
+              {(statusLockReason || !returnAllowed) && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>{statusLockReason || sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Locked" : "Expired"}</span>}
             </button>
           )}
         </div>,
@@ -2980,6 +2986,7 @@ export default function MyOrderPage() {
     [poRefreshKey, orderId],
   );
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
+  const hasDraftOrderPO = orderPOs.some(po => String(po.status || "").toLowerCase() === "draft");
   const canCancelOrderByPO = !hasConfirmedOrderPO;
   const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
   const refreshApprovalStatus = async () => {
@@ -3000,6 +3007,7 @@ export default function MyOrderPage() {
   };
   const approvalPending = ["Pending", "In Progress", "Sent Back", "Escalated"].includes(approvalStatus || "");
   const awaitingApproval = Boolean(order?.deferPurchaseOrders && orderPOs.length === 0 && (approvalStatus == null || approvalPending));
+  const statusLockReason = "Order status changes are locked until its Draft Purchase Orders are confirmed.";
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
@@ -3055,6 +3063,16 @@ export default function MyOrderPage() {
       ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
       : []
   );
+  const activeOrderSubOrders = subOrders.filter(sub => sub.itemStatus !== "Cancelled");
+  const hasUnconfirmedActiveOrderPO = activeOrderSubOrders.some(
+    sub => !isConfirmedPO(getCanonicalPOForSubOrder(orderPOs, sub)),
+  );
+  const hasOrderProcurementFlow = awaitingApproval ||
+    orderPOs.length > 0 ||
+    activeOrderSubOrders.some(sub => Boolean(sub.selectedVendorId || sub.selectedVendorName));
+  const statusLockedUntilPOConfirmed = awaitingApproval ||
+    hasDraftOrderPO ||
+    (hasOrderProcurementFlow && activeOrderSubOrders.length > 0 && hasUnconfirmedActiveOrderPO);
   const storedMasterStatus = String(order?.status || "Processing");
   // Reflect the current item statuses immediately instead of waiting for the
   // localStorage → context synchronization round-trip. The same derived status
@@ -3101,9 +3119,9 @@ export default function MyOrderPage() {
     sub => sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled",
   );
   const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
-  const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
+  const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem && !statusLockedUntilPOConfirmed;
   const handleCancelOrder = async (reason: string) => {
-    if (isOrderCancelled || !canCancelOrder) return;
+    if (isOrderCancelled || !canCancelOrder || statusLockedUntilPOConfirmed) return;
     try {
       await cancelApprovalRequestsForReference(orderId, {
         userId: user?.id,
@@ -3150,7 +3168,7 @@ export default function MyOrderPage() {
     [subOrders]
   );
   const updateStatus = (subId: string, status: string, metadata: Record<string, any> = {}) => {
-    if (isOrderInactive) return;
+    if (isOrderInactive || statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target || target.itemStatus === "Cancelled") return;
     if (isDigitalDocumentProduct(target)) {
@@ -3229,6 +3247,7 @@ export default function MyOrderPage() {
   };
 
   const handleRaiseReturn = (subId: string, reason: string, details: string) => {
+    if (statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target || !isPhysicalProduct(target) || !isReturnAllowed(target)) return;
     updateStatus(subId, "Return Request Raised", {
@@ -3242,6 +3261,7 @@ export default function MyOrderPage() {
   };
 
   const handlePickupScheduled = (subId: string, details: { pickupPersonName: string; pickupContactNumber: string; pickupDate: string; pickupTimeWindow: string }) => {
+    if (statusLockedUntilPOConfirmed) return;
     updateStatus(subId, "Pickup Scheduled", {
       ...details,
       pickupScheduledAt: new Date().toISOString(),
@@ -3253,6 +3273,7 @@ export default function MyOrderPage() {
   };
 
   const handlePickupDone = (subId: string, details: { pickupDoneDate: string; pickupDoneTime: string }) => {
+    if (statusLockedUntilPOConfirmed) return;
     updateStatus(subId, "Pickup Done", {
       ...details,
       pickupDoneAt: new Date().toISOString(),
@@ -3264,7 +3285,7 @@ export default function MyOrderPage() {
   };
 
   const requestShipped = (subId: string) => {
-    if (isOrderInactive) return;
+    if (isOrderInactive || statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(sub => sub.id === subId);
     if (!target || isDigitalDocumentProduct(target)) return;
     setPendingShippedTarget(subId);
@@ -3285,7 +3306,7 @@ export default function MyOrderPage() {
   };
 
   const saveTrackingForSubOrder = (tracking: any) => {
-    if (!trackingTarget) return;
+    if (!trackingTarget || statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(sub => sub.id === trackingTarget);
     if (!target || isDigitalDocumentProduct(target)) {
       setPendingShippedTarget(null);
@@ -3329,7 +3350,7 @@ export default function MyOrderPage() {
   };
 
   const handleCancelItem = (subId: string, reason: string) => {
-    if (isOrderInactive) return;
+    if (isOrderInactive || statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(s => s.id === subId);
     if (
       !target ||
@@ -4273,12 +4294,18 @@ export default function MyOrderPage() {
                 <StatusPill status={masterStatus} />
                 {!isClientPortalUser && !isOrderCancelled && !canCancelOrder && (
                   <span
-                    title={hasConfirmedOrderPO
-                      ? "This order cannot be cancelled because a purchase order has already been generated."
-                      : "This order cannot be cancelled because an item has already shipped."}
+                    title={statusLockedUntilPOConfirmed
+                      ? statusLockReason
+                      : hasConfirmedOrderPO
+                        ? "This order cannot be cancelled because a purchase order has already been generated."
+                        : "This order cannot be cancelled because an item has already shipped."}
                     style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 8px", border: "1px solid #e1e5eb", borderRadius: 6, background: "#f5f6f8", color: "#77808d", fontSize: 9.5, fontWeight: 600, whiteSpace: "nowrap" }}
                   >
-                    🔒 {hasConfirmedOrderPO ? "PO generated — order locked" : "Order shipped — order locked"}
+                    🔒 {statusLockedUntilPOConfirmed
+                      ? "PO confirmation required — status locked"
+                      : hasConfirmedOrderPO
+                        ? "PO generated — order locked"
+                        : "Order shipped — order locked"}
                   </span>
                 )}
               </div>
@@ -4631,8 +4658,10 @@ export default function MyOrderPage() {
                                   Select Vendor
                                 </button>
                                 <button
-                                  onClick={() => setCancelTarget(sub.id)}
-                                  style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                                  disabled={statusLockedUntilPOConfirmed}
+                                  title={statusLockedUntilPOConfirmed ? statusLockReason : undefined}
+                                  onClick={() => { if (!statusLockedUntilPOConfirmed) setCancelTarget(sub.id); }}
+                                  style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: statusLockedUntilPOConfirmed ? "#9ca3af" : "#dc2626", cursor: statusLockedUntilPOConfirmed ? "not-allowed" : "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
                                 >
                                   Cancel Sub Order
                                 </button>
@@ -4798,7 +4827,11 @@ export default function MyOrderPage() {
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                        ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
-                           {returnOk ? (
+                            {statusLockedUntilPOConfirmed ? (
+                              <span title={statusLockReason} style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>
+                                Locked until PO confirmation
+                              </span>
+                            ) : returnOk ? (
                              <button
                                onClick={() => setReturnTarget(sub.id)}
                                style={{ padding: "5px 10px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
@@ -4839,12 +4872,13 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
-                             cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !hasConfirmedPO && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
+                            cancelEnabled={!isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed && !hasShipmentStarted && !hasConfirmedPO && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
                              onRequestPickupDone={() => setPickupDoneTarget(sub.id)}
-                            statusUpdatesEnabled={!isOrderInactive && !itemCancelled}
+                            statusUpdatesEnabled={!isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed}
+                            statusLockReason={statusLockedUntilPOConfirmed ? statusLockReason : undefined}
                           />
                         </div>
                       )}

@@ -89,7 +89,9 @@ export default function OrderDetailsSummaryCard({
         </div>
         <div style={{ ...rowStyle, marginBottom: 7 }}>
           <span style={labelStyle}>Consolidated Discount</span>
-          <span style={{ ...valueStyle, color: "#16764a" }}>{formatPrice(pricing.discountAmount)}</span>
+          <span style={{ ...valueStyle, color: "#16764a" }}>
+            {pricing.discountAmount > 0 ? `-${formatPrice(pricing.discountAmount)}` : formatPrice(0)}
+          </span>
         </div>
         <div style={{ ...rowStyle, marginBottom: 0, paddingTop: 7, borderTop: "1px solid #e4e7ec" }}>
           <strong style={{ color: "#344054", fontSize: 12.5, lineHeight: 1.35 }}>Total Order Amount</strong>
