@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
+import { Building2, Mail, Phone, Truck, UserRound } from "lucide-react";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
@@ -11,8 +12,7 @@ import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSub
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
-import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
-import SLABadge from "@/components/shared/SLABadge";
+import { computeSLAStatus, parseLooseDate, type SLAStatus } from "@/lib/slaUtils";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import OrderDetailsSummaryCard from "@/pages/OrderDetailsSummaryCard";
 import {
@@ -2542,9 +2542,47 @@ function ThreeDotMenu({
 
 function Field({ label, value }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 11.5, color: "#9ca3af", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 13.5, fontWeight: 500, color: "#111827", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{value}</div>
+    <div style={{ marginBottom: 7 }}>
+      <div style={{ fontSize: 9.5, color: "#7b8492", marginBottom: 1 }}>{label}</div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: "#26313f", lineHeight: 1.25, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{value}</div>
+    </div>
+  );
+}
+
+function OrderSlaNotice({ sla }: { sla: SLAStatus }) {
+  const stateStyle: Record<SLAStatus["state"], { background: string; border: string; color: string; dot: string; label: string }> = {
+    "on-track": { background: "#eaf7f1", border: "#c6e5d8", color: "#286b52", dot: "#30956e", label: "On Track" },
+    warning: { background: "#fff8e8", border: "#f1daa2", color: "#8a6716", dot: "#d5a327", label: "Warning" },
+    breached: { background: "#fff0ef", border: "#f2c6c2", color: "#a23b35", dot: "#d84b43", label: "SLA Breached" },
+    "sla-met": { background: "#eaf7f1", border: "#c6e5d8", color: "#286b52", dot: "#30956e", label: "SLA Met" },
+    "sla-missed": { background: "#fff0ef", border: "#f2c6c2", color: "#a23b35", dot: "#d84b43", label: "SLA Missed" },
+    unknown: { background: "#f7f8fa", border: "#e1e5eb", color: "#667085", dot: "#98a2b3", label: "No SLA" },
+  };
+  const style = stateStyle[sla.state];
+  const deadline = sla.deadlineISO && sla.state !== "unknown"
+    ? new Date(sla.deadlineISO).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div style={{ minWidth: 190, maxWidth: 260, padding: "7px 10px", display: "flex", alignItems: "flex-start", gap: 7, background: style.background, border: `1px solid ${style.border}`, borderRadius: 8, boxSizing: "border-box" }}>
+      <span aria-hidden="true" style={{ width: 7, height: 7, marginTop: 4, flexShrink: 0, borderRadius: "50%", background: style.dot }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, color: style.color, fontSize: 10, lineHeight: 1.2 }}>
+          <strong style={{ whiteSpace: "nowrap" }}>{style.label}</strong>
+          <span style={{ textAlign: "right" }}>{sla.label}</span>
+        </div>
+        {deadline && (
+          <div style={{ marginTop: 4, color: "#667085", fontSize: 9, lineHeight: 1.2 }}>
+            SLA Deadline: <strong style={{ color: "#475467", fontWeight: 600 }}>{deadline}</strong>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -4101,7 +4139,7 @@ export default function MyOrderPage() {
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
-  const topInfoCard: any = { ...card, padding: 16, minWidth: 0 };
+  const topInfoCard: any = { ...card, borderRadius: 9, padding: 10, minWidth: 0, boxSizing: "border-box" };
 
   // poRefreshKey is updated by the poCreated/storage listeners above so this
   // expression re-runs whenever POs are added or changed.
@@ -4204,6 +4242,15 @@ export default function MyOrderPage() {
     );
   }
 
+  const slaTiers = getClientSLA();
+  const standardSla = slaTiers.find(t => t.name === "Standard") ?? slaTiers[0];
+  const slaTargetHours = standardSla?.orderProcessingTime ?? 24;
+  const orderSla = computeSLAStatus(
+    `${order.orderDate} ${order.orderTime || ""}`,
+    slaTargetHours,
+    masterStatus === "Delivered" || masterStatus === "Cancelled",
+  );
+
   return (
     <div className="bg-background text-foreground min-h-screen" style={{ fontFamily: "'Inter','Segoe UI',sans-serif", minHeight: "100vh" }}>
       {/* No maxWidth cap here — on wide monitors a fixed cap left visible
@@ -4212,8 +4259,8 @@ export default function MyOrderPage() {
       <div style={{ width: "100%", margin: "0 auto", padding: "28px 24px 48px", boxSizing: "border-box" }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 22 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <button
                 onClick={() => navigate(-1)}
@@ -4224,6 +4271,16 @@ export default function MyOrderPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}><span style={{ color: "#374151" }}>{orderId}</span></h1>
                 <StatusPill status={masterStatus} />
+                {!isClientPortalUser && !isOrderCancelled && !canCancelOrder && (
+                  <span
+                    title={hasConfirmedOrderPO
+                      ? "This order cannot be cancelled because a purchase order has already been generated."
+                      : "This order cannot be cancelled because an item has already shipped."}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 8px", border: "1px solid #e1e5eb", borderRadius: 6, background: "#f5f6f8", color: "#77808d", fontSize: 9.5, fontWeight: 600, whiteSpace: "nowrap" }}
+                  >
+                    🔒 {hasConfirmedOrderPO ? "PO generated — order locked" : "Order shipped — order locked"}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
@@ -4231,6 +4288,8 @@ export default function MyOrderPage() {
                 <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
               </div>
             </div>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+              <OrderSlaNotice sla={orderSla} />
             {/* Cancel Order button — top-right, hidden for portal users and already-cancelled orders */}
             {!isClientPortalUser && (
               isOrderCancelled ? (
@@ -4247,14 +4306,7 @@ export default function MyOrderPage() {
                 </div>
               ) : (
                 !canCancelOrder ? (
-                  <span
-                   title={hasConfirmedOrderPO
-                     ? "This order cannot be cancelled because a purchase order has already been generated."
-                     : "This order cannot be cancelled because an item has already shipped."}
-                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
-                  >
-                     {hasConfirmedOrderPO ? "🔒 PO generated — order locked" : "🔒 Order shipped — order locked"}
-                  </span>
+                  null
                 ) : (
                   <button
                     onClick={() => setPendingCancelStatus(true)}
@@ -4267,6 +4319,7 @@ export default function MyOrderPage() {
                 )
               )
             )}
+            </div>
           </div>
         </div>
 
@@ -4281,70 +4334,62 @@ export default function MyOrderPage() {
             <b>Approval rejected:</b> This order did not pass its approval workflow. No purchase orders were created.
           </div>
         )}
-        {(() => {
-          const tiers = getClientSLA();
-          const std = tiers.find(t => t.name === "Standard") ?? tiers[0];
-          const targetHrs = std?.orderProcessingTime ?? 24;
-          const start = order ? `${order.orderDate} ${order.orderTime || ""}` : null;
-          const done = masterStatus === "Delivered" || masterStatus === "Cancelled";
-          const sla = computeSLAStatus(start, targetHrs, done);
-          const colors: Record<string, string> = {
-            'on-track': '#f0fdf4', 'warning': '#fffbeb', 'breached': '#fef2f2',
-            'sla-met': '#f0fdf4', 'sla-missed': '#fef2f2', 'unknown': '#f9fafb',
-          };
-          const borders: Record<string, string> = {
-            'on-track': '#bbf7d0', 'warning': '#fcd34d', 'breached': '#fecaca',
-            'sla-met': '#bbf7d0', 'sla-missed': '#fecaca', 'unknown': '#e5e7eb',
-          };
-          return (
-            <div style={{ background: colors[sla.state], border: `1px solid ${borders[sla.state]}`, borderRadius: 10, padding: "12px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Order Processing SLA</div>
-                <div style={{ fontSize: 13, color: "#374151" }}>Target: <b>{targetHrs}h</b> (Standard tier)</div>
-              </div>
-              <SLABadge sla={sla} />
-              {sla.deadlineISO && sla.state !== 'unknown' && (
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                  SLA Deadline: <b style={{ color: "#374151" }}>{new Date(sla.deadlineISO).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</b>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
         {/* Top information cards — matched to the compact reference layout */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
-          <OrderDetailsSummaryCard order={order} subOrders={subOrders} />
+        <style>{`
+          .order-details-top-info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+          }
+          @media (max-width: 680px) {
+            .order-details-top-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          }
+          @media (max-width: 440px) {
+            .order-details-top-info-grid { grid-template-columns: minmax(0, 1fr); }
+          }
+        `}</style>
+        <div className="order-details-top-info-grid">
           <div style={topInfoCard}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, color: "#344054", marginBottom: 9 }}>
+              <Building2 size={12} color="#667085" /> Billing Information
+            </div>
             <Field label="Client" value={clientInfo?.name || order?.client || "—"} />
             <Field label="Billing Address" value={billingAddress} />
-            <Field label="Email" value={clientInfo?.email || "—"} />
-            <Field label="Phone" value={clientInfo?.billing_phone || clientInfo?.billingPhone || clientInfo?.phone || clientInfo?.mobile || "—"} />
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 5, color: "#667085", fontSize: 9.5, lineHeight: 1.25, overflowWrap: "anywhere" }}>
+              <Mail size={10} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>{clientInfo?.email || "—"}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 4, color: "#667085", fontSize: 9.5, lineHeight: 1.25, overflowWrap: "anywhere" }}>
+              <Phone size={10} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>{clientInfo?.billing_phone || clientInfo?.billingPhone || clientInfo?.phone || clientInfo?.mobile || "—"}</span>
+            </div>
           </div>
           <div style={topInfoCard}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16 }}>
-              <Field label="Address Label" value={deliveryInfo.label || "—"} />
-              <Field label="Attention" value={deliveryInfo.attentionName || "—"} />
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, color: "#344054", marginBottom: 9 }}>
+              <Truck size={12} color="#667085" /> Shipping Information
             </div>
-            <Field label="Address" value={shippingAddress} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16 }}>
-              <Field label="Phone" value={deliveryInfo.phone || "—"} />
-            </div>
-            <div style={{ marginTop: 2 }}>
-              <div style={{ fontSize: 11.5, color: "#9ca3af", marginBottom: 2 }}>Delivery Instructions</div>
-              <div style={{ fontSize: 13.5, fontWeight: 500, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                {deliveryInfo.instructions || "No delivery instructions provided"}
+            <Field label="Address Label" value={deliveryInfo.label || "—"} />
+            <Field label="Shipping Address" value={shippingAddress} />
+            {deliveryInfo.phone && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 5, color: "#667085", fontSize: 9.5, lineHeight: 1.25 }}>
+                <Phone size={10} style={{ marginTop: 1, flexShrink: 0 }} />
+                <span>{deliveryInfo.phone}</span>
               </div>
+            )}
+            <div style={{ marginTop: 6, color: deliveryInfo.instructions ? "#667085" : "#98a2b3", fontSize: 9.5, lineHeight: 1.25, fontStyle: "italic", overflowWrap: "anywhere" }}>
+              {deliveryInfo.instructions || "No delivery instructions provided"}
             </div>
           </div>
           <div style={topInfoCard}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor Information</div>
-            <Field label="Ordered By" value={requesterName} />
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700, fontSize: 11.5, color: "#344054", marginBottom: 9 }}>
+              <UserRound size={12} color="#667085" /> Requester Information
+            </div>
+            <Field label="Entered By" value={requesterName} />
             <Field label="Ordered For" value={orderedFor} />
             <Field label="Role" value={requesterRole} />
           </div>
+          <OrderDetailsSummaryCard order={order} subOrders={subOrders} />
         </div>
 
         {/* Stepper + Assignment */}

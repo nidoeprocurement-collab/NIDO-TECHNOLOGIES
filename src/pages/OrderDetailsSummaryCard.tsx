@@ -1,9 +1,8 @@
 import type { MyOrder } from "@/contexts/MyOrdersContext";
-import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import { formatCurrency } from "@/lib/formatters";
+import { ClipboardList } from "lucide-react";
 import {
   calculateRemainingOrderPricing,
-  getOrderLineUnitPriceInclusive,
   getOrderSubOrderId,
 } from "@/lib/orderPricing";
 
@@ -13,7 +12,7 @@ type OrderSummarySubOrder = {
 };
 
 function formatPrice(amount: number) {
-  return formatCurrency(amount, undefined, { decimals: 0 });
+  return formatCurrency(amount, undefined, { decimals: 2 });
 }
 
 export default function OrderDetailsSummaryCard({
@@ -30,90 +29,71 @@ export default function OrderDetailsSummaryCard({
   const items = (order.cartItems || []).filter(
     (item, index) => !cancelledIds.has(getOrderSubOrderId(order.id, item, index)),
   );
-  const totalDiscountPct = pricing.subtotalBeforeDiscount > 0
-    ? (pricing.discountAmount / pricing.subtotalBeforeDiscount) * 100
-    : 0;
-  const discountDisplay = pricing.discountAmount > 0
-    ? `-${formatPrice(pricing.discountAmount)} (${Number(totalDiscountPct.toFixed(2))}%)`
-    : "—";
+  const totalItems = items.reduce((total, item) => total + (Number(item.quantity) || 0), 0);
+  const rowStyle = {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 6,
+    marginBottom: 5,
+  } as const;
+  const labelStyle = {
+    minWidth: 0,
+    color: "#667085",
+    fontSize: 9.5,
+    lineHeight: 1.25,
+  } as const;
+  const valueStyle = {
+    flexShrink: 0,
+    color: "#344054",
+    fontSize: 9.5,
+    fontWeight: 600,
+    lineHeight: 1.25,
+    textAlign: "right" as const,
+    whiteSpace: "nowrap" as const,
+  };
 
   return (
-    <div className="h-full rounded-xl border border-gray-200 bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-semibold text-gray-900">Order Summary</h2>
+    <div style={{ height: "100%", minWidth: 0, boxSizing: "border-box", background: "#fff", border: "1px solid #e0e5eb", borderRadius: 9, padding: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 9 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+          <ClipboardList size={12} color="#64748b" />
+          <h2 style={{ margin: 0, color: "#344054", fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap" }}>Order Summary</h2>
+        </div>
+        <span style={{ color: "#98a2b3", fontSize: 9, whiteSpace: "nowrap" }}>{order.id}</span>
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm text-gray-500">{items.length} Items in Order</span>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingBottom: 7, marginBottom: 7, borderBottom: "1px solid #edf0f3" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+          <span style={labelStyle}>Sub-Orders</span>
+          <strong style={valueStyle}>{subOrders.length}</strong>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+          <span style={labelStyle}>Total Items</span>
+          <strong style={valueStyle}>{totalItems}</strong>
+        </div>
       </div>
 
-      {items.length > 0 ? (
-        <div className="mb-4 space-y-3">
-          {items.map((item) => (
-            <div key={item.subOrderId || `${item.id}-${item.name}`} className="flex items-center gap-3">
-              {item.image ? (
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="h-12 w-12 shrink-0 rounded-lg border border-gray-100 object-cover"
-                />
-              ) : (
-                <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-gray-50">
-                  📦
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="line-clamp-2 text-xs font-medium leading-snug text-gray-800">{item.name}</p>
-                <p className="mt-0.5 text-xs text-gray-400">Qty: {item.quantity}</p>
-                <ProductConfigurationSummary
-                  configuration={item.configuration}
-                  priceAdjustment={item.configurationPriceAdjustment}
-                />
-              </div>
-              <p className="shrink-0 text-right text-xs font-semibold text-gray-900">
-                {formatPrice(getOrderLineUnitPriceInclusive(item) * item.quantity)}
-              </p>
-            </div>
-          ))}
+      <div style={{ paddingTop: 1 }}>
+        <div style={rowStyle}>
+          <span style={labelStyle}>Sub-Total (excl. GST)</span>
+          <span style={valueStyle}>{formatPrice(pricing.subtotalBeforeDiscount)}</span>
         </div>
-      ) : (
-        <p className="mb-4 text-sm text-gray-400">Item details are not available for this order.</p>
-      )}
-
-      <div className="space-y-2 border-t border-gray-100 pt-3 text-sm">
-        <div className="flex justify-between gap-3">
-          <span className="text-gray-500">Items Subtotal</span>
-          <span className="font-medium text-gray-900">{formatPrice(pricing.subtotalBeforeDiscount)}</span>
+        <div style={rowStyle}>
+          <span style={labelStyle}>GST (GST)</span>
+          <span style={valueStyle}>{formatPrice(pricing.totalGst)}</span>
         </div>
-        <div className="flex justify-between gap-3">
-          <span className="text-gray-500">Discounts</span>
-          <span className="text-right font-medium text-green-600">{discountDisplay}</span>
+        <div style={rowStyle}>
+          <span style={labelStyle}>Shipping / delivery</span>
+          <span style={valueStyle}>{formatPrice(pricing.shippingDeliveryFee)}</span>
         </div>
-        <div className="flex justify-between gap-3 border-t border-gray-100 pt-2">
-          <span className="text-gray-500">Subtotal after discounts</span>
-          <span className="font-medium text-gray-900">{formatPrice(pricing.preTaxSubtotal)}</span>
+        <div style={{ ...rowStyle, marginBottom: 7 }}>
+          <span style={labelStyle}>Consolidated Discount</span>
+          <span style={{ ...valueStyle, color: "#16764a" }}>{formatPrice(pricing.discountAmount)}</span>
         </div>
-        {pricing.slabs.map((slab) => (
-          <div key={slab.rate} className="flex justify-between gap-3">
-            <span className="text-gray-500">Tax ({slab.rate}%)</span>
-            <span className="font-medium text-gray-900">{formatPrice(slab.gst)}</span>
-          </div>
-        ))}
-        {pricing.shippingDeliveryFee > 0 && (
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-500">Shipping / Delivery Fee</span>
-            <span className="font-medium text-gray-900">{formatPrice(pricing.shippingDeliveryFee)}</span>
-          </div>
-        )}
-        {pricing.platformFee > 0 && (
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-500">Platform Fee</span>
-            <span className="font-medium text-gray-900">{formatPrice(pricing.platformFee)}</span>
-          </div>
-        )}
-        <div className="flex justify-between gap-3 border-t border-gray-100 pt-2">
-          <span className="font-semibold text-gray-900">Total Amount</span>
-          <span className="text-base font-bold text-gray-900">{formatPrice(pricing.grandTotal)}</span>
+        <div style={{ ...rowStyle, marginBottom: 0, paddingTop: 7, borderTop: "1px solid #e4e7ec" }}>
+          <strong style={{ color: "#344054", fontSize: 10, lineHeight: 1.2 }}>Total Order Amount</strong>
+          <strong style={{ ...valueStyle, color: "#1d4ed8", fontSize: 10.5 }}>{formatPrice(pricing.grandTotal)}</strong>
         </div>
       </div>
     </div>

@@ -17,6 +17,6 @@
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
 - [Independent fulfillment status ownership](digital-fulfillment-status-authority.md) — PO Details and Order Details keep separate fulfillment progress; cancellation safeguards remain an exception.
-- [Order Details checkout pricing](order-details-line-pricing.md) — saved discount snapshots drive struck-through unit prices, GST-exclusive line totals, and the top-left checkout-style summary.
+- [Order Details layout and pricing](order-details-line-pricing.md) — saved discounts drive GST-exclusive rows; keep Billing, Shipping, Requester, Summary cards and the compact SLA notice aligned to the reference.
 - [Document activity audit](document-activity-audit.md) — successful document uploads and downloads should appear in the matching order or PO Notes feed.
 - [Client contract archive behavior](client-contract-archive.md) — archived contracts remain viewable from the archive list, but their details are read-only.
