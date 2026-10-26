@@ -111,14 +111,16 @@ shipping still collects its own tracking, and digital partial quantities are
 entered independently.
 
 **Why:** The user requested that PO Details and Order Details statuses be
-kept locked until Draft POs are confirmed, while retaining independent
-fulfillment progress after procurement confirmation.
+kept locked until Draft POs are confirmed, that Cancel Order remain available
+before PO creation and after all POs are cancelled, and that fulfillment stay
+independent after procurement confirmation.
 
 **How to apply:** Persist each status in its own record. Do not copy PO status
 into `nido_subitems_<orderId>`, recalculate order summaries from PO updates, or
 copy later PO fulfillment progress into Order Details. Keep the pre-confirmation
-gate on item and master-order status changes, then allow customer-facing status
-updates independently after all active items have confirmed POs.
+gate on item status changes. The master Cancel Order action is available before
+any PO is generated and again after every generated PO is cancelled; otherwise
+keep it hidden while an active PO exists.
 
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)

@@ -8,6 +8,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
+import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
@@ -2987,7 +2988,7 @@ export default function MyOrderPage() {
   );
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const hasDraftOrderPO = orderPOs.some(po => String(po.status || "").toLowerCase() === "draft");
-  const canCancelOrderByPO = !hasConfirmedOrderPO;
+  const canCancelOrderByPO = canCancelOrderByPurchaseOrders(orderPOs);
   const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
   const refreshApprovalStatus = async () => {
     if (!orderId) {
@@ -3119,9 +3120,9 @@ export default function MyOrderPage() {
     sub => sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled",
   );
   const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
-  const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem && !statusLockedUntilPOConfirmed;
+  const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
   const handleCancelOrder = async (reason: string) => {
-    if (isOrderCancelled || !canCancelOrder || statusLockedUntilPOConfirmed) return;
+    if (isOrderCancelled || !canCancelOrder) return;
     try {
       await cancelApprovalRequestsForReference(orderId, {
         userId: user?.id,
@@ -4317,7 +4318,7 @@ export default function MyOrderPage() {
             </div>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "flex-end", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
               <OrderSlaNotice sla={orderSla} />
-            {/* Cancel Order button — top-right, hidden for portal users and already-cancelled orders */}
+            {/* Cancel Order is available before PO creation and after all POs are cancelled. */}
             {!isClientPortalUser && (
               isOrderCancelled ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
