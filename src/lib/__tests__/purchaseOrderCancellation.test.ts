@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAllPOs, updatePO, type StoredPO } from "../purchaseOrderStore";
+import { getAllPOs, reopenSubOrderForVendorSelection, updatePO, type StoredPO } from "../purchaseOrderStore";
 
 const poStorageKey = "nido_all_purchase_orders";
 
@@ -111,15 +111,57 @@ describe("PO cancellation projection", () => {
     window.removeEventListener("orderSubItemsUpdated", itemUpdate);
   });
 
-  it("keeps an explicitly cancelled PO line closed while reopening its active siblings", () => {
-    localStorage.setItem(poStorageKey, JSON.stringify([makePO("Confirmed", ["Pending", "Cancelled"])]));
+  it("reopens a vendor-cancelled PO line instead of cancelling its customer order item", () => {
+    const po = makePO("Confirmed", ["Pending", "Cancelled"]);
+    po.items[1].cancelSource = "vendor-po";
+    localStorage.setItem(poStorageKey, JSON.stringify([po]));
 
     updatePO("PO-CANCEL-TEST", { status: "Cancelled", cancelReason: "Vendor unavailable" });
 
     const itemState = JSON.parse(localStorage.getItem("nido_subitems_ORDER-CANCEL-TEST") || "{}");
     expect(itemState["SUB-1"].itemStatus).toBe("Pending");
     expect(itemState["SUB-1"].selectedVendorId).toBeNull();
+    expect(itemState["SUB-2"].itemStatus).toBe("Pending");
+    expect(itemState["SUB-2"].cancelReason).toBe("");
+    expect(itemState["SUB-2"].selectedVendorId).toBeNull();
+  });
+
+  it("keeps an item explicitly cancelled from Order Details terminal when its PO is cancelled", () => {
+    const po = makePO("Confirmed", ["Pending", "Cancelled"]);
+    po.items[1].cancelSource = "order-details";
+    localStorage.setItem(poStorageKey, JSON.stringify([po]));
+    localStorage.setItem("nido_subitems_ORDER-CANCEL-TEST", JSON.stringify({
+      "SUB-1": { itemStatus: "Processing", selectedVendorId: "VENDOR-1" },
+      "SUB-2": { itemStatus: "Cancelled", cancelReason: "Customer cancelled item" },
+    }));
+
+    updatePO("PO-CANCEL-TEST", { status: "Cancelled", cancelReason: "Vendor unavailable" });
+
+    const itemState = JSON.parse(localStorage.getItem("nido_subitems_ORDER-CANCEL-TEST") || "{}");
+    expect(itemState["SUB-1"].itemStatus).toBe("Pending");
     expect(itemState["SUB-2"].itemStatus).toBe("Cancelled");
-    expect(itemState["SUB-2"].cancelReason).toBe("Vendor unavailable");
+    expect(itemState["SUB-2"].cancelReason).toBe("Customer cancelled item");
+  });
+
+  it("clears only the cancelled item's vendor assignment and reopens it for reassignment", () => {
+    const itemUpdate = vi.fn();
+    window.addEventListener("orderSubItemsUpdated", itemUpdate);
+
+    reopenSubOrderForVendorSelection("ORDER-CANCEL-TEST", "SUB-1");
+
+    const itemState = JSON.parse(localStorage.getItem("nido_subitems_ORDER-CANCEL-TEST") || "{}");
+    expect(itemState["SUB-1"]).toMatchObject({
+      itemStatus: "Pending",
+      selectedVendorId: null,
+      selectedVendorName: "",
+      stockAllocations: [],
+      referenceNumber: "",
+      serialNumber: "",
+    });
+    expect(JSON.parse(localStorage.getItem("nido_vendors_ORDER-CANCEL-TEST") || "{}")).toEqual({
+      "SUB-2": "VENDOR-1",
+    });
+    expect(itemUpdate).toHaveBeenCalled();
+    window.removeEventListener("orderSubItemsUpdated", itemUpdate);
   });
 });

@@ -76,6 +76,7 @@ export interface POLineItem {
   /** Fulfilment state and shipment details for this specific PO line. */
   status?: string;
   cancelReason?: string;
+  cancelSource?: "vendor-po" | "order-details";
   tracking?: {
     number: string;
     carrier: string;
@@ -134,6 +135,80 @@ export function isPOConfirmed(po: Pick<StoredPO, "status"> | null | undefined): 
   // as pending so an order cannot become accidentally non-cancellable merely
   // because an incomplete PO record exists in localStorage.
   return Boolean(status) && status !== "draft" && status !== "cancelled" && status !== "rejected";
+}
+
+export function getPOAggregateAfterLineCancellation(items: POLineItem[]): Partial<StoredPO> {
+  const activeItems = items.filter(item => String(item.status || "").toLowerCase() !== "cancelled");
+  const primary = activeItems[0] || items[0];
+  const subtotal = activeItems.reduce((sum, item) => sum + Number(item.lineSubtotal || 0), 0);
+  const sgstAmt = Math.round(
+    activeItems.reduce(
+      (sum, item) => sum + Number(item.lineSubtotal || 0) * ((item.gstPct ?? 18) / 2) / 100,
+      0,
+    ) * 100,
+  ) / 100;
+
+  return {
+    items,
+    subOrderId: primary?.subOrderId || "",
+    subOrderIds: items.map(item => item.subOrderId),
+    item: primary?.item || "",
+    sku: primary?.sku || "",
+    category: primary?.category || "",
+    hsnCode: primary?.hsnCode || "",
+    specs: primary?.specs || [],
+    referenceNumber: primary?.referenceNumber || "",
+    serialNumber: primary?.serialNumber || "",
+    qty: activeItems.length ? (primary?.qty || 0) : 0,
+    unitPrice: activeItems.length ? (primary?.unitPrice || 0) : 0,
+    subtotal,
+    sgstPct: (primary?.gstPct ?? 18) / 2,
+    cgstPct: (primary?.gstPct ?? 18) / 2,
+    sgstAmt,
+    cgstAmt: sgstAmt,
+    grandTotal: subtotal + sgstAmt + sgstAmt,
+  };
+}
+
+/** Return a PO-cancelled customer item to vendor selection without cancelling the order item. */
+export function reopenSubOrderForVendorSelection(orderId: string, subOrderId: string): void {
+  if (typeof window === "undefined" || !orderId || !subOrderId) return;
+
+  const itemStateKey = `nido_subitems_${orderId}`;
+  let itemState: Record<string, any> = {};
+  try {
+    itemState = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
+  } catch {
+    itemState = {};
+  }
+  itemState[subOrderId] = {
+    ...(itemState[subOrderId] || {}),
+    itemStatus: "Pending",
+    cancelReason: "",
+    tracking: null,
+    trackingOwner: undefined,
+    selectedVendorId: null,
+    selectedVendorName: "",
+    vendorSelectionMeta: null,
+    stockAllocations: [],
+    referenceNumber: "",
+    serialNumber: "",
+    updatedOn: new Date().toLocaleDateString("en-IN"),
+  };
+  localStorage.setItem(itemStateKey, JSON.stringify(itemState));
+
+  const vendorsKey = `nido_vendors_${orderId}`;
+  try {
+    const vendors: Record<string, string> = JSON.parse(localStorage.getItem(vendorsKey) || "{}");
+    delete vendors[subOrderId];
+    localStorage.setItem(vendorsKey, JSON.stringify(vendors));
+  } catch {
+    /* storage unavailable */
+  }
+
+  window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+    detail: { orderId, subOrderIds: [subOrderId], reopenedSubOrderIds: [subOrderId] },
+  }));
 }
 
 function syncPOIdentifiersToClientOrder(po: StoredPO): void {
@@ -224,18 +299,17 @@ export function updatePO(
     if (changes.status === "Cancelled") {
       const po = all[idx];
       const orderId = po.orderId;
-      const allLinesCancelled = Boolean(po.items?.length) && po.items.every(
-        line => String(line.status || "").toLowerCase() === "cancelled",
-      );
-      const cancelLinkedItems = options.cancelLinkedItems === true || allLinesCancelled;
+      const cancelLinkedItems = options.cancelLinkedItems === true;
       const subOrderIds: string[] = po.subOrderIds?.length
         ? po.subOrderIds
         : [po.subOrderId].filter(Boolean);
-      const cancelledLineIds = new Set<string>();
+      const orderCancelledLineIds = new Set<string>();
+      const vendorCancelledLineIds = new Set<string>();
       (po.items || []).forEach((line, index) => {
-        if (String(line.status || "").toLowerCase() !== "cancelled") return;
         const subId = line.subOrderId || po.subOrderIds?.[index];
-        if (subId) cancelledLineIds.add(subId);
+        if (!subId || String(line.status || "").toLowerCase() !== "cancelled") return;
+        if (line.cancelSource === "order-details") orderCancelledLineIds.add(subId);
+        if (line.cancelSource === "vendor-po") vendorCancelledLineIds.add(subId);
       });
 
       try {
@@ -263,15 +337,24 @@ export function updatePO(
         if (changed) localStorage.setItem(vendorsKey, JSON.stringify(vendors));
       } catch { /* storage unavailable */ }
 
+      const existingCancelledItemIds = new Set<string>();
       try {
         const itemStateKey = `nido_subitems_${orderId}`;
         const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
         for (const subId of subOrderIds) {
-          const itemCancelled = cancelLinkedItems || cancelledLineIds.has(subId);
+          const previouslyCancelled = itemState[subId]?.itemStatus === "Cancelled";
+          if (previouslyCancelled && !vendorCancelledLineIds.has(subId)) {
+            existingCancelledItemIds.add(subId);
+          }
+          const itemCancelled = cancelLinkedItems ||
+            orderCancelledLineIds.has(subId) ||
+            (previouslyCancelled && !vendorCancelledLineIds.has(subId));
           itemState[subId] = {
             ...(itemState[subId] || {}),
             itemStatus: itemCancelled ? "Cancelled" : "Pending",
-            cancelReason: itemCancelled ? changes.cancelReason || "Purchase order cancelled" : "",
+            cancelReason: itemCancelled
+              ? itemState[subId]?.cancelReason || changes.cancelReason || "Purchase order cancelled"
+              : "",
             tracking: null,
             trackingOwner: undefined,
             updatedOn: new Date().toLocaleDateString("en-IN"),
@@ -299,7 +382,11 @@ export function updatePO(
             orderId,
             subOrderIds,
             reason: changes.cancelReason || "Purchase order cancelled",
-            reopenedSubOrderIds: subOrderIds.filter(subId => !cancelLinkedItems && !cancelledLineIds.has(subId)),
+            reopenedSubOrderIds: subOrderIds.filter(subId =>
+              !cancelLinkedItems &&
+              !orderCancelledLineIds.has(subId) &&
+              !existingCancelledItemIds.has(subId),
+            ),
           },
         }));
       } catch { /* SSR safe */ }

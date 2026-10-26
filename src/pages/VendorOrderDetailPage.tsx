@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
+import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, getPOAggregateAfterLineCancellation, isPOConfirmed, reopenSubOrderForVendorSelection, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import {
@@ -9,7 +9,7 @@ import {
   getDigitalFulfillmentStatusIndex,
   getDigitalFulfillmentStatusSequence,
 } from "@/lib/digitalFulfillmentStatuses";
-import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
+import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
@@ -1044,23 +1044,36 @@ export default function VendorOrderDetailPage() {
     setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled", cancelReason: reason } : it));
     const po = getPOByNumber(poKey);
     if (po && itemIndex >= 0) {
-      const previousStatus = po.items[itemIndex]?.status || "Pending";
+      const currentLine = po.items[itemIndex];
+      const previousStatus = currentLine?.status || "Pending";
+      const updatedLines = po.items.map((line, index) => index === itemIndex
+        ? { ...line, status: "Cancelled", cancelReason: reason, cancelSource: "vendor-po" as const }
+        : line);
       updatePO(poKey, {
-        items: po.items.map((line, index) => index === itemIndex
-          ? { ...line, status: "Cancelled", cancelReason: reason }
-          : line),
+        ...getPOAggregateAfterLineCancellation(updatedLines),
       });
-      const subOrderId = po.items[itemIndex]?.subOrderId;
-      if (subOrderId) {
-        try {
-          const key = `nido_subitems_${po.orderId}`;
-          const saved = JSON.parse(localStorage.getItem(key) || "{}");
-          saved[subOrderId] = { ...(saved[subOrderId] || {}), itemStatus: "Cancelled", cancelReason: reason, updatedOn: new Date().toLocaleDateString("en-IN") };
-          localStorage.setItem(key, JSON.stringify(saved));
-          window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
-        } catch { /* storage unavailable */ }
+      if (currentLine?.productCode && po.vendorId && currentLine.qty > 0) {
+        if (isPOConfirmed(po)) {
+          restoreAllocatedPhysicalStock(
+            po.vendorId,
+            currentLine.productCode,
+            currentLine.qty,
+            `Vendor cancelled PO ${po.poNumber} item`,
+          );
+        } else if (String(po.status || "").toLowerCase() === "draft") {
+          releaseVendorReservation(
+            po.vendorId,
+            currentLine.productCode,
+            currentLine.qty,
+            `Vendor cancelled Draft PO ${po.poNumber} item`,
+          );
+        }
       }
-      const text = `${pendingItemCancel.name} status changed from ${previousStatus} to Cancelled. Reason: ${reason}`;
+      const subOrderId = currentLine?.subOrderId || po.subOrderIds?.[itemIndex] || po.subOrderId;
+      if (subOrderId) {
+        reopenSubOrderForVendorSelection(po.orderId, subOrderId);
+      }
+      const text = `${pendingItemCancel.name} PO line changed from ${previousStatus} to Cancelled by the vendor. Reason: ${reason}`;
       const activity = makePOActivity(text, "status-change", `activity_item_cancel_${poKey}_${pendingItemCancel.id}_${Date.now()}`);
       appendPOActivity(poKey, activity);
       appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${text}`, {
@@ -1215,7 +1228,12 @@ export default function VendorOrderDetailPage() {
 
     // 1. Convert reserved stock → allocated for every line item
     for (const li of po.items) {
-      if (li.productCode && po.vendorId && li.qty > 0) {
+      if (
+        li.productCode &&
+        po.vendorId &&
+        li.qty > 0 &&
+        String(li.status || "").toLowerCase() !== "cancelled"
+      ) {
         convertReservedToAllocated(po.vendorId, li.productCode, li.qty, po.poNumber);
       }
     }

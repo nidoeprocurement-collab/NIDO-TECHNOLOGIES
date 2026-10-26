@@ -9,7 +9,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
-import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -2718,6 +2718,8 @@ function findPOLineForSubOrder(po: any, subOrderId: string, subOrder?: any): any
 
 function poCoversSubOrder(po: any, subOrderId: string, subOrder?: any): boolean {
   if (String(po?.status || "").toLowerCase() === "cancelled") return false;
+  const matchingLine = findPOLineForSubOrder(po, subOrderId, subOrder);
+  if (String(matchingLine?.status || "").toLowerCase() === "cancelled") return false;
   if (po?.subOrderId === subOrderId) return true;
   if (Array.isArray(po?.subOrderIds) && po.subOrderIds.includes(subOrderId)) return true;
   return Array.isArray(po?.items) && po.items.some((item: any) => poLineMatchesSubOrder(item, subOrderId, subOrder));
@@ -2750,14 +2752,20 @@ function getCanonicalPOForSubOrder(pos: any[], subOrderOrId: string | any): any 
 
 function getCancelledPOForSubOrder(pos: any[], subOrderId: string, subOrder?: any): any | null {
   return pos
-    .filter(po =>
-      String(po?.status || "").toLowerCase() === "cancelled" &&
-      (
+    .filter(po => {
+      const poIsCancelled = String(po?.status || "").toLowerCase() === "cancelled";
+      const line = findPOLineForSubOrder(po, subOrderId, subOrder);
+      const lineIsCancelled = String(line?.status || "").toLowerCase() === "cancelled";
+      const vendorCancelledLine = lineIsCancelled && line?.cancelSource !== "order-details" && (
+        line?.cancelSource === "vendor-po" ||
+        (line?.cancelSource == null && subOrder?.itemStatus !== "Cancelled" && !poIsCancelled)
+      );
+      const poCoversItem =
         po?.subOrderId === subOrderId ||
         po?.subOrderIds?.includes?.(subOrderId) ||
-        po?.items?.some?.((item: any) => poLineMatchesSubOrder(item, subOrderId, subOrder))
-      ),
-    )
+        Boolean(line);
+      return (poIsCancelled && poCoversItem) || vendorCancelledLine;
+    })
     .sort((a, b) => String(b.createdOn || "").localeCompare(String(a.createdOn || "")))[0] || null;
 }
 
@@ -2818,39 +2826,6 @@ function hasPOItemShipmentStarted(po: any, subOrderId: string, subOrder?: any): 
     poStatus.includes("dispatched") ||
     poStatus.includes("delivered") ||
     poStatus.includes("in transit");
-}
-
-function getPOAggregateAfterLineCancellation(items: POLineItem[]): Partial<StoredPO> {
-  const activeItems = items.filter((item: any) => String(item.status || "").toLowerCase() !== "cancelled");
-  const primary = activeItems[0] || items[0];
-  const subtotal = activeItems.reduce((sum, item) => sum + Number(item.lineSubtotal || 0), 0);
-  const sgstAmt = Math.round(
-    activeItems.reduce(
-      (sum, item) => sum + Number(item.lineSubtotal || 0) * ((item.gstPct ?? 18) / 2) / 100,
-      0,
-    ) * 100,
-  ) / 100;
-
-  return {
-    items,
-    subOrderId: primary?.subOrderId || "",
-    subOrderIds: items.map((item) => item.subOrderId),
-    item: primary?.item || "",
-    sku: primary?.sku || "",
-    category: primary?.category || "",
-    hsnCode: primary?.hsnCode || "",
-    specs: primary?.specs || [],
-    referenceNumber: primary?.referenceNumber || "",
-    serialNumber: primary?.serialNumber || "",
-    qty: activeItems.length ? (primary?.qty || 0) : 0,
-    unitPrice: activeItems.length ? (primary?.unitPrice || 0) : 0,
-    subtotal,
-    sgstPct: (primary?.gstPct ?? 18) / 2,
-    cgstPct: (primary?.gstPct ?? 18) / 2,
-    sgstAmt,
-    cgstAmt: sgstAmt,
-    grandTotal: subtotal + sgstAmt + sgstAmt,
-  };
 }
 
 function isConfirmedPO(po: any): boolean {
@@ -3410,7 +3385,9 @@ export default function MyOrderPage() {
     targetPOs.forEach((po: any) => {
       if (po.status === "Draft") return;
       const nextItems = (po.items || []).map((line: any) =>
-          poLineMatchesSubOrder(line, subId, target) ? { ...line, status: "Cancelled", cancelReason: reason } : line
+          poLineMatchesSubOrder(line, subId, target)
+            ? { ...line, status: "Cancelled", cancelReason: reason, cancelSource: "order-details" }
+            : line
       );
       const activeItems = nextItems.filter((line: any) => String(line.status || "").toLowerCase() !== "cancelled");
       const documents = (po.documents || []).map((doc: any) => {
@@ -4573,8 +4550,7 @@ export default function MyOrderPage() {
                     const canonicalLine = canonicalPO
                       ? findPOLineForSubOrder(canonicalPO, sub.id, sub)
                       : undefined;
-                    const cancelledLine = String(canonicalLine?.status || "").toLowerCase() === "cancelled";
-                    const itemCancelled = isSubOrderCancelled || cancelledLine;
+                    const itemCancelled = isSubOrderCancelled;
                     const unitPriceExclGst = Math.max(0, Number(sub.unitPriceExclGst) || 0);
                     const discountPct = Math.max(0, Math.min(99.99, Number(sub.cartDiscountPct) || 0));
                     const originalUnitPriceExclGst = Math.max(
@@ -4644,7 +4620,11 @@ export default function MyOrderPage() {
                               ) : (
                                 <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
                               )}
-                              {cancelledPO && <div style={{ fontSize: 10, color: "#991b1b", marginTop: 3 }}>PO Cancelled</div>}
+                              {cancelledPO && (
+                                <div style={{ fontSize: 10, color: "#991b1b", marginTop: 3 }}>
+                                  {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "PO Cancelled" : "PO Item Cancelled"}
+                                </div>
+                              )}
                               <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
                             </div>
                           ) : cancelledPONeedsResolution ? (
@@ -4653,7 +4633,7 @@ export default function MyOrderPage() {
                                 onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)}
                                 style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
                               >
-                                {cancelledPO.poNumber} · Cancelled ↗
+                                  {cancelledPO.poNumber} · {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "Cancelled" : "Item Cancelled"} ↗
                               </button>
                               <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>
                                 Select a replacement vendor or cancel this sub-order.
@@ -4666,10 +4646,8 @@ export default function MyOrderPage() {
                                   Select Vendor
                                 </button>
                                 <button
-                                  disabled={statusLockedUntilPOConfirmed}
-                                  title={statusLockedUntilPOConfirmed ? statusLockReason : undefined}
-                                  onClick={() => { if (!statusLockedUntilPOConfirmed) setCancelTarget(sub.id); }}
-                                  style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: statusLockedUntilPOConfirmed ? "#9ca3af" : "#dc2626", cursor: statusLockedUntilPOConfirmed ? "not-allowed" : "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                                  onClick={() => setCancelTarget(sub.id)}
+                                  style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
                                 >
                                   Cancel Sub Order
                                 </button>
