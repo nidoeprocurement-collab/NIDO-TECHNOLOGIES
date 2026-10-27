@@ -64,11 +64,11 @@ export default function OrderDetailsSummaryCard({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingBottom: 7, marginBottom: 7, borderBottom: "1px solid #edf0f3" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-start", gap: 5, minWidth: 0 }}>
           <span style={labelStyle}>Sub-Orders</span>
           <strong style={valueStyle}>{subOrders.length}</strong>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-start", gap: 5, minWidth: 0 }}>
           <span style={labelStyle}>Total Items</span>
           <strong style={valueStyle}>{totalItems}</strong>
         </div>

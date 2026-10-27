@@ -155,9 +155,9 @@ const lbSt = { display: "block", fontSize: 12, fontWeight: 600, color: "#374151"
 const inSt: any = { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", outline: "none" };
 
 // ── Overlay / ModalBox helpers ────────────────────────────────────────────────
-function Overlay({ children, onClose }) {
+function Overlay({ children, onClose, closeOnBackdrop = true }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={closeOnBackdrop ? onClose : undefined}>
       <div onClick={e => e.stopPropagation()}>{children}</div>
     </div>
   );
@@ -1883,27 +1883,36 @@ function DocumentsNotesTab({
           </div>
         ) : (
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 8, marginBottom: 18 }}>
-            <div style={{ display: "grid", gridTemplateColumns: isClientPortalUser ? "1fr" : "1fr 220px" }}>
-              <div style={{ padding: "14px 16px", borderRight: isClientPortalUser ? "none" : "1px solid #e5e7eb" }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>{isClientPortalUser ? "Message the NIDO team" : "Add Note"}</div>
+            <style>{`
+              .order-note-composer-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 240px;
+              }
+              @media (max-width: 680px) {
+                .order-note-composer-grid { grid-template-columns: minmax(0, 1fr); }
+              }
+            `}</style>
+            <div className="order-note-composer-grid" style={{ gridTemplateColumns: isClientPortalUser ? "1fr" : undefined }}>
+              <div style={{ padding: "10px 14px", borderRight: isClientPortalUser ? "none" : "1px solid #e5e7eb" }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 6, color: "#111827" }}>{isClientPortalUser ? "Message the NIDO team" : "Add Note"}</div>
                 <textarea value={noteText} onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }} placeholder="Write your note here..."
-                  rows={4} style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }} />
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                  rows={3} style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent", lineHeight: 1.4 }} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
                   <div style={{ fontSize: 12, color: "#9ca3af" }}>{noteText.length} / 500</div>
                   {isClientPortalUser && (
                     <button onClick={handleAddNote} disabled={!noteText.trim()}
-                      style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
+                      style={{ padding: "6px 18px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
                       Send
                     </button>
                   )}
                 </div>
               </div>
               {!isClientPortalUser && (
-                <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 8 }}>Visibility</div>
                     {[["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to the client on the portal"]].map(([label, icon, sub]) => (
-                      <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                      <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 8, cursor: "pointer" }}>
                         <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
                           {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
                         </div>
@@ -1916,7 +1925,7 @@ function DocumentsNotesTab({
                   </div>
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
                     <button onClick={handleAddNote} disabled={!noteText.trim()}
-                      style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
+                      style={{ padding: "6px 18px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
                       Add
                     </button>
                   </div>
@@ -1996,7 +2005,7 @@ function EditAssignmentModal({ data, onSave, onClose }) {
 function AddTrackingModal({ current, onSave, onClose }) {
   const [form, setForm] = useState(current || { trackingNumber: "", carrier: "", note: "", linkLabel: "Track Package" });
   return (
-    <Overlay onClose={onClose}>
+    <Overlay onClose={onClose} closeOnBackdrop={false}>
       <ModalBox title={current ? "Update Tracking Info" : "Add Tracking Info"} onClose={onClose}>
         <div style={{ padding: "20px 22px 8px" }}>
           {[["trackingNumber", "Tracking Number", "e.g. 1Z999AA1234567890"], ["note", "Tracking Note", "e.g. Shipped on Apr 17, 2026"], ["linkLabel", "Link Label", "e.g. Track Package"]].map(([k, label, ph]) => (
