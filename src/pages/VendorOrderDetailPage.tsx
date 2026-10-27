@@ -299,7 +299,7 @@ function DeliveredConfirmationModal({ subject, onConfirm, onClose }: { subject: 
             Are you sure you want to mark this {subject} as <b>Delivered</b>?
           </div>
           <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#9a3412" }}>
-            Delivered is a final status and cannot be replaced. Documents and Notes will be locked afterward.
+            Delivered is a final status and cannot be replaced. Documents and Notes become read-only, but existing files and conversation history remain available.
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
@@ -312,7 +312,7 @@ function DeliveredConfirmationModal({ subject, onConfirm, onClose }: { subject: 
 }
 
 // ── Doc Actions Menu ──────────────────────────────────────────────────────────
-function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDelete: () => void }) {
+function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDelete?: () => void }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -354,9 +354,11 @@ function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDe
           <button onClick={() => { onDownload(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" }}>
             ⬇ Download
           </button>
-          <button onClick={() => { onDelete(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}>
-            🗑 Delete
-          </button>
+          {onDelete && (
+            <button onClick={() => { onDelete(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}>
+              🗑 Delete
+            </button>
+          )}
         </div>
       )}
     </>
@@ -894,6 +896,10 @@ export default function VendorOrderDetailPage() {
   const isCancelled = isPOCancelled || isMasterOrderCancelled;
   const isDelivered = orderStatus === "Delivered";
 
+  useEffect(() => {
+    if (isDelivered) setShowUploadDocument(false);
+  }, [isDelivered]);
+
   // Reset all state when navigating between different PO detail pages
   useEffect(() => {
     const po = getPOByNumber(poKey);
@@ -918,6 +924,7 @@ export default function VendorOrderDetailPage() {
       const data = storedPOToDetail(latest);
       setOrderStatus(data.status);
       setItems(data.items);
+      setDocuments(data.documents);
       setNotes(data.notes);
       setPoCancelReason(latest.cancelReason || "");
     };
@@ -1188,6 +1195,7 @@ export default function VendorOrderDetailPage() {
     }
   };
   const handleUploadDocument = (doc: any) => {
+    if (isDelivered) return;
     const nextDocuments = [...documents, doc];
     if (getPOByNumber(poKey)) updatePO(poKey, { documents: nextDocuments });
     setDocuments(nextDocuments);
@@ -1214,17 +1222,19 @@ export default function VendorOrderDetailPage() {
     }
   };
   const handleDeleteDoc = (id: string) => {
+    if (isDelivered) return;
     const nextDocuments = documents.filter(doc => doc.id !== id);
     if (getPOByNumber(poKey)) updatePO(poKey, { documents: nextDocuments });
     setDocuments(nextDocuments);
   };
   const handleDeleteNote = (id: string) => {
+    if (isDelivered) return;
     const nextNotes = notes.filter(n => n.id !== id);
     updatePO(poKey, { notes: nextNotes });
     setNotes(nextNotes);
   };
   const handleAddNote = () => {
-    if (!noteText.trim()) return;
+    if (isDelivered || !noteText.trim()) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const actor = getActivityActor("System Owner");
@@ -1788,19 +1798,24 @@ export default function VendorOrderDetailPage() {
             <div style={{ fontSize: 14, fontWeight: 700, color: "#991b1b" }}>Purchase Order is Cancelled</div>
             <div style={{ fontSize: 12.5, marginTop: 4 }}>This purchase order and its linked order are inactive and can no longer be edited or updated.</div>
           </div>
-        ) : isDelivered ? (
-          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280", marginBottom: 16 }}>
-            <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>Documents & Notes are locked</div>
-            <div style={{ fontSize: 12.5, marginTop: 4 }}>This PO is Delivered and can no longer be edited.</div>
-          </div>
         ) : (
           <>
+        {isDelivered && (
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 10, color: "#6b7280", marginBottom: 16 }}>
+            <div style={{ fontSize: 17, lineHeight: 1.2 }}>🔒</div>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#374151" }}>Documents & Notes are read-only</div>
+              <div style={{ fontSize: 12.5, marginTop: 3 }}>This PO is Delivered. Previously uploaded documents and conversation history remain available for review and download.</div>
+            </div>
+          </div>
+        )}
         {/* Documents Section */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
-            <button onClick={() => setShowUploadDocument(true)} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
+            {!isDelivered && (
+              <button onClick={() => setShowUploadDocument(true)} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
+            )}
           </div>
           <div style={{ padding: "20px 24px" }}>
             {documents.length === 0 ? (
@@ -1824,7 +1839,7 @@ export default function VendorOrderDetailPage() {
                     <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
                     <DocActionsMenu
                       onDownload={() => handleDownloadDocument(doc)}
-                      onDelete={() => handleDeleteDoc(doc.id)}
+                      onDelete={isDelivered ? undefined : () => handleDeleteDoc(doc.id)}
                     />
                   </div>
                 ))}
@@ -1841,6 +1856,7 @@ export default function VendorOrderDetailPage() {
           </div>
           <div style={{ padding: "20px 24px 28px" }}>
             {/* Inline Add Note composer */}
+            {!isDelivered && (
             <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
                 <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
@@ -1881,6 +1897,7 @@ export default function VendorOrderDetailPage() {
                 </div>
               </div>
             </div>
+            )}
             {/* Note list */}
             {notes.map((note, i) => (
               <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
@@ -1970,7 +1987,7 @@ export default function VendorOrderDetailPage() {
           onClose={() => setUpdateTrackingItem(null)}
         />
       )}
-      {showUploadDocument && (
+      {showUploadDocument && !isDelivered && (
         <UploadDocumentModal
           onSave={handleUploadDocument}
           onClose={() => setShowUploadDocument(false)}

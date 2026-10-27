@@ -2261,7 +2261,7 @@ function DeliveredConfirmationModal({ subject, onConfirm, onClose }: { subject: 
             Are you sure you want to mark this {subject} as <b>Delivered</b>?
           </div>
           <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#9a3412" }}>
-            Delivered is a final status. It cannot be replaced or edited afterward, and Documents & Notes will be locked.
+            Delivered is a final status. Documents & Notes become read-only, but existing files and conversation history remain available.
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
