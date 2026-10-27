@@ -49,6 +49,7 @@ import {
   isHybridType,
   isDigitalOnlyType,
 } from "@/lib/productTypeRules";
+import { useI18n } from "@/i18n/I18nProvider";
 
 const STATS = [
   { icon: <Package className="w-5 h-5 text-blue-500" />, label: "Total Products", value: "128", sub: "All Products", bg: "bg-blue-50" },
@@ -118,6 +119,31 @@ function typeBadgeClasses(type: string): string {
   if (normalized.includes("cloud") || normalized.includes("service")) return "bg-sky-50 text-sky-700";
   if (normalized.includes("hybrid")) return "bg-amber-50 text-amber-700";
   return "bg-emerald-50 text-emerald-700";
+}
+
+function displayTypeName(type: string): string {
+  const normalized = type.toLowerCase();
+  if (normalized.includes("digital")) return "Digital License";
+  if (normalized.includes("subscription") || normalized.includes("saas")) return "Subscription (SaaS)";
+  if (normalized.includes("hybrid")) return "Hybrid Product";
+  if (normalized.includes("cloud") || normalized.includes("service")) return "Cloud Service";
+  return "Physical Product";
+}
+
+function formatVendorLeadTime(value: string | number | undefined, type: string) {
+  const raw = String(value ?? "").trim();
+  const isDigital = isDigitalOnlyType(type);
+  if (raw && /\d\s*[-–]\s*\d/.test(raw)) {
+    const range = raw.replace(/(\d)\s*[-–]\s*(\d)/, "$1–$2");
+    const primary = /(?:days?|hours?)$/i.test(range)
+      ? range
+      : `${range} ${isDigital ? "Hours" : "Days"}`;
+    return {
+      primary,
+      secondary: isDigital ? "Provisioning" : isHybridType(type) ? "Instant" : undefined,
+    };
+  }
+  return formatLeadTimeByType(value, type);
 }
 
 const MENU_ITEMS = [
@@ -736,7 +762,9 @@ function ConfirmRemoveDialog({
 export default function VendorProductsPage() {
   const { id: vendorId = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { fmt } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
@@ -773,6 +801,16 @@ export default function VendorProductsPage() {
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  useEffect(() => {
+    const closeRowMenu = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest("[data-vendor-product-actions]")) {
+        setOpenRowMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", closeRowMenu);
+    return () => document.removeEventListener("mousedown", closeRowMenu);
   }, []);
 
   const handleSaveEdit = (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => {
@@ -1113,131 +1151,127 @@ export default function VendorProductsPage() {
                 No {isDigitalTab ? "digital" : "physical"} products are assigned to this vendor yet.
               </div>
             ) : (
-            <div className="w-full overflow-hidden">
-                <table className="w-full table-fixed text-sm">
-               <colgroup>
-                 <col style={{ width: "21%" }} />
-                 <col style={{ width: "9%" }} />
-                 <col style={{ width: "12%" }} />
-                 <col style={{ width: "11%" }} />
-                  {!isDigitalTab && <col style={{ width: "9%" }} />}
-                 <col style={{ width: "8%" }} />
-                 <col style={{ width: "10%" }} />
-                 <col style={{ width: "8%" }} />
-                 <col style={{ width: "12%" }} />
-               </colgroup>
+            <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[1080px] text-sm">
               <thead>
                  <tr className="border-b border-gray-200 bg-gray-50">
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">VPC / MPI</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">SKU / MPI</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>
-                    {!isDigitalTab && (
-                      <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Price / Unit</th>
-                    )}
-                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Users / Licenses" : "Units / MOQ"}</th>
-                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Tenure / Billing" : "Stock"}</th>
-                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Provisioning Time" : "Lead Time"}</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Lead Time / SLA</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
                <tbody className="divide-y divide-gray-100">
                   {visibleProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
                    const initials = product.productName.slice(0, 2).toUpperCase();
-                    const type = getProductType(product.physicalType);
+                    const catalogProduct = catalogProducts.find((catalog) =>
+                      catalog.id === product.id ||
+                      catalog.masterProductCode === product.masterProductCode
+                    );
+                    const type = getProductType(product.physicalType || catalogProduct?.physicalType);
                     const hybrid = isHybridType(type);
                    const current = parseInt(product.stock || "0") || 0;
                    const reserved = parseInt(product.reservedStock || "0") || 0;
                    const available = Math.max(0, current - reserved);
                     const availability = getAvailabilityByType(available, type);
-                    const leadTime = formatLeadTimeByType(product.leadTime, type);
-                    const tenureBilling = getTenureBilling(type);
+                    const leadTime = formatVendorLeadTime(product.leadTime, type);
+                    const isCloudService = type.toLowerCase().includes("cloud");
+                    const quantityValue = product.moq
+                      ? isCloudService ? fmt(Number(product.moq)) : `${product.moq} ${getQuantityLabel(type)}${Number(product.moq) === 1 ? "" : getQuantityLabel(type) === "Units" ? "" : "s"}`
+                      : "—";
                    return (
                      <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
-                       <td className="px-2 py-4">
+                        <td className="px-2 py-3.5">
                          <div className="flex items-center gap-2">
                            {product.images && product.images.length > 0 ? (
-                             <img src={product.images[0]} alt={product.productName} className="w-10 h-10 rounded-md object-cover border border-gray-200 flex-shrink-0" />
+                              <img src={product.images[0]} alt={product.productName} className="w-9 h-9 rounded-md object-cover border border-gray-200 flex-shrink-0" />
                            ) : (
-                             <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0 border border-blue-200">{initials}</div>
+                              <div className="w-9 h-9 bg-blue-100 rounded-md flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0 border border-blue-200">{initials}</div>
                            )}
                            <div className="min-w-0">
                              <div className="font-semibold text-gray-800 text-sm leading-snug">{product.productName}</div>
-                             <div className="text-xs text-gray-500 mt-1">{product.category || "—"}</div>
+                              <div className="text-xs text-gray-500 mt-1">{product.category || "—"}</div>
                            </div>
                          </div>
                        </td>
-                       <td className="px-2 py-4 align-middle">
-                         <span className={`inline-flex max-w-[112px] rounded-md px-2 py-2 text-xs font-semibold leading-snug ${typeBadgeClasses(type)}`}>{type}</span>
+                        <td className="px-2 py-3.5 align-middle">
+                          <span className={`inline-flex max-w-[112px] rounded-md px-2 py-2 text-xs font-semibold leading-snug ${typeBadgeClasses(type)}`}>{displayTypeName(type)}</span>
                        </td>
-                        <td className="px-2 py-4 align-middle break-words">
-                         <div className="space-y-1">
-                            <div className="font-mono text-[10px] text-gray-700 break-all">{product.vendorProductCode || "—"}</div>
-                            <div className="font-mono text-[10px] text-gray-500 break-all">{product.masterProductCode || "—"}</div>
+                        <td className="px-2 py-3.5 align-middle">
+                          <div className="space-y-1">
+                            <div className="font-mono text-xs text-gray-800 break-all">{product.masterProductCode || "—"}</div>
+                            <div className="font-mono text-xs text-gray-500 break-all">{product.skuCode || "—"}</div>
                          </div>
                        </td>
-                         <td className="px-2 py-4 align-middle break-words text-xs text-gray-700">{getPricingModel(type)}</td>
-                        {!isDigitalTab && (
-                          <td className="px-2 py-4 align-middle break-words">
-                            <div className="font-semibold text-gray-800 text-sm">
-                              {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
-                            </div>
-                          </td>
-                        )}
-                         <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
-                           {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
+                        <td className="px-2 py-3.5 align-middle text-xs text-gray-700">{getPricingModel(type)}</td>
+                        <td className="px-2 py-3.5 align-middle">
+                          <div className="font-semibold text-gray-800 text-sm">
+                            {product.price && Number.isFinite(Number(product.price)) ? fmt(Number(product.price)) : "—"}
+                          </div>
+                          {isCloudService && <div className="text-xs text-gray-500">(Min. Commitment)</div>}
                        </td>
-                         <td className="px-2 py-4 align-middle break-words">
-                          {isDigitalTab ? (
-                            <div className="space-y-1 text-xs">
-                              <div className="font-semibold text-gray-800">{tenureBilling.tenure}</div>
-                              <div className="text-gray-500">{tenureBilling.billing}</div>
+                        <td className="px-2 py-3.5 align-middle text-sm text-gray-700">{quantityValue}</td>
+                        <td className="px-2 py-3.5 align-middle">
+                          {availability.isUnlimited ? (
+                            <div className="space-y-1">
+                              <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
+                              <div className="text-xs font-medium text-emerald-600">Instant</div>
                             </div>
-                          ) : availability.isUnlimited ? (
-                           <div className="space-y-1">
+                          ) : (
+                            <div className="space-y-1">
                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
-                             <div className="text-xs font-medium text-emerald-600">Instant</div>
-                           </div>
-                         ) : (
-                           <div className="space-y-1">
-                              <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
-                             <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
+                              <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
                                 availability.status === "In Stock" ? "bg-emerald-50 text-emerald-700" :
                                 availability.status === "Low Stock" ? "bg-amber-50 text-amber-700" :
-                               "bg-red-50 text-red-600"
-                             }`}>
+                                "bg-red-50 text-red-600"
+                              }`}>
                                 {availability.status}
-                             </span>
-                           </div>
-                         )}
+                              </span>
+                            </div>
+                          )}
                        </td>
-                         <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
-                         <div className="space-y-1">
-                            <div>{leadTime.primary}{!isDigitalTab && hybrid ? " *" : ""}</div>
+                        <td className="px-2 py-3.5 align-middle text-gray-700 text-sm">
+                          <div className="space-y-1">
+                            <div>{leadTime.primary}{hybrid ? " *" : ""}</div>
                            {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
-                         </div>
-                       </td>
-                         <td className="px-2 py-4 align-middle">
-                           <div className="flex flex-wrap items-center gap-1">
-                             <button
-                               type="button"
-                               onClick={() => navigate(`/vendors/${vendorId}/add-products?edit=${encodeURIComponent(product.id)}`)}
+                          </div>
+                        </td>
+                        <td className="px-2 py-3.5 align-middle">
+                          <div className="relative flex items-center gap-1" data-vendor-product-actions>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/vendors/${vendorId}/add-products?edit=${encodeURIComponent(product.id)}`)}
                               aria-label={`Edit ${product.productName}`}
-                               className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                               <Pencil className="w-3 h-3" /><span className="hidden sm:inline">Edit</span>
+                              <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => setRemoveProduct(product)}
-                              aria-label={`Remove ${product.productName}`}
-                              data-confirmation-skip
-                               className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-1.5 text-[11px] font-medium text-red-700 hover:bg-red-100 transition-colors"
+                              onClick={() => setOpenRowMenu(openRowMenu === product.id ? null : product.id)}
+                              aria-label={`More actions for ${product.productName}`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                               <Trash2 className="w-3 h-3" /><span className="hidden sm:inline">Remove</span>
+                              <MoreVertical className="w-4 h-4" />
                             </button>
+                            {openRowMenu === product.id && (
+                              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                                <button
+                                  type="button"
+                                  onClick={() => { setOpenRowMenu(null); setRemoveProduct(product); }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" /> Remove Product
+                                </button>
+                              </div>
+                            )}
                           </div>
-                       </td>
+                        </td>
                      </tr>
                    );
                  })}
@@ -1260,12 +1294,12 @@ export default function VendorProductsPage() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              {Array.from({ length: Math.ceil(vendorProducts.length / perPage) }, (_, i) => i + 1).map((p) => (
+              {Array.from({ length: Math.ceil(visibleProducts.length / perPage) }, (_, i) => i + 1).map((p) => (
                 <button key={p} onClick={() => setCurrentPage(p)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === p ? "bg-blue-600 text-white shadow-sm" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{p}</button>
               ))}
               <button
-                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(vendorProducts.length / perPage), p + 1))}
-                disabled={currentPage >= Math.ceil(vendorProducts.length / perPage)}
+                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(visibleProducts.length / perPage), p + 1))}
+                disabled={currentPage >= Math.ceil(visibleProducts.length / perPage)}
                 className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />

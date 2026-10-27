@@ -17,6 +17,7 @@ interface OrderExportDialogProps {
   onOpenChange: (open: boolean) => void;
   statuses: OrderExportOption[];
   clients: OrderExportOption[];
+  clientLabel?: string;
   onExport: (filters: OrderExportFilters) => void | boolean | Promise<void | boolean>;
 }
 
@@ -45,10 +46,10 @@ function MultiSelectDropdown({
       ? options.filter((option) => option.label.toLocaleLowerCase().includes(query))
       : options;
   }, [options, search]);
-  const pluralLabel = label === "Status" ? "statuses" : "clients";
+  const pluralLabel = label === "Status" ? "statuses" : `${label.toLocaleLowerCase()}s`;
   const selectedLabel = selected.length === 0
     ? `All ${pluralLabel}`
-    : `${selected.length} ${selected.length === 1 && label === "Status" ? "status" : pluralLabel} selected`;
+    : `${selected.length} ${selected.length === 1 ? label.toLocaleLowerCase() : pluralLabel} selected`;
 
   const toggleOption = (value: string, checked: boolean) => {
     onSelectedChange(checked
@@ -144,6 +145,7 @@ export default function OrderExportDialog({
   onOpenChange,
   statuses,
   clients,
+  clientLabel = "Client",
   onExport,
 }: OrderExportDialogProps) {
   const [filters, setFilters] = useState<OrderExportFilters>({ ...EMPTY_ORDER_EXPORT_FILTERS });
@@ -185,7 +187,7 @@ export default function OrderExportDialog({
         <DialogHeader>
           <DialogTitle>Export orders</DialogTitle>
           <DialogDescription>
-            Narrow the current results by order date, status, or client. Leave a filter unselected to include all matching values.
+            Narrow the current results by order date, status, or {clientLabel.toLocaleLowerCase()}. Leave a filter unselected to include all matching values.
           </DialogDescription>
         </DialogHeader>
 
@@ -222,7 +224,7 @@ export default function OrderExportDialog({
             onOpenChange={(nextOpen) => setOpenDropdown(nextOpen ? "status" : null)}
           />
           <MultiSelectDropdown
-            label="Client"
+            label={clientLabel}
             options={clients}
             selected={filters.clients}
             onSelectedChange={(selected) => setFilters((current) => ({ ...current, clients: selected }))}

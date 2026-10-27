@@ -9,6 +9,7 @@ import SLABadge from "@/components/shared/SLABadge";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 import { buildVendorOrdersCsv } from "@/lib/orderCsvExport";
+import { getVendors } from "@/lib/vendorDataStore";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
 import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
@@ -232,7 +233,6 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   ]));
   const poTabs: (OrderStatus | "All")[] = ["All", ...poStatusOptions];
   const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
   const [vendorFilter, setVendorFilter] = useState("All Vendors");
   const [dateRange, setDateRange] = useState("All Dates");
   const [search, setSearch] = useState("");
@@ -269,21 +269,21 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       .sort((a, b) => a.localeCompare(b))
       .map(status => ({ value: status, label: status })),
   [displayedOrders]);
-  const exportClientOptions = useMemo<OrderExportOption[]>(() => {
-    const clients = new Map<string, string>();
-    displayedOrders.forEach(order => {
-      const value = order.clientId || order.client;
-      if (value && !clients.has(value)) clients.set(value, order.client || value);
-    });
-    return [...clients.entries()]
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [displayedOrders]);
+  const exportVendorOptions = useMemo<OrderExportOption[]>(() =>
+    getVendors()
+      .filter(vendor =>
+        !vendor.archived &&
+        (!hasVendorScope(scope) ||
+          vendor.id === scope.vendorId ||
+          vendor.name === scope.vendorName)
+      )
+      .map(vendor => ({ value: vendor.name, label: vendor.name }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  [scope.vendorId, scope.vendorName]);
 
   const getFiltered = (): Order[] => {
     let rows = [...displayedOrders];
     if (activeTab !== "All") rows = rows.filter(r => r.status === activeTab);
-    if (statusFilter !== "All") rows = rows.filter(r => r.status === statusFilter);
     if (vendorFilter !== "All Vendors") rows = rows.filter(r => r.vendor === vendorFilter);
     if (search) rows = rows.filter(r =>
       r.id.toLowerCase().includes(search) ||
@@ -416,7 +416,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     const ordersToExport = filterOrdersForExport(filtered, exportFilters, {
       getDate: order => order.date,
       getStatus: order => order.status,
-      getClient: order => order.clientId || order.client,
+      getClient: order => order.vendor,
     });
     const poByNumber = new Map(getAllPOs().map((po) => [po.poNumber, po]));
     const exportablePOs = ordersToExport
@@ -523,7 +523,8 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
         statuses={exportStatusOptions}
-        clients={exportClientOptions}
+        clients={exportVendorOptions}
+        clientLabel="Vendor"
         onExport={doExport}
       />
       {/* Toast */}
@@ -584,18 +585,6 @@ export default function VendorOrderList(scope: VendorScope = {}) {
           <input value={search} onChange={e => { setPage(1); setSearch(e.target.value.toLowerCase().trimStart()); }}
             placeholder="Search PO, order, vendor, or item..."
             style={{ width: "100%", padding: "8px 10px 8px 34px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, outline: "none" }} />
-        </div>
-
-        {/* Status filter */}
-        <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-          <button style={s.btn} onClick={() => setOpenDropdown(openDropdown === "status" ? null : "status")}>
-            Status ▾
-          </button>
-          <Dropdown id="status">
-            {(["All", ...poStatusOptions] as (OrderStatus | "All")[]).map(st => (
-              <button key={st} style={s.ddItem} onClick={() => { setPage(1); setStatusFilter(st); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
-            ))}
-          </Dropdown>
         </div>
 
         {/* Vendor filter */}
