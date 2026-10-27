@@ -4338,7 +4338,6 @@ export default function MyOrderPage() {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-start", gap: 8, flexShrink: 0 }}>
-              <OrderSlaNotice sla={orderSla} />
             {/* Cancel Order is available before PO creation and after all POs are cancelled. */}
             {!isClientPortalUser && (
               isOrderCancelled ? (
@@ -4463,13 +4462,14 @@ export default function MyOrderPage() {
                 <Stepper currentStatus={masterStatus} orderDate={order?.orderDate} />
               )}
             </div>
-             {!isClientPortalUser && (
-               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-                 <span style={{ fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
-                    Approval and billing are separate from fulfillment. Status updates from the saved sub-order and PO line progress.
-                 </span>
-               </div>
-             )}
+            <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 14, paddingTop: 12, display: "flex", justifyContent: isClientPortalUser ? "flex-end" : "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {!isClientPortalUser && (
+                <span style={{ flex: "1 1 260px", fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
+                  Approval and billing are separate from fulfillment. Status updates from the saved sub-order and PO line progress.
+                </span>
+              )}
+              <OrderSlaNotice sla={orderSla} />
+            </div>
           </div>
           {!isClientPortalUser && (
             <div style={card}>
