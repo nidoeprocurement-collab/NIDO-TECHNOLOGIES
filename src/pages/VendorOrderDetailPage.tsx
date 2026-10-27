@@ -16,7 +16,7 @@ import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import { getProductSpecLines } from "@/lib/productConfiguration";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
-import { appendOrderActivity, createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
+import { createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -1038,11 +1038,6 @@ export default function VendorOrderDetailPage() {
       const text = `${currentItem?.name || "Item"} status changed from ${previousStatus} to ${savedStatus}.`;
       const activity = makePOActivity(text, "status-change", `activity_item_status_${poKey}_${id}_${savedStatus}_${Date.now()}`);
       appendPOActivity(poKey, activity);
-      appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${text}`, {
-        actor: activity.author,
-        eventType: "status-change",
-        id: activity.id,
-      });
     }
   };
   const confirmItemCancel = (reason: string) => {
@@ -1106,11 +1101,6 @@ export default function VendorOrderDetailPage() {
       const text = `${pendingItemCancel.name} PO line changed from ${previousStatus} to Cancelled by the vendor. Reason: ${reason}`;
       const activity = makePOActivity(text, "status-change", `activity_item_cancel_${poKey}_${pendingItemCancel.id}_${Date.now()}`);
       appendPOActivity(poKey, activity);
-      appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${text}`, {
-        actor: activity.author,
-        eventType: "status-change",
-        id: activity.id,
-      });
     }
     setPendingItemCancel(null);
   };
@@ -1175,11 +1165,6 @@ export default function VendorOrderDetailPage() {
       `activity_tracking_${poKey}_${id}_${Date.now()}`,
     );
     appendPOActivity(poKey, activity);
-    appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${activity.text}`, {
-      actor: activity.author,
-      eventType: activity.kind === "status-change" ? "status-change" : "activity",
-      id: activity.id,
-    });
 
   };
   const recordDocumentActivity = (action: "uploaded" | "downloaded", doc: any) => {
@@ -1293,12 +1278,6 @@ export default function VendorOrderDetailPage() {
     updatePO(poKey, { status: "Confirmed", notes: updatedNotes });
     setOrderStatus("Processing");
     setNotes(updatedNotes);
-    appendOrderActivity(po.orderId, `Purchase Order ${po.poNumber} status changed from Draft to Confirmed.`, {
-      actor: auditNote.author,
-      eventType: "status-change",
-      id: `activity_po_confirmed_${po.poNumber}_${auditNote.id}`,
-    });
-
     // 4. Send vendor email notification
     if (po.vendorEmail) {
       sendEmail({
@@ -1950,11 +1929,6 @@ export default function VendorOrderDetailPage() {
               updatePO(poKey, { status: "Cancelled", cancelReason: reason });
               const activity = makePOActivity(`Purchase Order ${po.poNumber} status changed from ${po.status} to Cancelled. Reason: ${reason}`, "status-change", `activity_po_cancelled_${po.poNumber}_${Date.now()}`);
               appendPOActivity(poKey, activity);
-              appendOrderActivity(po.orderId, activity.text, {
-                actor: activity.author,
-                eventType: "status-change",
-                id: activity.id,
-              });
             }
             setCancelled(true);
             setOrderStatus("Cancelled");

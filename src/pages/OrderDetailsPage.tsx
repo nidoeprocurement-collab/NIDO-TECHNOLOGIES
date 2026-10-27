@@ -9,7 +9,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
-import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -3218,18 +3218,6 @@ export default function MyOrderPage() {
       `${target.itemName} status changed from ${previousStatus} to ${savedStatus}.`,
       { actor, eventType: "status-change" },
     );
-    getAllPOs()
-      .filter(po => po.orderId === orderId && poCoversSubOrder(po, subId))
-      .forEach(po => appendPOActivity(po.poNumber, {
-        id: `activity_item_status_${po.poNumber}_${subId}_${savedStatus}_${Date.now()}`,
-        author: actor,
-        initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
-        color: "#d97706",
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        text: `${target.itemName} status changed from ${previousStatus} to ${savedStatus}.`,
-        visibility: "Internal Note",
-        kind: "status-change",
-      }));
     if (savedStatus === "Provisioned" && previousStatus !== "Provisioned" && !isClientPortalUser) {
       setProvisionedUploadPrompt({ subId, itemName: target.itemName });
     }
@@ -3322,18 +3310,6 @@ export default function MyOrderPage() {
         actor,
         eventType: "status-change",
       });
-      getAllPOs()
-        .filter(po => po.orderId === orderId && poCoversSubOrder(po, trackingTarget))
-        .forEach(po => appendPOActivity(po.poNumber, {
-          id: `activity_tracking_${po.poNumber}_${trackingTarget}_${Date.now()}`,
-          author: actor,
-          initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
-          color: "#d97706",
-          date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          text: `${target.itemName} status changed from ${previousStatus} to Shipped. Tracking details were recorded.`,
-          visibility: "Internal Note",
-          kind: "status-change",
-        }));
     }
     setPendingShippedTarget(null);
   };
@@ -3480,16 +3456,6 @@ export default function MyOrderPage() {
       actor,
       eventType: "status-change",
     });
-    targetPOs.forEach(po => appendPOActivity(po.poNumber, {
-      id: `activity_item_cancel_${po.poNumber}_${subId}_${Date.now()}`,
-      author: actor,
-      initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
-      color: "#d97706",
-      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      text: `${target.itemName} was cancelled. Reason: ${reason}`,
-      visibility: "Internal Note",
-      kind: "status-change",
-    }));
     setCancelTarget(null);
     setPoRefreshKey(k => k + 1);
   };
@@ -4187,11 +4153,6 @@ export default function MyOrderPage() {
       { actor, eventType: "status-change", id: `activity_po_rejected_${currentPO.poNumber}_${Date.now()}` },
     );
     updatePO(currentPO.poNumber, { status: "Cancelled", cancelReason: reason });
-    appendPOActivity(currentPO.poNumber, {
-      ...activity,
-      initials: activity.initials || "SY",
-      color: activity.color || "#d97706",
-    });
     appendOrderActivity(currentPO.orderId, activity.text, {
       actor,
       eventType: "status-change",
@@ -5075,11 +5036,6 @@ export default function MyOrderPage() {
                                        { actor, eventType: "status-change", id: `activity_po_confirmed_${po.poNumber}_${Date.now()}` },
                                      );
                                      updatePO(po.poNumber, { status: "Confirmed" });
-                                     appendPOActivity(po.poNumber, {
-                                       ...confirmationActivity,
-                                       initials: confirmationActivity.initials || "SY",
-                                       color: confirmationActivity.color || "#d97706",
-                                     });
                                      appendOrderActivity(po.orderId, confirmationActivity.text, {
                                        actor,
                                        eventType: "status-change",

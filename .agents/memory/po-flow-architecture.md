@@ -129,6 +129,20 @@ when any PO is active or an item has shipped/delivered. Enable it only before PO
 creation or after all POs are cancelled, and before shipment. Keep it hidden in
 the client portal.
 
+## Page-owned status history
+
+Status-change notes belong only to the details page where the change was made:
+PO Details actions write to PO notes, and Order Details actions write to order
+notes. Keep status data synchronization, stock handling, and cancellation
+safeguards separate from audit-note routing.
+
+**Why:** The user clarified that a status changed in either details page should
+appear only in that page's notes.
+
+**How to apply:** When a status handler updates related records, append its
+audit entry only to the originating page's history; do not mirror it to the
+other record's notes.
+
 ## Order item cancellation cutoff
 
 In the Order Details sub-order Actions menu, Cancel Item stays available after
