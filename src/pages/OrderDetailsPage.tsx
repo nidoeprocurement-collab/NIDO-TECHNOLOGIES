@@ -2586,15 +2586,15 @@ function OrderSlaNotice({ sla }: { sla: SLAStatus }) {
     : null;
 
   return (
-    <div style={{ minWidth: 190, maxWidth: 260, padding: "7px 10px", display: "flex", alignItems: "flex-start", gap: 7, background: style.background, border: `1px solid ${style.border}`, borderRadius: 8, boxSizing: "border-box" }}>
-      <span aria-hidden="true" style={{ width: 7, height: 7, marginTop: 4, flexShrink: 0, borderRadius: "50%", background: style.dot }} />
+    <div style={{ width: "100%", minWidth: 0, maxWidth: "none", padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 10, background: style.background, border: `1px solid ${style.border}`, borderRadius: 8, boxSizing: "border-box" }}>
+      <span aria-hidden="true" style={{ width: 8, height: 8, marginTop: 5, flexShrink: 0, borderRadius: "50%", background: style.dot }} />
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, color: style.color, fontSize: 12, lineHeight: 1.3 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, color: style.color, fontSize: 13.5, lineHeight: 1.35 }}>
           <strong style={{ whiteSpace: "nowrap" }}>{style.label}</strong>
           <span style={{ textAlign: "right" }}>{sla.label}</span>
         </div>
         {deadline && (
-          <div style={{ marginTop: 4, color: "#667085", fontSize: 11.5, lineHeight: 1.35 }}>
+          <div style={{ marginTop: 5, color: "#667085", fontSize: 12.5, lineHeight: 1.4 }}>
             SLA Deadline: <strong style={{ color: "#475467", fontWeight: 600 }}>{deadline}</strong>
           </div>
         )}
@@ -4462,12 +4462,12 @@ export default function MyOrderPage() {
                 <Stepper currentStatus={masterStatus} orderDate={order?.orderDate} />
               )}
             </div>
-            <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 14, paddingTop: 12, display: "flex", justifyContent: isClientPortalUser ? "flex-end" : "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              {!isClientPortalUser && (
-                <span style={{ flex: "1 1 260px", fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
+            {!isClientPortalUser && (
+              <div style={{ marginTop: 14, marginBottom: 12, fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
                   Approval and billing are separate from fulfillment. Status updates from the saved sub-order and PO line progress.
-                </span>
-              )}
+              </div>
+            )}
+            <div style={{ borderTop: "1px solid #e5e7eb", marginTop: isClientPortalUser ? 14 : 0, paddingTop: 12 }}>
               <OrderSlaNotice sla={orderSla} />
             </div>
           </div>
