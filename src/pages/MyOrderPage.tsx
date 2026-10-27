@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
-import { getAllPOs, isPOConfirmed } from "@/lib/purchaseOrderStore";
 import { buildOrdersCsv } from "@/lib/orderCsvExport";
 import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
 import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
@@ -223,17 +222,15 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
 }
 
 // ─── 3-dot action dropdown ─────────────────────────────────────────────────────
-function ActionDropdown({ onExport, onCreateOrder, onBulkStatus, onBulkNotes, onClose }: {
+function ActionDropdown({ onExport, onCreateOrder, onBulkNotes, onClose }: {
   onExport: () => void;
   onCreateOrder: () => void;
-  onBulkStatus: () => void;
   onBulkNotes: () => void;
   onClose: () => void;
 }) {
   const items = [
     { icon: "⬆️", label: "Export",              action: () => { onExport();      onClose(); } },
     { icon: "＋", label: "Create Order",         action: () => { onCreateOrder(); onClose(); } },
-    { icon: "⟳",  label: "Bulk Update Status",  action: () => { onBulkStatus();  onClose(); } },
     { icon: "✎",  label: "Bulk Update Notes",   action: () => { onBulkNotes();   onClose(); } },
   ];
   const _c = "hsl(var(--card))"; const _b = "hsl(var(--border))"; const _f = "hsl(var(--foreground))"; const _mu = "hsl(var(--muted))";
@@ -255,48 +252,6 @@ function ActionDropdown({ onExport, onCreateOrder, onBulkStatus, onBulkNotes, on
           {item.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-// ─── Bulk Status Modal ─────────────────────────────────────────────────────────
-function BulkStatusModal({ selectedCount, onApply, onClose }: {
-  selectedCount: number;
-  onApply: (status: OrderStatus) => void;
-  onClose: () => void;
-}) {
-  const [status, setStatus] = useState<OrderStatus>("Processing");
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
-      <div style={{
-        position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
-        width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
-        border: "1px solid hsl(var(--border))",
-      }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Status</h2>
-        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
-          Apply new status to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
-        </p>
-        <label style={labelSt}>New Status</label>
-        <select
-          value={status}
-          onChange={e => setStatus(e.target.value as OrderStatus)}
-          style={{ ...inputSt, marginBottom: 24, appearance: "none" as const, cursor: "pointer" }}
-        >
-          {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{
-            flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
-            background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
-          }}>Cancel</button>
-          <button onClick={() => { onApply(status); onClose(); }} style={{
-            flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
-            background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
-          }}>Apply</button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -412,7 +367,7 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 export default function MyOrderPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { orders, updateOrdersStatus } = useMyOrders();
+  const { orders } = useMyOrders();
   const { user, isImpersonating, isClientPortalUser } = useAuth();
   const isViewOnly = isImpersonating;
   const orderListData = useMemo(() => normalizeOrdersForList(orders), [orders]);
@@ -448,10 +403,7 @@ export default function MyOrderPage() {
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [selected, setSelected] = useState<Set<string>>(new Set<string>());
   const [currentPage, setCurrentPage] = useState(1);
-  const [showBulkStatus, setShowBulkStatus] = useState(false);
   const [showBulkNotes, setShowBulkNotes] = useState(false);
-  const [pendingBulkCancel, setPendingBulkCancel] = useState(false);
-  const [bulkCancelReason, setBulkCancelReason] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
 
@@ -551,69 +503,6 @@ export default function MyOrderPage() {
     return true;
   };
 
-  // ── Bulk update status ──────────────────────────────────────────────────────
-  const handleBulkStatusApply = (status: OrderStatus) => {
-    if (isViewOnly) {
-      showToast("This action is disabled while using client-user impersonation.");
-      return;
-    }
-    if (orderListData.invalidCount > 0) {
-      showToast("Some saved order records are invalid. Status updates are paused to avoid changing the wrong order.");
-      return;
-    }
-    if (status === "Cancelled") {
-      // Cancelling is a terminal, hard-to-undo action — confirm first.
-      setPendingBulkCancel(true);
-      return;
-    }
-    applyBulkStatus(status);
-  };
-
-  const applyBulkStatus = (status: OrderStatus, cancelReason?: string) => {
-    if (isViewOnly) {
-      showToast("This action is disabled while using client-user impersonation.");
-      setPendingBulkCancel(false);
-      setShowBulkStatus(false);
-      return;
-    }
-    if (orderListData.invalidCount > 0) {
-      showToast("Some saved order records are invalid. Status updates are paused to avoid changing the wrong order.");
-      setPendingBulkCancel(false);
-      setShowBulkStatus(false);
-      return;
-    }
-    // Cascades to sub-orders (and clears vendor selection) when moving to
-    // Cancelled/Draft, and stays in sync with the order detail page since
-    // both read/write the same shared order + sub-order state. Orders that
-    // are already Cancelled or have a confirmed/issued PO are skipped by the
-    // context itself, so they cannot be cancelled or processed further.
-    const ids = [...selected];
-     const alreadyCancelledIds = ids.filter(id => orderListData.orders.find(o => o.id === id)?.status === "Cancelled");
-    const poLockedIds = status === "Cancelled"
-      ? ids.filter(id => getAllPOs().some(po => po.orderId === id && isPOConfirmed(po)))
-      : [];
-    const skippedIds = new Set([...alreadyCancelledIds, ...poLockedIds]);
-    const eligibleIds = ids.filter(id => !skippedIds.has(id));
-    updateOrdersStatus(eligibleIds, status, cancelReason);
-    const skipped = skippedIds.size;
-    const applied = ids.length - skipped;
-    if (skipped > 0 && status === "Cancelled") {
-      const reasons = [
-        alreadyCancelledIds.length > 0 ? `${alreadyCancelledIds.length} already-cancelled` : "",
-        poLockedIds.length > 0 ? `${poLockedIds.length} with confirmed POs` : "",
-      ].filter(Boolean).join(" and ");
-      showToast(`Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}". ${skipped} order${skipped !== 1 ? "s" : ""} skipped (${reasons}).`);
-    } else {
-      showToast(
-        skipped > 0
-          ? `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}". ${skipped} already-cancelled order(s) were skipped.`
-          : `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}"`
-      );
-    }
-    setPendingBulkCancel(false);
-    setBulkCancelReason("");
-  };
-
   // ── Bulk update notes ───────────────────────────────────────────────────────
   const handleBulkNotesApply = (note: string, visibility: string) => {
     if (isViewOnly) {
@@ -684,13 +573,6 @@ export default function MyOrderPage() {
                     return;
                   }
                   navigate(location.pathname.startsWith("/portal/") ? "/portal/catalog" : "/shop");
-                }}
-                onBulkStatus={() => {
-                  if (isViewOnly) {
-                    showToast("This action is disabled while using client-user impersonation.");
-                    return;
-                  }
-                  setShowBulkStatus(true);
                 }}
                 onBulkNotes={() => {
                   if (isViewOnly) {
@@ -925,50 +807,6 @@ export default function MyOrderPage() {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.12)", zIndex: 299 }} onClick={() => setShowFilter(false)} />
           <FilterPanel filters={filters} setFilters={setFilters} onClose={() => setShowFilter(false)} onApply={handleApply} onClear={handleClear} />
         </>
-      )}
-
-      {/* Bulk status modal */}
-      {showBulkStatus && (
-        <BulkStatusModal
-          selectedCount={totalSelected}
-          onApply={handleBulkStatusApply}
-          onClose={() => setShowBulkStatus(false)}
-        />
-      )}
-
-      {/* Bulk cancel confirmation */}
-      {pendingBulkCancel && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={() => { setPendingBulkCancel(false); setBulkCancelReason(""); }} />
-          <div style={{ position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px", width: 420, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit", border: "1px solid hsl(var(--border))" }}>
-            <h2 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 700, color: "#dc2626" }}>
-              Cancel {totalSelected} order{totalSelected !== 1 ? "s" : ""}?
-            </h2>
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 16 }}>
-              ⚠️ This action cannot be undone. Once cancelled, an order can no longer be edited, have its status changed, or be processed further.
-            </div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "hsl(var(--foreground))", marginBottom: 5 }}>
-              Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
-            </label>
-            <textarea
-              value={bulkCancelReason}
-              onChange={e => setBulkCancelReason(e.target.value)}
-              rows={3}
-              placeholder="Enter reason for cancellation..."
-              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${bulkCancelReason.trim() ? "hsl(var(--border))" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none", marginBottom: 4, background: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
-            />
-            {!bulkCancelReason.trim() && <div style={{ fontSize: 11.5, color: "#dc2626", marginBottom: 14 }}>Reason is required before confirming cancellation.</div>}
-            {bulkCancelReason.trim() && <div style={{ marginBottom: 14 }} />}
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setPendingBulkCancel(false); setBulkCancelReason(""); }} style={{ flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
-                Keep Orders
-              </button>
-              <button onClick={() => { if (!bulkCancelReason.trim()) return; applyBulkStatus("Cancelled", bulkCancelReason.trim()); }} style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 8, background: bulkCancelReason.trim() ? "#dc2626" : "#fca5a5", color: "#fff", cursor: bulkCancelReason.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 14, fontFamily: "inherit", transition: "background 0.15s" }}>
-                Yes, Cancel
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Bulk notes modal */}
