@@ -4423,8 +4423,10 @@ export default function MyOrderPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13.5, color: "#344054", marginBottom: 10 }}>
               <Truck size={14} color="#667085" /> Shipping Information
             </div>
-            <Field label="Address Label" value={deliveryInfo.label || "—"} />
-            <Field label="Attention" value={deliveryInfo.attentionName || "—"} />
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
+              <Field label="Attention" value={deliveryInfo.attentionName || "—"} />
+              <Field label="Address Label" value={deliveryInfo.label || "—"} />
+            </div>
             <Field label="Shipping Address" value={shippingAddress} />
             <Field label="Phone" value={deliveryInfo.phone || "—"} />
             <Field label="Delivery Instructions" value={deliveryInfo.instructions || "No delivery instructions provided"} />
