@@ -658,7 +658,7 @@ export default function MyOrderPage() {
         clients={exportClientOptions}
         onExport={handleExport}
       />
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 28px 40px" }}>
+      <div style={{ width: "100%", boxSizing: "border-box", padding: "28px 4px 40px" }}>
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
