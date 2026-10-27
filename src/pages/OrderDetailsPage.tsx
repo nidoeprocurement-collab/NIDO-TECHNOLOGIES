@@ -4271,7 +4271,7 @@ export default function MyOrderPage() {
         [deliveryInfo.city, deliveryInfo.state, deliveryInfo.country, deliveryInfo.zip].filter(Boolean).join(", "),
       ].filter(Boolean).join("\n")
     : deliveryInfo.address || "—";
-  // Ordered By is always the authenticated person who placed the order.
+  // Requested By is always the authenticated person who placed the order.
   // Ordered For is the option selected in Shop's Ordered By dropdown. Older
   // orders stored the selected person's resolved name, so preserve that as a
   // backward-compatible fallback instead of showing the client name.
@@ -4334,8 +4334,7 @@ export default function MyOrderPage() {
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
-                <span>Created on <b style={{ color: "#374151" }}>{order ? `${order.orderDate} ${order.orderTime}` : "—"}</b></span><span style={{ color: "#d1d5db" }}>•</span>
-                <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
+                <span>Created on <b style={{ color: "#374151" }}>{order ? `${order.orderDate} ${order.orderTime}` : "—"}</b></span>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-start", gap: 8, flexShrink: 0 }}>
@@ -4425,22 +4424,16 @@ export default function MyOrderPage() {
               <Truck size={14} color="#667085" /> Shipping Information
             </div>
             <Field label="Address Label" value={deliveryInfo.label || "—"} />
+            <Field label="Attention" value={deliveryInfo.attentionName || "—"} />
             <Field label="Shipping Address" value={shippingAddress} />
-            {deliveryInfo.phone && (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 5, color: "#667085", fontSize: 11.5, lineHeight: 1.4 }}>
-                <Phone size={12} style={{ marginTop: 2, flexShrink: 0 }} />
-                <span>{deliveryInfo.phone}</span>
-              </div>
-            )}
-            <div style={{ marginTop: 7, color: deliveryInfo.instructions ? "#667085" : "#98a2b3", fontSize: 11.5, lineHeight: 1.4, fontStyle: "italic", overflowWrap: "anywhere" }}>
-              {deliveryInfo.instructions || "No delivery instructions provided"}
-            </div>
+            <Field label="Phone" value={deliveryInfo.phone || "—"} />
+            <Field label="Delivery Instructions" value={deliveryInfo.instructions || "No delivery instructions provided"} />
           </div>
           <div style={topInfoCard}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13.5, color: "#344054", marginBottom: 10 }}>
               <UserRound size={14} color="#667085" /> Requester Information
             </div>
-            <Field label="Entered By" value={requesterName} />
+            <Field label="Requested By" value={requesterName} />
             <Field label="Ordered For" value={orderedFor} />
             <Field label="Role" value={requesterRole} />
           </div>
