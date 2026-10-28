@@ -36,6 +36,10 @@ function isDeliveryComplete(status: unknown): boolean {
   return isDelivered(status) || isReturnWorkflow(status) || normalize(status) === "completed";
 }
 
+function isPartiallyDelivered(status: unknown): boolean {
+  return normalize(status).startsWith("partially delivered");
+}
+
 function isShipped(status: unknown): boolean {
   const value = normalize(status);
   return value === "shipped" || value === "partially shipped" || value === "dispatched";
@@ -61,11 +65,13 @@ export function deriveFulfillmentStatus(
   if (values.length > 0 && active.length === 0) return "Cancelled";
   if (active.length === 0) return fallback;
 
+  if (active.every(status => normalize(status) === "pending")) return "Pending";
+
   // A return can only be raised after delivery. Keep the master order at
   // Delivered while the item moves through its return workflow instead of
   // regressing it to Processing.
   if (active.every(isDeliveryComplete)) return "Delivered";
-  if (active.some(isDeliveryComplete)) return "Partially Delivered";
+  if (active.some(isDeliveryComplete) || active.some(isPartiallyDelivered)) return "Partially Delivered";
   if (active.every(isShipped)) return "Shipped";
   if (active.some(isShipped)) return "Partially Shipped";
   return "Processing";
