@@ -11,6 +11,9 @@ import { downloadSalesOrderPdf } from "@/lib/salesOrderPdfGenerator";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
+import { getPaginationItems } from "@/lib/pagination";
+
+const ORDERS_PER_PAGE = 10;
 
 function statusBadge(status: string) {
   switch (status) {
@@ -43,6 +46,7 @@ export default function SalesOrdersPage() {
   const [archivedOrders, setArchivedOrders] = useState<StoredSalesOrder[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [menuOpen, setMenuOpen] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   const [rowMenuRect, setRowMenuRect] = useState<DOMRect | null>(null);
@@ -77,6 +81,10 @@ export default function SalesOrdersPage() {
     const statusMatch = statusFilter === "all" || o.status === statusFilter;
     return match && statusMatch;
   });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageOrders = filtered.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  const paginationItems = getPaginationItems(safePage, totalPages);
 
   const stats = {
     total:      orders.length,
@@ -196,13 +204,13 @@ export default function SalesOrdersPage() {
             type="text"
             placeholder="Search orders..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
             className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
+          onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All</option>
@@ -237,7 +245,7 @@ export default function SalesOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(o => (
+                {pageOrders.map(o => (
                   <tr key={o.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{o.orderDate}</td>
                     <td className="px-4 py-3 text-sm font-medium">
@@ -313,6 +321,43 @@ export default function SalesOrdersPage() {
             </table>
           </div>
         )}
+        <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3">
+          <span className="text-xs text-gray-500">
+            Showing {filtered.length === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(safePage * ORDERS_PER_PAGE, filtered.length)} of {filtered.length} orders
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              aria-label="Previous page"
+              onClick={() => setCurrentPage(safePage - 1)}
+              disabled={safePage === 1}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ‹
+            </button>
+            {paginationItems.map((item, index) => item === "ellipsis" ? (
+              <span key={`ellipsis-${index}`} className="px-1 text-sm text-gray-400">…</span>
+            ) : (
+              <button
+                key={item}
+                onClick={() => setCurrentPage(item)}
+                aria-current={safePage === item ? "page" : undefined}
+                className={`h-8 min-w-8 rounded-md px-2 text-sm font-medium ${
+                  safePage === item ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+            <button
+              aria-label="Next page"
+              onClick={() => setCurrentPage(safePage + 1)}
+              disabled={safePage === totalPages}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ›
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Archived Orders Modal */}

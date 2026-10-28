@@ -11,6 +11,9 @@ import OrderExportDialog, { type OrderExportOption } from "@/components/shared/O
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
 import { formatCurrency } from "@/lib/formatters";
 import { normalizeOrdersForList } from "@/lib/orderListData";
+import { getPaginationItems } from "@/lib/pagination";
+
+const ORDERS_PER_PAGE = 10;
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -444,6 +447,10 @@ export default function MyOrderPage() {
       return true;
     });
   }, [visibleOrders, activeTab, search, appliedFilters]);
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageOrders = filteredOrders.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  const paginationItems = getPaginationItems(safePage, totalPages);
 
   const allChecked = filteredOrders.length > 0 && filteredOrders.every(o => selected.has(o.id));
   const someChecked = filteredOrders.some(o => selected.has(o.id)) && !allChecked;
@@ -455,8 +462,8 @@ export default function MyOrderPage() {
   const toggleOne = (id: string) =>
     setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const handleApply = () => { setAppliedFilters(filters); setShowFilter(false); };
-  const handleClear = () => { setFilters(EMPTY_FILTERS); setAppliedFilters(EMPTY_FILTERS); };
+  const handleApply = () => { setAppliedFilters(filters); setCurrentPage(1); setShowFilter(false); };
+  const handleClear = () => { setFilters(EMPTY_FILTERS); setAppliedFilters(EMPTY_FILTERS); setCurrentPage(1); };
 
   const selectedCount = filteredOrders.filter(o => selected.has(o.id)).length;
   const totalSelected = [...selected].length;
@@ -612,7 +619,7 @@ export default function MyOrderPage() {
               🔍
             </span>
             <input
-              value={search} onChange={e => setSearch(e.target.value)}
+              value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
               placeholder="Search by order ID, client name, or requester..."
               style={{
                 width: "100%", padding: "10px 14px 10px 38px", border: "1px solid hsl(var(--border))",
@@ -683,11 +690,11 @@ export default function MyOrderPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order, i) => {
+                {pageOrders.map((order, i) => {
                   const isSel = selected.has(order.id);
                   return (
                     <tr key={order.id}
-                      style={{ borderBottom: i < filteredOrders.length - 1 ? "1px solid hsl(var(--border))" : "none", background: isSel ? "hsl(var(--primary)/0.08)" : "transparent", transition: "background 0.1s" }}
+                      style={{ borderBottom: i < pageOrders.length - 1 ? "1px solid hsl(var(--border))" : "none", background: isSel ? "hsl(var(--primary)/0.08)" : "transparent", transition: "background 0.1s" }}
                       onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = "hsl(var(--muted))"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = isSel ? "hsl(var(--primary)/0.08)" : "transparent"; }}>
                       <td style={tdSt}>
@@ -779,23 +786,35 @@ export default function MyOrderPage() {
                 </>
               )}
               {selectedCount === 0 && (
-                <span>Showing 1 to {filteredOrders.length} of {filteredOrders.length} orders</span>
+                <span>Showing {filteredOrders.length === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1} to {Math.min(safePage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length} orders</span>
               )}
               {selectedCount > 0 && (
-                <span style={{ color: "hsl(var(--muted-foreground))" }}>· Showing 1 to {filteredOrders.length} of {filteredOrders.length} orders</span>
+                <span style={{ color: "hsl(var(--muted-foreground))" }}>· Showing {filteredOrders.length === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1} to {Math.min(safePage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length} orders</span>
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <button style={{ width: 30, height: 30, border: "1px solid hsl(var(--border))", borderRadius: 6, background: "hsl(var(--card))", cursor: "pointer", fontSize: 14, color: "hsl(var(--muted-foreground))" }}>‹</button>
-              {[1, 2, 3, 4, 5].map(p => (
-                <button key={p} onClick={() => setCurrentPage(p)} style={{
-                  width: 30, height: 30, border: currentPage === p ? "1px solid #2563eb" : "1px solid hsl(var(--border))",
-                  borderRadius: 6, background: currentPage === p ? "hsl(var(--primary)/0.1)" : "hsl(var(--card))",
-                  color: currentPage === p ? "#2563eb" : "hsl(var(--foreground))", cursor: "pointer",
-                  fontWeight: currentPage === p ? 700 : 400, fontSize: 13, fontFamily: "inherit",
-                }}>{p}</button>
+              <button
+                aria-label="Previous page"
+                onClick={() => setCurrentPage(safePage - 1)}
+                disabled={safePage === 1}
+                style={{ width: 30, height: 30, border: "1px solid hsl(var(--border))", borderRadius: 6, background: "hsl(var(--card))", cursor: safePage === 1 ? "not-allowed" : "pointer", fontSize: 14, color: "hsl(var(--muted-foreground))", opacity: safePage === 1 ? 0.45 : 1 }}
+              >‹</button>
+              {paginationItems.map((item, index) => item === "ellipsis" ? (
+                <span key={`ellipsis-${index}`} aria-hidden="true" style={{ padding: "0 3px", color: "hsl(var(--muted-foreground))" }}>…</span>
+              ) : (
+                <button key={item} onClick={() => setCurrentPage(item)} aria-current={safePage === item ? "page" : undefined} style={{
+                  width: 30, height: 30, border: safePage === item ? "1px solid #2563eb" : "1px solid hsl(var(--border))",
+                  borderRadius: 6, background: safePage === item ? "hsl(var(--primary)/0.1)" : "hsl(var(--card))",
+                  color: safePage === item ? "#2563eb" : "hsl(var(--foreground))", cursor: "pointer",
+                  fontWeight: safePage === item ? 700 : 400, fontSize: 13, fontFamily: "inherit",
+                }}>{item}</button>
               ))}
-              <button style={{ width: 30, height: 30, border: "1px solid hsl(var(--border))", borderRadius: 6, background: "hsl(var(--card))", cursor: "pointer", fontSize: 14, color: "hsl(var(--muted-foreground))" }}>›</button>
+              <button
+                aria-label="Next page"
+                onClick={() => setCurrentPage(safePage + 1)}
+                disabled={safePage === totalPages}
+                style={{ width: 30, height: 30, border: "1px solid hsl(var(--border))", borderRadius: 6, background: "hsl(var(--card))", cursor: safePage === totalPages ? "not-allowed" : "pointer", fontSize: 14, color: "hsl(var(--muted-foreground))", opacity: safePage === totalPages ? 0.45 : 1 }}
+              >›</button>
             </div>
           </div>
         </div>

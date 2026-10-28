@@ -4,6 +4,9 @@ import { Filter, MoreVertical, X } from "lucide-react";
 import { getClientOrders, saveClientOrder, type ClientOrderRecord } from "@/lib/clientDataStore";
 import { getPrefix } from "@/lib/configService";
 import { useAuth } from "@/contexts/AuthContext";
+import { getPaginationItems } from "@/lib/pagination";
+
+const ORDERS_PER_PAGE = 10;
 
 export const ordersData = [
   { id: "ORD-2024-1245", date: "2024-05-28", items: 12, amount: "$125,000", client: "TechSupply Co", status: "Delivered" },
@@ -162,6 +165,10 @@ export default function ClientOrdersPage({
   const [orders, setOrders] = useState<ClientOrderRecord[]>(() => getClientOrders(clientId, clientName));
   const visibleOrders = orders.filter((order) => isOrderInDateRange(order.date, dateRange));
   const total = visibleOrders.length;
+  const totalPages = Math.max(1, Math.ceil(total / ORDERS_PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const pageOrders = visibleOrders.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  const paginationItems = getPaginationItems(safePage, totalPages);
 
   const reload = () => setOrders(getClientOrders(clientId, clientName));
   useEffect(() => {
@@ -216,7 +223,7 @@ export default function ClientOrdersPage({
             </tr>
           </thead>
           <tbody>
-            {visibleOrders.map((order, i) => (
+            {pageOrders.map((order, i) => (
               <tr key={order.id} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
                 <td className="px-4 py-3">
                   <span
@@ -262,21 +269,39 @@ export default function ClientOrdersPage({
 
         {/* Footer pagination */}
         <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100 bg-white">
-          <p className="text-[11px] text-orange-500 font-medium">Showing 1 to {total} of {total} orders</p>
+          <p className="text-[11px] text-gray-500 font-medium">
+            Showing {total === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(safePage * ORDERS_PER_PAGE, total)} of {total} orders
+          </p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Previous page"
+              onClick={() => setPage(safePage - 1)}
               className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs transition-colors disabled:opacity-40"
-              disabled={page === 1}
+              disabled={safePage === 1}
             >
-              –
+              ‹
             </button>
-            <span className="w-7 h-7 flex items-center justify-center rounded bg-blue-600 text-white text-xs font-semibold">{page}</span>
+            {paginationItems.map((item, index) => item === "ellipsis" ? (
+              <span key={`ellipsis-${index}`} className="px-1 text-xs text-gray-400">…</span>
+            ) : (
+              <button
+                key={item}
+                onClick={() => setPage(item)}
+                aria-current={safePage === item ? "page" : undefined}
+                className={`min-w-7 h-7 px-1 flex items-center justify-center rounded border text-xs font-semibold transition-colors ${
+                  safePage === item ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
             <button
-              onClick={() => setPage((p) => p + 1)}
+              aria-label="Next page"
+              onClick={() => setPage(safePage + 1)}
               className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs transition-colors"
+              disabled={safePage === totalPages}
             >
-              +
+              ›
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
+import { getPaginationItems } from "@/lib/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -55,6 +56,7 @@ import {
 type PurchaseOrderStatus = "DRAFT" | "ISSUED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "CANCELLED";
 type BilledStatus = "YET TO BE BILLED" | "BILLED";
 type ReceiveStatus = "YET TO BE RECEIVED" | "RECEIVED";
+const ORDERS_PER_PAGE = 10;
 
 export interface PurchaseOrderItem {
   id: string;
@@ -318,11 +320,16 @@ export default function PurchaseOrdersPage() {
   const [form, setForm] = useState<PurchaseOrderForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [showPdfView, setShowPdfView] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmConvert, setConfirmConvert] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   // Load system POs
   useEffect(() => {
@@ -1100,6 +1107,10 @@ export default function PurchaseOrdersPage() {
     const q = search.toLowerCase();
     return o.poNumber.toLowerCase().includes(q) || o.vendorName.toLowerCase().includes(q) || o.referenceNumber.toLowerCase().includes(q) || o.sourceOrderNumber.toLowerCase().includes(q);
   });
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / ORDERS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageList = filteredList.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+  const paginationItems = getPaginationItems(safePage, totalPages);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1159,7 +1170,7 @@ export default function PurchaseOrdersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredList.map((o) => (
+                  pageList.map((o) => (
                     <TableRow key={o.key} className="border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={o.onClick}>
                       <TableCell className="pl-2" onClick={(e) => e.stopPropagation()}><Checkbox checked={false} /></TableCell>
                       <TableCell className="text-sm text-gray-600 whitespace-nowrap py-3.5">{o.date}</TableCell>
@@ -1200,6 +1211,43 @@ export default function PurchaseOrdersPage() {
                 )}
               </TableBody>
             </Table>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-gray-200 pt-3">
+              <span className="text-xs text-gray-500">
+                Showing {filteredList.length === 0 ? 0 : (safePage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(safePage * ORDERS_PER_PAGE, filteredList.length)} of {filteredList.length} purchase orders
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  aria-label="Previous page"
+                  onClick={() => setCurrentPage(safePage - 1)}
+                  disabled={safePage === 1}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ‹
+                </button>
+                {paginationItems.map((item, index) => item === "ellipsis" ? (
+                  <span key={`ellipsis-${index}`} className="px-1 text-sm text-gray-400">…</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setCurrentPage(item)}
+                    aria-current={safePage === item ? "page" : undefined}
+                    className={`h-8 min-w-8 rounded-md px-2 text-sm font-medium ${
+                      safePage === item ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+                <button
+                  aria-label="Next page"
+                  onClick={() => setCurrentPage(safePage + 1)}
+                  disabled={safePage === totalPages}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
