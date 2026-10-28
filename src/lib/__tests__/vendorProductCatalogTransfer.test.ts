@@ -73,7 +73,6 @@ describe("vendor product catalog transfer", () => {
     const images = parseVendorProductArrayField<string>(row, "images");
 
     expect(headers).toEqual([
-      "id",
       "vendorId",
       "masterProductCode",
       "skuCode",
@@ -96,14 +95,16 @@ describe("vendor product catalog transfer", () => {
       "moq",
       "leadTime",
       "stock",
-      "physicalStock",
-      "reservedStock",
-      "incomingStock",
       "lastStockUpdate",
       "vendorProductCode",
       "addedAt",
       "status",
     ]);
+    expect(headers).not.toContain("id");
+    expect(headers).not.toContain("physicalStock");
+    expect(headers).not.toContain("reservedStock");
+    expect(headers).not.toContain("incomingStock");
+    expect(row).not.toHaveProperty("id");
     expect(row.masterproductcode).toBe(digitalProduct.masterProductCode);
     expect(row.vendorproductcode).toBe(digitalProduct.vendorProductCode);
     expect(row.price).toBe(digitalProduct.price);
@@ -119,8 +120,13 @@ describe("vendor product catalog transfer", () => {
 
   it("keeps physical export variations in the legacy JSON column", () => {
     const csv = exportVendorProductCatalogCsv([physicalProduct], "physical");
+    const headers = csv.split(/\r?\n/, 1)[0].replace(/^\uFEFF/, "").split(",");
     const [row] = parseVendorProductImportFile("vendor-physical-catalog.csv", csv);
 
+    expect(headers).toContain("id");
+    expect(headers).toContain("physicalStock");
+    expect(headers).toContain("reservedStock");
+    expect(headers).toContain("incomingStock");
     expect(row.variations).toBe("[]");
   });
 

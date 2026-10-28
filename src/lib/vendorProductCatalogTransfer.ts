@@ -133,6 +133,14 @@ export function exportVendorProductCatalogCsv(
   catalogType: VendorCatalogType = "physical",
 ): string {
   const isDigitalCatalog = catalogType === "digital";
+  const beforeVariationHeaders = isDigitalCatalog
+    ? PRODUCT_HEADERS_BEFORE_VARIATIONS.filter((header) => header !== "id")
+    : PRODUCT_HEADERS_BEFORE_VARIATIONS;
+  const afterVariationHeaders = isDigitalCatalog
+    ? PRODUCT_HEADERS_AFTER_VARIATIONS.filter(
+        (header) => !["physicalStock", "reservedStock", "incomingStock"].includes(header),
+      )
+    : PRODUCT_HEADERS_AFTER_VARIATIONS;
   const maxVariationCount = isDigitalCatalog
     ? Math.max(1, ...products.map((product) => product.variations?.length ?? 0))
     : 0;
@@ -146,37 +154,43 @@ export function exportVendorProductCatalogCsv(
     ? buildVariationHeaders(maxVariationCount, maxOptionsPerField)
     : ["variations"];
   const headers = [
-    ...PRODUCT_HEADERS_BEFORE_VARIATIONS,
+    ...beforeVariationHeaders,
     ...variationHeaders,
-    ...PRODUCT_HEADERS_AFTER_VARIATIONS,
+    ...afterVariationHeaders,
   ];
 
   const rows = products.map((product) => {
     const variationValues = isDigitalCatalog
       ? buildVariationValues(product.variations, maxVariationCount, maxOptionsPerField)
       : [JSON.stringify(product.variations ?? [])];
+    const beforeVariationValues: Record<string, unknown> = {
+      id: product.id,
+      vendorId: product.vendorId,
+      masterProductCode: product.masterProductCode,
+      skuCode: product.skuCode,
+      productName: product.productName,
+      category: product.category,
+      brand: product.brand,
+      physicalType: product.physicalType,
+      images: JSON.stringify(product.images ?? []),
+    };
+    const afterVariationValues: Record<string, unknown> = {
+      price: product.price,
+      moq: product.moq,
+      leadTime: product.leadTime,
+      stock: product.stock,
+      physicalStock: product.physicalStock,
+      reservedStock: product.reservedStock,
+      incomingStock: product.incomingStock,
+      lastStockUpdate: product.lastStockUpdate,
+      vendorProductCode: product.vendorProductCode,
+      addedAt: product.addedAt,
+      status: product.status,
+    };
     return [
-      product.id,
-      product.vendorId,
-      product.masterProductCode,
-      product.skuCode,
-      product.productName,
-      product.category,
-      product.brand,
-      product.physicalType,
-      JSON.stringify(product.images ?? []),
+      ...beforeVariationHeaders.map((header) => beforeVariationValues[header]),
       ...variationValues,
-      product.price,
-      product.moq,
-      product.leadTime,
-      product.stock,
-      product.physicalStock,
-      product.reservedStock,
-      product.incomingStock,
-      product.lastStockUpdate,
-      product.vendorProductCode,
-      product.addedAt,
-      product.status,
+      ...afterVariationHeaders.map((header) => afterVariationValues[header]),
     ].map(csvEscape).join(",");
   });
 
