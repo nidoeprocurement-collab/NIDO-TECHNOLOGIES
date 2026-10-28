@@ -2275,6 +2275,7 @@ function DeliveredConfirmationModal({ subject, onConfirm, onClose }: { subject: 
 
 function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDate?: string }) {
   const steps = [
+    { label: "Pending", note: orderDate || "—" },
     { label: "Processing", note: orderDate || "—" },
     { label: "Pending Shipping", note: "Pending" },
     { label: "Partially Shipped", note: "In Progress" },
@@ -4291,7 +4292,6 @@ export default function MyOrderPage() {
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}><span style={{ color: "#374151" }}>{orderId}</span></h1>
-                <StatusPill status={masterStatus} />
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
