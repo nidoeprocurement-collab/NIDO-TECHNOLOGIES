@@ -9,7 +9,7 @@ import { buildOrdersCsv } from "@/lib/orderCsvExport";
 import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
 import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { normalizeOrdersForList } from "@/lib/orderListData";
 import { getPaginationItems } from "@/lib/pagination";
 
@@ -684,7 +684,7 @@ export default function MyOrderPage() {
                       onChange={toggleAll} style={{ cursor: "pointer", width: 15, height: 15 }}
                     />
                   </th>
-                  {["ORDER ID", "CLIENT", "REQUESTER", "ASSIGNED", "ORDER DATE ↓", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
+                  {["ORDER ID", "CLIENT", "ASSIGNED", "ORDER DATE ↓", "LAST UPDATED", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
                     <th key={h} style={thSt}>{h}</th>
                   ))}
                 </tr>
@@ -716,15 +716,6 @@ export default function MyOrderPage() {
                       </td>
                       <td style={tdSt}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                          <Avatar initial={order.requesterInitial} color={order.requesterColor} size={28} />
-                          <div>
-                            <div style={{ fontWeight: 500, color: "hsl(var(--foreground))" }}>{order.requester}</div>
-                            <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>{order.requesterRole}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={tdSt}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <Avatar initial={order.assignedInitial} color={order.assignedColor} size={28} />
                           <div>
                             <div style={{ fontWeight: 500, color: "hsl(var(--foreground))" }}>{order.assigned}</div>
@@ -743,6 +734,15 @@ export default function MyOrderPage() {
                       <td style={tdSt}>
                         <div style={{ color: "hsl(var(--foreground))" }}>{order.orderDate}</div>
                         <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>{order.orderTime}</div>
+                      </td>
+                      <td style={tdSt}>
+                        {(() => {
+                          const lastUpdated = order.updatedAt || order.createdAt
+                            || (order.orderDate ? `${order.orderDate} ${order.orderTime || ""}`.trim() : "");
+                          return lastUpdated
+                            ? <div style={{ color: "hsl(var(--foreground))", whiteSpace: "nowrap" }}>{formatDateTime(lastUpdated)}</div>
+                            : <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>;
+                        })()}
                       </td>
                       <td style={tdSt}><StatusBadge status={order.status} /></td>
                       <td style={tdSt}>
