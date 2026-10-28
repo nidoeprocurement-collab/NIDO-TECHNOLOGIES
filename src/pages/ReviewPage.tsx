@@ -22,6 +22,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
+import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -568,7 +569,15 @@ import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
                           <td className="py-3 px-2 border-r border-gray-300 align-middle">
                             <div className="flex items-center gap-3">
                               <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded-lg border border-gray-200 shrink-0" />
-                              <p className="font-medium text-sm leading-snug text-gray-900">{item.name}</p>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm leading-snug text-gray-900">{item.name}</p>
+                                {isDigitalOnlyProduct(item) && (
+                                  <ProductConfigurationSummary
+                                    configuration={item.configuration}
+                                    priceAdjustment={item.configurationPriceAdjustment}
+                                  />
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-2 border-r border-gray-300 text-center align-middle text-sm text-gray-900">
