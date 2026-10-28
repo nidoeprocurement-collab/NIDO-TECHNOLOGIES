@@ -28,7 +28,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCatalogProducts, type CatalogProduct, type CatalogVariation } from "@/lib/catalogStore";
+import { getCatalogProducts, type CatalogProduct } from "@/lib/catalogStore";
 import {
   getVendorProducts,
   removeVendorProduct,
@@ -52,6 +52,7 @@ import {
   filterVendorProductsByCatalogType,
   parseVendorProductArrayField,
   parseVendorProductImportFile,
+  parseVendorProductVariations,
   type VendorCatalogType,
 } from "@/lib/vendorProductCatalogTransfer";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -799,7 +800,7 @@ export default function VendorProductsPage() {
 
   const handleExportCatalog = (catalogType: VendorProductTab) => {
     const products = filterVendorProductsByCatalogType(vendorProducts, catalogType);
-    const csv = exportVendorProductCatalogCsv(products);
+    const csv = exportVendorProductCatalogCsv(products, catalogType);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -877,7 +878,7 @@ export default function VendorProductsPage() {
 
           const existing = existingById.get(master.id);
           const images = parseVendorProductArrayField<string>(rawRow, "images");
-          const variations = parseVendorProductArrayField<CatalogVariation>(rawRow, "variations", "vendorVariations");
+          const variations = parseVendorProductVariations(rawRow, existing?.variations);
           const importedStatus = normalizeImportValue(row, "status").toLowerCase();
           const vendorProductCode = normalizeImportValue(row, "vendorProductCode", "vendorSku")
             || existing?.vendorProductCode
