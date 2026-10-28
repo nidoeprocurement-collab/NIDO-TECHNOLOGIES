@@ -18,8 +18,6 @@ import {
   Star,
   Download,
   Upload,
-  RefreshCcw,
-  BookOpen,
   Pencil,
   Trash2,
   X,
@@ -30,7 +28,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
+import { getCatalogProducts, type CatalogProduct, type CatalogVariation } from "@/lib/catalogStore";
 import {
   getVendorProducts,
   removeVendorProduct,
@@ -49,6 +47,13 @@ import {
   isHybridType,
   isDigitalOnlyType,
 } from "@/lib/productTypeRules";
+import {
+  exportVendorProductCatalogCsv,
+  filterVendorProductsByCatalogType,
+  parseVendorProductArrayField,
+  parseVendorProductImportFile,
+  type VendorCatalogType,
+} from "@/lib/vendorProductCatalogTransfer";
 import { useI18n } from "@/i18n/I18nProvider";
 
 const STATS = [
@@ -148,62 +153,15 @@ function formatVendorLeadTime(value: string | number | undefined, type: string) 
 
 const MENU_ITEMS = [
   { icon: <Plus className="w-4 h-4" />, label: "Add Product" },
-  { icon: <Tag className="w-4 h-4" />, label: "Bulk Price Update" },
-  { icon: <Upload className="w-4 h-4" />, label: "Import Products" },
-  { icon: <Download className="w-4 h-4" />, label: "Export Catalog" },
-  { icon: <RefreshCcw className="w-4 h-4" />, label: "Sync Vendor Feed" },
-  { icon: <BookOpen className="w-4 h-4" />, label: "Assign to Master Catalog" },
+  { icon: <Upload className="w-4 h-4" />, label: "Import P Products" },
+  { icon: <Upload className="w-4 h-4" />, label: "Import D Products" },
+  { icon: <Download className="w-4 h-4" />, label: "Export P Catalog" },
+  { icon: <Download className="w-4 h-4" />, label: "Export D Catalog" },
 ];
 
 type ToolDialog = "bulkPrice" | "assign" | null;
 type BulkPriceMode = "increase" | "decrease";
-type VendorProductTab = "physical" | "digital";
-
-function csvEscape(value: unknown): string {
-  const text = String(value ?? "");
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function parseCsvRows(text: string): Record<string, string>[] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let quoted = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    const next = text[i + 1];
-    if (char === '"' && quoted && next === '"') {
-      field += '"';
-      i += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      row.push(field.trim());
-      field = "";
-    } else if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && next === "\n") i += 1;
-      row.push(field.trim());
-      if (row.some((value) => value !== "")) rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += char;
-    }
-  }
-  row.push(field.trim());
-  if (row.some((value) => value !== "")) rows.push(row);
-
-  if (rows.length < 2) return [];
-  const normalizeHeader = (header: string) => header.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  const headers = rows[0].map(normalizeHeader);
-  return rows.slice(1).map((values) =>
-    headers.reduce<Record<string, string>>((result, header, index) => {
-      if (header) result[header] = values[index] ?? "";
-      return result;
-    }, {}),
-  );
-}
+type VendorProductTab = VendorCatalogType;
 
 function normalizeImportValue(row: Record<string, string>, ...keys: string[]): string {
   for (const key of keys) {
@@ -776,6 +734,7 @@ export default function VendorProductsPage() {
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const importCatalogTypeRef = useRef<VendorProductTab>("physical");
 
   // Load vendor products from store
   useEffect(() => {
@@ -838,45 +797,17 @@ export default function VendorProductsPage() {
     toast.success(`${updatedCount} vendor price${updatedCount === 1 ? "" : "s"} updated.`);
   };
 
-  const handleExportCatalog = () => {
-    const headers = [
-      "vendorProductCode",
-      "masterProductCode",
-      "productName",
-      "category",
-      "brand",
-      "price",
-      "moq",
-      "leadTime",
-      "stock",
-      "reservedStock",
-      "incomingStock",
-      "status",
-    ];
-    const rows = vendorProducts.map((product) =>
-      [
-        product.vendorProductCode,
-        product.masterProductCode,
-        product.productName,
-        product.category,
-        product.brand,
-        product.price,
-        product.moq,
-        product.leadTime,
-        product.stock,
-        product.reservedStock,
-        product.incomingStock || "0",
-        product.status,
-      ].map(csvEscape).join(","),
-    );
-    const blob = new Blob([`\uFEFF${headers.join(",")}\n${rows.join("\n")}`], { type: "text/csv;charset=utf-8;" });
+  const handleExportCatalog = (catalogType: VendorProductTab) => {
+    const products = filterVendorProductsByCatalogType(vendorProducts, catalogType);
+    const csv = exportVendorProductCatalogCsv(products);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `vendor-catalog-${vendorId}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `vendor-${catalogType}-catalog-${vendorId}-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success(`${vendorProducts.length} product${vendorProducts.length === 1 ? "" : "s"} exported.`);
+    toast.success(`${products.length} ${catalogType} product${products.length === 1 ? "" : "s"} exported.`);
   };
 
   const handleSyncVendorFeed = () => {
@@ -901,30 +832,28 @@ export default function VendorProductsPage() {
     );
   };
 
-  const handleImportFile = (file: File) => {
+  const handleImportFile = (file: File, catalogType: VendorProductTab) => {
     setImporting(true);
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const raw = String(reader.result || "");
-        const parsed = file.name.toLowerCase().endsWith(".json")
-          ? JSON.parse(raw)
-          : parseCsvRows(raw);
-        const rows = Array.isArray(parsed) ? parsed : [];
+        const rows = parseVendorProductImportFile(file.name, raw);
         if (rows.length === 0) throw new Error("The file has no product rows.");
 
         const catalogById = new Map(catalogProducts.map((product) => [product.id.toLowerCase(), product]));
         const catalogByCode = new Map(catalogProducts.map((product) => [product.masterProductCode.toLowerCase(), product]));
         const catalogBySku = new Map(catalogProducts.map((product) => [product.skuCode.toLowerCase(), product]));
         const catalogByName = new Map(catalogProducts.map((product) => [product.productName.trim().toLowerCase(), product]));
-        const existingById = new Map(getVendorProducts(vendorId).map((product) => [product.id, product]));
-        const pending: Omit<VendorProduct, "vendorProductCode">[] = [];
+        const currentProducts = getVendorProducts(vendorId);
+        const existingById = new Map(currentProducts.map((product) => [product.id, product]));
+        const pending: Array<Omit<VendorProduct, "vendorProductCode"> & { vendorProductCode?: string }> = [];
         let updatedCount = 0;
         let skippedCount = 0;
         let missingCount = 0;
 
         for (const rawRow of rows) {
-          const row = Object.entries(rawRow as Record<string, unknown>).reduce<Record<string, string>>((result, [key, value]) => {
+          const row = Object.entries(rawRow).reduce<Record<string, string>>((result, [key, value]) => {
             result[key.replace(/[^a-z0-9]/gi, "").toLowerCase()] = String(value ?? "").trim();
             return result;
           }, {});
@@ -940,16 +869,44 @@ export default function VendorProductsPage() {
             continue;
           }
 
+          const masterIsDigital = isDigitalOnlyType(getProductType(master.physicalType || master.productType));
+          if (masterIsDigital !== (catalogType === "digital")) {
+            skippedCount += 1;
+            continue;
+          }
+
           const existing = existingById.get(master.id);
+          const images = parseVendorProductArrayField<string>(rawRow, "images");
+          const variations = parseVendorProductArrayField<CatalogVariation>(rawRow, "variations", "vendorVariations");
+          const importedStatus = normalizeImportValue(row, "status").toLowerCase();
+          const vendorProductCode = normalizeImportValue(row, "vendorProductCode", "vendorSku")
+            || existing?.vendorProductCode
+            || "";
           const updates: Partial<VendorProduct> = {
             ...masterSnapshot(master),
+            skuCode: normalizeImportValue(row, "skuCode", "sku") || master.skuCode || existing?.skuCode || "",
+            productName: normalizeImportValue(row, "productName", "name") || master.productName,
+            category: normalizeImportValue(row, "category") || master.category,
+            brand: normalizeImportValue(row, "brand") || master.brand,
+            physicalType: master.physicalType || master.productType || "Physical Product",
+            images: images.found ? images.value : existing?.images || master.images || [],
+            variations: variations.found ? variations.value : existing?.variations || [],
             price: normalizeImportValue(row, "price", "purchasePrice") || existing?.price || "",
             moq: normalizeImportValue(row, "moq", "minimumOrderQuantity") || existing?.moq || "",
             leadTime: normalizeImportValue(row, "leadTime", "leadTimeDays") || existing?.leadTime || "",
             stock: normalizeImportValue(row, "stock", "currentStock") || existing?.stock || "0",
             physicalStock: normalizeImportValue(row, "physicalStock") || existing?.physicalStock || existing?.stock || "0",
             incomingStock: normalizeImportValue(row, "incomingStock") || existing?.incomingStock || "0",
-            status: normalizeImportValue(row, "status") === "Inactive" ? "Inactive" : "Active",
+            reservedStock: existing?.reservedStock || "0",
+            lastStockUpdate: normalizeImportValue(row, "lastStockUpdate") || existing?.lastStockUpdate,
+            vendorProductCode,
+            addedAt: normalizeImportValue(row, "addedAt") || existing?.addedAt
+              || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+            status: importedStatus === "inactive"
+              ? "Inactive"
+              : importedStatus === "active"
+                ? "Active"
+                : existing?.status || "Active",
           };
 
           if (existing) {
@@ -961,22 +918,33 @@ export default function VendorProductsPage() {
               vendorId,
               ...updates,
               reservedStock: "0",
-              addedAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-            } as Omit<VendorProduct, "vendorProductCode">);
+            } as Omit<VendorProduct, "vendorProductCode"> & { vendorProductCode?: string });
           }
         }
 
         if (pending.length > 0) {
-          const codes = reserveVendorProductCodes(pending.length);
-          addVendorProducts(vendorId, pending.map((product, index) => ({ ...product, vendorProductCode: codes[index] } as VendorProduct)));
+          const codes = reserveVendorProductCodes(pending.filter((product) => !product.vendorProductCode).length);
+          let nextCode = 0;
+          addVendorProducts(vendorId, pending.map((product) => ({
+            ...product,
+            vendorProductCode: product.vendorProductCode || codes[nextCode++],
+          } as VendorProduct)));
         }
 
         setVendorProducts(getVendorProducts(vendorId));
         const importedCount = pending.length + updatedCount;
         if (importedCount === 0) {
-          toast.error("No rows could be imported. Match each row to a master product code, SKU, ID, or product name.");
+          const reasons = [
+            missingCount ? `${missingCount} row${missingCount === 1 ? "" : "s"} did not match the master catalog` : "",
+            skippedCount ? `${skippedCount} row${skippedCount === 1 ? "" : "s"} were for the other product type` : "",
+          ].filter(Boolean);
+          toast.error(reasons.length ? `No rows imported: ${reasons.join("; ")}.` : "No rows could be imported.");
         } else {
-          toast.success(`${importedCount} product${importedCount === 1 ? "" : "s"} imported${missingCount ? `; ${missingCount} row${missingCount === 1 ? "" : "s"} skipped` : ""}.`);
+          const skipped = [
+            missingCount ? `${missingCount} unmatched` : "",
+            skippedCount ? `${skippedCount} wrong product type` : "",
+          ].filter(Boolean);
+          toast.success(`${importedCount} ${catalogType} product${importedCount === 1 ? "" : "s"} imported${skipped.length ? `; ${skipped.join(", ")} skipped` : ""}.`);
         }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not read the import file.");
@@ -1029,11 +997,16 @@ export default function VendorProductsPage() {
   const handleMenuAction = (label: string) => {
     setMenuOpen(false);
     if (label === "Add Product") navigate(`/vendors/${vendorId}/add-products`);
-    if (label === "Bulk Price Update") setToolDialog("bulkPrice");
-    if (label === "Import Products") importInputRef.current?.click();
-    if (label === "Export Catalog") handleExportCatalog();
-    if (label === "Sync Vendor Feed") handleSyncVendorFeed();
-    if (label === "Assign to Master Catalog") setToolDialog("assign");
+    if (label === "Import P Products") {
+      importCatalogTypeRef.current = "physical";
+      importInputRef.current?.click();
+    }
+    if (label === "Import D Products") {
+      importCatalogTypeRef.current = "digital";
+      importInputRef.current?.click();
+    }
+    if (label === "Export P Catalog") handleExportCatalog("physical");
+    if (label === "Export D Catalog") handleExportCatalog("digital");
   };
 
   return (
@@ -1061,7 +1034,7 @@ export default function VendorProductsPage() {
         disabled={importing}
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file) handleImportFile(file);
+          if (file) handleImportFile(file, importCatalogTypeRef.current);
         }}
       />
       {editProduct && (
