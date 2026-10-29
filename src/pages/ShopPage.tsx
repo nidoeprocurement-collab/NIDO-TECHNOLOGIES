@@ -1456,7 +1456,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
 
   return (
     <div
-      className={`group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${isGrid ? "min-h-[520px]" : "h-full"} ${vendorPanelOpen ? "z-20" : ""}`}
+      className={`group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${isGrid ? "" : "h-full"} ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
       {/* Top row: product type badge + Heart */}
@@ -1802,7 +1802,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
       )}
 
       {/* Add to Cart button */}
-       <div className="mt-auto px-3 pb-3" onClick={e => e.stopPropagation()}>
+       <div className="mt-3 px-3 pb-3" onClick={e => e.stopPropagation()}>
         <button
           onClick={handleAdd}
           disabled={!canAdd}
@@ -2037,11 +2037,12 @@ export default function ShopPage() {
     : catalogProducts;
   const allCats = ["All Categories", ...Array.from(new Set(visibleCatalogProducts.map(p => p.category)))];
   const allBrands = ["All Brands", ...Array.from(new Set(visibleCatalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
-  const physicalProductCount = visibleCatalogProducts.filter(product => {
-    const kind = getShopProductKind(product);
-    return kind === "physical" || kind === "hybrid";
-  }).length;
-  const digitalProductCount = visibleCatalogProducts.filter(product => getShopProductKind(product) !== "physical").length;
+  const physicalProductCount = visibleCatalogProducts.filter(
+    product => getShopProductKind(product) !== "digital",
+  ).length;
+  const digitalProductCount = visibleCatalogProducts.filter(
+    product => getShopProductKind(product) === "digital",
+  ).length;
 
   const closeFilterMenus = () => {
     setClientOpen(false);
@@ -2060,8 +2061,8 @@ export default function ShopPage() {
     .filter(p => {
       const productKind = getShopProductKind(p);
       const inPrimaryTab = primaryShopTab === "physical"
-        ? productKind === "physical" || productKind === "hybrid"
-        : productKind !== "physical";
+        ? productKind !== "digital"
+        : productKind === "digital";
       if (!inPrimaryTab) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (shopTab !== "all" && productKind !== shopTab) return false;
