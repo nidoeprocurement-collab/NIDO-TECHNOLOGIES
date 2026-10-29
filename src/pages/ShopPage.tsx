@@ -933,30 +933,8 @@ function ConfiguredServiceProductCard({
   const configurationFields = getCatalogVariationFields(vendorConfiguredProduct);
   const storedConfiguration = toStoredCloudConfiguration(configurationFields, configuration);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
-  const getSelectedConfigurationValue = (labels: string[]) => {
-    const normalizedLabels = labels.map(label => label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim());
-    for (const normalizedLabel of normalizedLabels) {
-      const fieldIndex = configurationFields.findIndex(
-        field => field.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === normalizedLabel,
-      );
-      if (fieldIndex < 0) continue;
-      const field = configurationFields[fieldIndex];
-      return configuration[cloudFieldKey(field, fieldIndex)] ?? field.options[0]?.label ?? field.value;
-    }
-    return "";
-  };
-  const selectedProvider = getSelectedConfigurationValue(["Cloud Provider", "License Provider", "Subscription Provider", "Provider"]);
-  const selectedCategory = getSelectedConfigurationValue(["Product Category", "Category"]);
-  const serviceType = getSelectedConfigurationValue(["Service Type"]) || product.subcategory || findCloudField(dataFields, ["service type", "service"]);
-  const region = getSelectedConfigurationValue(["Region", "Region Availability", "Location"]) || findCloudField(dataFields, ["region", "location"]);
-  const deploymentModel = getSelectedConfigurationValue(["Deployment Model", "Deployment"]) || findCloudField(dataFields, ["deployment"]);
-  const billingModel = getSelectedConfigurationValue(["Billing Model", "Billing", "Pricing Model"])
-    || findCloudField(dataFields, ["billing", "pricing model"])
-    || getPricingModel(product.physicalType || product.productType || serviceLabel);
-  const pricingUnit = getSelectedConfigurationValue(["Pricing Unit", "Unit"]) || findCloudField(dataFields, ["pricing unit", "unit"]);
-  const serviceStatus = getSelectedConfigurationValue(["Service Status", "Availability", "Status"])
-    || findCloudField(dataFields, ["service status", "availability", "status"])
-    || (product.inStock ? "Available" : "Unavailable");
+  const selectedConfigurationEntries = Object.entries(storedConfiguration)
+    .filter(([, value]) => Boolean(value.trim()));
   const productType = getProductType(product.physicalType || product.productType);
   const gstRate = getEffectiveTaxPctForCategory(product.category);
   const hsnForCategory = (() => {
@@ -1085,39 +1063,6 @@ function ConfiguredServiceProductCard({
     );
   };
 
-  const infoFields: [string, string][] = [
-    [providerLabel, selectedProvider || provider],
-    ["Product Category", selectedCategory || product.category],
-    ["Service Type", serviceType],
-    ["Region Availability", region],
-    ["Deployment Model", deploymentModel],
-    ["Billing Model", billingModel],
-    ["Pricing Unit", pricingUnit],
-    ["Service Status", serviceStatus],
-  ].filter(([, value]) => Boolean(value));
-  const normalizeInfoLabel = (label: string) => {
-    const normalized = label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    if (normalized.includes("provider")) return "provider";
-    if (normalized === "category" || normalized === "product category") return "product category";
-    if (normalized.includes("service type")) return "service type";
-    if (normalized.includes("region") || normalized.includes("location")) return "region";
-    if (normalized.includes("deployment")) return "deployment model";
-    if (normalized.includes("billing") || normalized.includes("pricing model")) return "billing model";
-    if (normalized === "unit" || normalized.includes("pricing unit")) return "pricing unit";
-    if (normalized.includes("availability") || normalized.includes("status")) return "service status";
-    return normalized;
-  };
-  const displayedInfoLabels = new Set(infoFields.map(([label]) => normalizeInfoLabel(label)));
-  configurationFields.forEach((field, index) => {
-    const normalizedLabel = normalizeInfoLabel(field.label);
-    if (displayedInfoLabels.has(normalizedLabel)) return;
-    displayedInfoLabels.add(normalizedLabel);
-    infoFields.push([
-      field.label,
-      configuration[cloudFieldKey(field, index)] ?? field.options[0]?.label ?? field.value,
-    ]);
-  });
-
   return (
     <div
       className={`group relative flex flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "min-h-[520px]" : "h-full"}`}
@@ -1129,7 +1074,6 @@ function ConfiguredServiceProductCard({
             <ServiceIcon size={18} />
           </div>
           <div className="min-w-0">
-            {provider && <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider}</p>}
             <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-gray-900">{product.name}</h3>
           </div>
         </div>
@@ -1141,31 +1085,18 @@ function ConfiguredServiceProductCard({
 
       <div className="mx-3 mt-3 flex h-[86px] items-center justify-center overflow-hidden rounded-xl border border-blue-50 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {product.image ? (
-          <img src={product.image} alt={`${provider || serviceLabel} ${product.name}`} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
+          <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
         ) : (
           <ServiceIcon size={38} className="text-blue-300" />
         )}
       </div>
 
-      <div className="px-3 pt-3">
-        <div className="flex items-center gap-2">
-          <span className={`text-[11px] font-semibold ${getCategoryColor(product.category)}`}>{product.category}</span>
-          {serviceType && <span className="text-[10px] text-gray-400">· {serviceType}</span>}
-        </div>
-        {product.description && <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-gray-500">{product.description}</p>}
-      </div>
-
-      <div className="mx-3 mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-gray-100 pt-3">
-        {infoFields.map(([label, value]) => (
-          <div key={label} className="min-w-0">
-            <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
-            <p className={`mt-0.5 truncate text-[10px] font-semibold ${label === "Service Status" && value === "Unavailable" ? "text-red-600" : "text-gray-700"}`}>{value}</p>
-          </div>
-        ))}
-      </div>
+      {product.description && (
+        <p className="px-3 pt-3 line-clamp-2 text-[11px] leading-relaxed text-gray-500">{product.description}</p>
+      )}
 
       <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
-        <label className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">{providerLabel} / Vendor</label>
+        <label className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">Vendor</label>
         <select
           value={selectedVendor?.vendorId || ""}
           onChange={event => {
@@ -1175,7 +1106,7 @@ function ConfiguredServiceProductCard({
           }}
           className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] text-gray-700 outline-none transition-colors focus:border-blue-400"
         >
-          <option value="">Select {providerLabel.toLowerCase()} / vendor</option>
+          <option value="">Select a vendor</option>
           {vendorComps.map(vendor => (
             <option key={vendor.vendorId} value={vendor.vendorId} disabled={!canUseVendor(vendor)}>
               {vendor.vendorName}{!canUseVendor(vendor) ? " — unavailable" : ""}
@@ -1191,7 +1122,9 @@ function ConfiguredServiceProductCard({
             <p className="mt-0.5 text-[16px] font-bold text-gray-900">
               {selectedVendor && clientSellingPriceExclGst > 0 ? formatCurrency(clientSellingPriceExclGst) : selectedVendor ? "Custom Quote" : "Select a vendor"}
             </p>
-            <p className="text-[9px] text-gray-400">{billingModel}{selectedVendor && clientSellingPriceExclGst > 0 ? ` · GST ${gstRate}% added in cart` : ""}</p>
+            {selectedVendor && clientSellingPriceExclGst > 0 && (
+              <p className="text-[9px] text-gray-400">GST {gstRate}% added in cart</p>
+            )}
           </div>
           {selectedVendor && (
             <div className="flex items-center rounded-lg border border-gray-200">
@@ -1201,6 +1134,16 @@ function ConfiguredServiceProductCard({
             </div>
           )}
         </div>
+        {selectedConfigurationEntries.length > 0 && (
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-gray-100 pt-2">
+            {selectedConfigurationEntries.map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
+                <p className="truncate text-[10px] font-semibold text-gray-700">{value}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-auto grid grid-cols-2 gap-2 px-3 pb-3 pt-3" onClick={event => event.stopPropagation()}>
