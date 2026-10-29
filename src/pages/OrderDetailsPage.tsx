@@ -4206,7 +4206,7 @@ export default function MyOrderPage() {
   const subOrdersColumns = isDigitalOrder
     ? (isClientPortalUser
       ? ["#", "PRODUCT NAME & DESCRIPTION", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"]
-      : ["#", "PRODUCT NAME & DESCRIPTION", "VENDOR/PO NUMBER", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"])
+      : ["#", "PRODUCT NAME & DESCRIPTION", "Vendor/PO Number", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"])
     : (isClientPortalUser
       ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
       : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
@@ -4715,6 +4715,8 @@ export default function MyOrderPage() {
                             <span style={{ display: "inline-block", padding: "3px 7px", borderRadius: 6, background: subPresentation.type.toLowerCase().includes("cloud") ? "#eff6ff" : "#f3e8ff", color: subPresentation.type.toLowerCase().includes("cloud") ? "#1d4ed8" : "#6b21a8", fontSize: 10.5, fontWeight: 600, lineHeight: 1.3, overflowWrap: "anywhere" }}>{subPresentation.type}</span>
                           </div>
                           <div style={{ fontSize: 11.5, minWidth: 0, overflowWrap: "break-word" }}>{digitalLicenseTerm}</div>
+                          <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
+                          <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>{unitPriceContent}</div>
                         </>
                       )}
                        {!isDigitalOrder && (
@@ -4741,14 +4743,15 @@ export default function MyOrderPage() {
                            {subIsDigital ? subPresentation.provisioningTime : "—"}
                          </div>
                        )}
-                       {isDigitalOrder && (
-                         <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
-                           {subPresentation.provisioningTime}
-                         </div>
-                       )}
                       <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>
                          {formatCurrency(lineTotal)}
                       </div>
+                      {isDigitalOrder && (
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0, fontSize: 11.5, lineHeight: 1.4, overflowWrap: "break-word" }}>
+                          <Mail size={13} color="#2563eb" style={{ flexShrink: 0, marginTop: 1 }} />
+                          <span>{digitalDeliveryMode}<br /><span style={{ color: "#6b7280" }}>({digitalDeliveryTiming})</span></span>
+                        </div>
+                      )}
                       <div style={{ minWidth: 0, overflow: "hidden" }}>
                         <StatusPill status={sub.itemStatus} compact />
                         <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div>
