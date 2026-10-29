@@ -32,6 +32,11 @@ export default class PageErrorBoundary extends React.Component<
 
   render() {
     if (this.state.error) {
+      const showErrorDetails =
+        import.meta.env.DEV
+        || window.location.hostname === "localhost"
+        || window.location.hostname.endsWith(".replit.dev");
+
       return (
         <main className="mx-auto flex min-h-[50vh] w-full max-w-3xl items-center justify-center px-5 py-12">
           <section
@@ -44,8 +49,8 @@ export default class PageErrorBoundary extends React.Component<
             <p className="mt-2 text-sm text-gray-600">
               Refresh the page and try again. If the problem continues, contact your administrator.
             </p>
-            {import.meta.env.DEV && (
-              <details className="mt-4 rounded-lg bg-red-50 p-3">
+            {showErrorDetails && (
+              <details open className="mt-4 rounded-lg bg-red-50 p-3">
                 <summary className="cursor-pointer text-xs font-semibold text-red-800">
                   Development error details
                 </summary>
