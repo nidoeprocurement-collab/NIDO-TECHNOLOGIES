@@ -132,8 +132,16 @@ function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number; totalStock: number; hasEligibleVendor: boolean };
 type ShopTab = "all" | "physical" | "digital" | "subscription" | "cloud" | "hybrid";
-type ProductTypeFilter = "all" | "physical" | "digital";
 type SortOption = "Popularity" | "Price: Low to High" | "Price: High to Low" | "Name";
+
+const SHOP_TABS: { id: ShopTab; label: string; icon: typeof Package }[] = [
+  { id: "all", label: "All Products", icon: Package },
+  { id: "physical", label: "Physical Products", icon: Package },
+  { id: "digital", label: "Digital Licenses", icon: KeyRound },
+  { id: "subscription", label: "Subscriptions (SaaS)", icon: Repeat2 },
+  { id: "cloud", label: "Cloud Services", icon: Cloud },
+  { id: "hybrid", label: "Hybrid Products", icon: Layers3 },
+];
 
 function getShopProductKind(product: Pick<Product, "productType" | "physicalType" | "category" | "name">): Exclude<ShopTab, "all"> {
   const value = `${product.productType || ""} ${product.physicalType || ""} ${product.category || ""} ${product.name || ""}`.toLowerCase();
@@ -178,6 +186,11 @@ function getShopProductLabel(kind: Exclude<ShopTab, "all">): string {
     hybrid: "Hybrid Product",
   };
   return labels[kind];
+}
+
+function getShopProductIcon(kind: Exclude<ShopTab, "all">) {
+  const Icon = SHOP_TABS.find(tab => tab.id === kind)?.icon || Package;
+  return <Icon size={12} />;
 }
 
 type CloudDataField = {
@@ -919,11 +932,14 @@ function ConfiguredServiceProductCard({
   const configurationFields = getCatalogVariationFields(vendorConfiguredProduct);
   const storedConfiguration = toStoredCloudConfiguration(configurationFields, configuration);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
-  const selectedConfigurationFields = configurationFields.map((field, index) => {
-    const value = configuration[cloudFieldKey(field, index)] ?? field.options[0]?.label ?? field.value;
-    const selectedOption = field.options.find(option => option.label === value);
-    return { label: field.label, value, priceAdjustment: selectedOption?.priceAdjustment || 0 };
-  });
+  const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
+  const region = findCloudField(dataFields, ["region", "location"]);
+  const deploymentModel = findCloudField(dataFields, ["deployment"]);
+  const billingModel = findCloudField(dataFields, ["billing", "pricing model"]) || getPricingModel(product.physicalType || product.productType || serviceLabel);
+  const pricingUnit = findCloudField(dataFields, ["pricing unit", "unit"]);
+  const serviceStatus = findCloudField(dataFields, ["service status", "availability", "status"])
+    || (product.inStock ? "Available" : "Unavailable");
+  const configurationCount = configurationFields.length;
   const productType = getProductType(product.physicalType || product.productType);
   const gstRate = getEffectiveTaxPctForCategory(product.category);
   const hsnForCategory = (() => {
@@ -1052,6 +1068,18 @@ function ConfiguredServiceProductCard({
     );
   };
 
+  const infoFields = [
+    [providerLabel, provider],
+    ["Product Category", product.category],
+    ["Service Type", serviceType],
+    ["Region Availability", region],
+    ["Deployment Model", deploymentModel],
+    ["Billing Model", billingModel],
+    ["Pricing Unit", pricingUnit],
+    ["Service Status", serviceStatus],
+    ["Configurations", configurationCount > 0 ? `${configurationCount} available` : ""],
+  ].filter(([, value]) => Boolean(value));
+
   return (
     <div
       className={`group relative flex flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "min-h-[520px]" : "h-full"}`}
@@ -1081,27 +1109,22 @@ function ConfiguredServiceProductCard({
         )}
       </div>
 
-      {product.description && (
-        <div className="px-3 pt-3">
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-gray-500">{product.description}</p>
+      <div className="px-3 pt-3">
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] font-semibold ${getCategoryColor(product.category)}`}>{product.category}</span>
+          {serviceType && <span className="text-[10px] text-gray-400">· {serviceType}</span>}
         </div>
-      )}
+        {product.description && <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-gray-500">{product.description}</p>}
+      </div>
 
-      {selectedConfigurationFields.length > 0 && (
-        <div className="mx-3 mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-gray-100 pt-3">
-          {selectedConfigurationFields.map(({ label, value, priceAdjustment }) => (
-            <div key={label} className="min-w-0">
-              <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
-              <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-700" title={value}>{value}</p>
-              {priceAdjustment !== 0 && (
-                <p className={`truncate text-[9px] ${priceAdjustment > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                  {priceAdjustment > 0 ? "+" : ""}{formatCurrency(priceAdjustment)} / unit
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="mx-3 mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-gray-100 pt-3">
+        {infoFields.slice(0, 8).map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
+            <p className={`mt-0.5 truncate text-[10px] font-semibold ${label === "Service Status" && value === "Unavailable" ? "text-red-600" : "text-gray-700"}`}>{value}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
         <label className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">{providerLabel} / Vendor</label>
@@ -1130,7 +1153,7 @@ function ConfiguredServiceProductCard({
             <p className="mt-0.5 text-[16px] font-bold text-gray-900">
               {selectedVendor && clientSellingPriceExclGst > 0 ? formatCurrency(clientSellingPriceExclGst) : selectedVendor ? "Custom Quote" : "Select a vendor"}
             </p>
-            <p className="text-[9px] text-gray-400">{selectedVendor && clientSellingPriceExclGst > 0 ? `GST ${gstRate}% added in cart` : "Final unit price"}</p>
+            <p className="text-[9px] text-gray-400">{billingModel}{selectedVendor && clientSellingPriceExclGst > 0 ? ` · GST ${gstRate}% added in cart` : ""}</p>
           </div>
           {selectedVendor && (
             <div className="flex items-center rounded-lg border border-gray-200">
@@ -1923,7 +1946,7 @@ export default function ShopPage() {
   const { user, isClientPortalUser } = useAuth();
   useI18n();
   const [search, setSearch] = useState("");
-  const [productTypeFilter, setProductTypeFilter] = useState<ProductTypeFilter>("all");
+  const [shopTab, setShopTab] = useState<ShopTab>("all");
   const [brand, setBrand] = useState("All Brands");
   const [sortBy, setSortBy] = useState<SortOption>("Popularity");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -2029,9 +2052,7 @@ export default function ShopPage() {
   const filtered = visibleCatalogProducts
     .filter(p => {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
-      const productKind = getShopProductKind(p);
-      if (productTypeFilter === "physical" && productKind !== "physical" && productKind !== "hybrid") return false;
-      if (productTypeFilter === "digital" && productKind === "physical") return false;
+      if (shopTab !== "all" && getShopProductKind(p) !== shopTab) return false;
       if (category !== "All Categories" && p.category !== category) return false;
       if (brand !== "All Brands" && p.brand !== brand) return false;
       if (availability === "In Stock" && !p.inStock) return false;
@@ -2056,11 +2077,16 @@ export default function ShopPage() {
     localStorage.setItem(ORDER_REQUESTER_KEY, "self");
     setCategory("All Categories");
     setBrand("All Brands");
-    setProductTypeFilter("all");
+    setShopTab("all");
     setAvailability("All");
     setSearch("");
     setCurrentPage(1);
     closeFilterMenus();
+  };
+
+  const handleShopTabChange = (tab: ShopTab) => {
+    setShopTab(tab);
+    setCurrentPage(1);
   };
 
   const pageNums = () => {
@@ -2162,26 +2188,6 @@ export default function ShopPage() {
           </div>
         )}
 
-        {selectedClientId && (
-          <div className="relative shrink-0">
-            <select
-              aria-label="Filter products by type"
-              value={productTypeFilter}
-              onChange={event => {
-                setProductTypeFilter(event.target.value as ProductTypeFilter);
-                resetPage();
-                setMoreFiltersOpen(false);
-              }}
-              className="h-[38px] min-w-[150px] appearance-none rounded-lg border border-gray-200 bg-white px-3 pr-8 text-xs text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-400 md:text-sm"
-            >
-              <option value="all">All Products</option>
-              <option value="digital">Digital Products</option>
-              <option value="physical">Physical Products</option>
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
-        )}
-
         {/* More Filters */}
         {selectedClientId && (
           <div className="relative">
@@ -2196,6 +2202,33 @@ export default function ShopPage() {
             </button>
             {moreFiltersOpen && (
               <div className="absolute left-0 top-full z-40 mt-1 w-[min(92vw,360px)] rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Product type</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {SHOP_TABS.map(tab => {
+                    const Icon = tab.icon;
+                    const active = shopTab === tab.id;
+                    const count = tab.id === "all"
+                      ? visibleCatalogProducts.length
+                      : visibleCatalogProducts.filter(product => getShopProductKind(product) === tab.id).length;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => handleShopTabChange(tab.id)}
+                        className={`flex min-h-14 flex-col items-start justify-between rounded-lg border px-2 py-1.5 text-left text-[10px] transition-colors ${
+                          active ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-blue-200 hover:bg-blue-50/50"
+                        }`}
+                      >
+                        <span className="flex w-full items-center justify-between gap-1">
+                          <Icon size={12} className={active ? "text-blue-600" : "text-gray-400"} />
+                          <span className={`rounded-full px-1 text-[9px] ${active ? "bg-white text-blue-600" : "bg-gray-100 text-gray-500"}`}>{count}</span>
+                        </span>
+                        <span className="leading-tight">{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <label className="text-[10px] font-medium text-gray-500">
                     Category
