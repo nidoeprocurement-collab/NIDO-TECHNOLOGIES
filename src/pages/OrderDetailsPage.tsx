@@ -47,6 +47,7 @@ import {
   formatPartiallyProvisionedStatus,
   getDigitalFulfillmentStatusIndex,
   getDigitalFulfillmentStatusSequence,
+  hasDigitalLicenseBeenProvisioned,
 } from "@/lib/digitalFulfillmentStatuses";
 import { toast } from "sonner";
 import {
@@ -2828,6 +2829,20 @@ function hasPOItemShipmentStarted(po: any, subOrderId: string, subOrder?: any): 
   );
   const lineStatus = String(matchingLine?.status || "").toLowerCase();
   const poStatus = String(po.status || "").toLowerCase();
+  const digitalLineStatus = String(matchingLine?.status || "");
+  const digitalPOStatus = String(po.status || "");
+  const digitalLine = Boolean(
+    (matchingLine && isDigitalDocumentProduct(matchingLine)) ||
+    (subOrder && isDigitalDocumentProduct(subOrder)),
+  );
+  const digitalQuantity = matchingLine?.qty ?? matchingLine?.quantity ?? subOrder?.qty;
+  if (
+    digitalLine &&
+    (
+      hasDigitalLicenseBeenProvisioned(digitalLineStatus, digitalQuantity) ||
+      hasDigitalLicenseBeenProvisioned(digitalPOStatus, digitalQuantity)
+    )
+  ) return true;
   return lineStatus.includes("shipped") ||
     lineStatus.includes("dispatched") ||
     lineStatus.includes("delivered") ||
@@ -3093,22 +3108,28 @@ export default function MyOrderPage() {
     const timer = window.setInterval(() => setReturnWindowTick(value => value + 1), 60 * 1000);
     return () => window.clearInterval(timer);
   }, []);
-  const hasShippedCustomerItem = subOrders.some(
-    sub => sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered",
-  );
+  const hasCancellationCutoffItem = subOrders.some(sub => {
+    const digital = isDigitalDocumentProduct({
+      productType: sub.commercialTerms?.productType,
+      itemName: sub.itemName,
+    });
+    return digital
+      ? hasDigitalLicenseBeenProvisioned(sub.itemStatus, sub.qty)
+      : sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered";
+  });
   // Delivered orders normally lock Documents & Notes. A live return request
   // reopens the section for the client/owner conversation until pickup is done.
   const hasActiveReturnWorkflow = subOrders.some(
     sub => sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled",
   );
   const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
-  const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
-  const cancelOrderUnavailableReason = !canCancelOrderByPO && hasShippedCustomerItem
-    ? "Active purchase orders and shipped or delivered items both block cancellation."
+  const canCancelOrder = canCancelOrderByPO && !hasCancellationCutoffItem;
+  const cancelOrderUnavailableReason = !canCancelOrderByPO && hasCancellationCutoffItem
+    ? "Active purchase orders and shipment or digital provisioning progress both block cancellation."
     : !canCancelOrderByPO
       ? "Cancel all active purchase orders before cancelling this order."
-      : hasShippedCustomerItem
-        ? "This order cannot be cancelled after an item has shipped or been delivered."
+      : hasCancellationCutoffItem
+        ? "This order cannot be cancelled after an item has shipped or a digital license has been provisioned."
         : "";
   const handleCancelOrder = async (reason: string) => {
     if (isOrderCancelled || !canCancelOrder) return;
@@ -3323,6 +3344,7 @@ export default function MyOrderPage() {
       target.itemStatus === "Cancelled" ||
       target.itemStatus === "Shipped" ||
       target.itemStatus === "Delivered" ||
+      (isDigitalDocumentProduct(target) && hasDigitalLicenseBeenProvisioned(target.itemStatus, target.qty)) ||
       RETURN_WORKFLOW_STATUSES.includes(target.itemStatus)
     ) return;
 
@@ -4529,6 +4551,8 @@ export default function MyOrderPage() {
                   });
                   const subPresentation = getDocumentProductPresentation(sub, { quantity: sub.qty });
                   const isSubOrderCancelled = sub.itemStatus === "Cancelled";
+                  const digitalCancellationLocked = subIsDigital &&
+                    hasDigitalLicenseBeenProvisioned(sub.itemStatus, sub.qty);
                   // A cancelled sub-order is fully inactive in this view. Do
                   // not expose stale PO/vendor projections or action handlers.
                     const allOrderPOs = Object.values(createdPOs) as any[];
@@ -4812,7 +4836,7 @@ export default function MyOrderPage() {
                              >
                                Raise Return Request
                              </button>
-                            ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) && !hasShipmentStarted && !hasConfirmedPO ? (
+                             ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !digitalCancellationLocked && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) && !hasShipmentStarted && !hasConfirmedPO ? (
                             <button
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
@@ -4823,8 +4847,10 @@ export default function MyOrderPage() {
                             </button>
                            ) : sub.itemStatus === "Delivered" ? (
                              <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>Return window expired</span>
-                           ) : hasShipmentStarted ? (
-                              <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>Cancellation unavailable after shipment</span>
+                            ) : digitalCancellationLocked ? (
+                              <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>Cancellation unavailable after a license is provisioned</span>
+                            ) : hasShipmentStarted ? (
+                               <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>{subIsDigital ? "Cancellation unavailable after a license is provisioned" : "Cancellation unavailable after shipment"}</span>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                           )}
@@ -4846,7 +4872,7 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
-                            cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
+                            cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !digitalCancellationLocked && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}

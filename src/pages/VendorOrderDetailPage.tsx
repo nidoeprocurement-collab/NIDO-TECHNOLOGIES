@@ -8,6 +8,7 @@ import {
   deriveDigitalFulfillmentStatus,
   getDigitalFulfillmentStatusIndex,
   getDigitalFulfillmentStatusSequence,
+  hasDigitalLicenseBeenProvisioned,
 } from "@/lib/digitalFulfillmentStatuses";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
@@ -990,7 +991,11 @@ export default function VendorOrderDetailPage() {
     }
     if (status === "Cancelled") {
       const it = currentItem;
-      if (it?.status === "Shipped" || it?.status === "Delivered") return;
+      if (it && (
+        it.status === "Shipped" ||
+        it.status === "Delivered" ||
+        (digital && hasDigitalLicenseBeenProvisioned(it.status, it.qty))
+      )) return;
       setPendingItemCancel({ id, name: it?.name || "this item" });
       return;
     }
@@ -1043,6 +1048,14 @@ export default function VendorOrderDetailPage() {
   const confirmItemCancel = (reason: string) => {
     if (!pendingItemCancel) return;
     const itemIndex = items.findIndex(it => it.id === pendingItemCancel.id);
+    const itemToCancel = items[itemIndex];
+    if (
+      !itemToCancel ||
+      itemToCancel.status === "Shipped" ||
+      itemToCancel.status === "Delivered" ||
+      (isDigitalDocumentProduct(itemToCancel) &&
+        hasDigitalLicenseBeenProvisioned(itemToCancel.status, itemToCancel.qty))
+    ) return;
     setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled", cancelReason: reason } : it));
     const po = getPOByNumber(poKey);
     if (po && itemIndex >= 0) {
@@ -1729,8 +1742,14 @@ export default function VendorOrderDetailPage() {
               <div style={{ minWidth: 0 }}>
                 {item.status === "Cancelled" ? (
                   <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>Cancelled</span>
-                ) : item.status === "Shipped" || item.status === "Delivered" ? (
-                  <span style={{ fontSize: 12, color: "#9ca3af" }} title="Shipped and delivered items cannot be cancelled here">—</span>
+                ) : item.status === "Shipped" || item.status === "Delivered" ||
+                  (isDigitalDocumentProduct(item) && hasDigitalLicenseBeenProvisioned(item.status, item.qty)) ? (
+                  <span
+                    style={{ fontSize: 12, color: "#9ca3af" }}
+                    title={isDigitalDocumentProduct(item)
+                      ? "Items cannot be cancelled after a license has been provisioned"
+                      : "Shipped and delivered items cannot be cancelled here"}
+                  >—</span>
                 ) : isCancelled ? (
                   <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                 ) : (

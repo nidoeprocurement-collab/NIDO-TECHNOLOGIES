@@ -90,3 +90,13 @@ export function getDigitalFulfillmentStatusIndex(
   const stage = normalizedStatus.replace(/\s+\([^)]*\)$/, "");
   return sequence.findIndex((option) => option === stage);
 }
+
+/** The digital equivalent of shipment progress begins when any license is provisioned. */
+export function hasDigitalLicenseBeenProvisioned(
+  status: string,
+  quantity?: number | string,
+): boolean {
+  const currentIndex = getDigitalFulfillmentStatusIndex(status, quantity);
+  const provisionedIndex = getDigitalFulfillmentStatusIndex("Partially Provisioned", quantity);
+  return provisionedIndex >= 0 && currentIndex >= provisionedIndex;
+}
