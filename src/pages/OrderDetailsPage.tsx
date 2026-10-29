@@ -4190,31 +4190,23 @@ export default function MyOrderPage() {
       : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
   if (isDigitalOrder) {
     const quantityIndex = isClientPortalUser ? 3 : 4;
-    subOrdersColumns[quantityIndex] = DIGITAL_PRODUCT_HEADERS.quantity;
-    subOrdersColumns[quantityIndex + 1] = DIGITAL_PRODUCT_HEADERS.tenure;
-    subOrdersColumns.splice(quantityIndex + 2, 0, DIGITAL_PRODUCT_HEADERS.provisioning);
+    subOrdersColumns.splice(quantityIndex, 2, DIGITAL_PRODUCT_HEADERS.provisioning);
   } else if (isMixedOrder) {
     const insertAt = subOrdersColumns.indexOf("TOTAL");
-    subOrdersColumns.splice(
-      insertAt,
-      0,
-      DIGITAL_PRODUCT_HEADERS.quantity,
-      DIGITAL_PRODUCT_HEADERS.tenure,
-      DIGITAL_PRODUCT_HEADERS.provisioning,
-    );
+    subOrdersColumns.splice(insertAt, 0, DIGITAL_PRODUCT_HEADERS.provisioning);
   }
   // Keep Status compact, reserve a readable width for the GST-exclusive total,
   // and use the freed space to balance item, tracking, and vendor details.
   const subOrdersColTemplateBase = isClientPortalUser
     ? (isDigitalOrder
-      ? "28px 110px minmax(0,2.2fr) 38px minmax(0,.78fr) minmax(0,1fr) minmax(0,1.2fr) 82px 88px"
+      ? "28px 110px minmax(0,2.4fr) minmax(0,1fr) minmax(0,1.2fr) 82px 88px"
       : isMixedOrder
-        ? "28px 100px minmax(0,2fr) 44px minmax(0,.78fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,1.2fr) 82px minmax(0,1.05fr) 88px"
+        ? "28px 100px minmax(0,2fr) 44px minmax(0,.78fr) minmax(0,.85fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.05fr) 88px"
         : "28px 100px minmax(0,2.2fr) 44px minmax(0,.78fr) minmax(0,1.2fr) 82px minmax(0,1.2fr) 88px")
     : (isDigitalOrder
-      ? "28px 110px minmax(0,1.95fr) 72px 38px minmax(0,.78fr) minmax(0,1fr) 112px 82px minmax(0,1.2fr) 80px"
+      ? "28px 110px minmax(0,1.95fr) 72px minmax(0,.95fr) minmax(0,1fr) 112px minmax(0,1.2fr) 80px"
       : isMixedOrder
-        ? "28px 105px minmax(0,1.85fr) 72px 38px minmax(0,.8fr) 38px minmax(0,.8fr) minmax(0,1fr) 112px 82px minmax(0,1fr) minmax(0,1.15fr) 80px"
+        ? "28px 105px minmax(0,1.85fr) 72px 38px minmax(0,.8fr) minmax(0,.8fr) minmax(0,1fr) 112px 82px minmax(0,1fr) 80px"
         : "28px 105px minmax(0,2fr) 72px 44px minmax(0,.8fr) 112px 82px minmax(0,1.05fr) minmax(0,1.05fr) 80px");
   const subOrdersColTemplate = subOrdersColTemplateBase;
   const subOrdersColGap = 6;
@@ -4665,35 +4657,29 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       )}
-                       <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>
-                         {isMixedOrder && subIsDigital ? "—" : sub.qty}
-                       </div>
-                       <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
-                          {isMixedOrder && subIsDigital
-                            ? "—"
-                            : isDigitalOrder
-                            ? subPresentation.tenureBilling
-                             : hasDiscount ? (
-                               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                                 <span style={{ color: "#15803d", fontWeight: 700 }}>
-                                   {formatCurrency(unitPriceExclGst)} <span style={{ fontSize: 10.5 }}>({Number(discountPct.toFixed(2))}% off)</span>
-                                 </span>
-                                 <del style={{ color: "#9ca3af", fontSize: 11.5 }}>{formatCurrency(originalUnitPriceExclGst)}</del>
-                               </div>
-                             ) : formatCurrency(unitPriceExclGst)}
-                       </div>
-                       {isMixedOrder && (
+                       {!isDigitalOrder && (
                          <>
                            <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>
-                             {subIsDigital ? subPresentation.quantity : "—"}
+                             {isMixedOrder && subIsDigital ? "—" : sub.qty}
                            </div>
                            <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
-                             {subIsDigital ? subPresentation.tenureBilling : "—"}
-                           </div>
-                           <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
-                             {subIsDigital ? subPresentation.provisioningTime : "—"}
+                             {isMixedOrder && subIsDigital
+                               ? "—"
+                               : hasDiscount ? (
+                                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                   <span style={{ color: "#15803d", fontWeight: 700 }}>
+                                     {formatCurrency(unitPriceExclGst)} <span style={{ fontSize: 10.5 }}>({Number(discountPct.toFixed(2))}% off)</span>
+                                   </span>
+                                   <del style={{ color: "#9ca3af", fontSize: 11.5 }}>{formatCurrency(originalUnitPriceExclGst)}</del>
+                                 </div>
+                               ) : formatCurrency(unitPriceExclGst)}
                            </div>
                          </>
+                       )}
+                       {isMixedOrder && (
+                         <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
+                           {subIsDigital ? subPresentation.provisioningTime : "—"}
+                         </div>
                        )}
                        {isDigitalOrder && (
                          <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>

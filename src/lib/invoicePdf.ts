@@ -341,8 +341,8 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
 
       const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
       return [
-        String(index + 1), description, item.hsnSac || '', String(item.quantity),
-        presentation.tenureBilling, presentation.provisioningTime, fmt2(taxable),
+        String(index + 1), description, item.hsnSac || '',
+        presentation.provisioningTime, fmt2(taxable),
         taxRateLabel, fmt2(gst), fmt2(taxable + gst),
       ];
     });
@@ -351,7 +351,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
       startY,
       margin: { left: margin, right: margin },
       head: [digital
-        ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+        ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
         : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
       body,
       theme: 'grid',

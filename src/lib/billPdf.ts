@@ -276,7 +276,7 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
       const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
       return [
         String(index + 1), item.itemDetails || '—', item.account || '—',
-        item.quantity.toFixed(2), presentation.tenureBilling, presentation.provisioningTime,
+        presentation.provisioningTime,
         fmt2(taxable), `${item.taxPercent}%`, fmt2(gst), fmt2(taxable + gst),
       ];
     });
@@ -285,7 +285,7 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
       startY,
       margin: { left: margin, right: margin },
       head: [digital
-        ? ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+        ? ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
         : ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
       body: tableBody,
       theme: 'grid',

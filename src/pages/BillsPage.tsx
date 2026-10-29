@@ -426,16 +426,9 @@ function BillPdfView({ bill }: { bill: BillEntry }) {
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">#</th>
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Account</th>
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">
-              {hasDigitalItems ? hasPhysicalItems ? `QTY / ${DIGITAL_PRODUCT_HEADERS.quantity}` : DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}
-            </th>
+            {hasPhysicalItems && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Qty</th>}
             {hasPhysicalItems && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>}
-            {hasDigitalItems && (
-              <>
-                <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.tenure}</th>
-                <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
-              </>
-            )}
+            {hasDigitalItems && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>}
             <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Amount</th>
           </tr>
         </thead>
@@ -450,14 +443,9 @@ function BillPdfView({ bill }: { bill: BillEntry }) {
                 <td className="px-3 py-2.5 text-gray-500">{i + 1}</td>
                 <td className="px-3 py-2.5 whitespace-pre-wrap"><p className="font-medium">{item.itemDetails || "—"}</p></td>
                 <td className="px-3 py-2.5 text-gray-500">{item.account || "—"}</td>
-                <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
+                {hasPhysicalItems && <td className="px-3 py-2.5 text-right">{digital ? "—" : item.quantity.toFixed(2)}</td>}
                 {hasPhysicalItems && <td className="px-3 py-2.5 text-right">{digital ? "—" : item.rate.toFixed(2)}</td>}
-                {hasDigitalItems && (
-                  <>
-                    <td className="px-3 py-2.5 text-right">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : "—"}</td>
-                    <td className="px-3 py-2.5 text-right">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}</td>
-                  </>
-                )}
+                {hasDigitalItems && <td className="px-3 py-2.5 text-right">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}</td>}
                 <td className="px-3 py-2.5 text-right font-medium">{taxable.toFixed(2)}</td>
               </tr>
             );
@@ -852,21 +840,14 @@ export default function BillsPage() {
                     <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-10">#</th>
                     <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item / Specification</th>
                     <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">HSN/SAC</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-20">
-                      {hasDigitalFormItems ? hasPhysicalFormItems ? `QTY / ${DIGITAL_PRODUCT_HEADERS.quantity}` : DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}
-                    </th>
+                    {hasPhysicalFormItems && <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-20">Qty</th>}
                     {hasPhysicalFormItems && (
                       <>
                         <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Unit Rate</th>
                         <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">Disc</th>
                       </>
                     )}
-                    {hasDigitalFormItems && (
-                      <>
-                        <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.tenure}</th>
-                        <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
-                      </>
-                    )}
+                    {hasDigitalFormItems && <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>}
                     <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Taxable</th>
                     <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">GST Rate</th>
                     <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">GST</th>
@@ -891,9 +872,13 @@ export default function BillsPage() {
                         <td className="px-2 py-2">
                           <input className={inp + " text-center"} value={item.hsnSac} onChange={(e) => handleItemChange(item.id, "hsnSac", e.target.value)} placeholder="HSN/SAC" />
                         </td>
-                        <td className="px-2 py-2">
-                          <input className={inp + " text-center"} value={String(item.quantity)} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} />
-                        </td>
+                        {hasPhysicalFormItems && (
+                          <td className="px-2 py-2">
+                            {digital ? <span className="block text-center text-gray-400">—</span> : (
+                              <input className={inp + " text-center"} value={String(item.quantity)} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} />
+                            )}
+                          </td>
+                        )}
                         {hasPhysicalFormItems && (digital ? (
                           <>
                             <td className="px-2 py-2 text-center text-gray-400">—</td>
@@ -909,16 +894,7 @@ export default function BillsPage() {
                             </td>
                           </>
                         ))}
-                        {hasDigitalFormItems && (
-                          <>
-                            <td className="px-2 py-2 text-center text-xs text-gray-600">
-                              {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : "—"}
-                            </td>
-                            <td className="px-2 py-2 text-center text-xs text-gray-600">
-                              {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}
-                            </td>
-                          </>
-                        )}
+                        {hasDigitalFormItems && <td className="px-2 py-2 text-center text-xs text-gray-600">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}</td>}
                         <td className="px-2 py-2 text-right text-gray-700 font-medium">{taxable.toFixed(2)}</td>
                         <td className="px-2 py-2">
                           <select className={sel + " text-center"} value={String(item.taxPercent)} onChange={(e) => handleItemChange(item.id, "taxPercent", e.target.value)}>
@@ -1174,9 +1150,9 @@ export default function BillsPage() {
                         "#",
                         "ITEM / DESCRIPTION",
                         "ACCOUNT",
-                        hasDigitalBillItems ? hasPhysicalBillItems ? `QTY / ${DIGITAL_PRODUCT_HEADERS.quantity}` : DIGITAL_PRODUCT_HEADERS.quantity : "QTY",
+                        ...(hasPhysicalBillItems ? ["QTY"] : []),
                         ...(hasPhysicalBillItems ? [`RATE (${currencySymbol})`, "DISC %"] : []),
-                        ...(hasDigitalBillItems ? [DIGITAL_PRODUCT_HEADERS.tenure, DIGITAL_PRODUCT_HEADERS.provisioning] : []),
+                        ...(hasDigitalBillItems ? [DIGITAL_PRODUCT_HEADERS.provisioning] : []),
                         `TAXABLE (${currencySymbol})`,
                         "GST RATE",
                         `GST (${currencySymbol})`,
@@ -1200,7 +1176,7 @@ export default function BillsPage() {
                             <p className="font-semibold text-gray-900">{item.itemDetails || "—"}</p>
                           </td>
                           <td className="px-3 py-3 text-gray-600">{item.account || "—"}</td>
-                          <td className="px-3 py-3 text-center">{item.quantity}</td>
+                          {hasPhysicalBillItems && <td className="px-3 py-3 text-center">{digital ? "—" : item.quantity}</td>}
                           {hasPhysicalBillItems && (digital ? (
                             <>
                               <td className="px-3 py-3 text-center text-gray-400">—</td>
@@ -1212,16 +1188,7 @@ export default function BillsPage() {
                               <td className="px-3 py-3 text-center text-gray-500">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
                             </>
                           ))}
-                          {hasDigitalBillItems && (
-                            <>
-                              <td className="px-3 py-3 text-center text-gray-600">
-                                {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : "—"}
-                              </td>
-                              <td className="px-3 py-3 text-center text-gray-600">
-                                {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}
-                              </td>
-                            </>
-                          )}
+                          {hasDigitalBillItems && <td className="px-3 py-3 text-center text-gray-600">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}</td>}
                           <td className="px-3 py-3 text-right">{taxable.toFixed(2)}</td>
                           <td className="px-3 py-3 text-center">{item.taxPercent}%</td>
                           <td className="px-3 py-3 text-right">{gst.toFixed(2)}</td>

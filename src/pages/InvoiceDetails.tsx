@@ -111,7 +111,7 @@ export default function InvoiceDetails() {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               {(digital
-                ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, DIGITAL_PRODUCT_HEADERS.provisioning, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+                ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.provisioning, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
                 : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
               ).map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
@@ -134,21 +134,18 @@ export default function InvoiceDetails() {
                     {item.commercialTerms && (
                       <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 leading-tight">
                         <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
-                        <span>{digital ? `${DIGITAL_PRODUCT_HEADERS.tenure}:` : 'MOQ / Min Qty:'} <strong className="text-gray-700">{digital ? presentation.tenureBilling : item.commercialTerms.moqLabel}</strong></span>
+                        {!digital && <span>MOQ / Min Qty: <strong className="text-gray-700">{item.commercialTerms.moqLabel}</strong></span>}
                         <span>{digital ? `${DIGITAL_PRODUCT_HEADERS.provisioning}:` : 'Lead Time / SLA:'} <strong className="text-gray-700">{digital ? presentation.provisioningTime : `${item.commercialTerms.leadTimePrimary}${item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}`}</strong></span>
                         <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
                       </div>
                     )}
                   </td>
                   <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
-                  <td className="px-3 py-3 text-center">{item.quantity}</td>
                   {digital ? (
-                    <>
-                      <td className="px-3 py-3 text-center text-gray-600">{presentation.tenureBilling}</td>
-                      <td className="px-3 py-3 text-center text-gray-600">{presentation.provisioningTime}</td>
-                    </>
+                    <td className="px-3 py-3 text-center text-gray-600">{presentation.provisioningTime}</td>
                   ) : (
                     <>
+                      <td className="px-3 py-3 text-center">{item.quantity}</td>
                       <td className="px-3 py-3 text-right">{fmt(item.rate)}</td>
                       <td className="px-3 py-3 text-right text-gray-500">{fmt(disc)}</td>
                     </>

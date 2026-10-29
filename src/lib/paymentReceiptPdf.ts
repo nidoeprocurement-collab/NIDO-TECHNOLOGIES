@@ -260,8 +260,6 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
     receipt.reference ? `Ref / Txn ID: ${receipt.reference}` : '',
     receipt.taxDeducted === 'tds' ? 'Tax Deducted: TDS (Income Tax)' : 'Tax Deducted: None',
     receipt.productType && receipt.productType !== 'Mixed Products' ? `Product Type: ${receipt.productType}` : '',
-    receipt.usersLicenses !== undefined ? `Users / Licenses: ${receipt.usersLicenses}` : '',
-    receipt.tenureBilling ? `Tenure / Billing: ${receipt.tenureBilling}` : '',
     receipt.provisioningTime ? `Provisioning Time: ${receipt.provisioningTime}` : '',
   ].filter(Boolean);
 
@@ -280,8 +278,6 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
           '1',
           receipt.descriptionOfSupply || 'Payment received against invoice',
           receipt.invoiceNumber || '—',
-          String(receipt.usersLicenses ?? '—'),
-          receipt.tenureBilling || '—',
           receipt.provisioningTime || '—',
           money(receipt.amountReceived),
         ]
@@ -296,7 +292,7 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
   ];
   if (bankCharges > 0) {
     tableBody.push(isDigitalReceipt
-      ? ['2', 'Bank Charges', '—', '—', '—', '—', money(bankCharges)]
+      ? ['2', 'Bank Charges', '—', '—', money(bankCharges)]
       : ['2', 'Bank Charges', '—', '—', '—', money(bankCharges)]);
   }
 
@@ -304,7 +300,7 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
     startY: y,
     margin: { left: margin, right: margin },
     head: [isDigitalReceipt
-      ? ['#', 'DESCRIPTION', 'INVOICE REF', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'AMOUNT']
+      ? ['#', 'DESCRIPTION', 'INVOICE REF', 'PROVISIONING TIME', 'AMOUNT']
       : ['#', 'DESCRIPTION', 'INVOICE REF', 'PAYMENT MODE', 'TAX', 'AMOUNT']],
     body: tableBody,
     theme: 'grid',
@@ -326,19 +322,28 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
       halign: 'center',
     },
     columnStyles: {
-      0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 148 },
-      2: { cellWidth: 78, halign: 'center' },
-      3: { cellWidth: 80, halign: 'center' },
-      4: { cellWidth: 70, halign: 'center' },
-      5: { cellWidth: 80, halign: 'right' },
+      ...(isDigitalReceipt ? {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 220 },
+        2: { cellWidth: 72, halign: 'center' },
+        3: { cellWidth: 105, halign: 'center' },
+        4: { cellWidth: 80, halign: 'right' },
+      } : {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 148 },
+        2: { cellWidth: 78, halign: 'center' },
+        3: { cellWidth: 80, halign: 'center' },
+        4: { cellWidth: 70, halign: 'center' },
+        5: { cellWidth: 80, halign: 'right' },
+      }),
     },
     didParseCell(data) {
+      const amountColumnIndex = isDigitalReceipt ? 4 : 5;
       if (data.section === 'body' && data.column.index === 1) {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.textColor = DARK;
       }
-      if (data.section === 'body' && data.column.index === 5) {
+      if (data.section === 'body' && data.column.index === amountColumnIndex) {
         data.cell.styles.fontStyle = 'bold';
       }
     },
@@ -395,18 +400,15 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
       ...productTableStyles,
       startY: productsY,
       margin: { left: margin, right: margin },
-      head: [['#', 'ITEM / DESCRIPTION', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'INVOICE VALUE']],
+      head: [['#', 'ITEM / DESCRIPTION', 'PROVISIONING TIME', 'INVOICE VALUE']],
       body: digitalProducts.map((item, index) => [
-        String(index + 1), item.description, String(item.quantity), item.tenureBilling || '—',
-        item.provisioningTime || '—', money(item.invoiceValue),
+        String(index + 1), item.description, item.provisioningTime || '—', money(item.invoiceValue),
       ]),
       columnStyles: {
         0: { cellWidth: 20, halign: 'center' },
-        1: { cellWidth: 130 },
-        2: { cellWidth: 70, halign: 'center' },
-        3: { cellWidth: 78, halign: 'center' },
-        4: { cellWidth: 88, halign: 'center' },
-        5: { cellWidth: 88, halign: 'right' },
+        1: { cellWidth: 190 },
+        2: { cellWidth: 100, halign: 'center' },
+        3: { cellWidth: 100, halign: 'right' },
       },
     });
   }

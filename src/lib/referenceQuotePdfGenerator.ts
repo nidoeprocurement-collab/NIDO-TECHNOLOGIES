@@ -265,10 +265,25 @@ export async function generateReferenceQuotePdfBase64(
         String(index + 1),
         item.name,
         (item.description || '') +
-          (item.commercialTerms ? `\nPricing Model: ${presentation.pricingModel}\n${DIGITAL_PRODUCT_HEADERS.tenure}: ${presentation.tenureBilling}\n${DIGITAL_PRODUCT_HEADERS.provisioning}: ${presentation.provisioningTime}` : ''),
+          (item.commercialTerms ? `\nPricing Model: ${presentation.pricingModel}\n${DIGITAL_PRODUCT_HEADERS.provisioning}: ${presentation.provisioningTime}` : ''),
         item.hsnSac || '',
-        String(item.qty),
-        presentation.tenureBilling,
+        fmt2(taxable),
+        `${item.taxPercent}%`,
+        fmt2(gst),
+        fmt2(taxable + gst),
+      ];
+    }
+    if (isDigitalDocumentProduct(item)) {
+      const presentation = getDocumentProductPresentation(item, { quantity: item.qty });
+      return [
+        String(index + 1),
+        item.name,
+        (item.description || '') +
+          (item.commercialTerms ? `\nPricing Model: ${presentation.pricingModel}\n${DIGITAL_PRODUCT_HEADERS.provisioning}: ${presentation.provisioningTime}` : ''),
+        item.hsnSac || '',
+        '—',
+        '—',
+        '—',
         fmt2(taxable),
         `${item.taxPercent}%`,
         fmt2(gst),
@@ -299,7 +314,7 @@ export async function generateReferenceQuotePdfBase64(
       'ITEM / DESCRIPTION',
       'HSN/SAC',
       ...(isDigitalQuote
-        ? ['USERS / LICENSES', 'TENURE / BILLING']
+        ? []
         : ['QTY', `RATE (${getCurrencySymbol(loadConfig())})`, `DISC (${getCurrencySymbol(loadConfig())})`]),
       `TAXABLE (${getCurrencySymbol(loadConfig())})`,
       'GST RATE',
@@ -307,7 +322,7 @@ export async function generateReferenceQuotePdfBase64(
       `AMOUNT (${getCurrencySymbol(loadConfig())})`,
     ]],
     body: tableBody.map((row) => isDigitalQuote
-      ? [row[0], `${row[1]}${row[2] ? `\n${row[2]}` : ''}`, row[3], row[4], row[5], row[6], row[7], row[8], row[9]]
+      ? [row[0], `${row[1]}${row[2] ? `\n${row[2]}` : ''}`, row[3], row[4], row[5], row[6], row[7]]
       : [row[0], `${row[1]}${row[2] ? `\n${row[2]}` : ''}`, row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]]),
     theme: 'grid',
     tableWidth: contentWidth,

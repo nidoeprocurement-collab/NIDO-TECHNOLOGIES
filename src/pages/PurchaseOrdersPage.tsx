@@ -1320,12 +1320,9 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
               <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">#</th>
               <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
               <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">HSN/SAC</th>
-              <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{group.digital ? DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}</th>
+              {!group.digital && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Qty</th>}
               {group.digital ? (
-                <>
-                  <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.tenure}</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
-                </>
+                <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
               ) : (
                 <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>
               )}
@@ -1340,14 +1337,13 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
                   <td className="px-3 py-2.5 text-gray-500">{i + 1}</td>
                   <td className="px-3 py-2.5"><p className="font-medium">{item.itemName || "—"}</p><p className="text-xs text-gray-400">{item.description}</p></td>
                   <td className="px-3 py-2.5 text-gray-500">{item.hsnSac || "—"}</td>
-                  <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
                   {group.digital ? (
-                    <>
-                      <td className="px-3 py-2.5 text-right">{presentation.tenureBilling}</td>
-                      <td className="px-3 py-2.5 text-right">{presentation.provisioningTime}</td>
-                    </>
+                    <td className="px-3 py-2.5 text-right">{presentation.provisioningTime}</td>
                   ) : (
-                    <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>
+                    <>
+                      <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
+                      <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>
+                    </>
                   )}
                   <td className="px-3 py-2.5 text-right font-medium">{(item.quantity * item.rate).toFixed(2)}</td>
                 </tr>

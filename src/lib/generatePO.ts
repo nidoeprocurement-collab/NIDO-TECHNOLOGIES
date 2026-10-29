@@ -340,7 +340,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       const presentation = getDocumentProductPresentation(li, { quantity: li.qty });
       return [
         String(indexOffset + index + 1), itemCell, presentation.type, presentation.pricingModel,
-        String(li.qty), presentation.tenureBilling, presentation.provisioningTime,
+        presentation.provisioningTime,
         li.hsnCode || '', fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(amount),
       ];
     });
@@ -348,7 +348,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       startY,
       margin: { left: margin, right: margin },
       head: [digital
-        ? ['#', 'ITEM / SPECIFICATION', 'TYPE', 'PRICING MODEL', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'HSN/SAC', 'TAXABLE', 'GST RATE', 'GST', 'NET AMOUNT']
+        ? ['#', 'ITEM / SPECIFICATION', 'TYPE', 'PRICING MODEL', 'PROVISIONING TIME', 'HSN/SAC', 'TAXABLE', 'GST RATE', 'GST', 'NET AMOUNT']
         : ['#', 'ITEM / SPECIFICATION', 'HSN/SAC', 'QTY', 'UNIT RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'NET AMOUNT']],
       body,
       theme: 'grid',
