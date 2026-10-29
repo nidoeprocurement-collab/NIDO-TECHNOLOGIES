@@ -132,6 +132,7 @@ function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number; totalStock: number; hasEligibleVendor: boolean };
 type ShopTab = "all" | "physical" | "digital" | "subscription" | "cloud" | "hybrid";
+type PrimaryShopTab = "physical" | "digital";
 type SortOption = "Popularity" | "Price: Low to High" | "Price: High to Low" | "Name";
 
 const SHOP_TABS: { id: ShopTab; label: string; icon: typeof Package }[] = [
@@ -1947,6 +1948,7 @@ export default function ShopPage() {
   useI18n();
   const [search, setSearch] = useState("");
   const [shopTab, setShopTab] = useState<ShopTab>("all");
+  const [primaryShopTab, setPrimaryShopTab] = useState<PrimaryShopTab>("physical");
   const [brand, setBrand] = useState("All Brands");
   const [sortBy, setSortBy] = useState<SortOption>("Popularity");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -2035,6 +2037,11 @@ export default function ShopPage() {
     : catalogProducts;
   const allCats = ["All Categories", ...Array.from(new Set(visibleCatalogProducts.map(p => p.category)))];
   const allBrands = ["All Brands", ...Array.from(new Set(visibleCatalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
+  const physicalProductCount = visibleCatalogProducts.filter(product => {
+    const kind = getShopProductKind(product);
+    return kind === "physical" || kind === "hybrid";
+  }).length;
+  const digitalProductCount = visibleCatalogProducts.filter(product => getShopProductKind(product) !== "physical").length;
 
   const closeFilterMenus = () => {
     setClientOpen(false);
@@ -2051,8 +2058,13 @@ export default function ShopPage() {
 
   const filtered = visibleCatalogProducts
     .filter(p => {
+      const productKind = getShopProductKind(p);
+      const inPrimaryTab = primaryShopTab === "physical"
+        ? productKind === "physical" || productKind === "hybrid"
+        : productKind !== "physical";
+      if (!inPrimaryTab) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
-      if (shopTab !== "all" && getShopProductKind(p) !== shopTab) return false;
+      if (shopTab !== "all" && productKind !== shopTab) return false;
       if (category !== "All Categories" && p.category !== category) return false;
       if (brand !== "All Brands" && p.brand !== brand) return false;
       if (availability === "In Stock" && !p.inStock) return false;
@@ -2154,6 +2166,44 @@ export default function ShopPage() {
       </div>
 
       {/* Filters row */}
+      <div
+        role="tablist"
+        aria-label="Shop product type"
+        className="mb-4 grid max-w-xl grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-gray-100 p-1"
+      >
+        {([
+          { id: "physical", label: "Physical Products", count: physicalProductCount, icon: Package },
+          { id: "digital", label: "Digital Products", count: digitalProductCount, icon: Cloud },
+        ] as const).map(tab => {
+          const Icon = tab.icon;
+          const active = primaryShopTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setPrimaryShopTab(tab.id);
+                setShopTab("all");
+                setCurrentPage(1);
+              }}
+              className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold transition-colors md:text-sm ${
+                active
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
+              }`}
+            >
+              <Icon size={15} />
+              {tab.label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-blue-50 text-blue-700" : "bg-gray-200 text-gray-500"}`}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-5 flex items-center gap-2.5 flex-wrap">
         <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm md:max-w-sm">
           <Search size={15} className="shrink-0 text-gray-400" />
