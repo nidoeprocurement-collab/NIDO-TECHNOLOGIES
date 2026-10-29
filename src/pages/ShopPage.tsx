@@ -133,6 +133,7 @@ function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 type VendorMatch = { leadTime: string; moq: number; totalStock: number; hasEligibleVendor: boolean };
 type ShopTab = "all" | "physical" | "digital" | "subscription" | "cloud" | "hybrid";
 type PrimaryShopTab = "physical" | "digital";
+const SHOP_PRIMARY_TAB_STORAGE_KEY = "nido_shop_primary_tab";
 type SortOption = "Popularity" | "Price: Low to High" | "Price: High to Low" | "Name";
 
 const SHOP_TABS: { id: ShopTab; label: string; icon: typeof Package }[] = [
@@ -1117,13 +1118,23 @@ function ConfiguredServiceProductCard({
 
       <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
         <div className="flex items-end justify-between gap-2">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Price / Unit</p>
             <p className="mt-0.5 text-[16px] font-bold text-gray-900">
               {selectedVendor && clientSellingPriceExclGst > 0 ? formatCurrency(clientSellingPriceExclGst) : selectedVendor ? "Custom Quote" : "Select a vendor"}
             </p>
+            {selectedConfigurationEntries.length > 0 && (
+              <div className="mt-1 space-y-0.5">
+                {selectedConfigurationEntries.map(([label, value]) => (
+                  <p key={label} className="break-words text-[9px] leading-tight text-gray-500">
+                    <span className="font-medium text-gray-400">{label}: </span>
+                    <span className="font-semibold text-gray-700">{value}</span>
+                  </p>
+                ))}
+              </div>
+            )}
             {selectedVendor && clientSellingPriceExclGst > 0 && (
-              <p className="text-[9px] text-gray-400">GST {gstRate}% added in cart</p>
+              <p className="mt-0.5 text-[9px] text-gray-400">GST {gstRate}% added in cart</p>
             )}
           </div>
           {selectedVendor && (
@@ -1134,16 +1145,6 @@ function ConfiguredServiceProductCard({
             </div>
           )}
         </div>
-        {selectedConfigurationEntries.length > 0 && (
-          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-gray-100 pt-2">
-            {selectedConfigurationEntries.map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
-                <p className="truncate text-[10px] font-semibold text-gray-700">{value}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="mt-auto grid grid-cols-2 gap-2 px-3 pb-3 pt-3" onClick={event => event.stopPropagation()}>
@@ -1928,7 +1929,9 @@ export default function ShopPage() {
   useI18n();
   const [search, setSearch] = useState("");
   const [shopTab, setShopTab] = useState<ShopTab>("all");
-  const [primaryShopTab, setPrimaryShopTab] = useState<PrimaryShopTab>("physical");
+  const [primaryShopTab, setPrimaryShopTab] = useState<PrimaryShopTab>(() =>
+    localStorage.getItem(SHOP_PRIMARY_TAB_STORAGE_KEY) === "digital" ? "digital" : "physical"
+  );
   const [brand, setBrand] = useState("All Brands");
   const [sortBy, setSortBy] = useState<SortOption>("Popularity");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -2166,6 +2169,7 @@ export default function ShopPage() {
               aria-selected={active}
               onClick={() => {
                 setPrimaryShopTab(tab.id);
+                localStorage.setItem(SHOP_PRIMARY_TAB_STORAGE_KEY, tab.id);
                 setShopTab("all");
                 setCurrentPage(1);
               }}
