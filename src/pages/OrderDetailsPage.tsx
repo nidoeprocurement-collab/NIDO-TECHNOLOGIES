@@ -2029,6 +2029,60 @@ function AddTrackingModal({ current, onSave, onClose }) {
   );
 }
 
+function ProvisionedDeliveryModal({ itemName, initialMode, initialEmail, onSave, onClose }) {
+  const [mode, setMode] = useState<"Email" | "Activated">(initialMode === "Activated" ? "Activated" : "Email");
+  const [email, setEmail] = useState(initialEmail || "");
+  const [error, setError] = useState("");
+  const save = () => {
+    const normalizedEmail = email.trim();
+    if (mode === "Email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    onSave(mode, mode === "Email" ? normalizedEmail : "");
+  };
+
+  return (
+    <Overlay onClose={onClose} closeOnBackdrop={false}>
+      <ModalBox title="Digital delivery details" onClose={onClose} width={480}>
+        <div style={{ padding: "18px 22px 8px" }}>
+          <div style={{ marginBottom: 14, fontSize: 13, color: "#4b5563" }}>
+            Choose how <strong style={{ color: "#111827" }}>{itemName}</strong> was delivered.
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 12px", border: `1px solid ${mode === "Email" ? "#93c5fd" : "#e5e7eb"}`, borderRadius: 8, background: mode === "Email" ? "#eff6ff" : "#fff", cursor: "pointer" }}>
+            <input type="radio" name="digital-delivery-mode" value="Email" checked={mode === "Email"} onChange={() => { setMode("Email"); setError(""); }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>Email license or access details</span>
+          </label>
+          {mode === "Email" && (
+            <div style={{ margin: "12px 0 16px" }}>
+              <label htmlFor="digital-delivery-email" style={lbSt}>Recipient email address</label>
+              <input
+                id="digital-delivery-email"
+                type="email"
+                value={email}
+                onChange={event => { setEmail(event.target.value); setError(""); }}
+                placeholder="name@example.com"
+                style={{ ...inSt, borderColor: error ? "#dc2626" : "#d1d5db" }}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? "digital-delivery-email-error" : undefined}
+              />
+              {error && <div id="digital-delivery-email-error" style={{ marginTop: 5, fontSize: 11.5, color: "#dc2626" }}>{error}</div>}
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 12px", border: `1px solid ${mode === "Activated" ? "#86efac" : "#e5e7eb"}`, borderRadius: 8, background: mode === "Activated" ? "#f0fdf4" : "#fff", cursor: "pointer" }}>
+            <input type="radio" name="digital-delivery-mode" value="Activated" checked={mode === "Activated"} onChange={() => { setMode("Activated"); setError(""); }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>Activated</span>
+          </label>
+          <div style={{ marginTop: 10, fontSize: 11.5, color: "#6b7280" }}>
+            This choice updates the Delivery Mode column; the fulfillment status remains Provisioned.
+          </div>
+        </div>
+        <ModalFooter onCancel={onClose} onSave={save} saveLabel="Save delivery details" skipConfirmation />
+      </ModalBox>
+    </Overlay>
+  );
+}
+
 function RaiseReturnModal({ itemName, onSubmit, onClose }) {
   const [reason, setReason] = useState(""), [details, setDetails] = useState(""), [submitted, setSubmitted] = useState(false);
   if (submitted) return (
@@ -3010,6 +3064,13 @@ export default function MyOrderPage() {
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
   const [documentsAuditNote, setDocumentsAuditNote] = useState<OrderNote | null>(null);
+  const [provisionedDeliveryTarget, setProvisionedDeliveryTarget] = useState<{
+    subId: string;
+    itemName: string;
+    deliveryMode: string;
+    deliveryEmail: string;
+    advanceStatus: boolean;
+  } | null>(null);
   const [provisionedUploadPrompt, setProvisionedUploadPrompt] = useState<{ subId: string; itemName: string } | null>(null);
   const [licenseUploadRequest, setLicenseUploadRequest] = useState<{ id: number; itemName: string } | null>(null);
 
@@ -3191,6 +3252,21 @@ export default function MyOrderPage() {
         .find(stage => stage !== "Partially Provisioned" || canPartiallyProvision);
       if (nextIndex < 0 || status !== expectedNextStatus) return;
     }
+    if (
+      isDigitalDocumentProduct(target)
+      && status === "Provisioned"
+      && !metadata.deliveryMode
+      && !isClientPortalUser
+    ) {
+      setProvisionedDeliveryTarget({
+        subId,
+        itemName: target.itemName,
+        deliveryMode: target.deliveryMode || target.commercialTerms?.deliveryMode || "Email",
+        deliveryEmail: target.deliveryEmail || "",
+        advanceStatus: true,
+      });
+      return;
+    }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
     const currentReturnIndex = returnStatuses.indexOf(target.itemStatus);
@@ -3243,6 +3319,25 @@ export default function MyOrderPage() {
     if (savedStatus === "Provisioned" && previousStatus !== "Provisioned" && !isClientPortalUser) {
       setProvisionedUploadPrompt({ subId, itemName: target.itemName });
     }
+  };
+
+  const saveProvisionedDelivery = (mode: "Email" | "Activated", email: string) => {
+    const target = provisionedDeliveryTarget;
+    if (!target) return;
+    const deliveryDetails = {
+      deliveryMode: mode,
+      deliveryEmail: mode === "Email" ? email.trim() : "",
+    };
+    if (target.advanceStatus) {
+      updateStatus(target.subId, "Provisioned", deliveryDetails);
+    } else {
+      const updatedOn = new Date().toLocaleDateString("en-IN");
+      setSubOrders(prev => prev.map(sub => sub.id === target.subId
+        ? { ...sub, ...deliveryDetails, updatedOn }
+        : sub
+      ));
+    }
+    setProvisionedDeliveryTarget(null);
   };
 
   const handleRaiseReturn = (subId: string, reason: string, details: string) => {
@@ -3889,6 +3984,8 @@ export default function MyOrderPage() {
       state[s.id] = {
         itemStatus: s.itemStatus,
         statusOwner: "order-details",
+        deliveryMode: s.deliveryMode || "",
+        deliveryEmail: s.deliveryEmail || "",
         selectedVendorId: s.selectedVendorId ?? null,
         selectedVendorName: s.selectedVendorName || "",
         vendorSelectionMeta: s.vendorSelectionMeta || null,
@@ -4591,6 +4688,7 @@ export default function MyOrderPage() {
                     </div>
                   ) : formatCurrency(unitPriceExclGst);
                   const digitalDeliveryMode = sub.deliveryMode || sub.commercialTerms?.deliveryMode || "Email";
+                  const digitalDeliveryEmail = String(sub.deliveryEmail || "").trim();
                   const digitalDeliveryTiming = subPresentation.provisioningTime.split(" · ")[0] || "Instant";
                   return (
                     <div className="order-details-suborders-grid order-details-suborders-row" key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "0 20px", boxSizing: "border-box", alignItems: "stretch", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
@@ -4744,11 +4842,33 @@ export default function MyOrderPage() {
                       {isDigitalOrder && (
                         <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0, fontSize: 11.5, lineHeight: 1.4, overflowWrap: "break-word" }}>
                           <Mail size={13} color="#2563eb" style={{ flexShrink: 0, marginTop: 1 }} />
-                          <span>{digitalDeliveryMode}<br /><span style={{ color: "#6b7280" }}>({digitalDeliveryTiming})</span></span>
+                          <span>
+                            {digitalDeliveryMode}
+                            {digitalDeliveryMode === "Email" && digitalDeliveryEmail && (
+                              <><br /><span style={{ color: "#374151", overflowWrap: "anywhere" }}>{digitalDeliveryEmail}</span></>
+                            )}
+                            {digitalDeliveryMode !== "Activated" && <><br /><span style={{ color: "#6b7280" }}>({digitalDeliveryTiming})</span></>}
+                          </span>
                         </div>
                       )}
                       <div style={{ minWidth: 0, overflow: "hidden" }}>
-                        <StatusPill status={sub.itemStatus} compact />
+                        {!isClientPortalUser && isDigitalOrder && sub.itemStatus === "Provisioned" && !isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed ? (
+                          <button
+                            type="button"
+                            title="Update digital delivery details"
+                            aria-label={`Edit delivery details for ${sub.itemName}`}
+                            onClick={() => setProvisionedDeliveryTarget({
+                              subId: sub.id,
+                              itemName: sub.itemName,
+                              deliveryMode: sub.deliveryMode || sub.commercialTerms?.deliveryMode || "Email",
+                              deliveryEmail: sub.deliveryEmail || "",
+                              advanceStatus: false,
+                            })}
+                            style={{ display: "inline-flex", padding: 0, border: 0, background: "transparent", cursor: "pointer" }}
+                          >
+                            <StatusPill status={sub.itemStatus} compact />
+                          </button>
+                        ) : <StatusPill status={sub.itemStatus} compact />}
                         <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div>
                         {(sub as any).cancelReason && (
                           <div style={{ fontSize: 10.5, color: "#991b1b", marginTop: 3, fontStyle: "italic", lineHeight: 1.4 }}>Reason: {(sub as any).cancelReason}</div>
@@ -5172,6 +5292,15 @@ export default function MyOrderPage() {
            excludedVendorIds={vendorTarget.previousVendorId ? [vendorTarget.previousVendorId] : []}
           onSelect={handleVendorSelection}
           onClose={() => setVendorTarget(null)}
+        />
+      )}
+      {provisionedDeliveryTarget && (
+        <ProvisionedDeliveryModal
+          itemName={provisionedDeliveryTarget.itemName}
+          initialMode={provisionedDeliveryTarget.deliveryMode}
+          initialEmail={provisionedDeliveryTarget.deliveryEmail}
+          onSave={saveProvisionedDelivery}
+          onClose={() => setProvisionedDeliveryTarget(null)}
         />
       )}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
