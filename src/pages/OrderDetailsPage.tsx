@@ -4205,8 +4205,8 @@ export default function MyOrderPage() {
   const isMixedOrder = hasDigitalSubOrders && hasPhysicalSubOrders;
   const subOrdersColumns = isDigitalOrder
     ? (isClientPortalUser
-      ? ["#", "PRODUCT NAME & DESCRIPTION", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"]
-      : ["#", "PRODUCT NAME & DESCRIPTION", "Vendor/PO Number", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"])
+      ? ["#", "SUB ORDER ID", "PRODUCT NAME & DESCRIPTION", "TYPE", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"]
+      : ["#", "SUB ORDER ID", "PRODUCT NAME & DESCRIPTION", "Vendor/PO Number", "TYPE", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"])
     : (isClientPortalUser
       ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
       : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
@@ -4218,8 +4218,8 @@ export default function MyOrderPage() {
   // and use the freed space to balance item, tracking, and vendor details.
   const subOrdersColTemplateBase = isDigitalOrder
     ? (isClientPortalUser
-      ? "28px minmax(0,2fr) minmax(0,.9fr) minmax(0,.8fr) 42px minmax(0,.95fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.9fr) 68px"
-      : "28px minmax(0,1.9fr) minmax(0,1.1fr) minmax(0,.85fr) minmax(0,.75fr) 38px minmax(0,.9fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.9fr) 68px")
+      ? "28px 100px minmax(0,2fr) minmax(0,.9fr) 42px minmax(0,.95fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.9fr) 68px"
+      : "28px 100px minmax(0,1.9fr) minmax(0,1.1fr) minmax(0,.85fr) 38px minmax(0,.9fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.9fr) 68px")
     : isClientPortalUser
       ? (isMixedOrder
         ? "28px 100px minmax(0,2fr) 44px minmax(0,.78fr) minmax(0,.85fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.05fr) 88px"
@@ -4590,21 +4590,17 @@ export default function MyOrderPage() {
                       <del style={{ color: "#9ca3af", fontSize: 11.5 }}>{formatCurrency(originalUnitPriceExclGst)}</del>
                     </div>
                   ) : formatCurrency(unitPriceExclGst);
-                  const digitalLicenseTerm = sub.licenseTerm
-                    || sub.commercialTerms?.licenseTerm
-                    || subPresentation.tenureBilling.split(" · ")[0]
-                    || "—";
                   const digitalDeliveryMode = sub.deliveryMode || sub.commercialTerms?.deliveryMode || "Email";
                   const digitalDeliveryTiming = subPresentation.provisioningTime.split(" · ")[0] || "Instant";
                   return (
                     <div className="order-details-suborders-grid order-details-suborders-row" key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "0 20px", boxSizing: "border-box", alignItems: "stretch", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
-                      {!isDigitalOrder && <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
-                       {!isClientPortalUser && !itemCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
-                         {!isClientPortalUser && itemCancelled && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Cancelled</span></div>}
-                         {!isClientPortalUser && !itemCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
-                      </div>}
+                        {!isDigitalOrder && !isClientPortalUser && !itemCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
+                        {!isDigitalOrder && !isClientPortalUser && itemCancelled && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Cancelled</span></div>}
+                        {!isDigitalOrder && !isClientPortalUser && !itemCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
+                      </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                           <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, overflow: "hidden" }}>
@@ -4714,7 +4710,6 @@ export default function MyOrderPage() {
                           <div style={{ minWidth: 0 }}>
                             <span style={{ display: "inline-block", padding: "3px 7px", borderRadius: 6, background: subPresentation.type.toLowerCase().includes("cloud") ? "#eff6ff" : "#f3e8ff", color: subPresentation.type.toLowerCase().includes("cloud") ? "#1d4ed8" : "#6b21a8", fontSize: 10.5, fontWeight: 600, lineHeight: 1.3, overflowWrap: "anywhere" }}>{subPresentation.type}</span>
                           </div>
-                          <div style={{ fontSize: 11.5, minWidth: 0, overflowWrap: "break-word" }}>{digitalLicenseTerm}</div>
                           <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
                           <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>{unitPriceContent}</div>
                         </>
