@@ -2038,10 +2038,10 @@ export default function ShopPage() {
   const allCats = ["All Categories", ...Array.from(new Set(visibleCatalogProducts.map(p => p.category)))];
   const allBrands = ["All Brands", ...Array.from(new Set(visibleCatalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
   const physicalProductCount = visibleCatalogProducts.filter(
-    product => getShopProductKind(product) !== "digital",
+    product => !isDigitalProduct(product),
   ).length;
   const digitalProductCount = visibleCatalogProducts.filter(
-    product => getShopProductKind(product) === "digital",
+    product => isDigitalProduct(product),
   ).length;
 
   const closeFilterMenus = () => {
@@ -2061,8 +2061,8 @@ export default function ShopPage() {
     .filter(p => {
       const productKind = getShopProductKind(p);
       const inPrimaryTab = primaryShopTab === "physical"
-        ? productKind !== "digital"
-        : productKind === "digital";
+        ? !isDigitalProduct(p)
+        : isDigitalProduct(p);
       if (!inPrimaryTab) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (shopTab !== "all" && productKind !== shopTab) return false;
