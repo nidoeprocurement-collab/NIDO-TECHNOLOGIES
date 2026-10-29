@@ -4203,31 +4203,28 @@ export default function MyOrderPage() {
   }));
   const isDigitalOrder = hasDigitalSubOrders && !hasPhysicalSubOrders;
   const isMixedOrder = hasDigitalSubOrders && hasPhysicalSubOrders;
-  const subOrdersColumns = isClientPortalUser
-    ? (isDigitalOrder
-      ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "ACTIONS"]
-      : ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"])
-    : (isDigitalOrder
-      ? ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "VENDOR", "ACTIONS"]
+  const subOrdersColumns = isDigitalOrder
+    ? (isClientPortalUser
+      ? ["#", "PRODUCT NAME & DESCRIPTION", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"]
+      : ["#", "PRODUCT NAME & DESCRIPTION", "VENDOR/PO NUMBER", "TYPE", "LICENSE TERM", "QTY", "UNIT PRICE (₹)", "TOTAL PRICE (₹)", "DELIVERY MODE", "STATUS", "ACTIONS"])
+    : (isClientPortalUser
+      ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
       : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
-  if (isDigitalOrder) {
-    const quantityIndex = isClientPortalUser ? 3 : 4;
-    subOrdersColumns.splice(quantityIndex, 2, DIGITAL_PRODUCT_HEADERS.provisioning);
-  } else if (isMixedOrder) {
+  if (!isDigitalOrder && isMixedOrder) {
     const insertAt = subOrdersColumns.indexOf("TOTAL");
     subOrdersColumns.splice(insertAt, 0, DIGITAL_PRODUCT_HEADERS.provisioning);
   }
   // Keep Status compact, reserve a readable width for the GST-exclusive total,
   // and use the freed space to balance item, tracking, and vendor details.
-  const subOrdersColTemplateBase = isClientPortalUser
-    ? (isDigitalOrder
-      ? "28px 110px minmax(0,2.4fr) minmax(0,1fr) minmax(0,1.2fr) 82px 88px"
-      : isMixedOrder
+  const subOrdersColTemplateBase = isDigitalOrder
+    ? (isClientPortalUser
+      ? "28px minmax(0,2fr) minmax(0,.9fr) minmax(0,.8fr) 42px minmax(0,.95fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.9fr) 68px"
+      : "28px minmax(0,1.9fr) minmax(0,1.1fr) minmax(0,.85fr) minmax(0,.75fr) 38px minmax(0,.9fr) minmax(0,1fr) minmax(0,.95fr) minmax(0,.9fr) 68px")
+    : isClientPortalUser
+      ? (isMixedOrder
         ? "28px 100px minmax(0,2fr) 44px minmax(0,.78fr) minmax(0,.85fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.05fr) 88px"
         : "28px 100px minmax(0,2.2fr) 44px minmax(0,.78fr) minmax(0,1.2fr) 82px minmax(0,1.2fr) 88px")
-    : (isDigitalOrder
-      ? "28px 110px minmax(0,1.95fr) 72px minmax(0,.95fr) minmax(0,1fr) 112px minmax(0,1.2fr) 80px"
-      : isMixedOrder
+      : (isMixedOrder
         ? "28px 105px minmax(0,1.85fr) 72px 38px minmax(0,.8fr) minmax(0,.8fr) minmax(0,1fr) 112px 82px minmax(0,1fr) 80px"
         : "28px 105px minmax(0,2fr) 72px 44px minmax(0,.8fr) 112px 82px minmax(0,1.05fr) minmax(0,1.05fr) 80px");
   const subOrdersColTemplate = subOrdersColTemplateBase;
@@ -4585,15 +4582,29 @@ export default function MyOrderPage() {
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
                   const subAllocs = vendorAllocations?.[sub.id];
                   const isMultiVendor = subAllocs && subAllocs.length > 1;
+                  const unitPriceContent = hasDiscount ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ color: "#15803d", fontWeight: 700 }}>
+                        {formatCurrency(unitPriceExclGst)} <span style={{ fontSize: 10.5 }}>({Number(discountPct.toFixed(2))}% off)</span>
+                      </span>
+                      <del style={{ color: "#9ca3af", fontSize: 11.5 }}>{formatCurrency(originalUnitPriceExclGst)}</del>
+                    </div>
+                  ) : formatCurrency(unitPriceExclGst);
+                  const digitalLicenseTerm = sub.licenseTerm
+                    || sub.commercialTerms?.licenseTerm
+                    || subPresentation.tenureBilling.split(" · ")[0]
+                    || "—";
+                  const digitalDeliveryMode = sub.deliveryMode || sub.commercialTerms?.deliveryMode || "Email";
+                  const digitalDeliveryTiming = subPresentation.provisioningTime.split(" · ")[0] || "Instant";
                   return (
                     <div className="order-details-suborders-grid order-details-suborders-row" key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "0 20px", boxSizing: "border-box", alignItems: "stretch", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
-                      <div style={{ minWidth: 0 }}>
+                      {!isDigitalOrder && <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
                        {!isClientPortalUser && !itemCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
                          {!isClientPortalUser && itemCancelled && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Cancelled</span></div>}
                          {!isClientPortalUser && !itemCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
-                      </div>
+                      </div>}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                           <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, overflow: "hidden" }}>
@@ -4603,6 +4614,7 @@ export default function MyOrderPage() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
+                            {sub.description && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word" }}>{sub.description}</div>}
                             {sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>Category: {sub.category}</div>}
                             {sub.productCode && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Product code: {sub.productCode}</div>}
                             {Array.isArray(sub.specs) && sub.specs.filter(Boolean).map((spec: string) => (
@@ -4619,67 +4631,91 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {itemCancelled ? (
+                          {isDigitalOrder ? (
+                            itemCancelled ? (
+                              <div>
+                                {previousVendorName && <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>{previousVendorName}</div>}
+                                {displayPO?.poNumber ? (
+                                  <button onClick={() => navigate(`/vendor-orders/${displayPO.poNumber}`)} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}>
+                                    PO {displayPO.poNumber} ↗
+                                  </button>
+                                ) : <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>}
+                                {cancelledPO && <div style={{ fontSize: 10, color: "#991b1b", marginTop: 3 }}>{String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "PO Cancelled" : "PO Item Cancelled"}</div>}
+                                <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
+                              </div>
+                            ) : cancelledPONeedsResolution ? (
+                              <div>
+                                {previousVendorName && <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>{previousVendorName}</div>}
+                                <button onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}>
+                                  PO {cancelledPO.poNumber} · {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "Cancelled" : "Item Cancelled"} ↗
+                                </button>
+                                <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>Select a different vendor or cancel this item from Order Details.</div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
+                                  <button onClick={() => setVendorTarget({ ...sub, previousVendorId: cancelledPO.vendorId })} style={{ padding: "4px 7px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}>Select Vendor</button>
+                                  <button onClick={() => setCancelTarget(sub.id)} style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}>Cancel Item</button>
+                                </div>
+                              </div>
+                            ) : hasPO ? (
+                              <div>
+                                {subPOs.map((po: any) => (
+                                  <div key={po.poNumber} style={{ marginBottom: 5, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName || "Vendor"}</div>
+                                    <button onClick={() => navigate(`/vendor-orders/${po.poNumber}`)} style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 10.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}>
+                                      PO {po.poNumber} ↗
+                                    </button>
+                                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{isConfirmedPO(po) ? "PO Issued" : "PO Pending"}</div>
+                                  </div>
+                                ))}
+                                {!hasConfirmedPO && <button onClick={() => setVendorTarget(sub)} style={{ marginTop: 2, padding: "4px 8px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}>Change Vendor</button>}
+                              </div>
+                            ) : sub.selectedVendorName ? (
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{sub.selectedVendorName}</div>
+                                <div style={{ fontSize: 10, color: "#9ca3af" }}>Selected at order</div>
+                                {!hasConfirmedPO && <button onClick={() => setVendorTarget(sub)} style={{ marginTop: 5, padding: "4px 8px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}>Change Vendor</button>}
+                              </div>
+                            ) : (
+                              <button onClick={() => setVendorTarget(sub)} style={{ padding: "5px 9px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}>Select Vendor</button>
+                            )
+                          ) : itemCancelled ? (
                             <div>
                               {displayPO?.poNumber ? (
-                                <button
-                                  onClick={() => navigate(`/vendor-orders/${displayPO.poNumber}`)}
-                                  style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                                >
+                                <button onClick={() => navigate(`/vendor-orders/${displayPO.poNumber}`)} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}>
                                   {displayPO.poNumber} ↗
                                 </button>
-                              ) : (
-                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
-                              )}
-                              {cancelledPO && (
-                                <div style={{ fontSize: 10, color: "#991b1b", marginTop: 3 }}>
-                                  {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "PO Cancelled" : "PO Item Cancelled"}
-                                </div>
-                              )}
+                              ) : <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>}
+                              {cancelledPO && <div style={{ fontSize: 10, color: "#991b1b", marginTop: 3 }}>{String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "PO Cancelled" : "PO Item Cancelled"}</div>}
                               <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
                             </div>
                           ) : cancelledPONeedsResolution ? (
                             <div>
-                              <button
-                                onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)}
-                                style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                              >
-                                  {cancelledPO.poNumber} · {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "Cancelled" : "Item Cancelled"} ↗
+                              <button onClick={() => navigate(`/vendor-orders/${cancelledPO.poNumber}`)} style={{ color: "#b91c1c", background: "none", border: "none", cursor: "pointer", fontSize: 11.5, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}>
+                                {cancelledPO.poNumber} · {String(cancelledPO.status || "").toLowerCase() === "cancelled" ? "Cancelled" : "Item Cancelled"} ↗
                               </button>
-                              <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>
-                                Select a different vendor or cancel this item from Order Details.
-                              </div>
+                              <div style={{ marginTop: 6, fontSize: 10.5, color: "#6b7280" }}>Select a different vendor or cancel this item from Order Details.</div>
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
-                                <button
-                                  onClick={() => setVendorTarget({ ...sub, previousVendorId: cancelledPO.vendorId })}
-                                  style={{ padding: "4px 7px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
-                                >
-                                  Select Vendor
-                                </button>
-                                <button
-                                  onClick={() => setCancelTarget(sub.id)}
-                                  style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
-                                >
-                                  Cancel Item
-                                </button>
+                                <button onClick={() => setVendorTarget({ ...sub, previousVendorId: cancelledPO.vendorId })} style={{ padding: "4px 7px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}>Select Vendor</button>
+                                <button onClick={() => setCancelTarget(sub.id)} style={{ padding: "4px 7px", border: "1px solid #fca5a5", borderRadius: 5, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}>Cancel Item</button>
                               </div>
                             </div>
                           ) : hasPO ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                               {subPOs.map((po: any) => (
-                                <button
-                                  key={po.poNumber}
-                                  onClick={() => navigate(`/vendor-orders/${po.poNumber}`)}
-                                  style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                                >
+                                <button key={po.poNumber} onClick={() => navigate(`/vendor-orders/${po.poNumber}`)} style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}>
                                   {po.poNumber} ↗
                                 </button>
                               ))}
                             </div>
-                          ) : (
-                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
-                          )}
+                          ) : <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>}
                         </div>
+                      )}
+                      {isDigitalOrder && (
+                        <>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ display: "inline-block", padding: "3px 7px", borderRadius: 6, background: subPresentation.type.toLowerCase().includes("cloud") ? "#eff6ff" : "#f3e8ff", color: subPresentation.type.toLowerCase().includes("cloud") ? "#1d4ed8" : "#6b21a8", fontSize: 10.5, fontWeight: 600, lineHeight: 1.3, overflowWrap: "anywhere" }}>{subPresentation.type}</span>
+                          </div>
+                          <div style={{ fontSize: 11.5, minWidth: 0, overflowWrap: "break-word" }}>{digitalLicenseTerm}</div>
+                        </>
                       )}
                        {!isDigitalOrder && (
                          <>
