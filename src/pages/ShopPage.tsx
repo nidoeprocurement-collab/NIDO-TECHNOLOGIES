@@ -933,14 +933,30 @@ function ConfiguredServiceProductCard({
   const configurationFields = getCatalogVariationFields(vendorConfiguredProduct);
   const storedConfiguration = toStoredCloudConfiguration(configurationFields, configuration);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
-  const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
-  const region = findCloudField(dataFields, ["region", "location"]);
-  const deploymentModel = findCloudField(dataFields, ["deployment"]);
-  const billingModel = findCloudField(dataFields, ["billing", "pricing model"]) || getPricingModel(product.physicalType || product.productType || serviceLabel);
-  const pricingUnit = findCloudField(dataFields, ["pricing unit", "unit"]);
-  const serviceStatus = findCloudField(dataFields, ["service status", "availability", "status"])
+  const getSelectedConfigurationValue = (labels: string[]) => {
+    const normalizedLabels = labels.map(label => label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim());
+    for (const normalizedLabel of normalizedLabels) {
+      const fieldIndex = configurationFields.findIndex(
+        field => field.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === normalizedLabel,
+      );
+      if (fieldIndex < 0) continue;
+      const field = configurationFields[fieldIndex];
+      return configuration[cloudFieldKey(field, fieldIndex)] ?? field.options[0]?.label ?? field.value;
+    }
+    return "";
+  };
+  const selectedProvider = getSelectedConfigurationValue(["Cloud Provider", "License Provider", "Subscription Provider", "Provider"]);
+  const selectedCategory = getSelectedConfigurationValue(["Product Category", "Category"]);
+  const serviceType = getSelectedConfigurationValue(["Service Type"]) || product.subcategory || findCloudField(dataFields, ["service type", "service"]);
+  const region = getSelectedConfigurationValue(["Region", "Region Availability", "Location"]) || findCloudField(dataFields, ["region", "location"]);
+  const deploymentModel = getSelectedConfigurationValue(["Deployment Model", "Deployment"]) || findCloudField(dataFields, ["deployment"]);
+  const billingModel = getSelectedConfigurationValue(["Billing Model", "Billing", "Pricing Model"])
+    || findCloudField(dataFields, ["billing", "pricing model"])
+    || getPricingModel(product.physicalType || product.productType || serviceLabel);
+  const pricingUnit = getSelectedConfigurationValue(["Pricing Unit", "Unit"]) || findCloudField(dataFields, ["pricing unit", "unit"]);
+  const serviceStatus = getSelectedConfigurationValue(["Service Status", "Availability", "Status"])
+    || findCloudField(dataFields, ["service status", "availability", "status"])
     || (product.inStock ? "Available" : "Unavailable");
-  const configurationCount = configurationFields.length;
   const productType = getProductType(product.physicalType || product.productType);
   const gstRate = getEffectiveTaxPctForCategory(product.category);
   const hsnForCategory = (() => {
@@ -1069,17 +1085,38 @@ function ConfiguredServiceProductCard({
     );
   };
 
-  const infoFields = [
-    [providerLabel, provider],
-    ["Product Category", product.category],
+  const infoFields: [string, string][] = [
+    [providerLabel, selectedProvider || provider],
+    ["Product Category", selectedCategory || product.category],
     ["Service Type", serviceType],
     ["Region Availability", region],
     ["Deployment Model", deploymentModel],
     ["Billing Model", billingModel],
     ["Pricing Unit", pricingUnit],
     ["Service Status", serviceStatus],
-    ["Configurations", configurationCount > 0 ? `${configurationCount} available` : ""],
   ].filter(([, value]) => Boolean(value));
+  const normalizeInfoLabel = (label: string) => {
+    const normalized = label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (normalized.includes("provider")) return "provider";
+    if (normalized === "category" || normalized === "product category") return "product category";
+    if (normalized.includes("service type")) return "service type";
+    if (normalized.includes("region") || normalized.includes("location")) return "region";
+    if (normalized.includes("deployment")) return "deployment model";
+    if (normalized.includes("billing") || normalized.includes("pricing model")) return "billing model";
+    if (normalized === "unit" || normalized.includes("pricing unit")) return "pricing unit";
+    if (normalized.includes("availability") || normalized.includes("status")) return "service status";
+    return normalized;
+  };
+  const displayedInfoLabels = new Set(infoFields.map(([label]) => normalizeInfoLabel(label)));
+  configurationFields.forEach((field, index) => {
+    const normalizedLabel = normalizeInfoLabel(field.label);
+    if (displayedInfoLabels.has(normalizedLabel)) return;
+    displayedInfoLabels.add(normalizedLabel);
+    infoFields.push([
+      field.label,
+      configuration[cloudFieldKey(field, index)] ?? field.options[0]?.label ?? field.value,
+    ]);
+  });
 
   return (
     <div
@@ -1119,7 +1156,7 @@ function ConfiguredServiceProductCard({
       </div>
 
       <div className="mx-3 mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-gray-100 pt-3">
-        {infoFields.slice(0, 8).map(([label, value]) => (
+        {infoFields.map(([label, value]) => (
           <div key={label} className="min-w-0">
             <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
             <p className={`mt-0.5 truncate text-[10px] font-semibold ${label === "Service Status" && value === "Unavailable" ? "text-red-600" : "text-gray-700"}`}>{value}</p>
