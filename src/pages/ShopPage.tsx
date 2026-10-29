@@ -934,8 +934,16 @@ function ConfiguredServiceProductCard({
   const configurationFields = getCatalogVariationFields(vendorConfiguredProduct);
   const storedConfiguration = toStoredCloudConfiguration(configurationFields, configuration);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
-  const selectedConfigurationEntries = Object.entries(storedConfiguration)
-    .filter(([, value]) => Boolean(value.trim()));
+  const selectedConfigurationEntries = configurationFields.flatMap((field, index) => {
+    const value = configuration[cloudFieldKey(field, index)] ?? field.options[0]?.label ?? field.value;
+    if (!value.trim()) return [];
+    const selectedOption = field.options.find(option => option.label === value);
+    return [{
+      label: field.label,
+      value,
+      priceAdjustment: selectedOption?.priceAdjustment || 0,
+    }];
+  });
   const productType = getProductType(product.physicalType || product.productType);
   const gstRate = getEffectiveTaxPctForCategory(product.category);
   const hsnForCategory = (() => {
@@ -1124,13 +1132,25 @@ function ConfiguredServiceProductCard({
               {selectedVendor && clientSellingPriceExclGst > 0 ? formatCurrency(clientSellingPriceExclGst) : selectedVendor ? "Custom Quote" : "Select a vendor"}
             </p>
             {selectedConfigurationEntries.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {selectedConfigurationEntries.map(([label, value]) => (
-                  <p key={label} className="break-words text-[9px] leading-tight text-gray-500">
-                    <span className="font-medium text-gray-400">{label}: </span>
-                    <span className="font-semibold text-gray-700">{value}</span>
-                  </p>
+              <div className="mt-1">
+                <p className="mb-0.5 text-[8px] font-semibold uppercase tracking-wide text-gray-400">
+                  Selected options · adjustment per unit
+                </p>
+                <div className="space-y-0.5">
+                {selectedConfigurationEntries.map(({ label, value, priceAdjustment }) => (
+                  <div key={label} className="flex items-baseline justify-between gap-2 text-[9px] leading-tight">
+                    <p className="min-w-0 break-words text-gray-500">
+                      <span className="font-medium text-gray-400">{label}: </span>
+                      <span className="font-semibold text-gray-700">{value}</span>
+                    </p>
+                    <span className="shrink-0 font-semibold text-gray-600">
+                      {priceAdjustment === 0
+                        ? "Included"
+                        : `${priceAdjustment > 0 ? "+" : ""}${formatCurrency(priceAdjustment)} / unit`}
+                    </span>
+                  </div>
                 ))}
+                </div>
               </div>
             )}
             {selectedVendor && clientSellingPriceExclGst > 0 && (
