@@ -403,12 +403,15 @@ export default function CartPage() {
                         className={`grid border-b border-gray-200 bg-gray-50 py-3 ${productTab === "digital" ? "px-2 gap-1" : "px-5 gap-3"}`}
                         style={{
                           gridTemplateColumns: productTab === "digital"
-                            ? "minmax(0, 2.55fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, .5fr) minmax(0, .9fr) minmax(0, .65fr)"
+                            ? "minmax(0, 2.35fr) minmax(0, .75fr) minmax(0, .8fr) minmax(0, .95fr) minmax(0, .5fr) minmax(0, .9fr) minmax(0, .65fr)"
                             : "minmax(300px,1fr) 115px 125px 145px 80px 120px 72px",
                         }}
                       >
                         <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider leading-tight">Product</span>
                         <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider leading-tight">Type</span>
+                        {productTab === "digital" && (
+                          <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">QTY</span>
+                        )}
                         <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">Price / Unit</span>
                         {productTab !== "digital" && (
                           <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">Units / MOQ</span>
@@ -464,7 +467,7 @@ export default function CartPage() {
                           className={`grid py-5 items-start ${isDigital ? "px-2 gap-1" : "px-5 gap-3"}`}
                           style={{
                             gridTemplateColumns: isDigital
-                               ? "minmax(0, 2.55fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, .5fr) minmax(0, .9fr) minmax(0, .65fr)"
+                                ? "minmax(0, 2.35fr) minmax(0, .75fr) minmax(0, .8fr) minmax(0, .95fr) minmax(0, .5fr) minmax(0, .9fr) minmax(0, .65fr)"
                               : "minmax(300px,1fr) 115px 125px 145px 80px 120px 72px",
                           }}
                        >
@@ -548,6 +551,18 @@ export default function CartPage() {
                              {productType}
                            </span>
                          </div>
+
+                          {isDigital && (
+                            <div className="flex flex-col items-center justify-start pt-1">
+                              <QtyInput
+                                value={item.quantity}
+                                moq={itemMoq}
+                                max={maxQty}
+                                compact
+                                onChange={qty => onUpdateQuantity(item.id, qty)}
+                              />
+                            </div>
+                          )}
 
                         {/* ── Unit Price ──────────────────────────────── */}
                         <div className="flex flex-col items-center justify-start pt-1">
