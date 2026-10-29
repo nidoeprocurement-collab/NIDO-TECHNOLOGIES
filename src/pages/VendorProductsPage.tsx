@@ -43,7 +43,6 @@ import {
   getPricingModel,
   getProductType,
   getQuantityLabel,
-  getTenureBilling,
   isHybridType,
   isDigitalOnlyType,
 } from "@/lib/productTypeRules";
@@ -356,7 +355,6 @@ function EditProductScreen({
 
   const productType = getProductType(product.physicalType);
   const isDigitalProduct = isDigitalOnlyType(productType);
-  const tenureBilling = getTenureBilling(productType);
   const reservedStock = parseInt(product.reservedStock || "0") || 0;
   const currentStockNum = parseInt(stock) || 0;
   const availableStock = Math.max(0, currentStockNum - reservedStock);
@@ -365,7 +363,7 @@ function EditProductScreen({
 
   const handleSave = () => {
     onSave({
-      price: price.trim(),
+      price: isDigitalProduct ? "0" : price.trim(),
       moq: moq.trim(),
       leadTime: leadTime.trim(),
       stock: isDigitalProduct ? product.stock || "0" : stock.trim(),
@@ -422,10 +420,12 @@ function EditProductScreen({
                      <span className="text-gray-400">Product Type</span>
                      <span className="text-right">{productType}</span>
                    </div>
-                   <div className="flex justify-between gap-3">
-                     <span className="text-gray-400">Pricing Model</span>
-                     <span className="text-right">{getPricingModel(productType)}</span>
-                   </div>
+                    {!isDigitalProduct && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-gray-400">Pricing Model</span>
+                        <span className="text-right">{getPricingModel(productType)}</span>
+                      </div>
+                    )}
                   <div className="flex justify-between">
                     <span className="text-gray-400">MPI Code</span>
                     <span className="font-mono">{product.masterProductCode}</span>
@@ -455,13 +455,21 @@ function EditProductScreen({
                </h3>
                 <p className="text-sm text-gray-400 mb-6">
                   {isDigitalProduct
-                     ? "Update users/licenses, tenure/billing, and provisioning time for this product."
+                     ? "Digital prices are set in Variations. Update included users/licenses and provisioning time here."
                      : "Update the vendor price, units/MOQ, lead time, and current stock for this product."}
                 </p>
 
               <div className="grid grid-cols-2 gap-6">
                 {/* Purchase Price */}
-                {!isDigitalProduct && (
+                {isDigitalProduct ? (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Price / Unit</label>
+                    <p className="text-xs text-gray-400 mb-2">Base price is fixed at 0; option prices are managed in Variations.</p>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700">
+                      {fmt(0)}
+                    </div>
+                  </div>
+                ) : (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                     Price / Unit
@@ -530,16 +538,7 @@ function EditProductScreen({
                   </div>
                 </div>
 
-                {isDigitalProduct ? (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tenure / Billing</label>
-                    <p className="text-xs text-gray-400 mb-2">Commercial terms derived from the digital product type</p>
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
-                      <p className="text-sm font-semibold text-gray-900">{tenureBilling.tenure}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{tenureBilling.billing}</p>
-                    </div>
-                  </div>
-                ) : (
+                {!isDigitalProduct && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock</label>
                     <p className="text-xs text-gray-400 mb-2">Total units physically held by vendor</p>
@@ -1126,13 +1125,13 @@ export default function VendorProductsPage() {
               </div>
             ) : (
             <div className="w-full overflow-x-auto">
-                <table className="w-full min-w-[1080px] text-sm">
+                <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "980px" : "1080px" }}>
               <thead>
                  <tr className="border-b border-gray-200 bg-gray-50">
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">SKU / MPI</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>
+                    {!isDigitalTab && <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>}
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
@@ -1149,6 +1148,7 @@ export default function VendorProductsPage() {
                     );
                     const type = getProductType(product.physicalType || catalogProduct?.physicalType);
                     const hybrid = isHybridType(type);
+                     const digital = isDigitalOnlyType(type);
                    const current = parseInt(product.stock || "0") || 0;
                    const reserved = parseInt(product.reservedStock || "0") || 0;
                    const available = Math.max(0, current - reserved);
@@ -1182,12 +1182,12 @@ export default function VendorProductsPage() {
                             <div className="font-mono text-xs text-gray-500 break-all">{product.skuCode || "—"}</div>
                          </div>
                        </td>
-                        <td className="px-2 py-3.5 align-middle text-xs text-gray-700">{getPricingModel(type)}</td>
+                         {!isDigitalTab && <td className="px-2 py-3.5 align-middle text-xs text-gray-700">{getPricingModel(type)}</td>}
                         <td className="px-2 py-3.5 align-middle">
                           <div className="font-semibold text-gray-800 text-sm">
-                            {product.price && Number.isFinite(Number(product.price)) ? fmt(Number(product.price)) : "—"}
+                             {digital ? fmt(0) : product.price && Number.isFinite(Number(product.price)) ? fmt(Number(product.price)) : "—"}
                           </div>
-                          {isCloudService && <div className="text-xs text-gray-500">(Min. Commitment)</div>}
+                           {!digital && isCloudService && <div className="text-xs text-gray-500">(Min. Commitment)</div>}
                        </td>
                         <td className="px-2 py-3.5 align-middle text-sm text-gray-700">{quantityValue}</td>
                         <td className="px-2 py-3.5 align-middle">

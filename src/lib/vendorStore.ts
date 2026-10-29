@@ -1,6 +1,7 @@
 import { recordStockEvent } from './stockHistoryStore';
 import { getVendorById } from './vendorDataStore';
 import type { CatalogProduct, CatalogVariation } from './catalogStore';
+import { isDigitalOnlyType } from './productTypeRules';
 
 const STORE_KEY = 'nido_vendor_products';
 
@@ -47,9 +48,15 @@ function getCurrentUser(): string {
 
 /** Ensure every product has physicalStock / reservedStock populated. */
 function migrateProduct(p: VendorProduct): VendorProduct {
-  if (p.physicalStock !== undefined && p.reservedStock !== undefined) return p;
+  const price = isDigitalOnlyType(p.physicalType || '') ? '0' : p.price;
+  if (
+    p.physicalStock !== undefined
+    && p.reservedStock !== undefined
+    && p.price === price
+  ) return p;
   return {
     ...p,
+    price,
     physicalStock: p.physicalStock ?? p.stock ?? '0',
     reservedStock: p.reservedStock ?? '0',
   };
@@ -59,8 +66,19 @@ function readStore(): Store {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
     const migrated: Store = {};
+    let digitalBasePricesChanged = false;
     for (const [vendorId, products] of Object.entries(raw)) {
-      migrated[vendorId] = (products as VendorProduct[]).map(migrateProduct);
+      migrated[vendorId] = (products as VendorProduct[]).map((product) => {
+        if (isDigitalOnlyType(product.physicalType || '') && product.price !== '0') {
+          digitalBasePricesChanged = true;
+        }
+        return migrateProduct(product);
+      });
+    }
+    if (digitalBasePricesChanged) {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(migrated));
+      } catch { /* use the normalized in-memory values if storage is unavailable */ }
     }
     return migrated;
   } catch {
@@ -69,7 +87,13 @@ function readStore(): Store {
 }
 
 function writeStore(store: Store): void {
-  localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  const normalized: Store = Object.fromEntries(
+    Object.entries(store).map(([vendorId, products]) => [
+      vendorId,
+      products.map(migrateProduct),
+    ]),
+  );
+  localStorage.setItem(STORE_KEY, JSON.stringify(normalized));
   window.dispatchEvent(new Event('vendorProductsUpdated'));
 }
 

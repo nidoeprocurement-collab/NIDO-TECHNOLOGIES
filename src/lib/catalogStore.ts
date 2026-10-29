@@ -1,4 +1,5 @@
 import { getPrefix } from './configService';
+import { isDigitalOnlyType } from './productTypeRules';
 
 export interface CatalogSpec {
   id: string;
@@ -134,9 +135,9 @@ export function saveCatalogProduct(
 
   // ── Propagate master catalog changes downstream ──────────────────────────
   // We use raw localStorage reads here (no imports from other stores) to avoid
-  // circular-dependency issues. Only the snapshot fields that originate from
-  // the master catalog are overwritten; vendor-specific / client-specific fields
-  // (price, moq, leadTime, stock, roles, preference, etc.) are left untouched.
+  // circular-dependency issues. Only master-catalog snapshot fields are overwritten;
+  // digital vendor base price is fixed at 0, while other vendor-specific fields
+  // (moq, leadTime, stock, roles, preference, etc.) remain untouched.
 
   // 1. Vendor products — matched by id (= catalog product id)
   try {
@@ -157,6 +158,7 @@ export function saveCatalogProduct(
           brand:             product.brand,
            physicalType:      product.physicalType,
           images:            product.images,
+          price: isDigitalOnlyType(product.physicalType || '') ? '0' : p.price,
         };
       });
     }

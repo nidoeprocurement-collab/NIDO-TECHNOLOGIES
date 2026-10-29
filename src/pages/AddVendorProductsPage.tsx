@@ -18,7 +18,6 @@ import {
   getPricingModel,
   getProductType,
   getQuantityLabel,
-  getTenureBilling,
   isDigitalOnlyType,
   isHybridType,
 } from "@/lib/productTypeRules";
@@ -309,24 +308,24 @@ function SelectedProductsTable({
 
   return (
     <div className="w-full overflow-x-visible">
-      <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "860px" : "980px" }}>
+      <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "760px" : "980px" }}>
         <thead className="sticky top-0 z-10">
           <tr className="bg-gray-50 border-b border-gray-100">
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">VPC / MPI</th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pricing Model</th>
-            {!isDigitalTab && (
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
-              </th>
-            )}
+            {!isDigitalTab && <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pricing Model</th>}
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
+            </th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
               <span className="flex items-center gap-1">{isDigitalTab ? "Variations" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
             </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <span className="flex items-center gap-1">{isDigitalTab ? "Tenure / Billing" : "Stock"} <Info className="w-3 h-3 text-gray-400" /></span>
-            </th>
+            {!isDigitalTab && (
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <span className="flex items-center gap-1">Stock <Info className="w-3 h-3 text-gray-400" /></span>
+              </th>
+            )}
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
               {isDigitalTab ? "Provisioning Time" : "Lead Time"}
             </th>
@@ -337,7 +336,6 @@ function SelectedProductsTable({
           {rows.map((row) => {
             const type = selectedProductType(row.catalogProduct);
             const digital = isDigitalOnlyType(type);
-            const tenureBilling = getTenureBilling(type);
             const formattedLeadTime = formatLeadTimeByType(row.leadTime, type);
 
             return (
@@ -362,9 +360,11 @@ function SelectedProductsTable({
                     <div className="font-mono text-[10px] text-gray-500 break-all">{row.catalogProduct.masterProductCode || "—"}</div>
                   </div>
                 </td>
-                <td className="px-3 py-2 align-middle text-xs text-gray-700 break-words">{getPricingModel(type)}</td>
-                {!digital && (
-                  <td className="px-3 py-3">
+                {!isDigitalTab && <td className="px-3 py-2 align-middle text-xs text-gray-700 break-words">{getPricingModel(type)}</td>}
+                <td className="px-3 py-3">
+                  {digital ? (
+                    <span className="text-sm font-semibold text-gray-700">0</span>
+                  ) : (
                     <input
                       type="number"
                       min={0}
@@ -375,8 +375,8 @@ function SelectedProductsTable({
                       placeholder="0.00"
                       className="w-full min-w-[90px] max-w-[110px] rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                     />
-                  </td>
-                )}
+                  )}
+                </td>
                 <td className="px-3 py-3">
                   {digital ? (
                     <button
@@ -402,13 +402,8 @@ function SelectedProductsTable({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-3">
-                  {digital ? (
-                    <div className="space-y-1 text-[10px] text-gray-700">
-                      <div className="font-semibold">{tenureBilling.tenure}</div>
-                      <div className="text-gray-500">{tenureBilling.billing}</div>
-                    </div>
-                  ) : (
+                {!isDigitalTab && (
+                  <td className="px-3 py-3">
                     <input
                       type="number"
                       min={0}
@@ -418,8 +413,8 @@ function SelectedProductsTable({
                       placeholder="0"
                       className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                  )}
-                </td>
+                  </td>
+                )}
                 <td className="px-3 py-3">
                   <div className="space-y-1">
                     <input
@@ -545,7 +540,7 @@ export default function AddVendorProductsPage() {
     setSelectedProductTab(isDigitalCatalogProduct(catalogProduct) ? "digital" : "physical");
     setSelectedRows([{
       catalogProduct,
-      price: existing.price,
+      price: isDigitalCatalogProduct(catalogProduct) ? "0" : existing.price,
       moq: existing.moq,
       leadTime: existing.leadTime,
       stock: existing.stock,
@@ -574,9 +569,7 @@ export default function AddVendorProductsPage() {
           const preview = `${vpcPrefix}${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
           return [...rows, {
             catalogProduct: product,
-            price: isDigitalCatalogProduct(product)
-              ? String(Number.isFinite(product.price) ? product.price : 0)
-              : "",
+            price: isDigitalCatalogProduct(product) ? "0" : "",
             moq: isDigitalCatalogProduct(product) ? "1" : "",
             leadTime: "",
             stock: "",
@@ -620,7 +613,7 @@ export default function AddVendorProductsPage() {
       // In edit mode the product already has a VPC — keep it as-is.
       const row = selectedRows[0];
       updateVendorProduct(vendorId, editProductId, {
-        price: row.price,
+        price: isDigitalCatalogProduct(row.catalogProduct) ? "0" : row.price,
         moq: isDigitalCatalogProduct(row.catalogProduct) ? row.moq || "1" : row.moq,
         leadTime: row.leadTime,
         stock: isDigitalCatalogProduct(row.catalogProduct) ? row.stock || "0" : row.stock,
@@ -640,7 +633,7 @@ export default function AddVendorProductsPage() {
         brand: r.catalogProduct.brand,
         physicalType: r.catalogProduct.physicalType,
         images: r.catalogProduct.images,
-        price: r.price,
+        price: isDigitalCatalogProduct(r.catalogProduct) ? "0" : r.price,
         moq: isDigitalCatalogProduct(r.catalogProduct) ? r.moq || "1" : r.moq,
         leadTime: r.leadTime,
         stock: isDigitalCatalogProduct(r.catalogProduct) ? r.stock || "0" : r.stock,
@@ -995,12 +988,10 @@ export default function AddVendorProductsPage() {
                       <p className="text-[11px] uppercase tracking-wide text-gray-400">Vendor Product Code</p>
                       <p className="text-sm font-mono text-gray-800 mt-0.5 break-words">{row.vendorProductCode}</p>
                     </div>
-                    {!isDigitalCatalogProduct(row.catalogProduct) && (
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Price / Unit</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.price}</p>
-                      </div>
-                    )}
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Price / Unit</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{isDigitalCatalogProduct(row.catalogProduct) ? "0" : row.price}</p>
+                    </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-gray-400">
                         {isDigitalCatalogProduct(row.catalogProduct) ? "Users / Licenses" : "Units / MOQ"}
@@ -1015,17 +1006,7 @@ export default function AddVendorProductsPage() {
                         {formatLeadTimeByType(row.leadTime, selectedProductType(row.catalogProduct)).primary}
                       </p>
                     </div>
-                    {isDigitalCatalogProduct(row.catalogProduct) ? (
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Tenure / Billing</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-0.5">
-                          {(() => {
-                            const terms = getTenureBilling(selectedProductType(row.catalogProduct));
-                            return `${terms.tenure} · ${terms.billing}`;
-                          })()}
-                        </p>
-                      </div>
-                    ) : (
+                    {!isDigitalCatalogProduct(row.catalogProduct) && (
                       <div>
                         <p className="text-[11px] uppercase tracking-wide text-gray-400">Stock</p>
                         <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.stock}</p>

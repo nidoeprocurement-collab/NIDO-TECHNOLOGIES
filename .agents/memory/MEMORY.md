@@ -16,6 +16,7 @@
 - [Approval engine adapter](approval-engine-local-mode.md) — approval UI/service contracts support local persistence now and a future backend switch via one environment flag.
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
+- [Digital vendor pricing](digital-vendor-pricing.md) — digital base unit price is always 0; configured variation prices remain the digital charge.
 - [Independent fulfillment status ownership](digital-fulfillment-status-authority.md) — PO Details and Order Details keep separate fulfillment progress; cancellation safeguards remain an exception.
 - [Order Details layout and pricing](order-details-line-pricing.md) — preserve saved GST-exclusive pricing; place a full-width SLA notice left-aligned below fulfillment status.
 - [Document activity audit](document-activity-audit.md) — retain and show existing documents and notes after Delivered; lock editing, not history.
