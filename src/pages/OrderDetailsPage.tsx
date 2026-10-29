@@ -4781,7 +4781,7 @@ export default function MyOrderPage() {
                           ) : <span style={{ color: "#d1d5db" }}>-</span>}
                         </div>
                       )}
-                      {!isClientPortalUser && (
+                      {!isClientPortalUser && !isDigitalOrder && (
                         <div style={{ minWidth: 0 }}>
                           {itemCancelled || cancelledPONeedsResolution ? (
                             previousVendorName ? (
