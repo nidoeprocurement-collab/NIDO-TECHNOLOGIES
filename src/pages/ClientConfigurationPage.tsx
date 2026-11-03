@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "./ClientUsersPage";
 import ClientPricingSettingsPanel from "./ClientPricingSettingsTabsPanel";
+import { archiveClientById } from "@/lib/clientStore";
 import { getPortalRoles, getPortalUsersByClient, updatePortalUser, type PortalUser } from "@/lib/portalUserStore";
 import {
   getClientGeneralSettings,
@@ -33,6 +35,7 @@ function toInviteUser(user: PortalUser): InviteUser {
 }
 
 export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { clientId?: string }) {
+  const navigate = useNavigate();
   const [configTab, setConfigTab] = useState("General");
   const configTabs = ["General", "Price Setting", "Invite Users"];
 
@@ -176,7 +179,18 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
           {/* Danger Zone */}
           <div className="pt-5">
             <p className="text-xs font-semibold text-gray-800 mb-3">Danger Zone</p>
-            <button className="px-3 py-1.5 text-xs border border-red-400 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                if (archiveClientById(clientId)) {
+                  toast.success("Client archived");
+                  navigate("/clients");
+                } else {
+                  toast.error("Client could not be archived");
+                }
+              }}
+              className="px-3 py-1.5 text-xs border border-red-400 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+            >
               Archive Client
             </button>
           </div>

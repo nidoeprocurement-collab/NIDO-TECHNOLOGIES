@@ -432,13 +432,13 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const topProducts = portalMode
     ? personalProducts.slice(0, 5)
     : catalog.slice(0, 5).map((product) => ({
-        productCode: product.productCode,
-        name: product.name,
-        category: product.category,
-        price: product.price,
-        availability: product.availability,
-        quantity: 0,
-      }));
+      productCode: product.productCode,
+      name: product.name,
+      category: product.category,
+      price: product.price,
+      availability: product.availability,
+      quantity: 0,
+    }));
   const startDate = client.contractStartDate || client.contract_start_date;
   const contractStart = startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "N/A";
   const address = [client.billingAddress || client.billing_address, client.billingCity || client.billing_city, client.billingState || client.billing_state, client.billingPincode || client.billing_pincode].filter(Boolean).join(", ");
@@ -544,7 +544,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
         <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-5 lg:px-7">
           <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
             <div>
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome back, {portalMode ? user?.name || "there" : client.name}! <span aria-hidden="true">👋</span></h1>
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome back, {portalMode ? user?.name || "there" : client.name}! <span aria-hidden="true">👋</span></h1>
               <p className="mt-1 text-xs text-gray-500">Here's what's happening with your account today.</p>
             </div>
           </header>
@@ -606,12 +606,12 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             Data shown below: <span className="font-semibold">{formatDateRange(selectedDateRange)}</span>
           </p>
 
-           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-             <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
-             <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
-              <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
-             <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
-              <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/support", "Overview")} />
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
+            <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
+            <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
+            <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
+            <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate(portalMode ? "/portal/support" : "/support/tickets")} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -624,17 +624,24 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 </div>
               </div>
               <div className="mt-4 space-y-2 text-[10px] text-gray-600">
-                 <a href={profileEmail ? `mailto:${profileEmail}` : undefined} className="flex items-center gap-2 truncate hover:text-blue-600"><Mail size={12} className="shrink-0 text-gray-400" />{profileEmail || "No email available"}</a>
-                 <a href={profilePhone ? `tel:${profilePhone}` : undefined} className="flex items-center gap-2 hover:text-blue-600"><Phone size={12} className="shrink-0 text-gray-400" />{profilePhone || "No phone available"}</a>
+                <a href={profileEmail ? `mailto:${profileEmail}` : undefined} className="flex items-center gap-2 truncate hover:text-blue-600"><Mail size={12} className="shrink-0 text-gray-400" />{profileEmail || "No email available"}</a>
+                <a href={profilePhone ? `tel:${profilePhone}` : undefined} className="flex items-center gap-2 hover:text-blue-600"><Phone size={12} className="shrink-0 text-gray-400" />{profilePhone || "No phone available"}</a>
                 <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
                 {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
               </div>
-                <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : goTo("Contracts")} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
-                View Contracts
-              </button>
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : goTo("Contracts")} className="flex-1 rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
+                  View Contracts
+                </button>
+                {!portalMode && (
+                  <button type="button" onClick={() => navigate(`/clients/${client.id}/edit`)} className="flex-1 rounded border border-gray-200 bg-white py-1.5 text-[10px] font-semibold text-gray-700 hover:bg-gray-50">
+                    Edit Client
+                  </button>
+                )}
+              </div>
             </Panel>
 
-             <Panel title="Orders Overview" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
+            <Panel title="Orders Overview" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
               <div className="flex min-h-[138px] items-center gap-4">
                 <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#10b981 0 ${((statusCounts[0].count / totalStatusCount) * 100)}%, #2563eb ${((statusCounts[0].count / totalStatusCount) * 100)}% ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}%, #f59e0b ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}% ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}%, #7c3aed ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}% 100%)` }}>
                   <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white"><span className="text-xl font-bold">{periodOrders.length}</span><span className="text-[9px] text-gray-500">Total Orders</span></div>
@@ -648,9 +655,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               </div>
             </Panel>
 
-             <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
+            <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
               <div className="space-y-2.5 text-[10px]">
-                 {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
+                {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
                 <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
@@ -659,18 +666,18 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
-             <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
-               {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
+            <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
+              {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[460px] text-left text-[10px]">
-                     <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">{portalMode ? "Qty Ordered" : "Stock"}</th></tr></thead>
-                     <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
+                    <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">{portalMode ? "Qty Ordered" : "Stock"}</th></tr></thead>
+                    <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
                   </table>
                 </div>
               )}
             </Panel>
 
-             <Panel title="Recent Orders" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
+            <Panel title="Recent Orders" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
               {recentOrders.length === 0 ? <EmptyState message="No orders found for this client in the selected period." /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[470px] text-left text-[10px]">
@@ -685,10 +692,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           <div className="mt-3">
             <h2 className="mb-2 text-xs font-bold text-gray-900">Quick Links</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-               <button type="button" onClick={() => openOverviewLink("/portal/catalog", "Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-               <button type="button" onClick={() => openOverviewLink("/portal/services", "Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-               <button type="button" onClick={() => openOverviewLink("/portal/support", "Overview")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-               <button type="button" onClick={() => openOverviewLink("/portal/reports", "Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => openOverviewLink("/portal/catalog", "Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => openOverviewLink("/portal/services", "Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => navigate(portalMode ? "/portal/support" : "/support/create")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => openOverviewLink("/portal/reports", "Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
             </div>
           </div>
         </main>

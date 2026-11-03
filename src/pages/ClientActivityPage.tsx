@@ -5,6 +5,7 @@ import {
   ChevronDown, ArrowRight, CheckCircle2, Calendar,
 } from "lucide-react";
 import { getClientActivities, saveClientActivity, type ClientActivityRecord } from "@/lib/clientDataStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 const STATS = [
   { icon: <FileText size={18} className="text-blue-500" />, value: "36", label: "Total Notes", sub: "Across Contract", bg: "bg-blue-50" },
@@ -34,32 +35,6 @@ interface Activity {
   group: string;
   createdAt?: string;
 }
-
-const ACTIVITIES: Activity[] = [
-  { id: 1, avatar: "PN", name: "Priya Nair", action: "added a note", boldPart: "", type: "Note", time: "11:45 AM", description: "Client confirmed the requirement for additional 50 users.\nPrice impact will be communicated separately.", visibility: "Visible to All", group: "Today" },
-  { id: 2, avatar: "RS", name: "Rahul Sharma", action: "updated SLA KPI:", boldPart: "Platform Uptime", type: "Update", time: "10:30 AM", description: "Uptime target achieved for May 2025 – 99.62%\nAll critical services are performing within SLA.", visibility: "Visible to All", group: "Today" },
-  { id: 3, avatar: "SI", name: "Sneha Iyer", action: "commented on", boldPart: "Pricing", type: "Comment", time: "09:15 AM", description: "Please review the pricing for additional storage.\nClient is expecting a discounted rate.", visibility: "Visible to All", group: "Today" },
-  { id: 4, avatar: "VS", name: "Vikram Singh", action: "added a note", boldPart: "", type: "Note", time: "Yesterday, 04:20 PM", description: "Shared the implementation plan with the client.\nKick-off meeting scheduled on June 5, 2025.", visibility: "Visible to All", group: "Yesterday" },
-  { id: 5, avatar: "SY", name: "System", action: "updated document:", boldPart: "Implementation Plan v1.0", type: "Update", time: "Yesterday, 02:10 PM", description: "New version uploaded by Ankit Verma.", visibility: "Visible to All", group: "Yesterday" },
-  { id: 6, avatar: "AV", name: "Ankit Verma", action: "completed task:", boldPart: "Data Migration Plan", type: "Task", completedBadge: "Completed", time: "Yesterday, 11:30 AM", description: "Data migration plan document shared with Apex team.", visibility: "Visible to All", group: "Yesterday" },
-  { id: 7, avatar: "PN", name: "Priya Nair", action: "mentioned you in a comment", boldPart: "", type: "Mention", time: "May 30, 2025, 03:40 PM", description: "@Rahul Sharma please review and confirm the SLA breach policy.", visibility: "", replies: 1, group: "May 30, 2025" },
-  { id: 8, avatar: "RS", name: "Rahul Sharma", action: "replied to a comment", boldPart: "", type: "Comment", time: "May 30, 2025, 03:55 PM", description: "Reviewed the breach policy. Looks good.\nWill share with the client for acceptance.", visibility: "", group: "May 30, 2025" },
-  { id: 9, avatar: "SY", name: "System", action: "created contract:", boldPart: "CT-2025-001", type: "Update", time: "May 29, 2025, 10:30 AM", description: "Contract created and signed by both parties.", visibility: "Visible to All", group: "May 29, 2025" },
-];
-
-const RECENT_NOTES = [
-  { text: "Client confirmed the requirement for additional 50 users.", by: "Priya Nair", when: "Today, 11:45 AM" },
-  { text: "Implementation plan shared with the client.", by: "Vikram Singh", when: "Yesterday, 04:20 PM" },
-  { text: "Pricing discussion for additional storage.", by: "Sneha Iyer", when: "May 30, 03:40 PM" },
-];
-
-const UPCOMING_TASKS = [
-  { label: "Client Acceptance on SLA", due: "Due: Jun 03, 2025" },
-  { label: "Review Pricing for Additional Storage", due: "Due: Jun 04, 2025" },
-  { label: "Kick-off Meeting with Apex Team", due: "Due: Jun 05, 2025" },
-  { label: "User Training Plan Approval", due: "Due: Jun 07, 2025" },
-  { label: "Quarterly Business Review", due: "Due: Jun 15, 2025" },
-];
 
 const DONUT = [
   { label: "Notes", count: 36, pct: 28, color: "#3b82f6" },
@@ -128,6 +103,7 @@ function DonutChart({ data = DONUT }: { data?: typeof DONUT }) {
 }
 
 export default function ClientActivityPage({ clientId }: { clientId?: string }) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("All Activity");
   const [noteText, setNoteText] = useState("");
   const [visibility, setVisibility] = useState("Select Visibility");
@@ -137,7 +113,7 @@ export default function ClientActivityPage({ clientId }: { clientId?: string }) 
   const [userFilter, setUserFilter] = useState("All Users");
   const [visibleCount, setVisibleCount] = useState(9);
   const [activities, setActivities] = useState<Activity[]>(() =>
-    clientId ? getClientActivities(clientId) : ACTIVITIES
+    clientId ? getClientActivities(clientId) : []
   );
 
   useEffect(() => {
@@ -152,10 +128,17 @@ export default function ClientActivityPage({ clientId }: { clientId?: string }) 
     if (!noteText.trim()) return;
     const now = new Date();
     const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const authorName = user?.name || "Admin";
+    const authorInitials = authorName
+      .split(/\s+/)
+      .map((part) => part[0] || "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "AD";
     const newNote: Activity = {
       id: Date.now(),
-      avatar: "PN",
-      name: "You",
+      avatar: authorInitials,
+      name: authorName,
       action: "added a note",
       boldPart: "",
       type: "Note",

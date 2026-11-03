@@ -637,6 +637,8 @@ export default function CatalogUpdatesTab() {
   const [bulkArchiveConfirmOpen, setBulkArchiveConfirmOpen] = useState(false);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [archiveConfirmItem, setArchiveConfirmItem] = useState<CatalogItem | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<CatalogItem | null>(null);
+  const [deleteAllArchivedConfirmOpen, setDeleteAllArchivedConfirmOpen] = useState(false);
 
   const bulkArchiveItems = () => {
     if (selectedIds.length === 0) return;
@@ -661,6 +663,27 @@ export default function CatalogUpdatesTab() {
     saveCatalogProduct({ ...product, publishStatus: 'draft' });
     setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: 'draft' as const } : i));
     toast.success('Product restored to Draft');
+  };
+
+  const confirmPermanentDeleteArchivedItem = () => {
+    if (!deleteConfirmItem) return;
+    deleteCatalogProduct(deleteConfirmItem.id);
+    setItems(prev => prev.filter(i => i.id !== deleteConfirmItem.id));
+    setSelectedIds(prev => prev.filter(id => id !== deleteConfirmItem.id));
+    toast.success(`"${deleteConfirmItem.name}" permanently removed from Master Catalogue`);
+    setDeleteConfirmItem(null);
+  };
+
+  const confirmPermanentDeleteAllArchived = () => {
+    const archivedItems = items.filter(i => i.publishStatus === 'archived');
+    if (archivedItems.length === 0) {
+      setDeleteAllArchivedConfirmOpen(false);
+      return;
+    }
+    archivedItems.forEach(item => deleteCatalogProduct(item.id));
+    setItems(prev => prev.filter(i => i.publishStatus !== 'archived'));
+    toast.success(`${archivedItems.length} archived product${archivedItems.length > 1 ? 's' : ''} permanently removed`);
+    setDeleteAllArchivedConfirmOpen(false);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1979,17 +2002,29 @@ export default function CatalogUpdatesTab() {
                   Archived Products
                   <span className="ml-2 text-base font-normal text-gray-400">({stats.archived} product{stats.archived !== 1 ? 's' : ''})</span>
                 </h2>
-                <p className="text-xs text-gray-400 mt-0.5">Hidden from the active catalogue. Use "Restore" to move a product back to Draft.</p>
+                <p className="text-xs text-gray-400 mt-0.5">Hidden from the active catalogue. Use "Restore" to move a product back to Draft, or "Remove Permanently" to delete it.</p>
               </div>
             </div>
-            <button
-              onClick={() => setArchivedOpen(false)}
-              className="text-gray-400 hover:text-gray-700 transition-colors p-1 rounded"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-3">
+              {stats.archived > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs h-8 border-red-200 text-red-600 hover:bg-red-50 whitespace-nowrap"
+                  onClick={() => setDeleteAllArchivedConfirmOpen(true)}
+                >
+                  <Trash2 size={13} /> Remove All Permanently
+                </Button>
+              )}
+              <button
+                onClick={() => setArchivedOpen(false)}
+                className="text-gray-400 hover:text-gray-700 transition-colors p-1 rounded"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Body */}
@@ -2012,7 +2047,7 @@ export default function CatalogUpdatesTab() {
                     <TableHead className="text-sm font-semibold text-gray-600 py-3 min-w-[120px]">Brand</TableHead>
                     <TableHead className="text-sm font-semibold text-gray-600 py-3 min-w-[100px]">Price</TableHead>
                     <TableHead className="text-sm font-semibold text-gray-600 py-3 min-w-[180px]">Tags</TableHead>
-                    <TableHead className="text-sm font-semibold text-gray-600 py-3 min-w-[100px]">Action</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3 min-w-[190px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2051,14 +2086,24 @@ export default function CatalogUpdatesTab() {
                         ) : <span className="text-sm text-gray-400">—</span>}
                       </TableCell>
                       <TableCell className="py-4 align-top">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 text-xs h-8 border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap"
-                          onClick={() => unarchiveItem(item.id)}
-                        >
-                          <ArchiveRestore size={13} /> Restore
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs h-8 border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+                            onClick={() => unarchiveItem(item.id)}
+                          >
+                            <ArchiveRestore size={13} /> Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 text-xs h-8 border-red-200 text-red-600 hover:bg-red-50 whitespace-nowrap"
+                            onClick={() => setDeleteConfirmItem(item)}
+                          >
+                            <Trash2 size={13} /> Remove
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -2068,6 +2113,64 @@ export default function CatalogUpdatesTab() {
           </div>
         </div>
       )}
+
+      {/* Permanent Delete Single Archived Product Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmItem} onOpenChange={(open) => { if (!open) setDeleteConfirmItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 size={18} /> Permanently Remove Product?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-1">
+            <p className="text-sm text-gray-700">
+              Are you sure you want to permanently remove <span className="font-semibold">"{deleteConfirmItem?.name}"</span> from the Master Catalogue?
+            </p>
+            <p className="text-sm text-red-500 mt-2">
+              This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmItem(null)}>Cancel</Button>
+            <Button
+              data-confirmation-skip=""
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmPermanentDeleteArchivedItem}
+            >
+              <Trash2 size={14} className="mr-2" /> Remove Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent Delete All Archived Products Confirmation Dialog */}
+      <Dialog open={deleteAllArchivedConfirmOpen} onOpenChange={setDeleteAllArchivedConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 size={18} /> Remove All Archived Products?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-1">
+            <p className="text-sm text-gray-700">
+              Are you sure you want to permanently remove all <span className="font-semibold">{stats.archived}</span> archived product{stats.archived !== 1 ? 's' : ''} from the Master Catalogue?
+            </p>
+            <p className="text-sm text-red-500 mt-2">
+              This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteAllArchivedConfirmOpen(false)}>Cancel</Button>
+            <Button
+              data-confirmation-skip=""
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmPermanentDeleteAllArchived}
+            >
+              <Trash2 size={14} className="mr-2" /> Remove All Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Import Dialog */}
       <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>

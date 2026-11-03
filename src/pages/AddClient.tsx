@@ -4,11 +4,11 @@ import { CATEGORY_LIST } from "@/lib/categories";
 import {
   addClient as addStoredClient,
   getClients,
-  isSharedClient,
   CLIENT_IMPORT_HEADERS,
   clientFromImportRow,
   parseClientCsv,
 } from "@/lib/clientStore";
+import { saveClientDocument } from "@/lib/clientDataStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
 import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
@@ -202,14 +202,17 @@ export default function AddClient() {
           pan_number: normalizePanInput(existing.pan_number || ""),
           currency: existing.currency || "INR",
           opening_balance:
-            existing.opening_balance != null
-              ? String(existing.opening_balance)
+            (existing.opening_balance ?? existing.openingBalance) != null
+              ? String(existing.opening_balance ?? existing.openingBalance)
               : "",
-          payment_terms: existing.payment_terms || "",
-          tds_rate: existing.tds_rate != null ? String(existing.tds_rate) : "",
-          bank_name: existing.bank_name || "",
-          account_number: existing.account_number || "",
-          ifsc_code: existing.ifsc_code || "",
+          payment_terms: existing.payment_terms || existing.paymentTerms || "",
+          tds_rate:
+            (existing.tds_rate ?? existing.tdsRate) != null
+              ? String(existing.tds_rate ?? existing.tdsRate)
+              : "",
+          bank_name: existing.bank_name || existing.bankName || "",
+          account_number: existing.account_number || existing.accountNumber || "",
+          ifsc_code: existing.ifsc_code || existing.ifscCode || "",
           branch: existing.branch || "",
           billing_address:
             existing.billing_address || existing.billingAddress || "",
@@ -625,16 +628,17 @@ export default function AddClient() {
     try {
       console.log("[v0] Saving client data:", formData.company_name);
 
-      if (clientIdToEdit && isSharedClient(clientIdToEdit)) {
-        toast.error("Shared demo clients are read-only. Add a new client to save changes.");
-        return;
-      }
-
       const existingClient = clientIdToEdit
         ? getClients().find((client) => client.id === clientIdToEdit)
         : undefined;
 
-      // Mock save operation
+      const openingBal = formData.opening_balance
+        ? parseFloat(formData.opening_balance)
+        : 0;
+      const tdsRateVal = formData.tds_rate
+        ? parseFloat(formData.tds_rate)
+        : 0;
+
       const clientData = {
         company_name: formData.company_name,
         category: formData.category,
@@ -655,16 +659,18 @@ export default function AddClient() {
         source_of_supply: formData.source_of_supply,
         pan_number: formData.pan_number,
         currency: formData.currency,
-        opening_balance: formData.opening_balance
-          ? parseFloat(formData.opening_balance)
-          : 0,
+        opening_balance: openingBal,
+        openingBalance: String(openingBal),
         payment_terms: formData.payment_terms,
-        tds_rate: formData.tds_rate
-          ? parseFloat(formData.tds_rate)
-          : 0,
+        paymentTerms: formData.payment_terms,
+        tds_rate: tdsRateVal,
+        tdsRate: String(tdsRateVal),
         bank_name: formData.bank_name,
+        bankName: formData.bank_name,
         account_number: formData.account_number,
+        accountNumber: formData.account_number,
         ifsc_code: formData.ifsc_code,
+        ifscCode: formData.ifsc_code,
         branch: formData.branch,
         billing_address: [billingAddressDetails.addressLine1, billingAddressDetails.addressLine2].filter(Boolean).join(", "),
         billingAddress: [billingAddressDetails.addressLine1, billingAddressDetails.addressLine2].filter(Boolean).join(", "),
@@ -681,9 +687,13 @@ export default function AddClient() {
         billing_pincode: formData.billing_pincode,
         billingPincode: formData.billing_pincode,
         shipping_address: [shippingAddressDetails.addressLine1, shippingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        shippingAddress: [shippingAddressDetails.addressLine1, shippingAddressDetails.addressLine2].filter(Boolean).join(", "),
         shipping_city: shippingAddressDetails.city,
+        shippingCity: shippingAddressDetails.city,
         shipping_state: shippingAddressDetails.state,
+        shippingState: shippingAddressDetails.state,
         shipping_pincode: shippingAddressDetails.pinCode,
+        shippingPincode: shippingAddressDetails.pinCode,
         shipping_attention: shippingAddressDetails.attention,
         shippingAttention: shippingAddressDetails.attention,
         shipping_country: shippingAddressDetails.country,
@@ -714,6 +724,32 @@ export default function AddClient() {
         name: clientData.company_name || formData.client_id,
         ...clientData,
       });
+
+      // Persist any uploaded onboarding documents to the client's document store
+      if (formData.documents.length > 0) {
+        const todayStr = new Date().toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+        for (const file of formData.documents) {
+          const ext = file.name.split(".").pop()?.toUpperCase() || "FILE";
+          const sizeKb = file.size / 1024;
+          const sizeStr =
+            sizeKb > 1024
+              ? `${(sizeKb / 1024).toFixed(1)} MB`
+              : `${Math.round(sizeKb)} KB`;
+          saveClientDocument(formData.client_id, {
+            id: `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: file.name,
+            category: "Compliance",
+            uploadedBy: formData.contact_person || "Admin",
+            uploadedAt: todayStr,
+            size: sizeStr,
+            type: ext,
+          });
+        }
+      }
       const savedClient = getClients().find((client) => client.id === formData.client_id);
       if (!savedClient || savedClient.company_name !== clientData.company_name) {
         throw new Error("The client could not be confirmed in local storage.");

@@ -325,15 +325,18 @@ export function saveCatalogProduct(
 
 export function deleteCatalogProduct(id: string): void {
   const products = getCatalogProducts();
-  const toDelete = products.find(p => p.id === id);
-  const remaining = products.filter(p => p.id !== id);
+  const toDelete = products.find(p => String(p.id) === String(id));
+  const remaining = products.filter(p => String(p.id) !== String(id));
   localStorage.setItem(STORE_KEY, JSON.stringify(remaining));
+  if (toDelete) {
+    removeArchivedProductFromDownstream(toDelete.id, toDelete.masterProductCode);
+  }
   window.dispatchEvent(new Event('catalogUpdated'));
   if (toDelete) {
     try {
       addCatalogAuditLog({
         event: 'Deleted Item',
-        detail: `Deleted: ${toDelete.productName} (${toDelete.skuCode || toDelete.masterProductCode || 'N/A'})`,
+        detail: `Permanently deleted: ${toDelete.productName} (${toDelete.skuCode || toDelete.masterProductCode || 'N/A'})`,
         itemId: toDelete.id,
         itemName: toDelete.productName,
         sku: toDelete.skuCode || toDelete.masterProductCode,

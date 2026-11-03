@@ -1,63 +1,87 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest"
 import {
   addClient,
+  archiveClientById,
   getArchivedClients,
   getClients,
-  saveArchivedClients,
-  saveClients,
+  isSharedClient,
+  restoreArchivedClient,
   type StoredClient,
-} from "@/lib/clientStore";
+} from "../clientStore"
 
-const userA = { id: "user-a", email: "a@example.com" };
-const userB = { id: "user-b", email: "b@example.com" };
-
-const addedClient: StoredClient = {
-  id: "CL-00001",
-  name: "Added for User A",
-  category: "IT Hardware",
-  tier: "Standard",
-  status: "active",
-};
-
-function signIn(user: typeof userA) {
-  localStorage.setItem("nido_user", JSON.stringify(user));
+function loginAs(id: string, email: string) {
+  localStorage.setItem(
+    "nido_auth_user",
+    JSON.stringify({
+      id,
+      email,
+      name: id,
+      role: "Administrator",
+      userType: "nido_admin",
+    }),
+  )
 }
 
-describe("clientStore account-scoped persistence", () => {
+function makeClient(id: string, name: string): StoredClient {
+  return {
+    id,
+    name,
+    company_name: name,
+    category: "IT & Software",
+    tier: "Standard Clients",
+    rep: "Account Owner",
+    email: `${id.toLowerCase()}@example.com`,
+    phone: "9876543210",
+    billingCity: "Bengaluru",
+    status: "active",
+  }
+}
+
+describe("clientStore account scoping and live operations", () => {
   beforeEach(() => {
-    localStorage.clear();
-  });
+    localStorage.clear()
+  })
 
-  it("keeps the five seed clients visible for every account", () => {
-    signIn(userA);
-    expect(getClients()).toHaveLength(5);
+  it("starts with an empty client list without mock demo clients", () => {
+    loginAs("admin-a", "admin.a@nidotechnologies.com")
+    expect(getClients()).toEqual([])
+    expect(isSharedClient("CI-00019")).toBe(false)
+  })
 
-    localStorage.removeItem("nido_user");
-    signIn(userB);
-    expect(getClients()).toHaveLength(5);
-  });
+  it("keeps newly created clients isolated to the signed-in account", () => {
+    loginAs("admin-a", "admin.a@nidotechnologies.com")
+    addClient(makeClient("CL-90001", "Account A Private Client"))
 
-  it("keeps added clients with their owner after switching accounts", () => {
-    signIn(userA);
-    addClient(addedClient);
-    expect(getClients().some(client => client.id === addedClient.id)).toBe(true);
+    expect(getClients().some((client) => client.id === "CL-90001")).toBe(true)
 
-    localStorage.removeItem("nido_user");
-    signIn(userB);
-    expect(getClients().some(client => client.id === addedClient.id)).toBe(false);
+    loginAs("admin-b", "admin.b@nidotechnologies.com")
 
-    localStorage.removeItem("nido_user");
-    signIn(userA);
-    expect(getClients().some(client => client.id === addedClient.id)).toBe(true);
-  });
+    expect(getClients().some((client) => client.id === "CL-90001")).toBe(false)
+  })
 
-  it("does not allow saving or archiving to remove the shared seed clients", () => {
-    signIn(userA);
-    saveClients([]);
-    expect(getClients()).toHaveLength(5);
+  it("allows editing any saved client in the signed-in account", () => {
+    loginAs("admin-a", "admin.a@nidotechnologies.com")
+    addClient(makeClient("CL-00001", "Acme Industries"))
+    addClient({
+      ...makeClient("CL-00001", "Acme Industries Updated"),
+      billingCity: "Mumbai",
+    })
 
-    saveArchivedClients([getClients()[0] as StoredClient & { archivedOn: string }]);
-    expect(getClients()).toHaveLength(5);
-    expect(getArchivedClients()).toHaveLength(0);
-  });
-});
+    const saved = getClients().find((c) => c.id === "CL-00001")
+    expect(saved?.name).toBe("Acme Industries Updated")
+    expect(saved?.billingCity).toBe("Mumbai")
+  })
+
+  it("archives and restores a live client", () => {
+    loginAs("admin-a", "admin.a@nidotechnologies.com")
+    addClient(makeClient("CL-00002", "Zenith Corp"))
+
+    expect(archiveClientById("CL-00002")).toBe(true)
+    expect(getClients().some((c) => c.id === "CL-00002")).toBe(false)
+    expect(getArchivedClients().some((c) => c.id === "CL-00002")).toBe(true)
+
+    expect(restoreArchivedClient("CL-00002")).toBe(true)
+    expect(getClients().some((c) => c.id === "CL-00002")).toBe(true)
+    expect(getArchivedClients().some((c) => c.id === "CL-00002")).toBe(false)
+  })
+})

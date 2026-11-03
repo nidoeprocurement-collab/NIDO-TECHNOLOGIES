@@ -3,13 +3,7 @@ import { Filter, X } from "lucide-react";
 import { getClientServices, saveClientService, type ClientServiceRecord } from "@/lib/clientDataStore";
 import { useAuth } from "@/contexts/AuthContext";
 
-export const servicesData = [
-  { id: "SRV-001", name: "Cloud Hosting Premium", provider: "CloudServe Inc", startDate: "2024-01-01", endDate: "2024-12-31", amount: "$12,000/year", status: "Active", category: "Hosting" },
-  { id: "SRV-002", name: "IT Support & Maintenance", provider: "TechSupply Co", startDate: "2024-01-01", endDate: "2024-12-31", amount: "$24,000/year", status: "Active", category: "Support" },
-  { id: "SRV-003", name: "Software Licenses", provider: "Microsoft", startDate: "2024-01-01", endDate: "2024-12-31", amount: "$36,000/year", status: "Active", category: "Software" },
-];
-
-const serviceCategories = ["All", "Hosting", "Support", "Software", "Networking", "Security"];
+const serviceCategories = ["All", "Hosting", "Support", "Software", "Networking", "Security", "Other"];
 type ClientDateRange = { start: string; end: string };
 
 function overlapsDateRange(startDate: string, endDate: string, range?: ClientDateRange): boolean {
@@ -23,6 +17,7 @@ function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (serv
   const [form, setForm] = useState({
     name: "",
     provider: "",
+    category: "Support",
     startDate: "",
     endDate: "",
     amount: "",
@@ -30,7 +25,7 @@ function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (serv
   });
 
   const set = (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
   return (
@@ -75,6 +70,22 @@ function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (serv
               placeholder="e.g. CloudServe Inc"
               className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Category <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={form.category}
+              onChange={set("category")}
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-700 bg-white"
+            >
+              {serviceCategories.filter((c) => c !== "All").map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
           {/* Start Date + End Date */}
@@ -150,7 +161,7 @@ function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (serv
                 endDate: form.endDate,
                 amount: `₹${Number(form.amount).toLocaleString("en-IN")}/year`,
                 status: "Active",
-                category: "Other",
+                category: form.category || "Other",
                 description: form.description.trim(),
               });
               onClose();

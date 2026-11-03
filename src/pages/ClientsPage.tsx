@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
+import { getPrefix } from "@/lib/prefixSettings"
+import { toast } from "sonner"
 import {
   getClients as getStoredClients,
   saveClients as saveStoredClients,
   getArchivedClients,
   saveArchivedClients,
-  isSharedClient,
+  restoreArchivedClient,
   CLIENT_IMPORT_HEADERS,
   clientFromImportRow,
   clientToImportValues,
@@ -26,7 +28,7 @@ import {
   Users, Building2, ChevronDown, ChevronRight, X, Mail, MapPin, Calendar,
   Archive, MoreVertical, CheckCircle, Clock, XCircle, Edit,
   Plus, Download, Upload, FileDown, Zap, Copy, Check,
-  IndianRupee, Star, FileText,
+  Star, RotateCcw, Eye,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -44,12 +46,12 @@ const statusColors: Record<string, string> = {
 }
 
 const tierColors: Record<string, string> = {
-  Premium:         "bg-amber-100 text-amber-700",
+  Premium:           "bg-amber-100 text-amber-700",
   "Premium Clients": "bg-amber-100 text-amber-700",
-  Standard:        "bg-blue-100 text-blue-700",
+  Standard:          "bg-blue-100 text-blue-700",
   "Standard Clients": "bg-blue-100 text-blue-700",
-  Basic:           "bg-gray-100 text-gray-600",
-  "Medium Clients": "bg-gray-100 text-gray-600",
+  Basic:             "bg-gray-100 text-gray-600",
+  "Medium Clients":  "bg-gray-100 text-gray-600",
 }
 
 function formatBalance(val: any): string {
@@ -79,8 +81,9 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
 }
 
 // ── Row Actions Menu ───────────────────────────────────────────────────────
-function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
+function RowActionsMenu({ client, onOverview, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
   client: StoredClient
+  onOverview: () => void
   onEdit: () => void
   onArchive: () => void
   onSetStatus: (s: ClientStatus) => void
@@ -115,46 +118,45 @@ function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, p
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
-          {isSharedClient(client.id) ? (
-            <div className="px-3 py-2 text-xs text-gray-500">
-              Shared demo client · read only
-            </div>
-          ) : (
-            <>
-              <button
-                onClick={() => { onEdit(); setOpen(false) }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
-              >
-                <Edit className="w-3.5 h-3.5 opacity-60" /> Edit Client
-              </button>
+          <button
+            onClick={() => { onOverview(); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+          >
+            <Eye className="w-3.5 h-3.5 opacity-60" /> Quick Overview
+          </button>
 
-              {/* Set Status submenu */}
-              <div className="relative">
-                <button
-                  onClick={() => setStatusOpen(p => !p)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <CheckCircle className="w-3.5 h-3.5 opacity-60" /> Set Status
-                  </span>
-                  <ChevronDown className={`w-3 h-3 opacity-40 transition-transform ${statusOpen ? "rotate-180" : ""}`} />
-                </button>
-                {statusOpen && (
-                  <div className="absolute right-full top-0 mr-1 w-40 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
-                    {statuses.map(s => (
-                      <button
-                        key={s.label}
-                        onClick={() => { onSetStatus(s.label); setOpen(false); setStatusOpen(false) }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 transition-colors text-left capitalize ${s.color} ${client.status === s.label ? "font-bold" : ""}`}
-                      >
-                        {s.icon} {s.label} {client.status === s.label && <span className="ml-auto opacity-50">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
+          <button
+            onClick={() => { onEdit(); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+          >
+            <Edit className="w-3.5 h-3.5 opacity-60" /> Edit Client
+          </button>
+
+          {/* Set Status submenu */}
+          <div className="relative">
+            <button
+              onClick={() => setStatusOpen(p => !p)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-3.5 h-3.5 opacity-60" /> Set Status
+              </span>
+              <ChevronDown className={`w-3 h-3 opacity-40 transition-transform ${statusOpen ? "rotate-180" : ""}`} />
+            </button>
+            {statusOpen && (
+              <div className="absolute right-full top-0 mr-1 w-40 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+                {statuses.map(s => (
+                  <button
+                    key={s.label}
+                    onClick={() => { onSetStatus(s.label); setOpen(false); setStatusOpen(false) }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 transition-colors text-left capitalize ${s.color} ${client.status === s.label ? "font-bold" : ""}`}
+                  >
+                    {s.icon} {s.label} {client.status === s.label && <span className="ml-auto opacity-50">✓</span>}
+                  </button>
+                ))}
               </div>
-            </>
-          )}
+            )}
+          </div>
 
           {/* Provision Portal */}
           <button
@@ -165,17 +167,13 @@ function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, p
             {provisioned ? "Re-provision Portal" : "Provision Portal"}
           </button>
 
-          {!isSharedClient(client.id) && (
-            <>
-              <div className="border-t border-gray-100 my-0.5" />
-              <button
-                onClick={() => { onArchive(); setOpen(false) }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors text-left"
-              >
-                <Archive className="w-3.5 h-3.5 opacity-70" /> Archive Client
-              </button>
-            </>
-          )}
+          <div className="border-t border-gray-100 my-0.5" />
+          <button
+            onClick={() => { onArchive(); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors text-left"
+          >
+            <Archive className="w-3.5 h-3.5 opacity-70" /> Archive Client
+          </button>
         </div>
       )}
     </div>
@@ -192,6 +190,7 @@ function ClientOverviewPopup({
   onClose: () => void
   onViewFullProfile?: () => void
 }) {
+  const balanceVal = client.openingBalance ?? client.opening_balance
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -206,8 +205,8 @@ function ClientOverviewPopup({
 
         <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
           {[
-            { label: "Tier",   value: client.tier   || "—", icon: <Star        className="w-4 h-4 text-amber-400" /> },
-            { label: "Status", value: client.status || "—", icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
+            { label: "Tier",     value: client.tier   || "—", icon: <Star        className="w-4 h-4 text-amber-400" /> },
+            { label: "Status",   value: client.status || "—", icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
             { label: "Category", value: client.category ? client.category.split(" ")[0] : "—", icon: <Building2 className="w-4 h-4 text-blue-500" /> },
           ].map(s => (
             <div key={s.label} className="flex flex-col items-center py-3 gap-1">
@@ -236,7 +235,7 @@ function ClientOverviewPopup({
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Details</h3>
             <div className="bg-blue-50 rounded-xl p-3">
               <p className="text-xs text-gray-500 mb-0.5">Opening Balance</p>
-              <p className="text-base font-bold text-gray-800">{formatBalance(client.openingBalance)}</p>
+              <p className="text-base font-bold text-gray-800">{formatBalance(balanceVal)}</p>
             </div>
             {(client.contractStartDate || client.contractEndDate) && (
               <div className="flex items-center gap-2 mt-1">
@@ -271,8 +270,11 @@ function ClientOverviewPopup({
 }
 
 // ── Archived Modal ─────────────────────────────────────────────────────────
-function ArchivedModal({ clients, onClose, onClientClick }: {
-  clients: ArchivedClient[]; onClose: () => void; onClientClick: (c: ArchivedClient) => void
+function ArchivedModal({ clients, onClose, onClientClick, onRestore }: {
+  clients: ArchivedClient[]
+  onClose: () => void
+  onClientClick: (c: ArchivedClient) => void
+  onRestore: (c: ArchivedClient) => void
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
@@ -280,7 +282,7 @@ function ArchivedModal({ clients, onClose, onClientClick }: {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Archived Clients</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{clients.length} {clients.length === 1 ? "client" : "clients"} · Read only</p>
+            <p className="text-xs text-gray-400 mt-0.5">{clients.length} {clients.length === 1 ? "client" : "clients"}</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
         </div>
@@ -294,7 +296,7 @@ function ArchivedModal({ clients, onClose, onClientClick }: {
             <table className="w-full table-fixed text-xs">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {["Client ID", "Client Name", "Category", "Representative", "Tier", "City", "Archived On"].map(h => (
+                  {["Client ID", "Client Name", "Category", "Representative", "Tier", "City", "Archived On", "Action"].map(h => (
                     <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -318,6 +320,14 @@ function ArchivedModal({ clients, onClose, onClientClick }: {
                     <td className="px-3 py-3 text-gray-500">{c.tier || "—"}</td>
                     <td className="px-3 py-3 text-gray-500">{c.billingCity || "—"}</td>
                     <td className="px-3 py-3 text-gray-500">{c.archivedOn}</td>
+                    <td className="px-3 py-3">
+                      <button
+                        onClick={() => onRestore(c)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Restore
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -325,7 +335,7 @@ function ArchivedModal({ clients, onClose, onClientClick }: {
           )}
         </div>
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
-          <p className="text-xs text-gray-400">This list is read-only. No actions can be performed on archived clients.</p>
+          <p className="text-xs text-gray-400">Archived clients can be inspected or restored to the active client list at any time.</p>
         </div>
       </div>
     </div>
@@ -489,7 +499,10 @@ export default function ClientsPageUI() {
   useEffect(() => {
     setClientsState(getStoredClients())
     setArchivedClientsState(getArchivedClients())
-    const onUpdate = () => setClientsState(getStoredClients())
+    const onUpdate = () => {
+      setClientsState(getStoredClients())
+      setArchivedClientsState(getArchivedClients())
+    }
     const onStorage = (event: StorageEvent) => {
       if (event.key?.startsWith("nido_clients_v3:") || event.key?.startsWith("nido_clients_archived_v2:")) {
         setClientsState(getStoredClients())
@@ -537,10 +550,20 @@ export default function ClientsPageUI() {
   const archiveClient = (client: StoredClient) => {
     persistClients(clients.filter(c => c.id !== client.id))
     persistArchived([...archivedClients, { ...client, status: "archived", archivedOn: new Date().toISOString().split("T")[0] }])
+    toast.success(`${client.name} archived`)
+  }
+
+  const handleRestoreArchived = (client: ArchivedClient) => {
+    if (restoreArchivedClient(client.id)) {
+      setClientsState(getStoredClients())
+      setArchivedClientsState(getArchivedClients())
+      toast.success(`${client.name} restored to active clients`)
+    }
   }
 
   const setClientStatus = (id: string, status: ClientStatus) => {
     persistClients(clients.map(c => c.id === id ? { ...c, status } : c))
+    toast.success(`Client status updated to ${status}`)
   }
 
   const handleProvision = (c: StoredClient) => {
@@ -555,6 +578,7 @@ export default function ClientsPageUI() {
   const confirmProvision = (flow: ProvisionFlow, reason: string) => {
     activateClientPortal(flow.clientId, flow.clientName, flow, reason)
     setProvisionConfirmation(null)
+    toast.success(`Portal access activated for ${flow.clientName}`)
   }
 
   const handleExport = () => {
@@ -581,25 +605,31 @@ export default function ClientsPageUI() {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-         const csv = e.target?.result as string
-         const rows = parseClientCsv(csv)
-        const maxId = clients.length > 0 ? Math.max(...clients.map(c => parseInt(c.id.replace("CI-", "")) || 0)) : 0
-         const newClients: StoredClient[] = rows.map((row, index) =>
-           clientFromImportRow(
-             row,
-             `CI-${String(maxId + index + 1).padStart(5, "0")}`,
-           ),
-         )
-         const existingIds = new Set(clients.map(c => c.id))
-         const uniqueClients = newClients.filter(c => {
-           if (existingIds.has(c.id)) return false
-           existingIds.add(c.id)
-           return true
-         })
-         persistClients([...clients, ...uniqueClients])
+        const csv = e.target?.result as string
+        const rows = parseClientCsv(csv)
+        const prefix = getPrefix("client") || "CL-"
+        const maxId = clients.length > 0
+          ? Math.max(...clients.map(c => parseInt(c.id.replace(/^\D+/, ""), 10) || 0))
+          : 0
+        const newClients: StoredClient[] = rows.map((row, index) =>
+          clientFromImportRow(
+            row,
+            `${prefix}${String(maxId + index + 1).padStart(5, "0")}`,
+          ),
+        )
+        const existingIds = new Set(clients.map(c => c.id))
+        const uniqueClients = newClients.filter(c => {
+          if (!c.name.trim()) return false
+          if (existingIds.has(c.id)) return false
+          existingIds.add(c.id)
+          return true
+        })
+        persistClients([...clients, ...uniqueClients])
         setShowBulkImport(false)
-         alert(`${uniqueClients.length} client(s) imported successfully.`)
-       } catch { alert("Error parsing CSV file. Please check the format.") }
+        toast.success(`${uniqueClients.length} client(s) imported successfully.`)
+      } catch {
+        toast.error("Error parsing CSV file. Please check the format.")
+      }
     }
     reader.readAsText(file)
   }
@@ -613,30 +643,39 @@ export default function ClientsPageUI() {
             <p className="text-xs text-gray-500">Clients / Client List</p>
             <h1 className="text-2xl font-bold">Clients</h1>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/clients/add")}>
-                <Plus     className="h-4 w-4 mr-2" /> Add Client
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={handleExport}>
-                <Download className="h-4 w-4 mr-2" /> Export Clients
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowBulkImport(true)}>
-                <Upload   className="h-4 w-4 mr-2" /> Bulk Import
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={handleDownloadTemplate}>
-                <FileDown className="h-4 w-4 mr-2" /> Download Template
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
-                <Archive  className="h-4 w-4 mr-2" /> Archived Clients ({archivedClients.length})
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => navigate("/clients/add")}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Add Client
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-full">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/clients/add")}>
+                  <Plus     className="h-4 w-4 mr-2" /> Add Client
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={handleExport}>
+                  <Download className="h-4 w-4 mr-2" /> Export Clients
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setShowBulkImport(true)}>
+                  <Upload   className="h-4 w-4 mr-2" /> Bulk Import
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={handleDownloadTemplate}>
+                  <FileDown className="h-4 w-4 mr-2" /> Download Template
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
+                  <Archive  className="h-4 w-4 mr-2" /> Archived Clients ({archivedClients.length})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -686,8 +725,8 @@ export default function ClientsPageUI() {
                 <col style={{ width: "8%" }} />
                 <col style={{ width: "9%" }} />
                 <col style={{ width: "10%" }} />
-                 <col style={{ width: "10%" }} />
-                 <col style={{ width: "7%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "7%" }} />
               </colgroup>
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
@@ -706,10 +745,23 @@ export default function ClientsPageUI() {
               <tbody>
                 {paged.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-16 text-gray-400">
-                      <div className="flex flex-col items-center gap-2">
+                    <td colSpan={10} className="text-center py-16 text-gray-400">
+                      <div className="flex flex-col items-center gap-3">
                         <Building2 className="w-8 h-8 opacity-30" />
-                        <p className="text-sm">No clients match the current filters</p>
+                        <p className="text-sm">
+                          {clients.length === 0
+                            ? "No clients added yet. Create your first client or bulk import a CSV to get started."
+                            : "No clients match the current filter"}
+                        </p>
+                        {clients.length === 0 && (
+                          <Button
+                            size="sm"
+                            onClick={() => navigate("/clients/add")}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-1.5" /> Add First Client
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -783,6 +835,7 @@ export default function ClientsPageUI() {
                     <td className="px-3 py-3 text-center">
                       <RowActionsMenu
                         client={c}
+                        onOverview={() => setOverviewClient(c)}
                         onEdit={() => navigate(`/clients/${c.id}/edit`)}
                         onArchive={() => archiveClient(c)}
                         onSetStatus={s => setClientStatus(c.id, s)}
@@ -832,8 +885,9 @@ export default function ClientsPageUI() {
           client={overviewClient}
           onClose={() => setOverviewClient(null)}
           onViewFullProfile={() => {
+            const targetId = overviewClient.id
             setOverviewClient(null)
-            navigate(`/clients/${overviewClient.id}/contracts`)
+            navigate(`/clients/${targetId}`)
           }}
         />
       )}
@@ -844,6 +898,7 @@ export default function ClientsPageUI() {
           clients={archivedClients}
           onClose={() => setShowArchived(false)}
           onClientClick={c => { setArchivedOverview(c); setShowArchived(false) }}
+          onRestore={handleRestoreArchived}
         />
       )}
 

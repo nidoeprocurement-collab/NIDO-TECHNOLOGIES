@@ -1,34 +1,41 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { searchGlobalPlatform } from "@/lib/globalSearch";
+import { getGlobalSearchResults } from "../globalSearch";
+import { addClient } from "../clientStore";
 
-describe("global platform search", () => {
+describe("getGlobalSearchResults", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("finds platform pages and seeded records", () => {
-    const pageResults = searchGlobalPlatform("purchase orders");
-    expect(pageResults.some(result => result.type === "page" && result.path === "/purchase-orders")).toBe(true);
+  it("finds sidebar modules and existing client records", () => {
+    addClient({
+      id: "CL-00001",
+      name: "Apex Manufacturing",
+      company_name: "Apex Manufacturing",
+      category: "Manufacturing",
+      billingCity: "Pune",
+      status: "active",
+    });
 
-    const recordResults = searchGlobalPlatform("Raj Manufacturing");
-    expect(recordResults.some(result =>
-      result.type === "record"
-      && result.title === "Raj Manufacturing"
-      && result.path === "/clients/CI-00019",
-    )).toBe(true);
+    const moduleResults = getGlobalSearchResults("invoice");
+    const clientResults = getGlobalSearchResults("Apex Manufacturing");
+
+    expect(moduleResults.some(item => item.path === "/sales/invoices")).toBe(true);
+    expect(clientResults.some(item => item.path === "/clients/CL-00001")).toBe(true);
   });
 
-  it("searches record IDs and does not index sensitive fields", () => {
-    localStorage.setItem("nido_support_tickets", JSON.stringify([{
-      id: "CUSTOM-001",
-      subject: "Northwind",
-      status: "Active",
-      password: "should never be searchable",
-    }]));
+  it("finds catalogue items and orders from existing workspace stores", () => {
+    const productResults = getGlobalSearchResults("MacBook");
+    const orderResults = getGlobalSearchResults("ORD-2024-001");
 
-    expect(searchGlobalPlatform("CUSTOM-001").some(result =>
-      result.title === "Northwind" && result.path === "/support/ticket/CUSTOM-001",
-    )).toBe(true);
-    expect(searchGlobalPlatform("should never be searchable")).toHaveLength(0);
+    expect(productResults.some(item => item.path === "/catalogue/products/PROD-001")).toBe(true);
+    expect(orderResults.some(item => item.path === "/orders/ORD-2024-001")).toBe(true);
+  });
+
+  it("keeps client portal search inside portal routes", () => {
+    const results = getGlobalSearchResults("support", { isClientPortalUser: true });
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.every(item => item.path.startsWith("/portal/"))).toBe(true);
   });
 });

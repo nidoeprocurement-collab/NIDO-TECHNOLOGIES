@@ -4,6 +4,7 @@ import {
   X, Upload, ArrowLeft,
 } from "lucide-react";
 import { getClientDocuments, saveClientDocument, type ClientDocumentRecord } from "@/lib/clientDataStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Doc = {
   id: string;
@@ -15,14 +16,6 @@ type Doc = {
   uploadedOn: string;
   fileData?: string;
 };
-
-const INITIAL_DOCS: Doc[] = [
-  { id: 1, name: "Service Agreement 2026.pdf", type: "PDF", size: "1.2 MB", uploadedBy: "Nitin Shetty", uploadedOn: "Jun 10, 2026" },
-  { id: 2, name: "Purchase Order #PO-0043.pdf", type: "PDF", size: "840 KB", uploadedBy: "Admin", uploadedOn: "Jun 5, 2026" },
-  { id: 3, name: "NDA_NitinSupplies.docx", type: "DOCX", size: "320 KB", uploadedBy: "Admin", uploadedOn: "May 28, 2026" },
-  { id: 4, name: "Hardware Inventory List.xlsx", type: "XLSX", size: "2.1 MB", uploadedBy: "Nitin Shetty", uploadedOn: "May 15, 2026" },
-  { id: 5, name: "Contract Renewal Terms.pdf", type: "PDF", size: "560 KB", uploadedBy: "Admin", uploadedOn: "Apr 30, 2026" },
-];
 
 function typeColor(type: string) {
   if (type === "PDF") return "bg-red-50 text-red-600";
@@ -79,9 +72,10 @@ function AddDocumentModal({
   onClose: () => void;
   onAdd: (doc: Omit<Doc, "id">, file: File | null) => void;
 }) {
+  const { user } = useAuth();
   const [name, setName] = useState("");
   const [type, setType] = useState("PDF");
-  const [uploadedBy, setUploadedBy] = useState("Admin");
+  const [uploadedBy, setUploadedBy] = useState(user?.name || "Admin");
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -173,14 +167,13 @@ function AddDocumentModal({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">Uploaded By</label>
-              <select
+              <input
+                type="text"
                 value={uploadedBy}
                 onChange={(e) => setUploadedBy(e.target.value)}
+                placeholder="Uploader name"
                 className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
-              >
-                <option>Admin</option>
-                <option>Nitin Shetty</option>
-              </select>
+              />
             </div>
           </div>
 

@@ -833,11 +833,44 @@ export function exportUsersCSV(currentUsers: Array<Record<string, unknown>>) {
   URL.revokeObjectURL(url);
 }
 
-const archivedUsersData = [
-  { id: "arc-001", name: "David Kim", role: "Analyst", email: "david.kim@apex.com", phone: "+1-555-1201", lastActive: "2025-11-15T10:00:00.000Z", status: "Archived", archivedOn: "2025-12-01", reason: "Left company", initials: "DK", color: "bg-slate-500" },
-  { id: "arc-002", name: "Priya Sharma", role: "Finance Officer", email: "priya.sharma@apex.com", phone: "+1-555-1202", lastActive: "2025-10-20T08:00:00.000Z", status: "Archived", archivedOn: "2025-11-01", reason: "Contract ended", initials: "PS", color: "bg-rose-400" },
-  { id: "arc-003", name: "Tom Baker", role: "Support Lead", email: "tom.baker@apex.com", phone: "+1-555-1203", lastActive: "2025-09-05T14:30:00.000Z", status: "Archived", archivedOn: "2025-10-01", reason: "Role restructured", initials: "TB", color: "bg-amber-500" },
-];
+type ArchivedUserEntry = {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  lastActive: string;
+  status: string;
+  archivedOn: string;
+  reason: string;
+  initials: string;
+  color: string;
+};
+
+const archivedUsersData: ArchivedUserEntry[] = [];
+
+function getArchivedUsersStorageKey(clientId?: string) {
+  return `nido_archived_portal_users_${clientId || "default"}`;
+}
+
+function loadArchivedUsersForClient(clientId?: string): ArchivedUserEntry[] {
+  try {
+    const raw = localStorage.getItem(getArchivedUsersStorageKey(clientId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveArchivedUsersForClient(clientId: string | undefined, list: ArchivedUserEntry[]) {
+  try {
+    localStorage.setItem(getArchivedUsersStorageKey(clientId), JSON.stringify(list));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 function ResetPasswordModal({
   userId,
@@ -1561,7 +1594,13 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
   );
 }
 
-function ImportUsersModal({ onClose }: { onClose: () => void }) {
+function ImportUsersModal({
+  onClose,
+  onImportRows,
+}: {
+  onClose: () => void;
+  onImportRows?: (headers: string[], rows: string[][]) => void;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string[][]>([]);
   const [dragging, setDragging] = useState(false);
@@ -1696,7 +1735,10 @@ function ImportUsersModal({ onClose }: { onClose: () => void }) {
             {!imported && (
               <button
                 disabled={!file || rows.length === 0}
-                onClick={() => setImported(true)}
+                onClick={() => {
+                  onImportRows?.(headers, rows);
+                  setImported(true);
+                }}
                 className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
               >
                 Import {rows.length > 0 ? `${rows.length} User${rows.length !== 1 ? "s" : ""}` : "Users"}
@@ -3016,7 +3058,9 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const [users, setUsers] = useState<UserRecord[]>(() =>
     clientId ? getPortalUsersByClient(clientId).map(portalUserToRecord) : []
   );
-  const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
+  const [archived, setArchived] = useState<ArchivedUserEntry[]>(() =>
+    loadArchivedUsersForClient(clientId)
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
@@ -3138,7 +3182,21 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const archiveUser = (id: string) => {
     const u = users.find((u) => u.id === id);
     if (!u) return;
-    setArchived((prev) => [...prev, { ...u, status: "Archived", archivedOn: new Date().toISOString().slice(0, 10), reason: "Manually archived" }] as typeof archivedUsersData);
+    const portalUser = getPortalUsersByClient(clientId || "").find((item) => item.id === id);
+    if (portalUser) {
+      updatePortalUser(id, { status: "inactive" });
+    }
+    const entry: ArchivedUserEntry = {
+      ...u,
+      status: "Archived",
+      archivedOn: new Date().toISOString().slice(0, 10),
+      reason: "Manually archived",
+    };
+    setArchived((prev) => {
+      const next = [...prev, entry];
+      saveArchivedUsersForClient(clientId, next);
+      return next;
+    });
     setUsers((prev) => prev.filter((u) => u.id !== id));
     setArchiveTarget(null);
     setRowMenu(null);
@@ -3245,7 +3303,53 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
           onCreate={createUser}
         />
       )}
-      {showImportUsers && <ImportUsersModal onClose={() => setShowImportUsers(false)} />}
+      {showImportUsers && (
+        <ImportUsersModal
+          onClose={() => setShowImportUsers(false)}
+          onImportRows={(headers, rows) => {
+            if (!clientId) return;
+            const normalizedHeaders = headers.map((h) => h.trim().toLowerCase());
+            const findCol = (names: string[]) =>
+              normalizedHeaders.findIndex((h) => names.includes(h));
+            const nameIdx = findCol(["full name", "name"]);
+            const emailIdx = findCol(["email id", "email"]);
+            const phoneIdx = findCol(["phone number", "phone"]);
+            const roleIdx = findCol(["role"]);
+            const empIdx = findCol(["employee id", "employeeid"]);
+            const titleIdx = findCol(["job title", "jobtitle"]);
+            const statusIdx = findCol(["status"]);
+            const defaultRole =
+              getPortalRoles(clientId).find((r) => r.status === "active")?.name ||
+              "Client User";
+
+            rows.forEach((row) => {
+              const name = (nameIdx >= 0 ? row[nameIdx] : row[3] || row[0] || "").trim();
+              const email = (emailIdx >= 0 ? row[emailIdx] : row[4] || row[1] || "").trim();
+              if (!name || !email) return;
+              const phone = (phoneIdx >= 0 ? row[phoneIdx] : row[5] || "").trim();
+              const role = (roleIdx >= 0 ? row[roleIdx] : defaultRole).trim() || defaultRole;
+              const statusVal = (statusIdx >= 0 ? row[statusIdx] : "Active").trim().toLowerCase();
+              try {
+                provisionPortalUser(clientId, clientName || "Client", {
+                  email,
+                  name,
+                  role,
+                  status: statusVal === "inactive" ? "inactive" : "active",
+                  phone,
+                  details: {
+                    employeeId: empIdx >= 0 ? row[empIdx] : "",
+                    jobTitle: titleIdx >= 0 ? row[titleIdx] : "",
+                    orgAccess: clientName || "Client",
+                  },
+                });
+              } catch {
+                // skip invalid row
+              }
+            });
+            setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
+          }}
+        />
+      )}
       {resetPasswordUser && (
         <ResetPasswordModal
           userId={resetPasswordUser.id}

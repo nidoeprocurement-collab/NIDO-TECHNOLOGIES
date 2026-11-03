@@ -8,13 +8,6 @@ import { getPaginationItems } from "@/lib/pagination";
 
 const ORDERS_PER_PAGE = 10;
 
-export const ordersData = [
-  { id: "ORD-2024-1245", date: "2024-05-28", items: 12, amount: "$125,000", client: "TechSupply Co", status: "Delivered" },
-  { id: "ORD-2024-1233", date: "2024-05-20", items: 8, amount: "$45,000", client: "Office Essentials", status: "In Transit" },
-  { id: "ORD-2024-1198", date: "2024-05-15", items: 5, amount: "$22,000", client: "CloudServe Inc", status: "Delivered" },
-  { id: "ORD-2024-1187", date: "2024-05-10", items: 15, amount: "$89,000", client: "TechSupply Co", status: "Delivered" },
-];
-
 type ClientDateRange = { start: string; end: string };
 
 function isOrderInDateRange(date: string, range?: ClientDateRange): boolean {
@@ -248,7 +241,21 @@ export default function ClientOrdersPage({
                   {rowMenu === order.id && (
                     <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-36" onClick={(e) => e.stopPropagation()}>
                       {["View Details", "Edit Order", "Download Invoice", "Cancel Order"].map((action) => (
-                        <button key={action} onClick={() => setRowMenu(null)} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${action === "Cancel Order" ? "text-red-500" : "text-gray-700"}`}>
+                        <button
+                          key={action}
+                          onClick={() => {
+                            setRowMenu(null);
+                            if (action === "View Details" || action === "Edit Order") {
+                              navigate(`/orders/${order.id}`);
+                            } else if (action === "Download Invoice") {
+                              navigate("/sales/invoices");
+                            } else if (action === "Cancel Order") {
+                              saveClientOrder({ ...order, status: "Cancelled" });
+                              reload();
+                            }
+                          }}
+                          className={`w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${action === "Cancel Order" ? "text-red-500" : "text-gray-700"}`}
+                        >
                           {action}
                         </button>
                       ))}
