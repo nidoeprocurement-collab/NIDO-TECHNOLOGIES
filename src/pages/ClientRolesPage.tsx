@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
 import { MoreVertical, X } from "lucide-react";
+import { ModuleMultiSelect } from "@/components/ModuleMultiSelect";
 import {
   createPortalRolePermission,
   getPortalModuleDescription,
@@ -93,7 +94,7 @@ export default function ClientRolesPage() {
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDescription, setNewRoleDescription] = useState("");
-  const [moduleToAdd, setModuleToAdd] = useState("");
+  const [modulesToAdd, setModulesToAdd] = useState<string[]>([]);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [draftRole, setDraftRole] = useState<PortalRole | null>(null);
 
@@ -149,16 +150,32 @@ export default function ClientRolesPage() {
     });
   };
 
-  const addModule = () => {
-    if (!draftRole || !moduleToAdd) return;
-    if (!draftRole.permissions.some(item => item.module === moduleToAdd)) {
+  const addModules = () => {
+    let currentDraft = draftRole;
+    if (!currentDraft && displayedRole) {
+      currentDraft = {
+        ...displayedRole,
+        permissions: displayedRole.permissions.map(permission => ({ ...permission })),
+      };
+      setDraftRole(currentDraft);
+    }
+    if (!currentDraft || modulesToAdd.length === 0) return;
+
+    const existing = new Set(currentDraft.permissions.map(item => item.module));
+    const toAdd = modulesToAdd.filter(name => !existing.has(name));
+    if (toAdd.length > 0) {
       setDraftRole({
-        ...draftRole,
-        permissions: [...draftRole.permissions, createPortalRolePermission(moduleToAdd)],
+        ...currentDraft,
+        permissions: [
+          ...currentDraft.permissions,
+          ...toAdd.map(name => createPortalRolePermission(name)),
+        ],
       });
     }
-    setModuleToAdd("");
+    setModulesToAdd([]);
   };
+
+  const addModule = () => addModules();
 
   const addRole = () => {
     const name = newRoleName.trim();
@@ -216,7 +233,7 @@ export default function ClientRolesPage() {
 
   const discardDraftRole = () => {
     setDraftRole(null);
-    setModuleToAdd("");
+    setModulesToAdd([]);
   };
 
   const downloadCsvTemplate = () => {
@@ -495,34 +512,17 @@ export default function ClientRolesPage() {
               </div>
             </div>
 
-            <div className="px-4 py-3 flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50">
-              <select
-                value={moduleToAdd}
-                onChange={event => setModuleToAdd(event.target.value)}
+            <div className="px-4 py-3 flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50">
+              <ModuleMultiSelect
+                existingModules={displayedRole.permissions.map(item => item.module)}
+                selectedModules={modulesToAdd}
+                onSelectionChange={setModulesToAdd}
+                onAddModules={addModules}
                 disabled={!isEditing}
-                className="max-w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
-                aria-label="Add module"
-              >
-                <option value="">Add module...</option>
-                {PORTAL_MODULE_CATALOG.map(module => {
-                  const alreadyAdded = displayedRole.permissions.some(item => item.module === module.name);
-                  return (
-                    <option key={module.name} value={module.name} disabled={alreadyAdded}>
-                      {module.name} — {module.description}{alreadyAdded ? " (already added)" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-              <button
-                type="button"
-                onClick={addModule}
-                disabled={!isEditing || !moduleToAdd}
-                className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40"
-              >
-                Add Module
-              </button>
+                onEnableEdit={() => beginEditing(displayedRole)}
+              />
               {!isEditing && (
-                <button type="button" onClick={() => beginEditing(displayedRole)} className="text-xs text-blue-600 hover:underline">
+                <button type="button" onClick={() => beginEditing(displayedRole)} className="text-xs text-blue-600 hover:underline font-medium">
                   Edit Role to Change Permissions
                 </button>
               )}

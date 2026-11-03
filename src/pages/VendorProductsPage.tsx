@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation, useSearchParams } from "react-router-dom";
 import {
   Plus,
   MoreVertical,
@@ -416,16 +416,16 @@ function EditProductScreen({
                 <h3 className="font-semibold text-gray-900 text-sm leading-snug">{product.productName}</h3>
                 <p className="text-xs text-gray-500">{product.category}</p>
                 <div className="space-y-1.5 text-xs text-gray-600 pt-1">
-                   <div className="flex justify-between gap-3">
-                     <span className="text-gray-400">Product Type</span>
-                     <span className="text-right">{productType}</span>
-                   </div>
-                    {!isDigitalProduct && (
-                      <div className="flex justify-between gap-3">
-                        <span className="text-gray-400">Pricing Model</span>
-                        <span className="text-right">{getPricingModel(productType)}</span>
-                      </div>
-                    )}
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-400">Product Type</span>
+                    <span className="text-right">{productType}</span>
+                  </div>
+                  {!isDigitalProduct && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-gray-400">Pricing Model</span>
+                      <span className="text-right">{getPricingModel(productType)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-400">MPI Code</span>
                     <span className="font-mono">{product.masterProductCode}</span>
@@ -450,14 +450,14 @@ function EditProductScreen({
           {/* Right: Editable fields */}
           <div className="flex-1 min-w-0">
             <div className="border border-gray-200 rounded-2xl p-6">
-               <h3 className="text-base font-semibold text-gray-900 mb-1">
-                 {isDigitalProduct ? "Digital Commercial Terms" : "Pricing & Inventory"}
-               </h3>
-                <p className="text-sm text-gray-400 mb-6">
-                  {isDigitalProduct
-                     ? "Digital prices are set in Variations. Update included users/licenses and provisioning time here."
-                     : "Update the vendor price, units/MOQ, lead time, and current stock for this product."}
-                </p>
+              <h3 className="text-base font-semibold text-gray-900 mb-1">
+                {isDigitalProduct ? "Digital Commercial Terms" : "Pricing & Inventory"}
+              </h3>
+              <p className="text-sm text-gray-400 mb-6">
+                {isDigitalProduct
+                  ? "Digital prices are set in Variations. Update included users/licenses and provisioning time here."
+                  : "Update the vendor price, units/MOQ, lead time, and current stock for this product."}
+              </p>
 
               <div className="grid grid-cols-2 gap-6">
                 {/* Purchase Price */}
@@ -470,26 +470,26 @@ function EditProductScreen({
                     </div>
                   </div>
                 ) : (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Price / Unit
-                  </label>
-                  <p className="text-xs text-gray-400 mb-2">Vendor purchase price (excl. GST)</p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <IndianRupee className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      aria-label="Vendor purchase price per unit"
-                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                    />
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Price / Unit
+                    </label>
+                    <p className="text-xs text-gray-400 mb-2">Vendor purchase price (excl. GST)</p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <IndianRupee className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        aria-label="Vendor purchase price per unit"
+                        className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
                   </div>
-                </div>
                 )}
 
                 {/* MOQ */}
@@ -560,65 +560,65 @@ function EditProductScreen({
 
                 {!isDigitalProduct && (
                   <>
-                {/* Reserved Stock — read-only */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Reserved Stock
-                  </label>
-                  <p className="text-xs text-gray-400 mb-2">Units reserved by client orders (not yet PO'd) — auto-managed</p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Layers className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="number"
-                      readOnly
-                      value={reservedStock}
-                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
+                    {/* Reserved Stock — read-only */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Reserved Stock
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">Units reserved by client orders (not yet PO'd) — auto-managed</p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <Layers className="w-4 h-4" />
+                        </span>
+                        <input
+                          type="number"
+                          readOnly
+                          value={reservedStock}
+                          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
 
-                {/* Available Stock — computed, read-only */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Available Stock
-                    <span className="ml-2 text-[10px] font-normal text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Computed</span>
-                  </label>
-                  <p className="text-xs text-gray-400 mb-2">= Current − Reserved · shown in client shop</p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Warehouse className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="number"
-                      readOnly
-                      value={availableStock}
-                      className={`w-full pl-9 pr-4 py-2.5 text-sm border rounded-xl bg-gray-50 cursor-not-allowed font-semibold ${availableStock > 0 ? "border-green-200 text-green-700" : "border-orange-200 text-orange-600"}`}
-                    />
-                  </div>
-                </div>
+                    {/* Available Stock — computed, read-only */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Available Stock
+                        <span className="ml-2 text-[10px] font-normal text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Computed</span>
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">= Current − Reserved · shown in client shop</p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <Warehouse className="w-4 h-4" />
+                        </span>
+                        <input
+                          type="number"
+                          readOnly
+                          value={availableStock}
+                          className={`w-full pl-9 pr-4 py-2.5 text-sm border rounded-xl bg-gray-50 cursor-not-allowed font-semibold ${availableStock > 0 ? "border-green-200 text-green-700" : "border-orange-200 text-orange-600"}`}
+                        />
+                      </div>
+                    </div>
 
-                {/* Incoming Stock */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Incoming Stock
-                  </label>
-                  <p className="text-xs text-gray-400 mb-2">Units on order / in transit (informational)</p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Timer className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={incomingStock}
-                      onChange={(e) => setIncomingStock(e.target.value)}
-                      placeholder="e.g. 200"
-                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
-                    />
-                  </div>
-                </div>
+                    {/* Incoming Stock */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Incoming Stock
+                      </label>
+                      <p className="text-xs text-gray-400 mb-2">Units on order / in transit (informational)</p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <Timer className="w-4 h-4" />
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={incomingStock}
+                          onChange={(e) => setIncomingStock(e.target.value)}
+                          placeholder="e.g. 200"
+                          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -659,17 +659,19 @@ function ConfirmRemoveDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div data-confirmation-skip className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+    <div data-confirmation-skip className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div data-confirmation-skip className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
               <Trash2 className="w-4 h-4 text-red-500" />
             </div>
-            <h3 className="text-base font-semibold text-gray-900">Remove Product</h3>
+            <h3 className="text-base font-semibold text-gray-900">Remove Product from Vendor</h3>
           </div>
           <button
+            type="button"
+            data-confirmation-skip
             onClick={onCancel}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           >
@@ -679,7 +681,7 @@ function ConfirmRemoveDialog({
 
         {/* Body */}
         <div className="px-6 py-5">
-          <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl mb-4">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl mb-4 border border-gray-100">
             {product.images && product.images.length > 0 ? (
               <img src={product.images[0]} alt={product.productName} className="w-10 h-10 rounded-lg object-cover border border-gray-200 shrink-0" />
             ) : (
@@ -689,25 +691,29 @@ function ConfirmRemoveDialog({
             )}
             <div className="min-w-0">
               <p className="font-medium text-gray-900 text-sm truncate">{product.productName}</p>
-              <p className="text-xs text-gray-400 font-mono">{product.masterProductCode}</p>
+              <p className="text-xs text-gray-400 font-mono mt-0.5">{product.masterProductCode || product.vendorProductCode || "—"}</p>
             </div>
           </div>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Are you sure you want to remove this product from the vendor list? This action cannot be undone.
+            Are you sure you want to remove <strong className="text-gray-900 font-semibold">{product.productName}</strong> from this vendor? It will be removed from this vendor only and will remain available in the Master Catalog.
           </p>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-3.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-end gap-3">
           <button
+            type="button"
+            data-confirmation-skip
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 bg-white hover:bg-gray-50 transition-colors font-medium shadow-sm"
           >
             Cancel
           </button>
           <button
+            type="button"
+            data-confirmation-skip
             onClick={onConfirm}
-            className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+            className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors shadow-sm"
           >
             Remove Product
           </button>
@@ -717,24 +723,37 @@ function ConfirmRemoveDialog({
   );
 }
 
-export default function VendorProductsPage() {
-  const { id: vendorId = "" } = useParams<{ id: string }>();
+export default function VendorProductsPage({ vendorId: propVendorId }: { vendorId?: string } = {}) {
+  const { id: routeVendorId = "" } = useParams<{ id: string }>();
+  const vendorId = propVendorId || routeVendorId || "";
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { fmt } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [editProduct, setEditProduct] = useState<VendorProduct | null>(null);
   const [removeProduct, setRemoveProduct] = useState<VendorProduct | null>(null);
   const [toolDialog, setToolDialog] = useState<ToolDialog>(null);
-  const [productTab, setProductTab] = useState<VendorProductTab>("physical");
+  const locationState = location.state as { productTab?: VendorProductTab } | null;
+  const initialProductTab: VendorProductTab =
+    locationState?.productTab === "digital" || searchParams.get("type") === "digital"
+      ? "digital"
+      : "physical";
+  const [productTab, setProductTab] = useState<VendorProductTab>(initialProductTab);
   const [importing, setImporting] = useState(false);
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importCatalogTypeRef = useRef<VendorProductTab>("physical");
+
+  useEffect(() => {
+    if (locationState?.productTab) {
+      setProductTab(locationState.productTab);
+    }
+  }, [locationState?.productTab]);
 
   // Load vendor products from store
   useEffect(() => {
@@ -762,25 +781,24 @@ export default function VendorProductsPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  useEffect(() => {
-    const closeRowMenu = (event: MouseEvent) => {
-      if (!(event.target instanceof Element) || !event.target.closest("[data-vendor-product-actions]")) {
-        setOpenRowMenu(null);
-      }
-    };
-    document.addEventListener("mousedown", closeRowMenu);
-    return () => document.removeEventListener("mousedown", closeRowMenu);
-  }, []);
-
   const handleSaveEdit = (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => {
     updateVendorProduct(vendorId, id, { ...updates, lastStockUpdate: new Date().toISOString() });
     setVendorProducts((prev) => prev.map((p) => p.id === id ? { ...p, ...updates } : p));
   };
 
-  const handleConfirmRemove = (id: string) => {
-    removeVendorProduct(vendorId, id);
-    setVendorProducts((prev) => prev.filter((p) => p.id !== id));
+  const handleConfirmRemove = (productToRemove: VendorProduct) => {
+    const targetVendorId = productToRemove.vendorId || vendorId;
+    removeVendorProduct(targetVendorId, productToRemove.id);
+    setVendorProducts((prev) =>
+      prev.filter(
+        (p) =>
+          p.id !== productToRemove.id &&
+          (!productToRemove.masterProductCode || p.masterProductCode !== productToRemove.masterProductCode) &&
+          (!productToRemove.vendorProductCode || p.vendorProductCode !== productToRemove.vendorProductCode)
+      )
+    );
     setRemoveProduct(null);
+    toast.success(`"${productToRemove.productName}" removed from this vendor.`);
   };
 
   const handleBulkPriceUpdate = (mode: BulkPriceMode, percentage: number) => {
@@ -832,132 +850,154 @@ export default function VendorProductsPage() {
     );
   };
 
-  const handleImportFile = (file: File, catalogType: VendorProductTab) => {
+  const handleImportFile = async (file: File, catalogType: VendorProductTab) => {
     setImporting(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const raw = String(reader.result || "");
-        const rows = parseVendorProductImportFile(file.name, raw);
-        if (rows.length === 0) throw new Error("The file has no product rows.");
-
-        const catalogById = new Map(catalogProducts.map((product) => [product.id.toLowerCase(), product]));
-        const catalogByCode = new Map(catalogProducts.map((product) => [product.masterProductCode.toLowerCase(), product]));
-        const catalogBySku = new Map(catalogProducts.map((product) => [product.skuCode.toLowerCase(), product]));
-        const catalogByName = new Map(catalogProducts.map((product) => [product.productName.trim().toLowerCase(), product]));
-        const currentProducts = getVendorProducts(vendorId);
-        const existingById = new Map(currentProducts.map((product) => [product.id, product]));
-        const pending: Array<Omit<VendorProduct, "vendorProductCode"> & { vendorProductCode?: string }> = [];
-        let updatedCount = 0;
-        let skippedCount = 0;
-        let missingCount = 0;
-
-        for (const rawRow of rows) {
-          const row = Object.entries(rawRow).reduce<Record<string, string>>((result, [key, value]) => {
-            result[key.replace(/[^a-z0-9]/gi, "").toLowerCase()] = String(value ?? "").trim();
-            return result;
-          }, {});
-          const identity = normalizeImportValue(row, "masterProductCode", "masterCode", "productCode", "id");
-          const sku = normalizeImportValue(row, "skuCode", "sku");
-          const name = normalizeImportValue(row, "productName", "name");
-          const master = catalogById.get(identity.toLowerCase()) ||
-            catalogByCode.get(identity.toLowerCase()) ||
-            catalogBySku.get(sku.toLowerCase()) ||
-            catalogByName.get(name.toLowerCase());
-          if (!master) {
-            missingCount += 1;
-            continue;
-          }
-
-          const masterIsDigital = isDigitalOnlyType(getProductType(master.physicalType || master.productType));
-          if (masterIsDigital !== (catalogType === "digital")) {
-            skippedCount += 1;
-            continue;
-          }
-
-          const existing = existingById.get(master.id);
-          const images = parseVendorProductArrayField<string>(rawRow, "images");
-          const variations = parseVendorProductVariations(rawRow, existing?.variations);
-          const importedStatus = normalizeImportValue(row, "status").toLowerCase();
-          const vendorProductCode = normalizeImportValue(row, "vendorProductCode", "vendorSku")
-            || existing?.vendorProductCode
-            || "";
-          const updates: Partial<VendorProduct> = {
-            ...masterSnapshot(master),
-            skuCode: normalizeImportValue(row, "skuCode", "sku") || master.skuCode || existing?.skuCode || "",
-            productName: normalizeImportValue(row, "productName", "name") || master.productName,
-            category: normalizeImportValue(row, "category") || master.category,
-            brand: normalizeImportValue(row, "brand") || master.brand,
-            physicalType: master.physicalType || master.productType || "Physical Product",
-            images: images.found ? images.value : existing?.images || master.images || [],
-            variations: variations.found ? variations.value : existing?.variations || [],
-            price: normalizeImportValue(row, "price", "purchasePrice") || existing?.price || "",
-            moq: normalizeImportValue(row, "moq", "minimumOrderQuantity") || existing?.moq || "",
-            leadTime: normalizeImportValue(row, "leadTime", "leadTimeDays") || existing?.leadTime || "",
-            stock: normalizeImportValue(row, "stock", "currentStock") || existing?.stock || "0",
-            physicalStock: normalizeImportValue(row, "physicalStock") || existing?.physicalStock || existing?.stock || "0",
-            incomingStock: normalizeImportValue(row, "incomingStock") || existing?.incomingStock || "0",
-            reservedStock: existing?.reservedStock || "0",
-            lastStockUpdate: normalizeImportValue(row, "lastStockUpdate") || existing?.lastStockUpdate,
-            vendorProductCode,
-            addedAt: normalizeImportValue(row, "addedAt") || existing?.addedAt
-              || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-            status: importedStatus === "inactive"
-              ? "Inactive"
-              : importedStatus === "active"
-                ? "Active"
-                : existing?.status || "Active",
-          };
-
-          if (existing) {
-            updateVendorProduct(vendorId, master.id, updates);
-            updatedCount += 1;
-          } else {
-            pending.push({
-              id: master.id,
-              vendorId,
-              ...updates,
-              reservedStock: "0",
-            } as Omit<VendorProduct, "vendorProductCode"> & { vendorProductCode?: string });
-          }
-        }
-
-        if (pending.length > 0) {
-          const codes = reserveVendorProductCodes(pending.filter((product) => !product.vendorProductCode).length);
-          let nextCode = 0;
-          addVendorProducts(vendorId, pending.map((product) => ({
-            ...product,
-            vendorProductCode: product.vendorProductCode || codes[nextCode++],
-          } as VendorProduct)));
-        }
-
-        setVendorProducts(getVendorProducts(vendorId));
-        const importedCount = pending.length + updatedCount;
-        if (importedCount === 0) {
-          const reasons = [
-            missingCount ? `${missingCount} row${missingCount === 1 ? "" : "s"} did not match the master catalog` : "",
-            skippedCount ? `${skippedCount} row${skippedCount === 1 ? "" : "s"} were for the other product type` : "",
-          ].filter(Boolean);
-          toast.error(reasons.length ? `No rows imported: ${reasons.join("; ")}.` : "No rows could be imported.");
-        } else {
-          const skipped = [
-            missingCount ? `${missingCount} unmatched` : "",
-            skippedCount ? `${skippedCount} wrong product type` : "",
-          ].filter(Boolean);
-          toast.success(`${importedCount} ${catalogType} product${importedCount === 1 ? "" : "s"} imported${skipped.length ? `; ${skipped.join(", ")} skipped` : ""}.`);
-        }
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Could not read the import file.");
-      } finally {
-        setImporting(false);
-        if (importInputRef.current) importInputRef.current.value = "";
+    try {
+      let raw = "";
+      const isExcel = /\.xlsx?$|\.xls$/i.test(file.name);
+      if (isExcel) {
+        const buffer = await file.arrayBuffer();
+        const XLSX = await import("xlsx");
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) throw new Error("The Excel workbook contains no sheets.");
+        raw = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName]);
+      } else {
+        raw = await file.text();
       }
-    };
-    reader.onerror = () => {
+
+      const rows = parseVendorProductImportFile(file.name.endsWith(".json") ? file.name : "import.csv", raw);
+      if (rows.length === 0) throw new Error("The file has no product rows.");
+
+      const currentProducts = getVendorProducts(vendorId);
+      const existingById = new Map<string, VendorProduct>();
+      const existingByVpc = new Map<string, VendorProduct>();
+      const existingByMpc = new Map<string, VendorProduct>();
+      const existingBySku = new Map<string, VendorProduct>();
+      const existingByName = new Map<string, VendorProduct>();
+
+      currentProducts.forEach((product) => {
+        if (product.id) existingById.set(product.id.toLowerCase(), product);
+        if (product.vendorProductCode) existingByVpc.set(product.vendorProductCode.trim().toLowerCase(), product);
+        if (product.masterProductCode) existingByMpc.set(product.masterProductCode.trim().toLowerCase(), product);
+        if (product.skuCode) existingBySku.set(product.skuCode.trim().toLowerCase(), product);
+        if (product.productName) existingByName.set(product.productName.trim().toLowerCase(), product);
+      });
+
+      const pending: Array<Omit<VendorProduct, "vendorProductCode"> & { vendorProductCode?: string }> = [];
+      let updatedCount = 0;
+
+      for (const rawRow of rows) {
+        const row = Object.entries(rawRow).reduce<Record<string, string>>((result, [key, value]) => {
+          result[key.replace(/[^a-z0-9]/gi, "").toLowerCase()] = String(value ?? "").trim();
+          return result;
+        }, {});
+
+        const rowId = normalizeImportValue(row, "id");
+        const vendorProductCode = normalizeImportValue(row, "vendorProductCode", "vendorSku");
+        const masterProductCode = normalizeImportValue(row, "masterProductCode", "masterCode", "productCode");
+        const skuCode = normalizeImportValue(row, "skuCode", "sku");
+        const productName = normalizeImportValue(row, "productName", "name");
+
+        // Match directly against existing vendor products without linking to master catalog
+        const existing = (rowId ? existingById.get(rowId.toLowerCase()) : undefined)
+          || (vendorProductCode ? existingByVpc.get(vendorProductCode.toLowerCase()) : undefined)
+          || (masterProductCode ? existingByMpc.get(masterProductCode.toLowerCase()) : undefined)
+          || (skuCode ? existingBySku.get(skuCode.toLowerCase()) : undefined)
+          || (productName ? existingByName.get(productName.toLowerCase()) : undefined);
+
+        const rawPhysicalType = normalizeImportValue(row, "physicalType", "productType", "type");
+        const physicalType = rawPhysicalType
+          || existing?.physicalType
+          || (catalogType === "digital" ? "Digital Licence" : "Physical Product");
+
+        // Parse variations from the uploaded file only
+        const variations = parseVendorProductVariations(rawRow, existing?.variations);
+        const images = parseVendorProductArrayField<string>(rawRow, "images");
+        const importedStatus = normalizeImportValue(row, "status").toLowerCase();
+
+        const isDigital = catalogType === "digital" || isDigitalOnlyType(getProductType(physicalType));
+        const price = normalizeImportValue(row, "price", "purchasePrice");
+        const resolvedPrice = isDigital
+          ? (price || existing?.price || "0")
+          : (price || existing?.price || "");
+
+        const resolvedStatus: "Active" | "Inactive" =
+          importedStatus === "inactive" ? "Inactive" :
+            importedStatus === "active" ? "Active" :
+              existing?.status || "Active";
+
+        const updates: Partial<VendorProduct> = {
+          skuCode: skuCode || existing?.skuCode || "",
+          productName: productName || existing?.productName || "Product",
+          category: normalizeImportValue(row, "category") || existing?.category || "General",
+          brand: normalizeImportValue(row, "brand") || existing?.brand || "",
+          physicalType,
+          images: images.found ? images.value : existing?.images || [],
+          // Only the variations present in the uploaded file get matched to the vendor digital products
+          variations: variations.found ? variations.value : existing?.variations || [],
+          price: resolvedPrice,
+          moq: normalizeImportValue(row, "moq", "minimumOrderQuantity") || existing?.moq || "1",
+          leadTime: normalizeImportValue(row, "leadTime", "leadTimeDays") || existing?.leadTime || (isDigital ? "Instant" : "1 Day"),
+          stock: normalizeImportValue(row, "stock", "currentStock") || existing?.stock || "0",
+          physicalStock: normalizeImportValue(row, "physicalStock") || existing?.physicalStock || existing?.stock || "0",
+          incomingStock: normalizeImportValue(row, "incomingStock") || existing?.incomingStock || "0",
+          reservedStock: existing?.reservedStock || "0",
+          lastStockUpdate: normalizeImportValue(row, "lastStockUpdate") || existing?.lastStockUpdate || new Date().toISOString(),
+          vendorProductCode: vendorProductCode || existing?.vendorProductCode || "",
+          masterProductCode: masterProductCode || existing?.masterProductCode || "",
+          addedAt: normalizeImportValue(row, "addedAt") || existing?.addedAt
+            || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+          status: resolvedStatus,
+        };
+
+        if (existing) {
+          updateVendorProduct(vendorId, existing.id, updates);
+          const updated = { ...existing, ...updates };
+          existingById.set(existing.id.toLowerCase(), updated as VendorProduct);
+          if (updated.vendorProductCode) existingByVpc.set(updated.vendorProductCode.trim().toLowerCase(), updated as VendorProduct);
+          if (updated.masterProductCode) existingByMpc.set(updated.masterProductCode.trim().toLowerCase(), updated as VendorProduct);
+          if (updated.skuCode) existingBySku.set(updated.skuCode.trim().toLowerCase(), updated as VendorProduct);
+          if (updated.productName) existingByName.set(updated.productName.trim().toLowerCase(), updated as VendorProduct);
+          updatedCount += 1;
+        } else {
+          const newId = rowId || `vp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${pending.length}`;
+          const newProduct = {
+            id: newId,
+            vendorId,
+            ...updates,
+            reservedStock: "0",
+          } as Omit<VendorProduct, "vendorProductCode"> & { vendorProductCode?: string };
+          pending.push(newProduct);
+          existingById.set(newId.toLowerCase(), newProduct as unknown as VendorProduct);
+          if (newProduct.vendorProductCode) existingByVpc.set(newProduct.vendorProductCode.trim().toLowerCase(), newProduct as unknown as VendorProduct);
+          if (newProduct.skuCode) existingBySku.set(newProduct.skuCode.trim().toLowerCase(), newProduct as unknown as VendorProduct);
+          if (newProduct.productName) existingByName.set(newProduct.productName.trim().toLowerCase(), newProduct as unknown as VendorProduct);
+        }
+      }
+
+      if (pending.length > 0) {
+        const codes = reserveVendorProductCodes(pending.filter((product) => !product.vendorProductCode).length);
+        let nextCode = 0;
+        addVendorProducts(vendorId, pending.map((product) => ({
+          ...product,
+          vendorProductCode: product.vendorProductCode || codes[nextCode++],
+        } as VendorProduct)));
+      }
+
+      setVendorProducts(getVendorProducts(vendorId));
+      const importedCount = pending.length + updatedCount;
+      if (importedCount === 0) {
+        toast.error("No rows could be imported.");
+      } else {
+        toast.success(`${importedCount} ${catalogType} product${importedCount === 1 ? "" : "s"} imported.`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not read the import file.");
+    } finally {
       setImporting(false);
-      toast.error("Could not read the import file.");
-    };
-    reader.readAsText(file);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
   };
 
   const handleAssignProducts = (assignments: Record<string, string>) => {
@@ -996,7 +1036,7 @@ export default function VendorProductsPage() {
 
   const handleMenuAction = (label: string) => {
     setMenuOpen(false);
-    if (label === "Add Product") navigate(`/vendors/${vendorId}/add-products`);
+    if (label === "Add Product") navigate(`/vendors/${vendorId}/add-products?type=${productTab}`);
     if (label === "Import P Products") {
       importCatalogTypeRef.current = "physical";
       importInputRef.current?.click();
@@ -1029,7 +1069,7 @@ export default function VendorProductsPage() {
       <input
         ref={importInputRef}
         type="file"
-        accept=".csv,.json,text/csv,application/json"
+        accept=".csv,.xlsx,.xls,.json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json"
         className="hidden"
         disabled={importing}
         onChange={(event) => {
@@ -1048,7 +1088,7 @@ export default function VendorProductsPage() {
         <ConfirmRemoveDialog
           product={removeProduct}
           onCancel={() => setRemoveProduct(null)}
-          onConfirm={() => handleConfirmRemove(removeProduct.id)}
+          onConfirm={() => handleConfirmRemove(removeProduct)}
         />
       )}
       <div className="w-full px-2 py-4 space-y-4">
@@ -1077,9 +1117,8 @@ export default function VendorProductsPage() {
                   key={tab}
                   type="button"
                   onClick={() => { setProductTab(tab); setCurrentPage(1); }}
-                  className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${
-                    productTab === tab ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
+                  className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${productTab === tab ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
                 >
                   {label} <span className="ml-1 text-[10px] font-medium text-gray-400">({count})</span>
                 </button>
@@ -1113,82 +1152,88 @@ export default function VendorProductsPage() {
             <div className="px-4 py-16 text-center text-gray-400 text-sm">
               No products assigned to this vendor yet.{" "}
               <button
-                onClick={() => navigate(`/vendors/${vendorId}/add-products`)}
+                onClick={() => navigate(`/vendors/${vendorId}/add-products?type=${productTab}`)}
                 className="text-blue-600 hover:underline font-medium"
               >
-                Add products from master catalog
+                Add {isDigitalTab ? "digital" : "physical"} products from master catalog
               </button>
             </div>
-            ) : visibleProducts.length === 0 ? (
-              <div className="px-4 py-16 text-center text-gray-400 text-sm">
-                No {isDigitalTab ? "digital" : "physical"} products are assigned to this vendor yet.
-              </div>
-            ) : (
+          ) : visibleProducts.length === 0 ? (
+            <div className="px-4 py-16 text-center text-gray-400 text-sm">
+              No {isDigitalTab ? "digital" : "physical"} products are assigned to this vendor yet.{" "}
+              <button
+                onClick={() => navigate(`/vendors/${vendorId}/add-products?type=${productTab}`)}
+                className="text-blue-600 hover:underline font-medium ml-1"
+              >
+                Add {isDigitalTab ? "digital" : "physical"} products
+              </button>
+            </div>
+          ) : (
             <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "980px" : "1080px" }}>
-              <thead>
-                 <tr className="border-b border-gray-200 bg-gray-50">
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
+              <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "980px" : "1080px" }}>
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">SKU / MPI</th>
                     {!isDigitalTab && <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>}
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Lead Time / SLA</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-               <tbody className="divide-y divide-gray-100">
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
                   {visibleProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
-                   const initials = product.productName.slice(0, 2).toUpperCase();
+                    const initials = product.productName.slice(0, 2).toUpperCase();
                     const catalogProduct = catalogProducts.find((catalog) =>
                       catalog.id === product.id ||
                       catalog.masterProductCode === product.masterProductCode
                     );
                     const type = getProductType(product.physicalType || catalogProduct?.physicalType);
                     const hybrid = isHybridType(type);
-                     const digital = isDigitalOnlyType(type);
-                   const current = parseInt(product.stock || "0") || 0;
-                   const reserved = parseInt(product.reservedStock || "0") || 0;
-                   const available = Math.max(0, current - reserved);
+                    const digital = isDigitalOnlyType(type);
+                    const current = parseInt(product.stock || "0") || 0;
+                    const reserved = parseInt(product.reservedStock || "0") || 0;
+                    const available = Math.max(0, current - reserved);
                     const availability = getAvailabilityByType(available, type);
                     const leadTime = formatVendorLeadTime(product.leadTime, type);
                     const isCloudService = type.toLowerCase().includes("cloud");
                     const quantityValue = product.moq
                       ? isCloudService ? fmt(Number(product.moq)) : `${product.moq} ${getQuantityLabel(type)}${Number(product.moq) === 1 ? "" : getQuantityLabel(type) === "Units" ? "" : "s"}`
                       : "—";
-                   return (
-                     <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
+                    return (
+                      <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
                         <td className="px-2 py-3.5">
-                         <div className="flex items-center gap-2">
-                           {product.images && product.images.length > 0 ? (
+                          <div className="flex items-center gap-2">
+                            {product.images && product.images.length > 0 ? (
                               <img src={product.images[0]} alt={product.productName} className="w-9 h-9 rounded-md object-cover border border-gray-200 flex-shrink-0" />
-                           ) : (
+                            ) : (
                               <div className="w-9 h-9 bg-blue-100 rounded-md flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0 border border-blue-200">{initials}</div>
-                           )}
-                           <div className="min-w-0">
-                             <div className="font-semibold text-gray-800 text-sm leading-snug">{product.productName}</div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-gray-800 text-sm leading-snug">{product.productName}</div>
                               <div className="text-xs text-gray-500 mt-1">{product.category || "—"}</div>
-                           </div>
-                         </div>
-                       </td>
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-2 py-3.5 align-middle">
                           <span className={`inline-flex max-w-[112px] rounded-md px-2 py-2 text-xs font-semibold leading-snug ${typeBadgeClasses(type)}`}>{displayTypeName(type)}</span>
-                       </td>
+                        </td>
                         <td className="px-2 py-3.5 align-middle">
                           <div className="space-y-1">
                             <div className="font-mono text-xs text-gray-800 break-all">{product.masterProductCode || "—"}</div>
                             <div className="font-mono text-xs text-gray-500 break-all">{product.skuCode || "—"}</div>
-                         </div>
-                       </td>
-                         {!isDigitalTab && <td className="px-2 py-3.5 align-middle text-xs text-gray-700">{getPricingModel(type)}</td>}
+                          </div>
+                        </td>
+                        {!isDigitalTab && <td className="px-2 py-3.5 align-middle text-xs text-gray-700">{getPricingModel(type)}</td>}
                         <td className="px-2 py-3.5 align-middle">
                           <div className="font-semibold text-gray-800 text-sm">
-                             {digital ? fmt(0) : product.price && Number.isFinite(Number(product.price)) ? fmt(Number(product.price)) : "—"}
+                            {digital ? fmt(0) : product.price && Number.isFinite(Number(product.price)) ? fmt(Number(product.price)) : "—"}
                           </div>
-                           {!digital && isCloudService && <div className="text-xs text-gray-500">(Min. Commitment)</div>}
-                       </td>
+                          {!digital && isCloudService && <div className="text-xs text-gray-500">(Min. Commitment)</div>}
+                        </td>
                         <td className="px-2 py-3.5 align-middle text-sm text-gray-700">{quantityValue}</td>
                         <td className="px-2 py-3.5 align-middle">
                           {availability.isUnlimited ? (
@@ -1199,88 +1244,79 @@ export default function VendorProductsPage() {
                           ) : (
                             <div className="space-y-1">
                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
-                              <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
-                                availability.status === "In Stock" ? "bg-emerald-50 text-emerald-700" :
-                                availability.status === "Low Stock" ? "bg-amber-50 text-amber-700" :
-                                "bg-red-50 text-red-600"
-                              }`}>
+                              <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${availability.status === "In Stock" ? "bg-emerald-50 text-emerald-700" :
+                                  availability.status === "Low Stock" ? "bg-amber-50 text-amber-700" :
+                                    "bg-red-50 text-red-600"
+                                }`}>
                                 {availability.status}
                               </span>
                             </div>
                           )}
-                       </td>
+                        </td>
                         <td className="px-2 py-3.5 align-middle text-gray-700 text-sm">
                           <div className="space-y-1">
                             <div>{leadTime.primary}{hybrid ? " *" : ""}</div>
-                           {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
+                            {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
                           </div>
                         </td>
                         <td className="px-2 py-3.5 align-middle">
-                          <div className="relative flex items-center gap-1" data-vendor-product-actions>
+                          <div className="flex items-center gap-1.5" data-vendor-product-actions data-confirmation-skip>
                             <button
                               type="button"
-                              onClick={() => navigate(`/vendors/${vendorId}/add-products?edit=${encodeURIComponent(product.id)}`)}
+                              onClick={() => navigate(`/vendors/${vendorId}/add-products?edit=${encodeURIComponent(product.id)}&type=${productTab}`)}
                               aria-label={`Edit ${product.productName}`}
+                              title={`Edit ${product.productName}`}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => setOpenRowMenu(openRowMenu === product.id ? null : product.id)}
-                              aria-label={`More actions for ${product.productName}`}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                              data-confirmation-skip
+                              onClick={() => setRemoveProduct(product)}
+                              aria-label={`Remove ${product.productName} from vendor`}
+                              title={`Remove ${product.productName}`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
                             >
-                              <MoreVertical className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                            {openRowMenu === product.id && (
-                              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                                <button
-                                  type="button"
-                                  onClick={() => { setOpenRowMenu(null); setRemoveProduct(product); }}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" /> Remove Product
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-            </table>
-          </div>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {/* Pagination */}
           {visibleProducts.length > 0 && (
-          <div className="px-4 py-3.5 flex items-center justify-between border-t border-gray-100">
-            <span className="text-sm text-gray-500">
-               Showing {Math.min((currentPage - 1) * perPage + 1, visibleProducts.length)}–{Math.min(currentPage * perPage, visibleProducts.length)} of {visibleProducts.length} product{visibleProducts.length !== 1 ? "s" : ""}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {Array.from({ length: Math.ceil(visibleProducts.length / perPage) }, (_, i) => i + 1).map((p) => (
-                <button key={p} onClick={() => setCurrentPage(p)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === p ? "bg-blue-600 text-white shadow-sm" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{p}</button>
-              ))}
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(visibleProducts.length / perPage), p + 1))}
-                disabled={currentPage >= Math.ceil(visibleProducts.length / perPage)}
-                className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <div className="ml-2 flex items-center gap-1.5 text-sm text-gray-500">10 / page <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></div>
+            <div className="px-4 py-3.5 flex items-center justify-between border-t border-gray-100">
+              <span className="text-sm text-gray-500">
+                Showing {Math.min((currentPage - 1) * perPage + 1, visibleProducts.length)}–{Math.min(currentPage * perPage, visibleProducts.length)} of {visibleProducts.length} product{visibleProducts.length !== 1 ? "s" : ""}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.ceil(visibleProducts.length / perPage) }, (_, i) => i + 1).map((p) => (
+                  <button key={p} onClick={() => setCurrentPage(p)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === p ? "bg-blue-600 text-white shadow-sm" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{p}</button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(visibleProducts.length / perPage), p + 1))}
+                  disabled={currentPage >= Math.ceil(visibleProducts.length / perPage)}
+                  className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <div className="ml-2 flex items-center gap-1.5 text-sm text-gray-500">10 / page <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></div>
+              </div>
             </div>
-          </div>
           )}
         </div>
       </div>

@@ -543,7 +543,7 @@ import { isDigitalOnlyProduct } from "@/lib/productTypeRules";
                                 </div>
 
                                 {/* Right */}
-                                <OrderSummaryPanel showItemList />
+                                <OrderSummaryPanel showItemList className="lg:w-[340px]" />
                               </div>
                             </div>
                           </div>

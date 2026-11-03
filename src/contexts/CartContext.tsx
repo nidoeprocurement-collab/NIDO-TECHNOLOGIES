@@ -54,11 +54,12 @@ export type CartItem = {
   vendorAllocations: StockAllocation[];
 };
 
-interface CartContextType {
+export interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'quantity' | 'vendorAllocations'>, quantity?: number) => void;
   removeItem: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
+  updateItem: (id: number, updates: Partial<CartItem>) => void;
   clearCart: () => void;
   /** Like clearCart but does NOT restore vendor stock — call this after a confirmed order. */
   consumeCart: () => void;
@@ -216,13 +217,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const updateItem = (id: number, updates: Partial<CartItem>) => {
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...updates } : i)),
+    );
+  };
+
   const clearCart = () => setItems([]);
 
   /** Clears the cart without restoring stock — call after a confirmed order. */
   const consumeCart = () => setItems([]);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, consumeCart }}>
+    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, updateItem, clearCart, consumeCart }}>
       {children}
     </CartContext.Provider>
   );

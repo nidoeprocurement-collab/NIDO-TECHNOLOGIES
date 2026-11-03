@@ -13,7 +13,6 @@ const PRODUCT_HEADERS_BEFORE_VARIATIONS = [
   "category",
   "brand",
   "physicalType",
-  "images",
 ] as const;
 
 const PRODUCT_HEADERS_AFTER_VARIATIONS = [
@@ -40,6 +39,11 @@ function csvEscape(value: unknown): string {
 }
 
 function parseCsvRows(text: string): Record<string, unknown>[] {
+  const firstLine = text.split(/\r?\n/, 1)[0] || "";
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delimiter = tabCount > commaCount ? "\t" : ",";
+
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -53,7 +57,7 @@ function parseCsvRows(text: string): Record<string, unknown>[] {
       index += 1;
     } else if (char === '"') {
       quoted = !quoted;
-    } else if (char === "," && !quoted) {
+    } else if (char === delimiter && !quoted) {
       row.push(field.trim());
       field = "";
     } else if ((char === "\n" || char === "\r") && !quoted) {
@@ -71,20 +75,72 @@ function parseCsvRows(text: string): Record<string, unknown>[] {
   if (row.some((value) => value !== "")) rows.push(row);
   if (rows.length < 2) return [];
 
-  let activeVariationField = 0;
-  const headers = rows[0].map((value) => {
+  const rawHeaders = rows[0];
+  let currentVariationIndex = 0;
+  let currentOptionIndex = 0;
+
+  const headers = rawHeaders.map((value, colIndex) => {
     const header = normalizeKey(value);
-    const variationField = header.match(/^variationfield(\d+)$/);
-    if (variationField) {
-      activeVariationField = Number(variationField[1]);
-      return header;
+
+    // Check if this column represents a variation field / variation name
+    const isVariationField =
+      (header.startsWith("variation") || header.startsWith("field") || header === "var") &&
+      !header.includes("option") &&
+      !header.includes("price") &&
+      !header.includes("label") &&
+      !header.includes("adjustment");
+
+    if (isVariationField) {
+      const match = header.match(/^variation(?:field)?(\d+)$/);
+      const explicitNum = match ? Number(match[1]) : 0;
+      if (explicitNum > currentVariationIndex) {
+        currentVariationIndex = explicitNum;
+      } else {
+        currentVariationIndex += 1;
+      }
+      currentOptionIndex = 0;
+      return `variationfield${currentVariationIndex}`;
     }
-    if (activeVariationField && /^(option|price)\d+$/.test(header)) {
-      return `variationfield${activeVariationField}${header}`;
+
+    // Check if this column represents an option / option label
+    const isOption =
+      (header.includes("option") || header.includes("label")) &&
+      !header.includes("price") &&
+      !header.includes("adjustment");
+
+    if (isOption) {
+      if (currentVariationIndex === 0) currentVariationIndex = 1;
+      const match = header.match(/option(\d+)$/) || header.match(/label(\d+)$/);
+      const explicitNum = match ? Number(match[1]) : 0;
+      if (explicitNum > currentOptionIndex) {
+        currentOptionIndex = explicitNum;
+      } else {
+        currentOptionIndex += 1;
+      }
+      return `variationfield${currentVariationIndex}option${currentOptionIndex}`;
     }
-    activeVariationField = 0;
+
+    // Check if this column represents a price adjustment for the current option
+    const prevHeader = colIndex > 0 ? normalizeKey(rawHeaders[colIndex - 1]) : "";
+    const isPrice =
+      currentVariationIndex > 0 &&
+      currentOptionIndex > 0 &&
+      (header.includes("price") || header.includes("adjustment")) &&
+      (header !== "price" || prevHeader.includes("option") || prevHeader.includes("label"));
+
+    if (isPrice) {
+      return `variationfield${currentVariationIndex}price${currentOptionIndex}`;
+    }
+
+    // If regular column reached, close current variation context
+    if (currentVariationIndex > 0) {
+      currentVariationIndex = 0;
+      currentOptionIndex = 0;
+    }
+
     return header;
   });
+
   return rows.slice(1).map((values) =>
     headers.reduce<Record<string, unknown>>((result, header, index) => {
       if (header) result[header] = values[index] ?? "";
@@ -138,17 +194,17 @@ export function exportVendorProductCatalogCsv(
     : PRODUCT_HEADERS_BEFORE_VARIATIONS;
   const afterVariationHeaders = isDigitalCatalog
     ? PRODUCT_HEADERS_AFTER_VARIATIONS.filter(
-        (header) => !["physicalStock", "reservedStock", "incomingStock"].includes(header),
-      )
+      (header) => !["physicalStock", "reservedStock", "incomingStock"].includes(header),
+    )
     : PRODUCT_HEADERS_AFTER_VARIATIONS;
   const maxVariationCount = isDigitalCatalog
     ? Math.max(1, ...products.map((product) => product.variations?.length ?? 0))
     : 0;
   const maxOptionsPerField = isDigitalCatalog
     ? Math.max(
-        1,
-        ...products.flatMap((product) => (product.variations ?? []).map((variation) => variation.options.length)),
-      )
+      1,
+      ...products.flatMap((product) => (product.variations ?? []).map((variation) => variation.options.length)),
+    )
     : 0;
   const variationHeaders = isDigitalCatalog
     ? buildVariationHeaders(maxVariationCount, maxOptionsPerField)
@@ -172,7 +228,6 @@ export function exportVendorProductCatalogCsv(
       category: product.category,
       brand: product.brand,
       physicalType: product.physicalType,
-      images: JSON.stringify(product.images ?? []),
     };
     const afterVariationValues: Record<string, unknown> = {
       price: product.price,
@@ -256,8 +311,6 @@ export function parseVendorProductVariations(
   if (fieldEntries.length === 0) return { found: false, value: [] };
 
   const variations = fieldEntries.flatMap(({ index, name }) => {
-    if (!name) return [];
-
     const prefix = `variationfield${index}`;
     const optionValues = new Map<number, { label?: string; price?: string }>();
     for (const [key, rawValue] of Object.entries(row)) {
@@ -270,8 +323,11 @@ export function parseVendorProductVariations(
       optionValues.set(optionIndex, current);
     }
 
+    const effectiveName = name || (optionValues.size > 0 ? (existingVariations[index - 1]?.name || `Variation ${index}`) : "");
+    if (!effectiveName && optionValues.size === 0) return [];
+
     const existingVariation = existingVariations.find(
-      (variation) => variation.name.trim().toLowerCase() === name.toLowerCase(),
+      (variation) => variation.name.trim().toLowerCase() === effectiveName.toLowerCase(),
     ) ?? existingVariations[index - 1];
     const options = [...optionValues.entries()]
       .sort(([left], [right]) => left - right)
@@ -281,7 +337,7 @@ export function parseVendorProductVariations(
         const priceText = importedOption.price?.replace(/,/g, "").trim() ?? "";
         const priceAdjustment = priceText ? Number(priceText) : 0;
         if (!Number.isFinite(priceAdjustment)) {
-          throw new Error(`The price for "${label}" in "${name}" must be a number.`);
+          throw new Error(`The price for "${label}" in "${effectiveName}" must be a number.`);
         }
         const existingOption = existingVariation?.options.find(
           (option) => option.label.trim().toLowerCase() === label.toLowerCase(),
@@ -293,12 +349,14 @@ export function parseVendorProductVariations(
         }];
       });
 
+    if (options.length === 0) return [];
+
     return [{
-      id: existingVariation?.id || `imported-variation-${index}-${normalizeKey(name) || "field"}`,
-      name,
+      id: existingVariation?.id || `imported-variation-${index}-${normalizeKey(effectiveName) || "field"}`,
+      name: effectiveName,
       options,
     }];
   });
 
-  return { found: true, value: variations };
+  return { found: variations.length > 0, value: variations };
 }

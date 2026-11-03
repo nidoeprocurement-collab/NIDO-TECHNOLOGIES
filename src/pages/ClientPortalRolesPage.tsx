@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShieldCheck, Plus, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ModuleMultiSelect } from '@/components/ModuleMultiSelect';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   getPortalRoles,
@@ -29,7 +30,7 @@ export default function ClientPortalRolesPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
-  const [moduleToAdd, setModuleToAdd] = useState('');
+  const [modulesToAdd, setModulesToAdd] = useState<string[]>([]);
 
   useEffect(() => {
     const refresh = () => {
@@ -208,26 +209,14 @@ export default function ClientPortalRolesPage() {
                     <p className="text-xs text-gray-500 mt-0.5">{selected.description}</p>
                   )}
                 </div>
-                <div className="px-6 py-2 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
-                  <select
-                    value={moduleToAdd}
-                    onChange={event => setModuleToAdd(event.target.value)}
-                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                <div className="px-6 py-2 flex items-center gap-3 border-b border-gray-100 bg-gray-50">
+                  <ModuleMultiSelect
+                    existingModules={selected.permissions.map(permission => permission.module)}
+                    selectedModules={modulesToAdd}
+                    onSelectionChange={setModulesToAdd}
+                    onAddModules={addModules}
                     disabled={!isAdmin}
-                  >
-                    <option value="">Add module...</option>
-                    {PORTAL_MODULE_CATALOG.map(module => {
-                      const alreadyAdded = selected.permissions.some(permission => permission.module === module.name);
-                      return (
-                        <option key={module.name} value={module.name} disabled={alreadyAdded}>
-                          {module.name} — {module.description}{alreadyAdded ? " (already added)" : ""}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <Button variant="outline" size="sm" onClick={addModule} disabled={!isAdmin || !moduleToAdd}>
-                    Add Module
-                  </Button>
+                  />
                   <span className="text-[11px] text-gray-400 ml-auto">
                     {selected.permissions.length} of {PORTAL_MODULES.length} modules
                   </span>

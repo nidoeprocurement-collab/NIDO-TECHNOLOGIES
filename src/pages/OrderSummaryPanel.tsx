@@ -14,9 +14,11 @@ function formatPrice(n: number) {
 export default function OrderSummaryPanel({
   showItemList = true,
   showEditCartButton = true,
+  className,
 }: {
   showItemList?: boolean;
   showEditCartButton?: boolean;
+  className?: string;
 }) {
   useI18n();
   const navigate = useNavigate();
@@ -45,7 +47,7 @@ export default function OrderSummaryPanel({
     ? `-${formatPrice(totalDiscountAmount)} (${Number(totalDiscountPct.toFixed(2))}%)`
     : "—";
   return (
-    <div className="w-full lg:w-72 shrink-0 space-y-4">
+    <div className={`w-full ${className || "lg:w-[340px]"} shrink-0 space-y-4`}>
       {/* Order Summary card */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">

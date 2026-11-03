@@ -671,7 +671,7 @@ export default function VendorDetailPage() {
       {/* Page body */}
       <div className="flex-1 overflow-auto">
         {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab key={dataVersion} vendor={vendor} /></div>}
-        {activeTab === "products" && <VendorProductsPage />}
+        {activeTab === "products" && <VendorProductsPage vendorId={vendor.id} />}
         {activeTab === "orders" && <VendorOrdersPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "services" && <VendorServicesPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "performance" && <VendorPerformancePage vendor={vendor} />}

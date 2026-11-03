@@ -659,7 +659,7 @@ import ProductConfigurationSummary from "@/components/shared/ProductConfiguratio
             </div>
 
             {/* Right */}
-            <OrderSummaryPanel showItemList={false} />
+            <OrderSummaryPanel showItemList={false} className="lg:w-[340px]" />
           </div>
         </div>
       </div>

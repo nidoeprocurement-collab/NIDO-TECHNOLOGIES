@@ -98,7 +98,10 @@ function writeStore(store: Store): void {
 }
 
 export function getVendorProducts(vendorId: string): VendorProduct[] {
-  return readStore()[vendorId] || [];
+  const store = readStore();
+  const targetId = String(vendorId ?? '').trim().toLowerCase();
+  const vId = Object.keys(store).find(k => k.toLowerCase() === targetId) || vendorId;
+  return store[vId] || [];
 }
 
 export function isCatalogProductAlreadyAssigned(
@@ -115,7 +118,9 @@ export function isCatalogProductAlreadyAssigned(
 
 export function saveVendorProducts(vendorId: string, products: VendorProduct[]): void {
   const store = readStore();
-  store[vendorId] = products;
+  const targetId = String(vendorId ?? '').trim().toLowerCase();
+  const vId = Object.keys(store).find(k => k.toLowerCase() === targetId) || vendorId;
+  store[vId] = products;
   writeStore(store);
 }
 
@@ -537,8 +542,18 @@ export function manualStockAdjustment(
 }
 
 export function removeVendorProduct(vendorId: string, productId: string): void {
-  const products = getVendorProducts(vendorId).filter(p => p.id !== productId);
-  saveVendorProducts(vendorId, products);
+  const store = readStore();
+  const targetVendorId = String(vendorId ?? '').trim().toLowerCase();
+  const vId = Object.keys(store).find(k => k.toLowerCase() === targetVendorId) || vendorId;
+  const target = String(productId ?? '').trim().toLowerCase();
+  const products = (store[vId] || []).filter(p => {
+    const pId = String(p.id ?? '').trim().toLowerCase();
+    const mpc = String(p.masterProductCode ?? '').trim().toLowerCase();
+    const vpc = String(p.vendorProductCode ?? '').trim().toLowerCase();
+    return pId !== target && mpc !== target && vpc !== target;
+  });
+  store[vId] = products;
+  writeStore(store);
 }
 
 export function getAllVendorProducts(): Record<string, VendorProduct[]> {

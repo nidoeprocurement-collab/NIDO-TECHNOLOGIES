@@ -544,7 +544,7 @@ export default function PaymentPage() {
           </div>
 
           {/* Right */}
-          <OrderSummaryPanel showItemList />
+          <OrderSummaryPanel showItemList className="lg:w-[340px]" />
         </div>
       </div>
     </div>

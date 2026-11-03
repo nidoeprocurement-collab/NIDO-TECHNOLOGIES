@@ -1,5 +1,6 @@
 import { getPrefix } from './configService';
 import { isDigitalOnlyType } from './productTypeRules';
+import { addCatalogAuditLog } from './catalogAuditStore';
 
 export interface CatalogSpec {
   id: string;
@@ -111,10 +112,18 @@ export function getMasterCatalogCategories(): string[] {
 
 export function saveCatalogProduct(
   product: CatalogProduct,
-  options: { skipDuplicateCheck?: boolean } = {},
+  options: {
+    skipDuplicateCheck?: boolean;
+    auditUser?: string;
+    auditEvent?: string;
+    auditDetail?: string;
+    skipAudit?: boolean;
+  } = {},
 ): boolean {
   const products = getCatalogProducts();
   const idx = products.findIndex(p => String(p.id) === String(product.id));
+  const existing = idx >= 0 ? products[idx] : undefined;
+
   if (!options.skipDuplicateCheck) {
     const duplicate = products.find(p =>
       String(p.id) !== String(product.id) &&
@@ -132,6 +141,101 @@ export function saveCatalogProduct(
   }
   localStorage.setItem(STORE_KEY, JSON.stringify(products));
   window.dispatchEvent(new Event('catalogUpdated'));
+
+  // ── Record live audit log ──────────────────────────────────────────────────
+  if (!options.skipAudit) {
+    try {
+      if (!existing) {
+        addCatalogAuditLog({
+          event: options.auditEvent || (product.publishStatus === 'published' ? 'New Item Added' : 'Draft Created'),
+          detail: options.auditDetail || `${product.productName} (${product.skuCode || product.masterProductCode || 'N/A'})`,
+          itemId: product.id,
+          itemName: product.productName,
+          sku: product.skuCode || product.masterProductCode,
+          user: options.auditUser,
+          status: product.publishStatus === 'published' ? 'Approved' : 'Draft',
+          newValue: `₹${Number(product.price || 0).toLocaleString('en-IN')}`,
+        });
+      } else {
+        const statusChanged = existing.publishStatus !== product.publishStatus;
+        const priceChanged = Number(existing.price || 0) !== Number(product.price || 0);
+
+        if (statusChanged && product.publishStatus === 'published') {
+          addCatalogAuditLog({
+            event: options.auditEvent || 'Item Approved',
+            detail: options.auditDetail || `Approved & Published: ${product.productName}`,
+            itemId: product.id,
+            itemName: product.productName,
+            sku: product.skuCode || product.masterProductCode,
+            user: options.auditUser,
+            status: 'Approved',
+            previousValue: existing.publishStatus,
+            newValue: 'published',
+          });
+        } else if (statusChanged && product.publishStatus === 'archived') {
+          addCatalogAuditLog({
+            event: options.auditEvent || 'Item Archived',
+            detail: options.auditDetail || `Archived product: ${product.productName}`,
+            itemId: product.id,
+            itemName: product.productName,
+            sku: product.skuCode || product.masterProductCode,
+            user: options.auditUser,
+            status: 'Archived',
+            previousValue: existing.publishStatus,
+            newValue: 'archived',
+          });
+        } else if (statusChanged && product.publishStatus === 'draft' && existing.publishStatus === 'pending') {
+          addCatalogAuditLog({
+            event: options.auditEvent || 'Item Rejected',
+            detail: options.auditDetail || `Rejected approval for ${product.productName} (returned to Draft)`,
+            itemId: product.id,
+            itemName: product.productName,
+            sku: product.skuCode || product.masterProductCode,
+            user: options.auditUser,
+            status: 'Rejected',
+            previousValue: 'pending',
+            newValue: 'draft',
+          });
+        } else if (priceChanged) {
+          addCatalogAuditLog({
+            event: options.auditEvent || 'Price Changed',
+            detail: options.auditDetail || `${product.productName}: ₹${Number(existing.price || 0).toLocaleString('en-IN')} → ₹${Number(product.price || 0).toLocaleString('en-IN')}`,
+            itemId: product.id,
+            itemName: product.productName,
+            sku: product.skuCode || product.masterProductCode,
+            user: options.auditUser,
+            status: 'Updated',
+            previousValue: `₹${Number(existing.price || 0).toLocaleString('en-IN')}`,
+            newValue: `₹${Number(product.price || 0).toLocaleString('en-IN')}`,
+          });
+        } else if (statusChanged) {
+          addCatalogAuditLog({
+            event: options.auditEvent || 'Status Changed',
+            detail: options.auditDetail || `${product.productName} status updated from ${existing.publishStatus} to ${product.publishStatus}`,
+            itemId: product.id,
+            itemName: product.productName,
+            sku: product.skuCode || product.masterProductCode,
+            user: options.auditUser,
+            status: product.publishStatus === 'pending' ? 'Pending' : (product.publishStatus === 'draft' ? 'Draft' : 'Updated'),
+            previousValue: existing.publishStatus,
+            newValue: product.publishStatus,
+          });
+        } else {
+          addCatalogAuditLog({
+            event: options.auditEvent || 'Item Details Updated',
+            detail: options.auditDetail || `Updated details for ${product.productName}`,
+            itemId: product.id,
+            itemName: product.productName,
+            sku: product.skuCode || product.masterProductCode,
+            user: options.auditUser,
+            status: 'Updated',
+          });
+        }
+      }
+    } catch {
+      // never block the save
+    }
+  }
 
   // ── Propagate master catalog changes downstream ──────────────────────────
   // We use raw localStorage reads here (no imports from other stores) to avoid
@@ -152,12 +256,12 @@ export function saveCatalogProduct(
         return {
           ...p,
           masterProductCode: product.masterProductCode,
-          skuCode:           product.skuCode,
-          productName:       product.productName,
-          category:          product.category,
-          brand:             product.brand,
-           physicalType:      product.physicalType,
-          images:            product.images,
+          skuCode: product.skuCode,
+          productName: product.productName,
+          category: product.category,
+          brand: product.brand,
+          physicalType: product.physicalType,
+          images: product.images,
           price: isDigitalOnlyType(product.physicalType || '') ? '0' : p.price,
         };
       });
@@ -189,24 +293,24 @@ export function saveCatalogProduct(
         clientChanged = true;
         return {
           ...e,
-          productCode:  product.masterProductCode,
-          sku:          product.skuCode,
-          name:         product.productName,
-          category:     product.category,
-          subcategory:  product.subcategory,
-          brand:        product.brand,
-          tags:         product.tags ?? [],
-          productType:  product.productType,
+          productCode: product.masterProductCode,
+          sku: product.skuCode,
+          name: product.productName,
+          category: product.category,
+          subcategory: product.subcategory,
+          brand: product.brand,
+          tags: product.tags ?? [],
+          productType: product.productType,
           physicalType: product.physicalType,
-          img:          product.images?.[0] ?? (e.img as string) ?? '',
-          images:       product.images ?? [],
-          description:  product.description,
+          img: product.images?.[0] ?? (e.img as string) ?? '',
+          images: product.images ?? [],
+          description: product.description,
           specs,
           generalSpecs,
           productNotes: product.productNotes,
-          videoUrl:     product.videoUrl,
-          warranty:     product.warranty,
-          variations:   product.variations ?? [],
+          videoUrl: product.videoUrl,
+          warranty: product.warranty,
+          variations: product.variations ?? [],
         };
       });
     }
@@ -220,9 +324,25 @@ export function saveCatalogProduct(
 }
 
 export function deleteCatalogProduct(id: string): void {
-  const products = getCatalogProducts().filter(p => p.id !== id);
-  localStorage.setItem(STORE_KEY, JSON.stringify(products));
+  const products = getCatalogProducts();
+  const toDelete = products.find(p => p.id === id);
+  const remaining = products.filter(p => p.id !== id);
+  localStorage.setItem(STORE_KEY, JSON.stringify(remaining));
   window.dispatchEvent(new Event('catalogUpdated'));
+  if (toDelete) {
+    try {
+      addCatalogAuditLog({
+        event: 'Deleted Item',
+        detail: `Deleted: ${toDelete.productName} (${toDelete.skuCode || toDelete.masterProductCode || 'N/A'})`,
+        itemId: toDelete.id,
+        itemName: toDelete.productName,
+        sku: toDelete.skuCode || toDelete.masterProductCode,
+        status: 'Deleted',
+      });
+    } catch {
+      // ignore
+    }
+  }
 }
 
 /**

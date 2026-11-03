@@ -19,8 +19,18 @@ import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 import {
   Plus, Search, Upload, FileDown, Pencil, Eye, Archive,
   Settings, ShoppingCart, X, Star, Image as ImageIcon, Download, MoreVertical,
-  LayoutGrid, LayoutList, CheckCircle, Clock, FileEdit, ArchiveRestore
+  LayoutGrid, LayoutList, CheckCircle, Clock, FileEdit, ArchiveRestore,
+  ShieldCheck, XCircle, AlertCircle, RefreshCw, Trash2, Filter, DollarSign, Package
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  getCatalogAuditLogs,
+  addCatalogAuditLog,
+  clearCatalogAuditLogs,
+  deleteCatalogAuditLog,
+  CATALOG_AUDIT_EVENT,
+  type CatalogAuditLog,
+} from '@/lib/catalogAuditStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -258,12 +268,7 @@ function ProductThumbnailCard({
 
 const initialItems: CatalogItem[] = [];
 
-const auditLogs = [
-  { event: 'New Item Added', detail: 'Apple MacBook Air M3', user: 'Annit Kumar', date: '26 Mar 2024 11:55 PM', status: 'Approved' },
-  { event: 'Price Changed', detail: 'Sandisk 1TB SSD', user: 'Sakelti Gupta', date: '25 Mar 2024 2:50 PM', status: 'Approved' },
-  { event: 'Deleted Item', detail: 'Formation Uptop', user: 'Rehul Verma', date: '16 Mar 2023 3:35 PM', status: 'Approved' },
-  { event: 'Bulk Update', detail: 'CSV Catalog Accounts', user: 'Sakelti Gupta', date: '07 Mar 2023 2:50 PM', status: 'Approved' },
-];
+// Real-time persistent audit logs are managed by catalogAuditStore
 
 /** Single source of truth for the CSV column order used by both
  *  exportCatalogExcel (export) and downloadTemplate (blank import template). */
@@ -338,12 +343,31 @@ export default function CatalogUpdatesTab() {
   const [viewMode, setViewMode] = useState<'list' | 'thumbnail'>('list');
   const [thumbPage, setThumbPage] = useState(1);
   const [listPage, setListPage] = useState(1);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 10;
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [brandFilter, setBrandFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Live Approval & Audit Logs State
+  const [auditLogs, setAuditLogs] = useState<CatalogAuditLog[]>(() => getCatalogAuditLogs());
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditEventFilter, setAuditEventFilter] = useState('all');
+  const [auditStatusFilter, setAuditStatusFilter] = useState('all');
+  const [auditPage, setAuditPage] = useState(1);
+  const AUDIT_PAGE_SIZE = 10;
+  const [activeTab, setActiveTab] = useState<'catalogue' | 'approvals-audit'>('catalogue');
+  const [clearAuditDialogOpen, setClearAuditDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const handleAuditUpdate = () => {
+      setAuditLogs(getCatalogAuditLogs());
+    };
+    handleAuditUpdate();
+    window.addEventListener(CATALOG_AUDIT_EVENT, handleAuditUpdate);
+    return () => window.removeEventListener(CATALOG_AUDIT_EVENT, handleAuditUpdate);
+  }, []);
 
   // Dialogs
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -907,10 +931,92 @@ export default function CatalogUpdatesTab() {
     toast.success('PDF export opened for printing');
   };
 
+  const pendingItems = items.filter(i => i.publishStatus === 'pending');
+
+  const handleApprovePending = (item: CatalogItem) => {
+    applyItemStatus(item.id, 'published');
+    toast.success(`"${item.name}" has been approved and published to the live catalogue.`);
+  };
+
+  const handleRejectPending = (item: CatalogItem) => {
+    applyItemStatus(item.id, 'draft');
+    toast.info(`"${item.name}" has been rejected and returned to Draft.`);
+  };
+
+  const handleApproveAllPending = () => {
+    if (pendingItems.length === 0) return;
+    const ids = pendingItems.map(p => p.id);
+    bulkUpdateStatus('published', ids);
+    toast.success(`All ${ids.length} pending items have been approved and published.`);
+  };
+
+  const filteredAuditLogs = auditLogs.filter(log => {
+    if (auditEventFilter !== 'all' && log.event !== auditEventFilter) return false;
+    if (auditStatusFilter !== 'all' && log.status !== auditStatusFilter) return false;
+    if (auditSearch.trim()) {
+      const q = auditSearch.toLowerCase();
+      const matchEvent = log.event?.toLowerCase().includes(q);
+      const matchDetail = log.detail?.toLowerCase().includes(q);
+      const matchUser = log.user?.toLowerCase().includes(q);
+      const matchItem = log.itemName?.toLowerCase().includes(q);
+      const matchSku = log.sku?.toLowerCase().includes(q);
+      if (!matchEvent && !matchDetail && !matchUser && !matchItem && !matchSku) return false;
+    }
+    return true;
+  });
+
+  const auditTotalPages = Math.ceil(filteredAuditLogs.length / AUDIT_PAGE_SIZE) || 1;
+  const auditSafePage = Math.min(auditPage, auditTotalPages);
+  const pagedAuditLogs = filteredAuditLogs.slice((auditSafePage - 1) * AUDIT_PAGE_SIZE, auditSafePage * AUDIT_PAGE_SIZE);
+
   const exportAuditLogs = () => {
-    exportToCSV(auditLogs.map(l => ({
-      Event: l.event, Detail: l.detail, User: l.user, Date: l.date, Status: l.status,
-    })), 'audit-logs.csv');
+    if (filteredAuditLogs.length === 0) {
+      toast.error('No audit logs to export');
+      return;
+    }
+    exportToCSV(filteredAuditLogs.map(l => ({
+      Event: l.event,
+      Detail: l.detail,
+      'Product / Item': l.itemName || '',
+      SKU: l.sku || '',
+      User: l.user,
+      Date: l.date,
+      Status: l.status,
+      'Previous Value': l.previousValue || '',
+      'New Value': l.newValue || '',
+    })), 'master-catalogue-audit-logs.csv');
+  };
+
+  const getAuditStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Approved':
+        return <Badge className="bg-emerald-600 text-white border-none font-medium text-xs">Approved</Badge>;
+      case 'Pending':
+        return <Badge className="bg-amber-500 text-white border-none font-medium text-xs">Pending</Badge>;
+      case 'Rejected':
+        return <Badge className="bg-rose-600 text-white border-none font-medium text-xs">Rejected</Badge>;
+      case 'Draft':
+        return <Badge className="bg-slate-500 text-white border-none font-medium text-xs">Draft</Badge>;
+      case 'Archived':
+        return <Badge className="bg-gray-500 text-white border-none font-medium text-xs">Archived</Badge>;
+      case 'Deleted':
+        return <Badge className="bg-red-700 text-white border-none font-medium text-xs">Deleted</Badge>;
+      case 'Updated':
+        return <Badge className="bg-blue-600 text-white border-none font-medium text-xs">Updated</Badge>;
+      default:
+        return <Badge variant="secondary" className="text-xs">{status}</Badge>;
+    }
+  };
+
+  const getEventIcon = (event: string) => {
+    if (event.includes('Approved')) return <CheckCircle size={15} className="text-emerald-600 shrink-0" />;
+    if (event.includes('Rejected')) return <XCircle size={15} className="text-rose-600 shrink-0" />;
+    if (event.includes('Added') || event.includes('Created')) return <Plus size={15} className="text-blue-600 shrink-0" />;
+    if (event.includes('Price')) return <DollarSign size={15} className="text-amber-600 shrink-0" />;
+    if (event.includes('Archived')) return <Archive size={15} className="text-purple-600 shrink-0" />;
+    if (event.includes('Deleted')) return <Trash2 size={15} className="text-red-600 shrink-0" />;
+    if (event.includes('Bulk')) return <Upload size={15} className="text-indigo-600 shrink-0" />;
+    return <Clock size={15} className="text-gray-500 shrink-0" />;
   };
 
   const downloadTemplate = () => {
@@ -982,32 +1088,67 @@ export default function CatalogUpdatesTab() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        <Card className="border-0 cursor-pointer">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="border-0 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => { setActiveTab('catalogue'); setStatusFilter('all'); }}>
           <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]" style={{ backgroundColor: '#1a6fac' }}>
             <ShoppingCart size={18} className="text-white" />
             <span className="font-medium text-sm text-white">{stats.total} Total</span>
           </CardContent>
         </Card>
-        <Card className="border-0 cursor-pointer">
+        <Card className="border-0 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => { setActiveTab('catalogue'); setStatusFilter('published'); }}>
           <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-white" style={{ backgroundColor: 'rgba(225, 86, 99, 0.98)' }}>
             <ShoppingCart size={18} />
             <span className="font-medium text-sm">{stats.published} Published</span>
           </CardContent>
         </Card>
-        <Card className="bg-yellow-100 text-yellow-700 border-0 cursor-pointer hover:bg-yellow-200">
+        <Card className="bg-yellow-100 text-yellow-700 border-0 cursor-pointer hover:bg-yellow-200 transition-colors" onClick={() => { setActiveTab('catalogue'); setStatusFilter('draft'); }}>
           <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]">
             <ShoppingCart size={18} />
             <span className="font-medium text-sm">{stats.drafts} Drafts</span>
           </CardContent>
         </Card>
-        <Card className="border-0 cursor-pointer">
-          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-blue-700" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)' }}>
-            <ShoppingCart size={18} />
-            <span className="font-medium text-sm">{stats.pending} Pending</span>
+        <Card className="border-0 cursor-pointer hover:opacity-90 transition-opacity" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)' }} onClick={() => setActiveTab('approvals-audit')}>
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-blue-700">
+            <Clock size={18} />
+            <span className="font-medium text-sm">{stats.pending} Pending Approval</span>
           </CardContent>
         </Card>
       </div>
+
+      {/* Primary Navigation Tabs */}
+      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as 'catalogue' | 'approvals-audit')} className="w-full space-y-6">
+        <div className="border-b border-gray-200 pb-2">
+          <TabsList className="bg-gray-100 p-1 rounded-xl flex gap-1 h-auto">
+            <TabsTrigger
+              value="catalogue"
+              className="px-4 py-2 text-sm font-semibold gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm transition-all"
+            >
+              <Package size={16} />
+              Catalogue Items
+              <span className="ml-1 px-1.5 py-0.2 rounded-full text-xs bg-gray-200 text-gray-700">
+                {stats.total}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="approvals-audit"
+              className="px-4 py-2 text-sm font-semibold gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm transition-all"
+            >
+              <ShieldCheck size={16} />
+              Approval &amp; Audit Logs
+              {stats.pending > 0 ? (
+                <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white animate-pulse">
+                  {stats.pending} Pending
+                </span>
+              ) : (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-xs bg-gray-200 text-gray-700">
+                  {auditLogs.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="catalogue" className="space-y-6 mt-0">
 
       {/* Actions Bar */}
       <div className="flex items-center justify-end gap-2">
@@ -1295,38 +1436,438 @@ export default function CatalogUpdatesTab() {
         </div>
       )}
 
-      {/* Approval & Audit Logs */}
-      <Card className="w-full min-w-0 border-gray-200">
-        <CardHeader className="flex flex-col items-start gap-3 border-b border-gray-200 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-semibold">Approval &amp; Audit Logs</CardTitle>
-          <Button variant="outline" size="sm" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={exportAuditLogs}><Download size={14} /> Export</Button>
-        </CardHeader>
-        <CardContent className="min-w-0 overflow-x-auto pt-6">
-          <Table className="min-w-[720px]">
-              <TableHeader>
-                <TableRow className="border-gray-200 bg-gray-50">
-                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Event</TableHead>
-                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">User</TableHead>
-                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Date</TableHead>
-                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {auditLogs.map((log, i) => (
-                  <TableRow key={i} className="border-gray-200 hover:bg-gray-50">
-                    <TableCell>
-                      <p className="text-sm font-medium">{log.event}</p>
-                      <p className="text-xs text-muted-foreground">{log.detail}</p>
-                    </TableCell>
-                    <TableCell className="text-sm">{log.user}</TableCell>
-                    <TableCell className="text-xs">{log.date}</TableCell>
-                    <TableCell><Badge className="bg-success text-success-foreground border-none">{log.status}</Badge></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          {/* Live Activity Summary Card (Bottom of Catalogue Tab) */}
+          <Card className="w-full min-w-0 border-gray-200">
+            <CardHeader className="flex flex-col items-start gap-3 border-b border-gray-200 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-blue-600" />
+                  Recent Approval &amp; Audit Activity
+                </CardTitle>
+                <p className="text-xs text-gray-500 mt-1">
+                  Live real-time audit trail of catalogue events and approval state changes.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100"
+                  onClick={exportAuditLogs}
+                  disabled={auditLogs.length === 0}
+                >
+                  <Download size={14} /> Export CSV
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                  onClick={() => setActiveTab('approvals-audit')}
+                >
+                  Manage Approvals &amp; Logs →
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="min-w-0 overflow-x-auto pt-6">
+              {auditLogs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Clock size={36} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-sm font-medium text-gray-700">No audit logs recorded yet</p>
+                  <p className="text-xs text-gray-500 mt-1">Actions like adding, publishing, editing, or archiving items will be logged here live.</p>
+                </div>
+              ) : (
+                <Table className="min-w-[720px]">
+                  <TableHeader>
+                    <TableRow className="border-gray-200 bg-gray-50">
+                      <TableHead className="text-gray-700 font-semibold uppercase text-xs">Event &amp; Detail</TableHead>
+                      <TableHead className="text-gray-700 font-semibold uppercase text-xs">Product / SKU</TableHead>
+                      <TableHead className="text-gray-700 font-semibold uppercase text-xs">User</TableHead>
+                      <TableHead className="text-gray-700 font-semibold uppercase text-xs">Date &amp; Time</TableHead>
+                      <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLogs.slice(0, 5).map((log) => (
+                      <TableRow key={log.id} className="border-gray-200 hover:bg-gray-50">
+                        <TableCell>
+                          <div className="flex items-start gap-2.5">
+                            <span className="mt-0.5">{getEventIcon(log.event)}</span>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{log.event}</p>
+                              <p className="text-xs text-muted-foreground">{log.detail}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm font-medium text-gray-800">{log.itemName || '-'}</p>
+                          <p className="text-xs font-mono text-gray-500">{log.sku || '-'}</p>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-700">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 text-xs font-medium">
+                            {log.user}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-gray-600">{log.date}</TableCell>
+                        <TableCell>{getAuditStatusBadge(log.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── TAB 2: LIVE APPROVAL & AUDIT LOGS WORKSPACE ───────────────────────── */}
+        <TabsContent value="approvals-audit" className="space-y-6 mt-0">
+          
+          {/* Card 1: Pending Catalogue Approvals Queue */}
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-200 bg-amber-50/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                  <Clock size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-semibold text-gray-900">Pending Catalogue Approvals</CardTitle>
+                    <Badge className="bg-amber-500 text-white font-bold text-xs">{pendingItems.length} Waiting</Badge>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">Review and approve items submitted for live client catalog publishing.</p>
+                </div>
+              </div>
+              {pendingItems.length > 0 && (
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-semibold shadow-sm"
+                  onClick={handleApproveAllPending}
+                >
+                  <CheckCircle size={15} /> Approve All Pending ({pendingItems.length})
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="pt-4">
+              {pendingItems.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle size={40} className="mx-auto text-emerald-500 mb-2" />
+                  <p className="text-sm font-semibold text-gray-800">All Catalogue Items Are Approved!</p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                    There are no products currently awaiting publication approval. When items are created or submitted as Pending, they will appear here for review.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[800px]">
+                    <TableHeader>
+                      <TableRow className="border-gray-200 bg-gray-50">
+                        <TableHead className="text-gray-700 font-semibold uppercase text-xs">Product Name</TableHead>
+                        <TableHead className="text-gray-700 font-semibold uppercase text-xs">Master Code / SKU</TableHead>
+                        <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
+                        <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
+                        <TableHead className="text-gray-700 font-semibold uppercase text-xs">Price</TableHead>
+                        <TableHead className="text-gray-700 font-semibold uppercase text-xs text-right">Approval Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingItems.map((item) => (
+                        <TableRow key={item.id} className="border-gray-200 hover:bg-gray-50">
+                          <TableCell className="font-semibold text-sm text-gray-900">
+                            {item.name}
+                          </TableCell>
+                          <TableCell className="text-xs font-mono text-gray-600">
+                            {item.masterProductCode || item.sku || '-'}
+                          </TableCell>
+                          <TableCell className="text-xs text-gray-700">{item.category}</TableCell>
+                          <TableCell className="text-xs text-gray-700">{item.brand || '-'}</TableCell>
+                          <TableCell className="text-xs font-semibold text-gray-900">
+                            ₹{item.price.toLocaleString('en-IN')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2.5 text-xs text-gray-600 hover:bg-gray-100"
+                                onClick={() => openPreview(item.id)}
+                                title="Preview Details"
+                              >
+                                <Eye size={13} className="mr-1" /> View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2.5 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                                onClick={() => handleRejectPending(item)}
+                              >
+                                <XCircle size={13} className="mr-1" /> Reject
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                                onClick={() => handleApprovePending(item)}
+                              >
+                                <CheckCircle size={13} className="mr-1" /> Approve
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Live Audit Logs Trail */}
+          <Card className="border-gray-200 shadow-sm">
+            <CardHeader className="flex flex-col gap-4 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-semibold text-gray-900">Master Catalogue Audit Logs</CardTitle>
+                    <Badge variant="outline" className="font-mono text-xs">{filteredAuditLogs.length} Records</Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Immutable history of all additions, price alterations, approvals, deletions, and bulk updates.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100 text-xs"
+                    onClick={exportAuditLogs}
+                    disabled={filteredAuditLogs.length === 0}
+                  >
+                    <Download size={14} /> Export CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 text-xs"
+                    onClick={() => setClearAuditDialogOpen(true)}
+                    disabled={auditLogs.length === 0}
+                  >
+                    <Trash2 size={13} /> Clear Logs
+                  </Button>
+                </div>
+              </div>
+
+              {/* Filters & Search Toolbar */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <div className="relative flex-1 min-w-[220px]">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search logs by event, product name, SKU, or user..."
+                    value={auditSearch}
+                    onChange={(e) => { setAuditSearch(e.target.value); setAuditPage(1); }}
+                    className="pl-9 text-xs h-9"
+                  />
+                  {auditSearch && (
+                    <button
+                      onClick={() => setAuditSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="w-[180px]">
+                  <Select
+                    value={auditEventFilter}
+                    onValueChange={(val) => { setAuditEventFilter(val); setAuditPage(1); }}
+                  >
+                    <SelectTrigger className="text-xs h-9">
+                      <SelectValue placeholder="All Events" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Events</SelectItem>
+                      <SelectItem value="New Item Added">New Item Added</SelectItem>
+                      <SelectItem value="Item Approved">Item Approved</SelectItem>
+                      <SelectItem value="Item Rejected">Item Rejected</SelectItem>
+                      <SelectItem value="Price Changed">Price Changed</SelectItem>
+                      <SelectItem value="Status Changed">Status Changed</SelectItem>
+                      <SelectItem value="Item Details Updated">Item Details Updated</SelectItem>
+                      <SelectItem value="Item Archived">Item Archived</SelectItem>
+                      <SelectItem value="Deleted Item">Deleted Item</SelectItem>
+                      <SelectItem value="Bulk Status Update">Bulk Status Update</SelectItem>
+                      <SelectItem value="Bulk Import">Bulk Import</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-[150px]">
+                  <Select
+                    value={auditStatusFilter}
+                    onValueChange={(val) => { setAuditStatusFilter(val); setAuditPage(1); }}
+                  >
+                    <SelectTrigger className="text-xs h-9">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="Approved">Approved</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Rejected">Rejected</SelectItem>
+                      <SelectItem value="Draft">Draft</SelectItem>
+                      <SelectItem value="Updated">Updated</SelectItem>
+                      <SelectItem value="Archived">Archived</SelectItem>
+                      <SelectItem value="Deleted">Deleted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(auditSearch || auditEventFilter !== 'all' || auditStatusFilter !== 'all') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 px-2.5 text-xs text-gray-600 hover:bg-gray-100"
+                    onClick={() => {
+                      setAuditSearch('');
+                      setAuditEventFilter('all');
+                      setAuditStatusFilter('all');
+                      setAuditPage(1);
+                    }}
+                  >
+                    Reset Filters
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4">
+              {filteredAuditLogs.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Filter size={36} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-sm font-semibold text-gray-800">
+                    {auditLogs.length === 0 ? 'No audit records in database' : 'No logs match your filter criteria'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                    {auditLogs.length === 0
+                      ? 'Whenever catalogue products are created, approved, price-adjusted, or deleted, entries are recorded here in real-time.'
+                      : 'Try broadening your search term or setting event and status filters back to "All".'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[850px]">
+                      <TableHeader>
+                        <TableRow className="border-gray-200 bg-gray-50">
+                          <TableHead className="text-gray-700 font-semibold uppercase text-xs w-[280px]">Event &amp; Action</TableHead>
+                          <TableHead className="text-gray-700 font-semibold uppercase text-xs">Product Details</TableHead>
+                          <TableHead className="text-gray-700 font-semibold uppercase text-xs">User</TableHead>
+                          <TableHead className="text-gray-700 font-semibold uppercase text-xs">Timestamp</TableHead>
+                          <TableHead className="text-gray-700 font-semibold uppercase text-xs text-center">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pagedAuditLogs.map((log) => (
+                          <TableRow key={log.id} className="border-gray-200 hover:bg-gray-50">
+                            <TableCell>
+                              <div className="flex items-start gap-2.5">
+                                <span className="mt-0.5">{getEventIcon(log.event)}</span>
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">{log.event}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5">{log.detail}</p>
+                                  {(log.previousValue || log.newValue) && (
+                                    <p className="text-[11px] text-gray-400 mt-1 font-mono">
+                                      {log.previousValue && <span>Old: {log.previousValue} </span>}
+                                      {log.previousValue && log.newValue && <span>→ </span>}
+                                      {log.newValue && <span className="text-blue-600 font-medium">New: {log.newValue}</span>}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {log.itemName ? (
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800">{log.itemName}</p>
+                                  {log.sku && <p className="text-xs font-mono text-gray-500">{log.sku}</p>}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 text-xs font-medium text-gray-800">
+                                👤 {log.user}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-xs text-gray-600 whitespace-nowrap">
+                              {log.date}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {getAuditStatusBadge(log.status)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Pagination */}
+                  {auditTotalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs text-gray-600">
+                      <span>Showing {(auditSafePage - 1) * AUDIT_PAGE_SIZE + 1} to {Math.min(auditSafePage * AUDIT_PAGE_SIZE, filteredAuditLogs.length)} of {filteredAuditLogs.length} audit logs</span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setAuditPage(p => Math.max(1, p - 1))}
+                          disabled={auditSafePage === 1}
+                        >
+                          ‹ Prev
+                        </Button>
+                        <span className="px-2">Page {auditSafePage} of {auditTotalPages}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setAuditPage(p => Math.min(auditTotalPages, p + 1))}
+                          disabled={auditSafePage === auditTotalPages}
+                        >
+                          Next ›
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Clear Audit Confirmation Dialog */}
+      <Dialog open={clearAuditDialogOpen} onOpenChange={setClearAuditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 size={18} /> Clear Catalogue Audit Logs?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-700">
+            Are you sure you want to clear all catalogue audit logs? This action will permanently remove all historical audit trail entries from the browser store.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearAuditDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                clearCatalogAuditLogs();
+                setClearAuditDialogOpen(false);
+                toast.success('Catalogue audit logs cleared');
+              }}
+            >
+              Clear All Logs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Publish Confirmation Dialog */}
       <Dialog open={!!publishConfirmItem} onOpenChange={(open) => { if (!open) setPublishConfirmItem(null); }}>

@@ -121,12 +121,12 @@ function VendorVariationsDialog({
     setVariations(current => current.map(variation =>
       variation.id === variationId
         ? {
-            ...variation,
-            options: [
-              ...variation.options,
-              { id: createVariationId("vendor-option"), label: "", priceAdjustment: 0 },
-            ],
-          }
+          ...variation,
+          options: [
+            ...variation.options,
+            { id: createVariationId("vendor-option"), label: "", priceAdjustment: 0 },
+          ],
+        }
         : variation,
     ));
   };
@@ -141,16 +141,16 @@ function VendorVariationsDialog({
       variation.id !== variationId
         ? variation
         : {
-            ...variation,
-            options: variation.options.map(option =>
-              option.id !== optionId
-                ? option
-                : {
-                    ...option,
-                    [field]: field === "priceAdjustment" ? (Number(value) || 0) : value,
-                  },
-            ),
-          },
+          ...variation,
+          options: variation.options.map(option =>
+            option.id !== optionId
+              ? option
+              : {
+                ...option,
+                [field]: field === "priceAdjustment" ? (Number(value) || 0) : value,
+              },
+          ),
+        },
     ));
   };
 
@@ -465,6 +465,7 @@ export default function AddVendorProductsPage() {
 
   const editProductId = searchParams.get("edit"); // null → add mode, string → edit mode
   const isEditMode = Boolean(editProductId);
+  const productTypeParam = searchParams.get("type"); // "physical" | "digital" | null
 
   // ── Catalog ──────────────────────────────────────────────────────────────
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
@@ -489,8 +490,19 @@ export default function AddVendorProductsPage() {
   useEffect(() => { setPage(1); }, [query]);
 
   const availableCatalog = useMemo(
-    () => catalog.filter((product) => !isCatalogProductAlreadyAssigned(product, vendorProducts)),
-    [catalog, vendorProducts],
+    () =>
+      catalog
+        .filter((product) => !isCatalogProductAlreadyAssigned(product, vendorProducts))
+        .filter((product) => {
+          if (productTypeParam === "digital") {
+            return isDigitalCatalogProduct(product);
+          }
+          if (productTypeParam === "physical") {
+            return !isDigitalCatalogProduct(product);
+          }
+          return true;
+        }),
+    [catalog, vendorProducts, productTypeParam],
   );
 
   const filtered = useMemo(() => {
@@ -526,8 +538,19 @@ export default function AddVendorProductsPage() {
   // ── Selection ────────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedRows, setSelectedRows] = useState<SelectedRow[]>([]);
-  const [selectedProductTab, setSelectedProductTab] = useState<SelectedProductTab>("physical");
+  const [selectedProductTab, setSelectedProductTab] = useState<SelectedProductTab>(() => {
+    if (productTypeParam === "digital") return "digital";
+    return "physical";
+  });
   const [variationRow, setVariationRow] = useState<SelectedRow | null>(null);
+
+  useEffect(() => {
+    if (productTypeParam === "digital") {
+      setSelectedProductTab("digital");
+    } else if (productTypeParam === "physical") {
+      setSelectedProductTab("physical");
+    }
+  }, [productTypeParam]);
 
   // In edit mode: pre-populate with the existing product
   useEffect(() => {
@@ -648,7 +671,12 @@ export default function AddVendorProductsPage() {
       addVendorProducts(vendorId, products);
     }
     setShowConfirmation(false);
-    navigate(`/vendors/${vendorId}`, { state: { tab: "products" } });
+    navigate(`/vendors/${vendorId}`, {
+      state: {
+        tab: "products",
+        productTab: productTypeParam === "digital" || selectedProductTab === "digital" ? "digital" : "physical",
+      },
+    });
   };
 
   const handleSubmit = () => {
@@ -658,12 +686,12 @@ export default function AddVendorProductsPage() {
     const errors: MissingField[] = [];
     for (const row of selectedRows) {
       const missing: string[] = [];
-        if (!isDigitalCatalogProduct(row.catalogProduct)) {
-          const basePrice = Number(row.price);
-          if (!row.price || row.price.trim() === "" || !Number.isFinite(basePrice) || basePrice < 0) {
-            missing.push("Price / Unit");
-          }
+      if (!isDigitalCatalogProduct(row.catalogProduct)) {
+        const basePrice = Number(row.price);
+        if (!row.price || row.price.trim() === "" || !Number.isFinite(basePrice) || basePrice < 0) {
+          missing.push("Price / Unit");
         }
+      }
       if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.moq || row.moq.trim() === "")) {
         missing.push("MOQ");
       }
@@ -686,7 +714,13 @@ export default function AddVendorProductsPage() {
     commitProducts();
   };
 
-  const goBack = () => navigate(`/vendors/${vendorId}`, { state: { tab: "products" } });
+  const goBack = () =>
+    navigate(`/vendors/${vendorId}`, {
+      state: {
+        tab: "products",
+        productTab: productTypeParam === "digital" ? "digital" : "physical",
+      },
+    });
   const physicalSelectedCount = selectedRows.filter((row) => !isDigitalCatalogProduct(row.catalogProduct)).length;
   const digitalSelectedCount = selectedRows.length - physicalSelectedCount;
   const visibleSelectedRows = selectedRows.filter((row) =>
@@ -697,7 +731,7 @@ export default function AddVendorProductsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-white font-[Inter,sans-serif]">
+    <div className="min-h-full flex flex-col bg-white font-[Inter,sans-serif]">
 
       {/* ── Sticky header ── */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-2 py-2 shadow-sm">
@@ -706,18 +740,28 @@ export default function AddVendorProductsPage() {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <h1 className="text-lg font-bold text-gray-900">
-            {isEditMode ? "Edit Product" : "Add Products to Vendor"}
+            {isEditMode
+              ? "Edit Product"
+              : productTypeParam === "digital"
+                ? "Add Digital Products to Vendor"
+                : productTypeParam === "physical"
+                  ? "Add Physical Products to Vendor"
+                  : "Add Products to Vendor"}
           </h1>
         </div>
         <p className="text-sm text-gray-500 ml-7">
           {isEditMode
             ? "Update the vendor-specific details for this product."
-            : "Search and select products from master catalog and set vendor-specific details."}
+            : productTypeParam === "digital"
+              ? "Search and select digital products from master catalog and set vendor-specific details."
+              : productTypeParam === "physical"
+                ? "Search and select physical products from master catalog and set vendor-specific details."
+                : "Search and select products from master catalog and set vendor-specific details."}
         </p>
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 px-2 py-2 flex flex-col gap-4">
+      <div className="flex-1 px-2 py-2 flex flex-col gap-4 pb-28">
 
         {/* ── Section 1: Search & Select ── */}
         {!isEditMode && (
@@ -726,7 +770,13 @@ export default function AddVendorProductsPage() {
             {/* Header */}
             <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100 flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
-              <h2 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h2>
+              <h2 className="text-sm font-semibold text-gray-800">
+                {productTypeParam === "digital"
+                  ? "Search & Select Digital Products"
+                  : productTypeParam === "physical"
+                    ? "Search & Select Physical Products"
+                    : "Search & Select Products"}
+              </h2>
               {selectedIds.size > 0 && (
                 <span className="ml-auto text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                   {selectedIds.size} selected
@@ -742,7 +792,13 @@ export default function AddVendorProductsPage() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by product name, SKU, category, brand…"
+                  placeholder={
+                    productTypeParam === "digital"
+                      ? "Search digital products by name, SKU, category, brand…"
+                      : productTypeParam === "physical"
+                        ? "Search physical products by name, SKU, category, brand…"
+                        : "Search by product name, SKU, category, brand…"
+                  }
                   className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {query && (
@@ -761,11 +817,15 @@ export default function AddVendorProductsPage() {
                 </div>
               ) : availableCatalog.length === 0 && !query.trim() ? (
                 <div className="px-5 py-10 text-center text-gray-400 text-sm">
-                  All published products have already been added to this vendor.
+                  {productTypeParam === "digital"
+                    ? "No published digital products available to add for this vendor."
+                    : productTypeParam === "physical"
+                      ? "No published physical products available to add for this vendor."
+                      : "All published products have already been added to this vendor."}
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="px-5 py-2 text-center text-gray-400 text-sm">
-                  No products match "<span className="font-medium text-gray-600">{query}</span>"
+                  No {productTypeParam ? (productTypeParam === "digital" ? "digital " : "physical ") : ""}products match "<span className="font-medium text-gray-600">{query}</span>"
                 </div>
               ) : (
                 <table className="w-full text-sm" style={{ minWidth: "620px" }}>
@@ -801,7 +861,12 @@ export default function AddVendorProductsPage() {
                             <div className="flex items-center gap-2.5">
                               <ProductThumb images={product.images} name={product.productName} />
                               <div>
-                                <div className="font-medium text-gray-800 text-sm leading-tight">{product.productName}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-800 text-sm leading-tight">{product.productName}</span>
+                                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${selectedProductTypeClasses(selectedProductType(product))}`}>
+                                    {selectedProductType(product)}
+                                  </span>
+                                </div>
                                 <div className="text-xs text-gray-400 font-mono mt-0.5">{product.masterProductCode}</div>
                               </div>
                             </div>
@@ -873,18 +938,21 @@ export default function AddVendorProductsPage() {
           {!isEditMode && (
             <div className="flex items-end gap-5 px-4 pt-2 border-b border-gray-100">
               {([
-                ["physical", "Physical Selected Products", physicalSelectedCount],
-                ["digital", "Digital Selected Products", digitalSelectedCount],
-              ] as const).map(([tab, label, count]) => (
+                ...(productTypeParam === "digital"
+                  ? []
+                  : [["physical", "Physical Selected Products", physicalSelectedCount] as const]),
+                ...(productTypeParam === "physical"
+                  ? []
+                  : [["digital", "Digital Selected Products", digitalSelectedCount] as const]),
+              ]).map(([tab, label, count]) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setSelectedProductTab(tab)}
-                  className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${
-                    selectedProductTab === tab
+                  className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${selectedProductTab === tab
                       ? "border-blue-600 text-blue-700"
                       : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
+                    }`}
                 >
                   {label} <span className="ml-1 text-[10px] font-medium text-gray-400">({count})</span>
                 </button>
@@ -904,14 +972,14 @@ export default function AddVendorProductsPage() {
                 </div>
               ) : (
                 <>
-                <SelectedProductsTable
-                  rows={isEditMode ? selectedRows : visibleSelectedRows}
-                  isEditMode={isEditMode}
-                  selectedTab={selectedProductTab}
-                  updateRow={updateRow}
-                  editVariations={setVariationRow}
-                  removeSelected={removeSelected}
-                />
+                  <SelectedProductsTable
+                    rows={isEditMode ? selectedRows : visibleSelectedRows}
+                    isEditMode={isEditMode}
+                    selectedTab={selectedProductTab}
+                    updateRow={updateRow}
+                    editVariations={setVariationRow}
+                    removeSelected={removeSelected}
+                  />
                 </>
               )}
 
@@ -1082,17 +1150,19 @@ export default function AddVendorProductsPage() {
       )}
 
       {/* ── Sticky footer ── */}
-      <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-2 py-2 flex items-center justify-end gap-3 shadow-[0_-1px_4px_rgba(0,0,0,0.06)]">
+      <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-sm border-t border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-end gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
         <button
+          type="button"
           onClick={goBack}
-          className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors shadow-sm"
         >
           Cancel
         </button>
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={selectedRows.length === 0}
-          className="flex items-center gap-2 px-2 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {isEditMode ? (
             <><Save className="w-4 h-4" /> Save Changes</>

@@ -748,10 +748,12 @@ function AddNewProductModal({
   clientId,
   onClose,
   onAdd,
+  productTab = "physical",
 }: {
   clientId: string;
   onClose: () => void;
   onAdd: (entries: CatalogEntry[]) => void;
+  productTab?: CatalogProductTab;
 }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [assignedProductCodes, setAssignedProductCodes] = useState<Set<string>>(new Set());
@@ -760,6 +762,8 @@ function AddNewProductModal({
   const [rows, setRows] = useState<SelectedRow[]>([]);
   const [preferences, setPreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
   const [roles, setRoles] = useState<string[]>(() => getAssignableCatalogRoles(clientId));
+
+  const isDigital = productTab === "digital";
 
   useEffect(() => {
     const loadAssignedProductCodes = () => {
@@ -812,10 +816,14 @@ function AddNewProductModal({
   }, [clientId]);
 
   const availableCatalog = useMemo(
-    () => catalog.filter((product) =>
-      !assignedProductCodes.has(normalizeMasterProductCode(product.masterProductCode))
-    ),
-    [catalog, assignedProductCodes]
+    () => catalog.filter((product) => {
+      if (assignedProductCodes.has(normalizeMasterProductCode(product.masterProductCode))) {
+        return false;
+      }
+      const prodIsDigital = isDigitalOnlyType(getProductType(product.physicalType || product.productType));
+      return isDigital ? prodIsDigital : !prodIsDigital;
+    }),
+    [catalog, assignedProductCodes, isDigital]
   );
 
   const filtered = useMemo(() => {
@@ -968,8 +976,14 @@ function AddNewProductModal({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Add New Product</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Search and select products from the master catalog to add to this client</p>
+            <h2 className="text-base font-semibold text-gray-900">
+              {isDigital ? "Add Digital Products to Client" : "Add Physical Products to Client"}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isDigital
+                ? "Search and select digital products from the master catalog to add to this client"
+                : "Search and select physical products from the master catalog to add to this client"}
+            </p>
           </div>
         </div>
         <button
@@ -989,8 +1003,12 @@ function AddNewProductModal({
             <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
               <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
               <div>
-                <h3 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Check the boxes next to the products you want to add</p>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  {isDigital ? "Search & Select Digital Products" : "Search & Select Physical Products"}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Check the boxes next to the {isDigital ? "digital " : "physical "}products you want to add
+                </p>
               </div>
               {selectedIds.size > 0 && (
                 <span className="ml-auto text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
@@ -1007,7 +1025,11 @@ function AddNewProductModal({
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by product name, master product code, category or brand…"
+                  placeholder={
+                    isDigital
+                      ? "Search digital products by name, master product code, category or brand…"
+                      : "Search physical products by name, master product code, category or brand…"
+                  }
                   className="w-full pl-9 pr-8 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {query && (
@@ -1026,11 +1048,13 @@ function AddNewProductModal({
                 </div>
               ) : availableCatalog.length === 0 ? (
                 <div className="px-8 py-16 text-center text-gray-400 text-sm">
-                  All available products are already added to this client&apos;s catalog.
+                  {isDigital
+                    ? "All available digital products are already added to this client's catalog."
+                    : "All available physical products are already added to this client's catalog."}
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="px-8 py-12 text-center text-gray-400 text-sm">
-                  No products match "<span className="font-medium text-gray-600">{query}</span>"
+                  No {isDigital ? "digital " : "physical "}products match &quot;<span className="font-medium text-gray-600">{query}</span>&quot;
                 </div>
               ) : (
                 <table className="w-full text-sm">
@@ -1066,7 +1090,20 @@ function AddNewProductModal({
                             <div className="flex items-center gap-3">
                               <ProductThumb images={product.images} name={product.productName} />
                               <div>
-                                <div className="font-medium text-gray-900 text-sm leading-tight">{product.productName}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-900 text-sm leading-tight">{product.productName}</span>
+                                  {(() => {
+                                    const type = getProductType(product.physicalType || product.productType);
+                                    const dig = isDigitalOnlyType(type);
+                                    return (
+                                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                        dig ? "bg-violet-50 text-violet-700 border border-violet-100" : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                      }`}>
+                                        {type}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                                 <div className="text-xs text-gray-400 font-mono mt-0.5">{product.masterProductCode}</div>
                               </div>
                             </div>
@@ -1129,7 +1166,20 @@ function AddNewProductModal({
                           <div className="flex items-center gap-3">
                             <ProductThumb images={row.product.images} name={row.product.productName} />
                             <div className="min-w-0">
-                              <div className="font-medium text-gray-900 text-sm leading-tight">{row.product.productName}</div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900 text-sm leading-tight">{row.product.productName}</span>
+                                {(() => {
+                                  const type = getProductType(row.product.physicalType || row.product.productType);
+                                  const dig = isDigitalOnlyType(type);
+                                  return (
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                      dig ? "bg-violet-50 text-violet-700 border border-violet-100" : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                    }`}>
+                                      {type}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                               <div className="text-xs text-gray-400 font-mono mt-0.5">{row.product.masterProductCode}</div>
                             </div>
                           </div>
@@ -1177,7 +1227,7 @@ function AddNewProductModal({
         </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 px-2 py-2 border-t border-gray-200 bg-white flex items-center justify-between gap-3">
+      <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-between gap-3 pb-8">
         <span className="text-sm text-gray-500">
           {rows.length === 0 ? "No products selected yet" : `${rows.length} product${rows.length !== 1 ? "s" : ""} selected`}
         </span>
@@ -1188,7 +1238,7 @@ function AddNewProductModal({
             onClick={handleAddProducts}
             className="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Add Product{rows.length > 1 ? "s" : ""}
+            Add {isDigital ? "Digital " : "Physical "}Product{rows.length > 1 ? "s" : ""}
           </button>
         </div>
       </div>
@@ -1337,6 +1387,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           clientId={clientId}
           onClose={() => setShowAddProduct(false)}
           onAdd={handleAddProducts}
+          productTab={productTab}
         />
       )}
       {viewProduct && (
@@ -1373,26 +1424,46 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
       {/* Catalog table card */}
       <div className="border border-gray-200 rounded-xl bg-white flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Client Catalog</h2>
-          <div className="relative">
+          <div className="flex items-center gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); setHeaderMenu((v) => !v); }}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+              type="button"
+              onClick={() => setShowAddProduct(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
             >
-              <MoreVertical size={16} />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add New {productTab === "digital" ? "Digital" : "Physical"} Product
             </button>
-            {headerMenu && (
-              <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-44" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => { setShowAddProduct(true); setHeaderMenu(false); }} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                  <span className="text-gray-400"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
-                  Add New Product
-                </button>
-                <button onClick={() => setHeaderMenu(false)} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Download size={13} className="text-gray-400" /> Export
-                </button>
-              </div>
-            )}
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setHeaderMenu((v) => !v); }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                title="More options"
+                aria-label="More options"
+              >
+                <MoreVertical size={16} />
+              </button>
+              {headerMenu && (
+                <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => { setShowAddProduct(true); setHeaderMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                    <span className="text-gray-400">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                    </span>
+                    Add New {productTab === "digital" ? "Digital" : "Physical"} Product
+                  </button>
+                  <button onClick={() => setHeaderMenu(false)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                    <Download size={13} className="text-gray-400" /> Export
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1552,7 +1623,28 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-xs text-gray-400">No products match your search.</td>
+                  <td colSpan={10} className="px-4 py-12 text-center text-xs text-gray-400">
+                    {search ? (
+                      `No ${productTab === "digital" ? "digital " : "physical "}products match your search.`
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2 py-4">
+                        <p className="text-sm text-gray-500">
+                          No {productTab === "digital" ? "digital" : "physical"} products have been added to this client yet.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddProduct(true)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                          Add New {productTab === "digital" ? "Digital" : "Physical"} Product
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               )}
             </tbody>

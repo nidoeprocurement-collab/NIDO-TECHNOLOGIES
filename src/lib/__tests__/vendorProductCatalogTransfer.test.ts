@@ -80,7 +80,6 @@ describe("vendor product catalog transfer", () => {
       "category",
       "brand",
       "physicalType",
-      "images",
       "Variation field 1",
       "Option 1",
       "Price 1",
@@ -101,6 +100,7 @@ describe("vendor product catalog transfer", () => {
       "status",
     ]);
     expect(headers).not.toContain("id");
+    expect(headers).not.toContain("images");
     expect(headers).not.toContain("physicalStock");
     expect(headers).not.toContain("reservedStock");
     expect(headers).not.toContain("incomingStock");
@@ -114,7 +114,7 @@ describe("vendor product catalog transfer", () => {
     expect(row.variationfield2).toBe("Storage");
     expect(row.variationfield2option2).toBe("50 GB");
     expect(row.variationfield2price2).toBe("2499");
-    expect(images.value).toEqual(digitalProduct.images);
+    expect(images.found).toBe(false);
     expect(variations.value).toEqual(digitalProduct.variations);
   });
 
@@ -124,6 +124,7 @@ describe("vendor product catalog transfer", () => {
     const [row] = parseVendorProductImportFile("vendor-physical-catalog.csv", csv);
 
     expect(headers).toContain("id");
+    expect(headers).not.toContain("images");
     expect(headers).toContain("physicalStock");
     expect(headers).toContain("reservedStock");
     expect(headers).toContain("incomingStock");
@@ -138,5 +139,44 @@ describe("vendor product catalog transfer", () => {
 
     expect(parseVendorProductArrayField(row, "variations").value)
       .toEqual(digitalProduct.variations);
+  });
+
+  it("imports all variation fields and options even when column headers repeat in Excel/CSV", () => {
+    const csvWithRepeatedHeaders = [
+      "vendorId,masterProductCode,skuCode,productName,physicalType,Variation field 1,Option 1,Price 1,Variation field 1,Option 1,Price 1,Variation field 1,Option 1,Price 1,price",
+      'VND-1006,MPC-001,SKU-001,Cloud Product,Digital Licence,Users,1 User,100,Plan,Pro,500,Storage,100 GB,1200,0',
+    ].join("\n");
+
+    const [row] = parseVendorProductImportFile("digital-import.csv", csvWithRepeatedHeaders);
+    const variations = parseVendorProductVariations(row);
+
+    expect(variations.found).toBe(true);
+    expect(variations.value).toHaveLength(3);
+    expect(variations.value[0].name).toBe("Users");
+    expect(variations.value[0].options[0].label).toBe("1 User");
+    expect(variations.value[0].options[0].priceAdjustment).toBe(100);
+    expect(variations.value[1].name).toBe("Plan");
+    expect(variations.value[1].options[0].label).toBe("Pro");
+    expect(variations.value[1].options[0].priceAdjustment).toBe(500);
+    expect(variations.value[2].name).toBe("Storage");
+    expect(variations.value[2].options[0].label).toBe("100 GB");
+    expect(variations.value[2].options[0].priceAdjustment).toBe(1200);
+  });
+
+  it("imports tab-delimited files with multiple variations", () => {
+    const tsv = [
+      ["vendorId", "productName", "physicalType", "Variation field 1", "Option 1", "Price 1", "Variation field 2", "Option 1", "Price 1"].join("\t"),
+      ["VND-1006", "Test App", "Digital Licence", "Tier", "Basic", "50", "Region", "US East", "20"].join("\t"),
+    ].join("\n");
+
+    const [row] = parseVendorProductImportFile("digital-import.tsv", tsv);
+    const variations = parseVendorProductVariations(row);
+
+    expect(variations.found).toBe(true);
+    expect(variations.value).toHaveLength(2);
+    expect(variations.value[0].name).toBe("Tier");
+    expect(variations.value[0].options[0].label).toBe("Basic");
+    expect(variations.value[1].name).toBe("Region");
+    expect(variations.value[1].options[0].label).toBe("US East");
   });
 });
