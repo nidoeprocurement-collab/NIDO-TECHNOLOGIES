@@ -427,7 +427,6 @@ export function removeArchivedProductFromDownstream(id: string, masterProductCod
     }
   } catch { /* never block */ }
 
-  return true;
 }
 
 export function generateMasterProductCode(): string {
