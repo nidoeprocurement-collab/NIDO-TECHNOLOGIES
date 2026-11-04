@@ -124,9 +124,9 @@ export function getCatalogProducts(): CatalogProduct[] {
         images: Array.isArray(product.images) ? product.images.filter((img): img is string => typeof img === 'string') : [],
         publishStatus:
           product.publishStatus === 'published' ||
-          product.publishStatus === 'pending' ||
-          product.publishStatus === 'archived' ||
-          product.publishStatus === 'draft'
+            product.publishStatus === 'pending' ||
+            product.publishStatus === 'archived' ||
+            product.publishStatus === 'draft'
             ? product.publishStatus
             : 'draft',
         price: Number(product.price) || 0,
