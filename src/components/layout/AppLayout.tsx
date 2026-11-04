@@ -38,9 +38,8 @@ export default function AppLayout() {
           When the sidebar is hidden, the content stretches to fill the
           freed-up space instead of leaving a gap. */}
       <div
-        className={`flex-1 flex flex-col min-w-0 h-full min-h-0 transition-[margin] duration-300 ${
-          collapsed ? 'lg:ml-16' : 'lg:ml-64'
-        }`}
+        className={`flex-1 flex flex-col min-w-0 h-full min-h-0 transition-[margin] duration-300 ${collapsed ? 'lg:ml-16' : 'lg:ml-64'
+          }`}
       >
         {/* Top Bar + Page Content share one scroll container, so the header
             scrolls away with the rest of the page instead of staying fixed. */}

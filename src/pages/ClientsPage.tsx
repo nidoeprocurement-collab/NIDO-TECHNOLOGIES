@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
-import { getPrefix } from "@/lib/prefixSettings"
+import { getPrefix } from "@/lib/configService"
 import { toast } from "sonner"
 import {
   getClients as getStoredClients,

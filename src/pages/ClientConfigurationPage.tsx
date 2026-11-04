@@ -139,9 +139,8 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
           <button
             key={tab}
             onClick={() => setConfigTab(tab)}
-            className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${
-              configTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${configTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             {tab}
             {configTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />}
@@ -209,7 +208,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
       )}
 
       <div className={configTab === "Price Setting" ? "flex flex-col" : "hidden"}>
-          <ClientPricingSettingsPanel clientId={clientId} />
+        <ClientPricingSettingsPanel clientId={clientId} />
       </div>
 
       {configTab === "Invite Users" && (
@@ -260,7 +259,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
           {/* Search */}
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               type="text"
@@ -277,9 +276,9 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
               onClick={() => setInviteRoleOpen((v) => !v)}
               className="flex items-center gap-2 px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="11" y1="18" x2="13" y2="18" /></svg>
               Filter by Role: <span className="text-blue-600 font-medium">{inviteRoleFilter}</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             {inviteRoleOpen && (
               <div className="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 min-w-[160px]">
