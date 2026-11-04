@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/configuration/auto-assignment",
+      "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }
   ]

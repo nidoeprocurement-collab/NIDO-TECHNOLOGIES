@@ -92,7 +92,7 @@ const defaultTags = ['CoreEssentials', 'New Arrival', 'High-End', 'Budget', 'Eco
 // ─── Helper Components ────────────────────────────────────────────────────────
 
 function PublishStatusBadge({ status }: { status?: 'draft' | 'published' | 'pending' | 'archived' }) {
-  if (!status) return null;
+  if (!status || typeof status !== 'string') return null;
   const cfg: Record<string, string> = {
     published: 'bg-green-100 text-green-700',
     draft: 'bg-yellow-100 text-yellow-700',
@@ -310,33 +310,33 @@ export default function CatalogUpdatesTab() {
   const navigate = useNavigate();
   const [items, setItems] = useState<CatalogItem[]>(() => {
     const stored = getCatalogProducts().map(p => ({
-      id: p.id,
-      masterProductCode: p.masterProductCode,
-      name: p.productName,
-      sku: p.skuCode || p.masterProductCode,
-      publishStatus: p.publishStatus,
-      category: p.category,
-      subCategory: p.subcategory,
+      id: String(p.id ?? ''),
+      masterProductCode: p.masterProductCode || '',
+      name: p.productName || 'Untitled Product',
+      sku: p.skuCode || p.masterProductCode || '',
+      publishStatus: p.publishStatus || 'draft',
+      category: p.category || '',
+      subCategory: p.subcategory || '',
       physicalType: p.physicalType?.trim() || 'Physical Product',
-      brand: p.brand,
-      price: p.price,
+      brand: p.brand || '',
+      price: Number(p.price) || 0,
       status: 'In Stock' as const,
-      tags: p.tags,
+      tags: Array.isArray(p.tags) ? p.tags : [],
       initialStock: 0,
       minStockThreshold: 0,
-      description: p.description,
+      description: p.description || '',
       specification: '',
-      warranty: p.warranty,
+      warranty: p.warranty || '',
       hsnCode: '',
       dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
       customsDeclaration: 'Exempt',
-      primaryVendor: '', vendorSku: '', leadTime: p.leadTime,
+      primaryVendor: '', vendorSku: '', leadTime: p.leadTime || '',
       vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
       trackPerformance: false, performanceRating: 4,
-      specifications: p.specifications || [],
-      generalSpecs: p.generalSpecs || [],
-      images: p.images || [],
-      image: p.images?.[0] || undefined,
+      specifications: Array.isArray(p.specifications) ? p.specifications : [],
+      generalSpecs: Array.isArray(p.generalSpecs) ? p.generalSpecs : [],
+      images: Array.isArray(p.images) ? p.images : [],
+      image: Array.isArray(p.images) ? p.images[0] || undefined : undefined,
     }));
     return stored;
   });
@@ -395,33 +395,33 @@ export default function CatalogUpdatesTab() {
 
   const loadFromStore = () => {
     const stored = getCatalogProducts().map(p => ({
-      id: p.id,
-      masterProductCode: p.masterProductCode,
-      name: p.productName,
-      sku: p.skuCode || p.masterProductCode,
-      publishStatus: p.publishStatus,
-      category: p.category,
-      subCategory: p.subcategory,
+      id: String(p.id ?? ''),
+      masterProductCode: p.masterProductCode || '',
+      name: p.productName || 'Untitled Product',
+      sku: p.skuCode || p.masterProductCode || '',
+      publishStatus: p.publishStatus || 'draft',
+      category: p.category || '',
+      subCategory: p.subcategory || '',
       physicalType: p.physicalType?.trim() || 'Physical Product',
-      brand: p.brand,
-      price: p.price,
+      brand: p.brand || '',
+      price: Number(p.price) || 0,
       status: 'In Stock' as const,
-      tags: p.tags,
+      tags: Array.isArray(p.tags) ? p.tags : [],
       initialStock: 0,
       minStockThreshold: 0,
-      description: p.description,
+      description: p.description || '',
       specification: '',
-      warranty: p.warranty,
+      warranty: p.warranty || '',
       hsnCode: '',
       dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
       customsDeclaration: 'Exempt',
-      primaryVendor: '', vendorSku: '', leadTime: p.leadTime,
+      primaryVendor: '', vendorSku: '', leadTime: p.leadTime || '',
       vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
       trackPerformance: false, performanceRating: 4,
-      specifications: p.specifications || [],
-      generalSpecs: p.generalSpecs || [],
-      images: p.images || [],
-      image: p.images?.[0] || undefined,
+      specifications: Array.isArray(p.specifications) ? p.specifications : [],
+      generalSpecs: Array.isArray(p.generalSpecs) ? p.generalSpecs : [],
+      images: Array.isArray(p.images) ? p.images : [],
+      image: Array.isArray(p.images) ? p.images[0] || undefined : undefined,
     }));
     setItems(stored);
   };
@@ -947,7 +947,7 @@ export default function CatalogUpdatesTab() {
 
   const exportCatalogPDF = () => {
     // Generate a simple printable HTML and open in new window for PDF save
-    const rows = items.map(i => `<tr><td>${i.name}</td><td>${i.sku}</td><td>${i.category}</td><td>${i.brand}</td><td>₹${i.price.toLocaleString()}</td><td>${i.status}</td></tr>`).join('');
+    const rows = items.map(i => `<tr><td>${i.name}</td><td>${i.sku}</td><td>${i.category}</td><td>${i.brand}</td><td>₹${(Number(i.price) || 0).toLocaleString()}</td><td>${i.status}</td></tr>`).join('');
     const html = `<html><head><title>Master Catalogue</title><style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5;font-weight:bold}h1{color:#333}</style></head><body><h1>Master Catalogue</h1><p>Exported on ${new Date().toLocaleDateString()}</p><table><thead><tr><th>Item Name</th><th>SKU</th><th>Category</th><th>Brand</th><th>Price</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
     const win = window.open('', '_blank');
     if (win) { win.document.write(html); win.document.close(); win.print(); }
@@ -1031,14 +1031,15 @@ export default function CatalogUpdatesTab() {
     }
   };
 
-  const getEventIcon = (event: string) => {
-    if (event.includes('Approved')) return <CheckCircle size={15} className="text-emerald-600 shrink-0" />;
-    if (event.includes('Rejected')) return <XCircle size={15} className="text-rose-600 shrink-0" />;
-    if (event.includes('Added') || event.includes('Created')) return <Plus size={15} className="text-blue-600 shrink-0" />;
-    if (event.includes('Price')) return <DollarSign size={15} className="text-amber-600 shrink-0" />;
-    if (event.includes('Archived')) return <Archive size={15} className="text-purple-600 shrink-0" />;
-    if (event.includes('Deleted')) return <Trash2 size={15} className="text-red-600 shrink-0" />;
-    if (event.includes('Bulk')) return <Upload size={15} className="text-indigo-600 shrink-0" />;
+  const getEventIcon = (event?: string) => {
+    const e = typeof event === 'string' ? event : '';
+    if (e.includes('Approved')) return <CheckCircle size={15} className="text-emerald-600 shrink-0" />;
+    if (e.includes('Rejected')) return <XCircle size={15} className="text-rose-600 shrink-0" />;
+    if (e.includes('Added') || e.includes('Created')) return <Plus size={15} className="text-blue-600 shrink-0" />;
+    if (e.includes('Price')) return <DollarSign size={15} className="text-amber-600 shrink-0" />;
+    if (e.includes('Archived')) return <Archive size={15} className="text-purple-600 shrink-0" />;
+    if (e.includes('Deleted')) return <Trash2 size={15} className="text-red-600 shrink-0" />;
+    if (e.includes('Bulk')) return <Upload size={15} className="text-indigo-600 shrink-0" />;
     return <Clock size={15} className="text-gray-500 shrink-0" />;
   };
 
@@ -1602,7 +1603,7 @@ export default function CatalogUpdatesTab() {
                           <TableCell className="text-xs text-gray-700">{item.category}</TableCell>
                           <TableCell className="text-xs text-gray-700">{item.brand || '-'}</TableCell>
                           <TableCell className="text-xs font-semibold text-gray-900">
-                            ₹{item.price.toLocaleString('en-IN')}
+                            ₹{(Number(item.price) || 0).toLocaleString('en-IN')}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -2200,7 +2201,7 @@ export default function CatalogUpdatesTab() {
                 <div><Label className="text-muted-foreground">SKU</Label><p>{viewItem.sku}</p></div>
                 <div><Label className="text-muted-foreground">Category</Label><p>{viewItem.category}</p></div>
                 <div><Label className="text-muted-foreground">Brand</Label><p>{viewItem.brand}</p></div>
-                <div><Label className="text-muted-foreground">Price</Label><p>₹{viewItem.price.toLocaleString()}</p></div>
+                <div><Label className="text-muted-foreground">Price</Label><p>₹{(Number(viewItem.price) || 0).toLocaleString()}</p></div>
                 <div><Label className="text-muted-foreground">Status</Label>
                   <div className="mt-1">
                     {viewItem.publishStatus ? (

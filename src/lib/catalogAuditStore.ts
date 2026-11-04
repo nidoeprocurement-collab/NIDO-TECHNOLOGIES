@@ -58,7 +58,32 @@ export function getCatalogAuditLogs(): CatalogAuditLog[] {
     const raw = localStorage.getItem(AUDIT_STORE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((log): log is Record<string, any> => Boolean(log && typeof log === 'object'))
+      .map((log, index) => ({
+        id: typeof log.id === 'string' && log.id ? log.id : `cal-legacy-${index}`,
+        event: typeof log.event === 'string' ? log.event : String(log.event || 'Updated'),
+        detail: typeof log.detail === 'string' ? log.detail : String(log.detail || ''),
+        itemId: typeof log.itemId === 'string' ? log.itemId : undefined,
+        itemName: typeof log.itemName === 'string' ? log.itemName : undefined,
+        sku: typeof log.sku === 'string' ? log.sku : undefined,
+        user: typeof log.user === 'string' && log.user ? log.user : 'System Owner',
+        date: typeof log.date === 'string' ? log.date : '',
+        timestamp: Number(log.timestamp) || 0,
+        status:
+          log.status === 'Approved' ||
+          log.status === 'Pending' ||
+          log.status === 'Rejected' ||
+          log.status === 'Draft' ||
+          log.status === 'Archived' ||
+          log.status === 'Updated' ||
+          log.status === 'Deleted'
+            ? log.status
+            : 'Updated',
+        previousValue: typeof log.previousValue === 'string' ? log.previousValue : undefined,
+        newValue: typeof log.newValue === 'string' ? log.newValue : undefined,
+      }));
   } catch {
     return [];
   }

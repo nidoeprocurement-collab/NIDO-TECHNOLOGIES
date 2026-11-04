@@ -1,5 +1,12 @@
 import * as React from "react"
 
+interface TabsContextValue {
+  currentValue: string
+  onValueChange: (value: string) => void
+}
+
+const TabsContext = React.createContext<TabsContextValue | undefined>(undefined)
+
 interface TabsProps {
   value?: string
   defaultValue?: string
@@ -13,22 +20,20 @@ const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
     const [internalValue, setInternalValue] = React.useState(defaultValue)
     const currentValue = value ?? internalValue
 
-    const handleValueChange = (newValue: string) => {
-      setInternalValue(newValue)
-      onValueChange?.(newValue)
-    }
+    const handleValueChange = React.useCallback(
+      (newValue: string) => {
+        setInternalValue(newValue)
+        onValueChange?.(newValue)
+      },
+      [onValueChange]
+    )
 
     return (
-      <div ref={ref} className={className} data-value={currentValue}>
-        {React.Children.map(children, (child) =>
-          React.isValidElement(child)
-            ? React.cloneElement(child as React.ReactElement<any>, {
-                currentValue,
-                onValueChange: handleValueChange,
-              })
-            : child
-        )}
-      </div>
+      <TabsContext.Provider value={{ currentValue, onValueChange: handleValueChange }}>
+        <div ref={ref} className={className} data-value={currentValue}>
+          {children}
+        </div>
+      </TabsContext.Provider>
     )
   }
 )
@@ -42,20 +47,13 @@ interface TabsListProps {
 }
 
 const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
-  ({ children, className, currentValue, onValueChange }, ref) => (
+  ({ children, className }, ref) => (
     <div
       ref={ref}
       className={`inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground ${className || ""}`}
       role="tablist"
     >
-      {React.Children.map(children, (child) =>
-        React.isValidElement(child)
-          ? React.cloneElement(child as React.ReactElement<any>, {
-              currentValue,
-              onValueChange,
-            })
-          : child
-      )}
+      {children}
     </div>
   )
 )
@@ -70,19 +68,28 @@ interface TabsTriggerProps {
 }
 
 const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
-  ({ value, children, className, onValueChange, currentValue }, ref) => (
-    <button
-      ref={ref}
-      onClick={() => onValueChange?.(value)}
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-        currentValue === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-      } ${className || ""}`}
-      role="tab"
-      aria-selected={currentValue === value}
-    >
-      {children}
-    </button>
-  )
+  ({ value, children, className, onValueChange, currentValue }, ref) => {
+    const context = React.useContext(TabsContext)
+    const activeValue = currentValue ?? context?.currentValue
+    const handleSelect = onValueChange ?? context?.onValueChange
+    const isActive = activeValue === value
+
+    return (
+      <button
+        ref={ref}
+        type="button"
+        data-state={isActive ? "active" : "inactive"}
+        onClick={() => handleSelect?.(value)}
+        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+          isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+        } ${className || ""}`}
+        role="tab"
+        aria-selected={isActive}
+      >
+        {children}
+      </button>
+    )
+  }
 )
 TabsTrigger.displayName = "TabsTrigger"
 
@@ -94,16 +101,23 @@ interface TabsContentProps {
 }
 
 const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
-  ({ value, children, className, currentValue }, ref) => (
-    <div
-      ref={ref}
-      hidden={currentValue !== value}
-      className={`mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className || ""}`}
-      role="tabpanel"
-    >
-      {children}
-    </div>
-  )
+  ({ value, children, className, currentValue }, ref) => {
+    const context = React.useContext(TabsContext)
+    const activeValue = currentValue ?? context?.currentValue
+    const isActive = activeValue === value
+
+    return (
+      <div
+        ref={ref}
+        hidden={!isActive}
+        data-state={isActive ? "active" : "inactive"}
+        className={`mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className || ""}`}
+        role="tabpanel"
+      >
+        {children}
+      </div>
+    )
+  }
 )
 TabsContent.displayName = "TabsContent"
 

@@ -89,12 +89,51 @@ clearSeedData();
 
 export function getCatalogProducts(): CatalogProduct[] {
   try {
-    const products = JSON.parse(localStorage.getItem(STORE_KEY) || '[]') as CatalogProduct[];
-    return products.map(product => ({
-      ...product,
-      physicalType: product.physicalType?.trim() || 'Physical Product',
-      variations: Array.isArray(product.variations) ? product.variations : [],
-    }));
+    const parsed = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((product): product is Record<string, any> => Boolean(product && typeof product === 'object'))
+      .map((product, index) => ({
+        ...product,
+        id: String(product.id ?? `cat-${index}`),
+        masterProductCode: typeof product.masterProductCode === 'string' ? product.masterProductCode : '',
+        skuCode: typeof product.skuCode === 'string' ? product.skuCode : (typeof product.sku === 'string' ? product.sku : ''),
+        productName:
+          typeof product.productName === 'string' && product.productName.trim()
+            ? product.productName
+            : typeof product.name === 'string' && product.name.trim()
+              ? product.name
+              : 'Untitled Product',
+        productType: typeof product.productType === 'string' ? product.productType : 'Product',
+        physicalType: typeof product.physicalType === 'string' && product.physicalType.trim() ? product.physicalType.trim() : 'Physical Product',
+        category: typeof product.category === 'string' ? product.category : '',
+        subcategory:
+          typeof product.subcategory === 'string'
+            ? product.subcategory
+            : typeof product.subCategory === 'string'
+              ? product.subCategory
+              : '',
+        brand: typeof product.brand === 'string' ? product.brand : '',
+        tags: Array.isArray(product.tags) ? product.tags.filter((t): t is string => typeof t === 'string') : [],
+        description: typeof product.description === 'string' ? product.description : '',
+        specifications: Array.isArray(product.specifications) ? product.specifications : [],
+        generalSpecs: Array.isArray(product.generalSpecs) ? product.generalSpecs : [],
+        variations: Array.isArray(product.variations) ? product.variations : [],
+        productNotes: typeof product.productNotes === 'string' ? product.productNotes : '',
+        videoUrl: typeof product.videoUrl === 'string' ? product.videoUrl : '',
+        images: Array.isArray(product.images) ? product.images.filter((img): img is string => typeof img === 'string') : [],
+        publishStatus:
+          product.publishStatus === 'published' ||
+          product.publishStatus === 'pending' ||
+          product.publishStatus === 'archived' ||
+          product.publishStatus === 'draft'
+            ? product.publishStatus
+            : 'draft',
+        price: Number(product.price) || 0,
+        moq: Number(product.moq) || 0,
+        leadTime: typeof product.leadTime === 'string' ? product.leadTime : '',
+        warranty: typeof product.warranty === 'string' ? product.warranty : '',
+      }));
   } catch {
     return [];
   }

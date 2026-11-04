@@ -685,15 +685,36 @@ function AppRoutes() {
               />
               <Route
                 path="configuration/master-catalogue"
-                element={<MasterCataloguePage />}
+                element={
+                  <PageErrorBoundary
+                    title="Master Catalogue failed to load"
+                    resetKey={location.pathname}
+                  >
+                    <MasterCataloguePage />
+                  </PageErrorBoundary>
+                }
               />
               <Route
                 path="configuration/master-catalogue/add"
-                element={<AddMasterCatalogueItemWrapper />}
+                element={
+                  <PageErrorBoundary
+                    title="Add Master Catalogue Item failed to load"
+                    resetKey={location.pathname}
+                  >
+                    <AddMasterCatalogueItemWrapper />
+                  </PageErrorBoundary>
+                }
               />
               <Route
                 path="configuration/master-catalogue/edit/:itemId"
-                element={<AddMasterCatalogueItemWrapper />}
+                element={
+                  <PageErrorBoundary
+                    title="Edit Master Catalogue Item failed to load"
+                    resetKey={location.pathname}
+                  >
+                    <AddMasterCatalogueItemWrapper />
+                  </PageErrorBoundary>
+                }
               />
               <Route path="integrations" element={<IntegrationsPage />} />
               <Route
