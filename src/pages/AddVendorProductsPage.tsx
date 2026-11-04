@@ -15,6 +15,7 @@ import {
 } from "@/lib/vendorStore";
 import {
   formatLeadTimeByType,
+  getAvailabilityByType,
   getPricingModel,
   getProductType,
   getQuantityLabel,
@@ -308,7 +309,7 @@ function SelectedProductsTable({
 
   return (
     <div className="w-full overflow-x-visible">
-      <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "760px" : "980px" }}>
+      <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "940px" : "980px" }}>
         <thead className="sticky top-0 z-10">
           <tr className="bg-gray-50 border-b border-gray-100">
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
@@ -318,14 +319,17 @@ function SelectedProductsTable({
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
               <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
             </th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <span className="flex items-center gap-1">{isDigitalTab ? "Variations" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
-            </th>
-            {!isDigitalTab && (
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                <span className="flex items-center gap-1">Stock <Info className="w-3 h-3 text-gray-400" /></span>
+            {isDigitalTab && (
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                <span className="flex items-center gap-1">Variations <Info className="w-3 h-3 text-gray-400" /></span>
               </th>
             )}
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <span className="flex items-center gap-1">{isDigitalTab ? "MOQ / Min Qty" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <span className="flex items-center gap-1">{isDigitalTab ? "Availability" : "Stock"} <Info className="w-3 h-3 text-gray-400" /></span>
+            </th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
               {isDigitalTab ? "Provisioning Time" : "Lead Time"}
             </th>
@@ -336,6 +340,7 @@ function SelectedProductsTable({
           {rows.map((row) => {
             const type = selectedProductType(row.catalogProduct);
             const digital = isDigitalOnlyType(type);
+            const availability = getAvailabilityByType(parseInt(row.stock || "0", 10) || 0, type);
             const formattedLeadTime = formatLeadTimeByType(row.leadTime, type);
 
             return (
@@ -377,33 +382,40 @@ function SelectedProductsTable({
                     />
                   )}
                 </td>
-                <td className="px-3 py-3">
-                  {digital ? (
+                {isDigitalTab && (
+                  <td className="px-3 py-3">
                     <button
                       type="button"
                       onClick={() => editVariations(row)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 whitespace-nowrap"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {row.variations.length > 0 ? `Edit (${row.variations.length})` : "Add Variations"}
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min={0}
-                        step="1"
-                        value={row.moq}
-                        onChange={(e) => updateRow(row.catalogProduct.id, "moq", e.target.value)}
-                        placeholder="0"
-                        className="w-full min-w-[56px] max-w-[76px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-[10px] text-gray-500">{getQuantityLabel(type)}</span>
-                    </div>
-                  )}
+                  </td>
+                )}
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={row.moq}
+                      onChange={(e) => updateRow(row.catalogProduct.id, "moq", e.target.value)}
+                      placeholder="1"
+                      aria-label={`${row.catalogProduct.productName} MOQ`}
+                      className="w-full min-w-[56px] max-w-[76px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-[10px] text-gray-500 whitespace-nowrap">{getQuantityLabel(type)}</span>
+                  </div>
                 </td>
-                {!isDigitalTab && (
-                  <td className="px-3 py-3">
+                <td className="px-3 py-3">
+                  {digital ? (
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-xs text-gray-800">{availability.primary}</div>
+                      <div className="text-[10px] font-medium text-emerald-600">Instant</div>
+                    </div>
+                  ) : (
                     <input
                       type="number"
                       min={0}
@@ -413,8 +425,8 @@ function SelectedProductsTable({
                       placeholder="0"
                       className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                  </td>
-                )}
+                  )}
+                </td>
                 <td className="px-3 py-3">
                   <div className="space-y-1">
                     <input
@@ -557,8 +569,37 @@ export default function AddVendorProductsPage() {
     if (!isEditMode || !editProductId) return;
     const existing = getVendorProducts(vendorId).find((p) => p.id === editProductId);
     if (!existing) return;
-    const catalogProduct = getCatalogProducts().find((p) => p.id === editProductId);
-    if (!catalogProduct) return;
+    const allCatalog = getCatalogProducts();
+    const catalogProduct: CatalogProduct =
+      allCatalog.find(
+        (p) =>
+          p.id === editProductId ||
+          (existing.masterProductCode &&
+            p.masterProductCode.toLowerCase() === existing.masterProductCode.toLowerCase())
+      ) || {
+        id: existing.id,
+        masterProductCode: existing.masterProductCode || "",
+        skuCode: existing.skuCode || "",
+        productName: existing.productName,
+        productType: existing.physicalType || "Physical Product",
+        physicalType: existing.physicalType || "Physical Product",
+        category: existing.category || "General",
+        subcategory: "",
+        brand: existing.brand || "",
+        tags: [],
+        description: "",
+        specifications: [],
+        generalSpecs: [],
+        variations: existing.variations || [],
+        productNotes: "",
+        videoUrl: "",
+        images: existing.images || [],
+        publishStatus: "published",
+        price: Number(existing.price) || 0,
+        moq: Number(existing.moq) || 1,
+        leadTime: Number(existing.leadTime) || 0,
+        warranty: "",
+      };
     setSelectedIds(new Set([editProductId]));
     setSelectedProductTab(isDigitalCatalogProduct(catalogProduct) ? "digital" : "physical");
     setSelectedRows([{
@@ -692,8 +733,8 @@ export default function AddVendorProductsPage() {
           missing.push("Price / Unit");
         }
       }
-      if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.moq || row.moq.trim() === "")) {
-        missing.push("MOQ");
+      if (!row.moq || row.moq.trim() === "" || Number(row.moq) <= 0) {
+        missing.push(isDigitalCatalogProduct(row.catalogProduct) ? "MOQ / Min Qty" : "MOQ");
       }
       if (!row.leadTime || row.leadTime.trim() === "") missing.push("Lead Time");
       if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.stock || row.stock.trim() === "")) {
@@ -1062,9 +1103,19 @@ export default function AddVendorProductsPage() {
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-gray-400">
-                        {isDigitalCatalogProduct(row.catalogProduct) ? "Users / Licenses" : "Units / MOQ"}
+                        {isDigitalCatalogProduct(row.catalogProduct) ? "MOQ / Min Qty" : "Units / MOQ"}
                       </p>
-                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.moq}</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                        {row.moq} {getQuantityLabel(selectedProductType(row.catalogProduct))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                        {isDigitalCatalogProduct(row.catalogProduct) ? "Availability" : "Stock"}
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                        {isDigitalCatalogProduct(row.catalogProduct) ? "Unlimited · Instant" : row.stock}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-gray-400">
@@ -1074,12 +1125,6 @@ export default function AddVendorProductsPage() {
                         {formatLeadTimeByType(row.leadTime, selectedProductType(row.catalogProduct)).primary}
                       </p>
                     </div>
-                    {!isDigitalCatalogProduct(row.catalogProduct) && (
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Stock</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.stock}</p>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
