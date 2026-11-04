@@ -739,12 +739,13 @@ export default function AddClient() {
             sizeKb > 1024
               ? `${(sizeKb / 1024).toFixed(1)} MB`
               : `${Math.round(sizeKb)} KB`;
-          saveClientDocument(formData.client_id, {
+          saveClientDocument({
+            clientId: formData.client_id,
             id: `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: file.name,
             category: "Compliance",
             uploadedBy: formData.contact_person || "Admin",
-            uploadedAt: todayStr,
+            uploadedOn: todayStr,
             size: sizeStr,
             type: ext,
           });

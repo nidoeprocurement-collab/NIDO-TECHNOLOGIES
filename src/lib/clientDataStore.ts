@@ -159,6 +159,8 @@ export interface ClientDocumentRecord {
   uploadedBy: string;
   uploadedOn: string;
   archived?: boolean;
+  category?: string;
+  uploadedAt?: string;
   /** Persisted data URL for browser-only document uploads. */
   fileData?: string;
 }
@@ -266,7 +268,8 @@ export function getClientDocuments(clientId: string): ClientDocumentRecord[] {
   return read<ClientDocumentRecord[]>(DOCUMENTS_KEY, []).filter((item) => matchesClient(item, clientId));
 }
 
-export function saveClientDocument(document: ClientDocumentRecord): void {
+export function saveClientDocument(documentOrClientId: ClientDocumentRecord | string, maybeDoc?: Partial<ClientDocumentRecord> & { uploadedAt?: string; category?: string }): void {
+  const document: ClientDocumentRecord = typeof documentOrClientId === "string" && maybeDoc ? { id: String(maybeDoc.id || ""), clientId: documentOrClientId, name: String(maybeDoc.name || ""), type: String(maybeDoc.type || ""), size: String(maybeDoc.size || ""), uploadedBy: String(maybeDoc.uploadedBy || ""), uploadedOn: String(maybeDoc.uploadedOn || maybeDoc.uploadedAt || ""), archived: maybeDoc.archived, fileData: maybeDoc.fileData } : (documentOrClientId as ClientDocumentRecord);
   const all = read<ClientDocumentRecord[]>(DOCUMENTS_KEY, []);
   write(DOCUMENTS_KEY, [document, ...all.filter((item) => item.id !== document.id)]);
 }
