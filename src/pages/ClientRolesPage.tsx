@@ -1,13 +1,13 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
 import { MoreVertical, X } from "lucide-react";
+import { toast } from "sonner";
 import { ModuleMultiSelect } from "@/components/ModuleMultiSelect";
 import {
   createPortalRolePermission,
   getPortalModuleDescription,
   getPortalRoles,
   getPortalUsersByClient,
-  PORTAL_MODULE_CATALOG,
   PORTAL_MODULES,
   savePortalRoles,
   updatePortalUser,
@@ -30,7 +30,18 @@ function csvEscape(value: string | boolean): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function parseCsv(text: string): string[][] {
+function parseCsv(rawText: string): string[][] {
+  const text = rawText.replace(/^\uFEFF/, "");
+  const firstLine = text.split(/\r?\n/, 1)[0] || "";
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const semiCount = (firstLine.match(/;/g) || []).length;
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const delimiter = tabCount > commaCount && tabCount > semiCount
+    ? "\t"
+    : semiCount > commaCount
+      ? ";"
+      : ",";
+
   const rows: string[][] = [];
   let row: string[] = [];
   let value = "";
@@ -44,7 +55,7 @@ function parseCsv(text: string): string[][] {
       index += 1;
     } else if (character === '"') {
       quoted = !quoted;
-    } else if (character === "," && !quoted) {
+    } else if (character === delimiter && !quoted) {
       row.push(value.trim());
       value = "";
     } else if ((character === "\n" || character === "\r") && !quoted) {
@@ -66,15 +77,113 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-function parseCsvBoolean(value: string, rowNumber: number, column: string): boolean {
+function normalizeCsvHeader(cell: string): string {
+  const cleaned = cell
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  switch (cleaned) {
+    case "role":
+    case "rolename":
+    case "name":
+    case "role_title":
+      return "role_name";
+    case "role_description":
+    case "desc":
+    case "details":
+      return "description";
+    case "role_status":
+    case "state":
+      return "status";
+    case "module_name":
+    case "modulename":
+    case "module_key":
+    case "page":
+      return "module";
+    case "moduledescription":
+    case "module_details":
+      return "module_description";
+    default:
+      return cleaned;
+  }
+}
+
+const MODULE_ALIASES: Record<string, string> = {
+  dashboard: "Dashboard",
+  home: "Dashboard",
+  catalog: "Catalog",
+  catalogue: "Catalog",
+  products: "Catalog",
+  product_catalog: "Catalog",
+  orders: "Orders",
+  order: "Orders",
+  my_orders: "Orders",
+  approvals: "Approvals",
+  approval: "Approvals",
+  services: "Services",
+  service: "Services",
+  my_services: "Services",
+  invoices: "Invoices",
+  invoice: "Invoices",
+  billing: "Invoices",
+  reports: "Reports",
+  report: "Reports",
+  notifications: "Notifications",
+  notification: "Notifications",
+  addresses: "Addresses",
+  address: "Addresses",
+  contracts: "Contracts",
+  contract: "Contracts",
+  support: "Support",
+  support_tickets: "Support",
+  tickets: "Support",
+  my_profile: "My Profile",
+  profile: "My Profile",
+};
+
+function resolvePortalModule(rawModule: string): string {
+  const trimmed = rawModule.trim();
+  if (!trimmed) return "";
+  const exact = PORTAL_MODULES.find(m => m.toLowerCase() === trimmed.toLowerCase());
+  if (exact) return exact;
+  const aliasKey = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return MODULE_ALIASES[aliasKey] || trimmed;
+}
+
+function parseCsvBoolean(value: string): boolean {
   const normalized = value.trim().toLowerCase();
-  if (["true", "yes", "1"].includes(normalized)) return true;
-  if (["false", "no", "0", ""].includes(normalized)) return false;
-  throw new Error(`Row ${rowNumber}: ${column} must be true or false.`);
+  if (["true", "yes", "y", "1", "t", "x", "✓", "✔", "enabled", "allow", "allowed", "active"].includes(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+function parseCsvStatus(value: string): "active" | "inactive" {
+  const normalized = value.trim().toLowerCase();
+  if (["inactive", "disabled", "false", "no", "0", "deactivated"].includes(normalized)) {
+    return "inactive";
+  }
+  return "active";
+}
+
+function readCsvFileText(file: File): Promise<string> {
+  if (typeof file.text === "function") {
+    return file.text();
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error || new Error("Could not read CSV file."));
+    reader.readAsText(file);
+  });
 }
 
 function downloadCsv(filename: string, rows: string[][]): void {
-  const blob = new Blob([rows.map(row => row.join(",")).join("\r\n")], {
+  const content = `${rows.map(row => row.join(",")).join("\r\n")}\r\n`;
+  const blob = new Blob([content], {
     type: "text/csv;charset=utf-8;",
   });
   const url = URL.createObjectURL(blob);
@@ -272,17 +381,17 @@ export default function ClientRolesPage() {
     if (!file) return;
 
     try {
-      const rows = parseCsv(await file.text());
-      if (rows.length < 2) throw new Error("The CSV must contain a header and at least one role row.");
+      const rows = parseCsv(await readCsvFileText(file));
+      if (rows.length < 2) {
+        throw new Error("The CSV template is empty. Please add at least one role row below the header before uploading.");
+      }
 
-      const header = rows[0].map(cell => cell.toLowerCase());
-      const missingColumns = CLIENT_PERMISSION_CSV_COLUMNS.filter(column => !header.includes(column));
-      if (missingColumns.length > 0) {
-        throw new Error(`Missing CSV columns: ${missingColumns.join(", ")}.`);
+      const header = rows[0].map(normalizeCsvHeader);
+      if (!header.includes("role_name")) {
+        throw new Error("Missing required CSV column: role_name.");
       }
 
       const columnIndex = Object.fromEntries(header.map((column, index) => [column, index]));
-      const moduleByName = new Map(PORTAL_MODULES.map(module => [module.toLowerCase(), module]));
       const imported = new Map<string, {
         name: string;
         description: string;
@@ -290,43 +399,61 @@ export default function ClientRolesPage() {
         permissions: Map<string, PortalRolePermission>;
       }>();
 
-      rows.slice(1).forEach((cells, index) => {
-        const rowNumber = index + 2;
-        const roleName = cells[columnIndex.role_name]?.trim();
-        const rawModule = (cells[columnIndex.module] || "").trim();
-        const moduleName = rawModule ? moduleByName.get(rawModule.toLowerCase()) : undefined;
-        if (!roleName) throw new Error(`Row ${rowNumber}: role_name is required.`);
-        if (rawModule && !moduleName) {
-          throw new Error(`Row ${rowNumber}: module must be one of ${PORTAL_MODULES.join(", ")}.`);
-        }
+      let lastRoleName = "";
 
-        const rawStatus = (cells[columnIndex.status] || "active").trim().toLowerCase();
-        if (rawStatus !== "active" && rawStatus !== "inactive") {
-          throw new Error(`Row ${rowNumber}: status must be active or inactive.`);
-        }
+      rows.slice(1).forEach((cells) => {
+        if (!cells.some(cell => cell.trim().length > 0)) return;
 
-        const permission = createPortalRolePermission(moduleName || "", Object.fromEntries(
-          CLIENT_ACTIONS.map(action => [
-            action,
-            parseCsvBoolean(cells[columnIndex[action]] || "", rowNumber, action),
-          ]),
-        ) as Partial<PortalRolePermission>);
-        if (!moduleName && CLIENT_ACTIONS.some(action => permission[action])) {
-          throw new Error(`Row ${rowNumber}: a module is required when permissions are enabled.`);
-        }
+        const explicitRoleName = columnIndex.role_name !== undefined
+          ? (cells[columnIndex.role_name] || "").trim()
+          : "";
+        const roleName = explicitRoleName || lastRoleName;
+        if (!roleName) return;
+        lastRoleName = roleName;
+
+        const rawModule = columnIndex.module !== undefined
+          ? (cells[columnIndex.module] || "").trim()
+          : "";
+        const moduleName = resolvePortalModule(rawModule);
+
+        const rawStatus = columnIndex.status !== undefined
+          ? (cells[columnIndex.status] || "").trim()
+          : "";
+        const status = rawStatus ? parseCsvStatus(rawStatus) : undefined;
+
+        const rawDescription = columnIndex.description !== undefined
+          ? (cells[columnIndex.description] || "").trim()
+          : "";
 
         const roleKey = roleName.toLowerCase();
         const current = imported.get(roleKey) || {
           name: roleName,
-          description: cells[columnIndex.description]?.trim() || "",
-          status: rawStatus as "active" | "inactive",
+          description: rawDescription,
+          status: status || "active",
           permissions: new Map<string, PortalRolePermission>(),
         };
-        current.description = cells[columnIndex.description]?.trim() || current.description;
-        current.status = rawStatus as "active" | "inactive";
-        if (moduleName) current.permissions.set(moduleName, permission);
+
+        if (rawDescription) current.description = rawDescription;
+        if (status) current.status = status;
+
+        if (moduleName) {
+          const permission = createPortalRolePermission(moduleName, Object.fromEntries(
+            CLIENT_ACTIONS.map(action => [
+              action,
+              columnIndex[action] !== undefined
+                ? parseCsvBoolean(cells[columnIndex[action]] || "")
+                : false,
+            ]),
+          ) as Partial<PortalRolePermission>);
+          current.permissions.set(moduleName, permission);
+        }
+
         imported.set(roleKey, current);
       });
+
+      if (imported.size === 0) {
+        throw new Error("No valid role rows were found in the CSV file.");
+      }
 
       const existingByName = new Map(roles.map(role => [role.name.toLowerCase(), role]));
       const importedRoles = Array.from(imported.values()).map((incoming, index) => {
@@ -336,26 +463,19 @@ export default function ClientRolesPage() {
           name: incoming.name,
           description: incoming.description,
           status: incoming.status,
-          permissions: [...incoming.permissions.values()].filter(permission =>
-            CLIENT_ACTIONS.some(action => permission[action]),
-          ),
+          permissions: [...incoming.permissions.values()],
         };
       });
-
-      const updateCount = importedRoles.filter(role => existingByName.has(role.name.toLowerCase())).length;
-      const createCount = importedRoles.length - updateCount;
-      if (!window.confirm(
-        `Import ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} (${createCount} new, ${updateCount} updated)? Existing role permissions will be replaced by the CSV values.`,
-      )) return;
 
       const importedByName = new Map(importedRoles.map(role => [role.name.toLowerCase(), role]));
       const untouchedRoles = roles.filter(role => !importedByName.has(role.name.toLowerCase()));
       const nextRoles = [...untouchedRoles, ...importedRoles];
       persist(nextRoles);
       setSelectedId(importedRoles[0]?.id || selectedId);
-      window.alert(`Imported ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} successfully.`);
+      toast.success(`Imported ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} successfully.`);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Could not import the CSV file.");
+      const message = error instanceof Error ? error.message : "Could not import the CSV file.";
+      toast.error(message);
     }
   };
 

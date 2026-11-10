@@ -40,7 +40,18 @@ function csvEscape(value: string | boolean): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-function parseCsv(text: string): string[][] {
+function parseCsv(rawText: string): string[][] {
+  const text = rawText.replace(/^\uFEFF/, "")
+  const firstLine = text.split(/\r?\n/, 1)[0] || ""
+  const commaCount = (firstLine.match(/,/g) || []).length
+  const semiCount = (firstLine.match(/;/g) || []).length
+  const tabCount = (firstLine.match(/\t/g) || []).length
+  const delimiter = tabCount > commaCount && tabCount > semiCount
+    ? "\t"
+    : semiCount > commaCount
+      ? ";"
+      : ","
+
   const rows: string[][] = []
   let row: string[] = []
   let value = ""
@@ -54,7 +65,7 @@ function parseCsv(text: string): string[][] {
       index += 1
     } else if (character === '"') {
       quoted = !quoted
-    } else if (character === "," && !quoted) {
+    } else if (character === delimiter && !quoted) {
       row.push(value.trim())
       value = ""
     } else if ((character === "\n" || character === "\r") && !quoted) {
@@ -76,11 +87,47 @@ function parseCsv(text: string): string[][] {
   return rows
 }
 
-function parseCsvBoolean(value: string, rowNumber: number, column: string): boolean {
+function normalizeNidoCsvHeader(cell: string): string {
+  const cleaned = cell
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+
+  switch (cleaned) {
+    case "role":
+    case "rolename":
+    case "name":
+      return "role_name"
+    case "role_description":
+    case "desc":
+      return "description"
+    case "role_status":
+      return "status"
+    case "modulekey":
+      return "module_key"
+    case "module_name":
+    case "modulename":
+      return "module"
+    case "moduledescription":
+      return "module_description"
+    default:
+      return cleaned
+  }
+}
+
+function parseCsvBoolean(value: string): boolean {
   const normalized = value.trim().toLowerCase()
-  if (["true", "yes", "1"].includes(normalized)) return true
-  if (["false", "no", "0", ""].includes(normalized)) return false
-  throw new Error(`Row ${rowNumber}: ${column} must be true or false.`)
+  return ["true", "yes", "y", "1", "t", "x", "✓", "✔", "enabled", "allow", "allowed", "active"].includes(normalized)
+}
+
+function parseNidoCsvStatus(value: string): "Active" | "Inactive" {
+  const normalized = value.trim().toLowerCase()
+  if (["inactive", "disabled", "false", "no", "0", "deactivated"].includes(normalized)) {
+    return "Inactive"
+  }
+  return "Active"
 }
 
 export default function NidoUsersPage() {
@@ -226,11 +273,12 @@ export default function NidoUsersPage() {
 
     try {
       const rows = parseCsv(await file.text())
-      if (rows.length < 2) throw new Error("The CSV must contain a header and at least one permission row.")
+      if (rows.length < 2) throw new Error("The CSV template is empty. Please add at least one role row below the header before uploading.")
 
-      const header = rows[0].map(cell => cell.replace(/^\uFEFF/, "").toLowerCase())
-      const missingColumns = NIDO_PERMISSION_CSV_COLUMNS.filter(column => !header.includes(column))
-      if (missingColumns.length > 0) throw new Error(`Missing CSV columns: ${missingColumns.join(", ")}.`)
+      const header = rows[0].map(normalizeNidoCsvHeader)
+      if (!header.includes("role_name")) {
+        throw new Error("Missing required CSV column: role_name.")
+      }
       const columnIndex = Object.fromEntries(header.map((column, index) => [column, index])) as Record<string, number>
       const moduleByKey = new Map(ROLE_PERMISSION_MODULE_OPTIONS.map(module => [module.key.toLowerCase(), module]))
       const moduleByLabel = new Map(ROLE_PERMISSION_MODULE_OPTIONS.map(module => [module.label.toLowerCase(), module]))
@@ -241,52 +289,70 @@ export default function NidoUsersPage() {
         permissions: Record<string, ModulePermissions>
       }>()
 
-      rows.slice(1).forEach((cells, index) => {
-        const rowNumber = index + 2
-        const roleName = cells[columnIndex.role_name]?.trim()
-        const moduleValue = (cells[columnIndex.module_key] || cells[columnIndex.module] || "").trim().toLowerCase()
-        const module = moduleByKey.get(moduleValue) || moduleByLabel.get(moduleValue)
-        if (!roleName) throw new Error(`Row ${rowNumber}: role_name is required.`)
-        if (!module) throw new Error(`Row ${rowNumber}: module_key or module is not a valid platform module.`)
+      let lastRoleName = ""
+
+      rows.slice(1).forEach((cells) => {
+        if (!cells.some(cell => cell.trim().length > 0)) return
+
+        const explicitRoleName = columnIndex.role_name !== undefined
+          ? (cells[columnIndex.role_name] || "").trim()
+          : ""
+        const roleName = explicitRoleName || lastRoleName
+        if (!roleName) return
+        lastRoleName = roleName
+
         if (roleName.toLowerCase() === "system owner") {
           throw new Error("System Owner cannot be changed through bulk upload.")
         }
 
-        const rawStatus = (cells[columnIndex.status] || "Active").trim().toLowerCase()
-        if (rawStatus !== "active" && rawStatus !== "inactive") {
-          throw new Error(`Row ${rowNumber}: status must be Active or Inactive.`)
-        }
+        const rawStatus = columnIndex.status !== undefined
+          ? (cells[columnIndex.status] || "").trim()
+          : ""
+        const status = rawStatus ? parseNidoCsvStatus(rawStatus) : undefined
+        const rawDescription = columnIndex.description !== undefined
+          ? (cells[columnIndex.description] || "").trim()
+          : ""
+
         const roleKey = roleName.toLowerCase()
         const current = imported.get(roleKey) || {
           name: roleName,
-          description: cells[columnIndex.description]?.trim() || "",
-          status: rawStatus === "active" ? "Active" : "Inactive",
+          description: rawDescription,
+          status: status || "Active",
           permissions: {},
         }
-        if (current.permissions[module.key]) {
-          throw new Error(`Row ${rowNumber}: duplicate permission row for ${roleName} and ${module.label}.`)
+        if (rawDescription) current.description = rawDescription
+        if (status) current.status = status
+
+        const moduleKeyRaw = columnIndex.module_key !== undefined
+          ? (cells[columnIndex.module_key] || "").trim()
+          : ""
+        const moduleLabelRaw = columnIndex.module !== undefined
+          ? (cells[columnIndex.module] || "").trim()
+          : ""
+        const module =
+          moduleByKey.get(moduleKeyRaw.toLowerCase()) ||
+          moduleByLabel.get(moduleKeyRaw.toLowerCase()) ||
+          moduleByKey.get(moduleLabelRaw.toLowerCase()) ||
+          moduleByLabel.get(moduleLabelRaw.toLowerCase())
+
+        if (module) {
+          const permissions: ModulePermissions = {}
+          ACTIONS.forEach(action => {
+            permissions[action.key] = columnIndex[action.key] !== undefined
+              ? parseCsvBoolean(cells[columnIndex[action.key]] || "")
+              : false
+          })
+          current.permissions[module.key] = permissions
         }
-        const permissions: ModulePermissions = {}
-        ACTIONS.forEach(action => {
-          permissions[action.key] = parseCsvBoolean(
-            cells[columnIndex[action.key]] || "",
-            rowNumber,
-            action.key,
-          )
-        })
-        current.description = cells[columnIndex.description]?.trim() || current.description
-        current.status = rawStatus === "active" ? "Active" : "Inactive"
-        current.permissions[module.key] = permissions
         imported.set(roleKey, current)
       })
 
+      if (imported.size === 0) {
+        throw new Error("No valid role rows were found in the CSV file.")
+      }
+
       const existingByName = new Map(roles.map(role => [role.name.toLowerCase(), role]))
       const importedRoles = Array.from(imported.values())
-      const updateCount = importedRoles.filter(role => existingByName.has(role.name.toLowerCase())).length
-      const createCount = importedRoles.length - updateCount
-      if (!window.confirm(
-        `Import ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} (${createCount} new, ${updateCount} updated)? Existing role permissions will be replaced by the CSV values.`,
-      )) return
 
       importedRoles.forEach(incoming => {
         const existing = existingByName.get(incoming.name.toLowerCase())

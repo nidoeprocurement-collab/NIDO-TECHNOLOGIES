@@ -127,4 +127,49 @@ describe("client role module editor", () => {
       anchorClickSpy.mockRestore();
     }
   });
+
+  it("bulk uploads a CSV matching the downloaded template format and persists roles and permissions", async () => {
+    render(
+      <MemoryRouter initialEntries={[`/clients/${clientId}/roles`]}>
+        <Routes>
+          <Route path="/clients/:id/roles" element={<ClientRolesPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const csvContent = [
+      "\uFEFFrole_name,description,status,module,module_description,view,create,edit,delete,approve,export,import,manage,configure",
+      "Procurement Manager,Approves purchase orders,Active,Dashboard,View dashboard,true,false,false,false,false,false,false,false,false",
+      "Procurement Manager,Approves purchase orders,Active,Orders,Manage orders,true,true,true,false,true,true,false,false,false",
+      ",,,Approvals,,yes,0,false,false,1,false,false,false,false",
+      "Read Only Auditor,Reviews invoices only,Active,Invoices,,false,false,false,false,false,false,false,false,false",
+    ].join("\r\n");
+
+    fireEvent.click(screen.getByRole("button", { name: "Role and permission actions" }));
+
+    const file = new File([csvContent], "client-role-permissions-template.csv", { type: "text/csv" });
+    const fileInput = screen.getByLabelText("Bulk Upload CSV") as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      const roles = getPortalRoles(clientId);
+      expect(roles).toHaveLength(2);
+    });
+
+    const savedRoles = getPortalRoles(clientId);
+    const procurementRole = savedRoles.find(r => r.name === "Procurement Manager");
+    expect(procurementRole).toBeDefined();
+    expect(procurementRole?.status).toBe("active");
+    expect(procurementRole?.description).toBe("Approves purchase orders");
+    expect(procurementRole?.permissions).toHaveLength(3);
+    expect(hasPortalPermission(clientId, "Procurement Manager", "Orders", "approve")).toBe(true);
+    expect(hasPortalPermission(clientId, "Procurement Manager", "Approvals", "view")).toBe(true);
+    expect(hasPortalPermission(clientId, "Procurement Manager", "Approvals", "approve")).toBe(true);
+
+    const auditorRole = savedRoles.find(r => r.name === "Read Only Auditor");
+    expect(auditorRole).toBeDefined();
+    expect(auditorRole?.permissions.map(p => p.module)).toEqual(["Invoices"]);
+  });
 });
