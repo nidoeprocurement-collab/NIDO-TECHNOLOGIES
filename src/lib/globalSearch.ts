@@ -160,6 +160,7 @@ const RECORD_SOURCES: SearchRecordSource[] = [
 const COVERED_STORAGE_KEYS = new Set([
   "nido_clients_v2",
   "nido_clients_archived_v1",
+  "nido_vendors_v2",
   "nido_catalog_products",
   "nido_vendor_products",
   "nido_my_orders",

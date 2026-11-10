@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useCart, type CartItem } from "@/contexts/CartContext";
 import { releaseVendorReservation, getAllVendorProducts } from "@/lib/vendorStore";
+import { getVendors } from "@/lib/vendorDataStore";
 import {
   getSlabDiscountPct,
   getClientCartPricingSettings,
@@ -382,13 +383,17 @@ function VendorSwitchModal({
 }) {
   const comps = computeVendorComparisons(item.productCode || "", item.category);
 
-  const fallbackVendors = [
-    { vendorId: "VND-1001", vendorName: "GreenLeaf Supplies", basePrice: item.vendorPrice || item.priceNum, rating: 4.8, leadTime: 2 },
-    { vendorId: "VND-1002", vendorName: "InfoTech Pvt. Ltd.", basePrice: Math.round((item.vendorPrice || item.priceNum) * 1.02), rating: 4.9, leadTime: 1 },
-    { vendorId: "VND-1003", vendorName: "Logistics Express", basePrice: Math.round((item.vendorPrice || item.priceNum) * 1.05), rating: 4.7, leadTime: 3 },
-  ];
+  const liveActiveVendors = getVendors()
+    .filter((v) => !v.archived && v.status !== "Inactive")
+    .map((v) => ({
+      vendorId: v.id,
+      vendorName: v.name,
+      basePrice: item.vendorPrice || item.priceNum,
+      rating: v.rating || 0,
+      leadTime: 3,
+    }));
 
-  const vendorsList = comps.length > 0 ? comps : fallbackVendors;
+  const vendorsList = comps.length > 0 ? comps : liveActiveVendors;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -404,7 +409,11 @@ function VendorSwitchModal({
         </div>
 
         <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-          {vendorsList.map((v) => {
+          {vendorsList.length === 0 ? (
+            <div className="py-8 px-4 text-center text-xs text-gray-500 border border-dashed border-gray-200 rounded-xl">
+              No active vendors available. Onboard a vendor in Vendor Management to assign here.
+            </div>
+          ) : vendorsList.map((v) => {
             const isSelected = item.selectedVendorId === v.vendorId || item.selectedVendorName === v.vendorName;
             return (
               <div
@@ -626,6 +635,10 @@ export default function CartPage() {
 
   // Load sample items matching screenshot if cart is empty
   const handleLoadSampleItems = () => {
+    const activeVendors = getVendors().filter((v) => !v.archived && v.status !== "Inactive");
+    const v0 = activeVendors[0];
+    const v1 = activeVendors[1] ?? v0;
+    const v2 = activeVendors[2] ?? v0;
     const sampleItems = [
       {
         id: Date.now() + 1,
@@ -641,8 +654,8 @@ export default function CartPage() {
         productType: "Digital License",
         physicalType: "Digital License",
         fulfillmentType: "digital" as const,
-        selectedVendorId: "VND-1001",
-        selectedVendorName: "GreenLeaf Supplies",
+        selectedVendorId: v0?.id || "",
+        selectedVendorName: v0?.name || "Unassigned Vendor",
         vendorPrice: 15300,
         clientSellingPriceExclGst: 15300,
         configuration: {
@@ -667,8 +680,8 @@ export default function CartPage() {
         productType: "Cloud Service",
         physicalType: "Cloud Service",
         fulfillmentType: "digital" as const,
-        selectedVendorId: "VND-1001",
-        selectedVendorName: "GreenLeaf Supplies",
+        selectedVendorId: v0?.id || "",
+        selectedVendorName: v0?.name || "Unassigned Vendor",
         vendorPrice: 8940.88,
         clientSellingPriceExclGst: 8940.88,
         configuration: {
@@ -692,8 +705,8 @@ export default function CartPage() {
         productType: "Digital License",
         physicalType: "Digital License",
         fulfillmentType: "digital" as const,
-        selectedVendorId: "VND-1002",
-        selectedVendorName: "InfoTech Pvt. Ltd.",
+        selectedVendorId: v1?.id || "",
+        selectedVendorName: v1?.name || "Unassigned Vendor",
         vendorPrice: 3118.96,
         clientSellingPriceExclGst: 3118.96,
         configuration: {
@@ -718,8 +731,8 @@ export default function CartPage() {
         productType: "Cloud Service",
         physicalType: "Cloud Service",
         fulfillmentType: "digital" as const,
-        selectedVendorId: "VND-1003",
-        selectedVendorName: "Logistics Express",
+        selectedVendorId: v2?.id || "",
+        selectedVendorName: v2?.name || "Unassigned Vendor",
         vendorPrice: 20337.20,
         clientSellingPriceExclGst: 20337.20,
         configuration: {

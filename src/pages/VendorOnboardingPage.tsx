@@ -153,7 +153,7 @@ export default function AddVendorPage() {
   const qualityCertificationsBase = ['CE Certified', 'RoHS Compliant', 'BIS Certified', 'UL Certified', 'FCC Certified', 'Others'];
   const environmentalCertificationsBase = ['ISO 14001', 'ISO 50001', 'Green Building', 'LEED Certified', 'Others'];
   const blacklistedBase = ['No', 'Under Review', 'Yes'];
-  const contractStatusesBase = ['Active', 'Inactive', 'Expired', 'Terminated', 'Under Review'];
+  const contractStatusesBase = ['Active', 'Pending', 'On Hold', 'Inactive', 'Expired', 'Terminated', 'Under Review'];
   const preferredBase = ['Yes', 'No'];
   const visibilityOptionsBase = ['Internal Only', 'Procurement Team', 'Finance Team', 'Management', 'All Users'];
 
@@ -387,6 +387,14 @@ export default function AddVendorPage() {
     const onboardedDate = formData.onboardingDate
       ? new Date(`${formData.onboardingDate}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
       : today;
+    const mappedStatus: 'Active' | 'Pending' | 'On Hold' | 'Inactive' =
+      formData.blacklisted === 'Yes' || formData.contractStatus === 'Inactive' || formData.contractStatus === 'Expired' || formData.contractStatus === 'Terminated'
+        ? 'Inactive'
+        : formData.blacklisted === 'Under Review' || formData.contractStatus === 'On Hold'
+          ? 'On Hold'
+          : formData.contractStatus === 'Pending' || formData.contractStatus === 'Under Review'
+            ? 'Pending'
+            : 'Active';
     addVendor({
       id: newId,
       ...getVendorCreationAuditFields(currentAuthenticatedUser),
@@ -409,7 +417,7 @@ export default function AddVendorPage() {
       alternateEmail: formData.alternateEmail,
       rating,
        region: addressDetails.billing.state || addressDetails.billing.country || '',
-      status: 'Pending',
+      status: mappedStatus,
       onboardedDate,
       monthSpend: 0,
       score: rating,
@@ -481,6 +489,7 @@ export default function AddVendorPage() {
       performanceCompliance: 0,
     });
 
+    toast.success(`Vendor "${formData.vendorName}" (${newId}) onboarded successfully`);
     navigate('/vendors');
   };
 
