@@ -176,16 +176,7 @@ export default function NidoUsersPage() {
   const downloadNidoPermissionsTemplate = () => {
     setShowRoleActionsMenu(false)
     const header = NIDO_PERMISSION_CSV_COLUMNS.map(csvEscape).join(",")
-    const rows = ROLE_PERMISSION_MODULE_OPTIONS.map(module => [
-      "New NIDO Role",
-      "Replace with your role description",
-      "Active",
-      module.key,
-      module.label,
-      module.description,
-      ...ACTIONS.map(() => false),
-    ].map(csvEscape).join(","))
-    const blob = new Blob([[header, ...rows].join("\r\n")], { type: "text/csv;charset=utf-8;" })
+    const blob = new Blob([`${header}\r\n`], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url

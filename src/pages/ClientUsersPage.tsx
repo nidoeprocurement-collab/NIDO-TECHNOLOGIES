@@ -733,9 +733,8 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
 
 export function downloadUserTemplate() {
   const headers = ["User ID", "Employee ID", "User Type", "Full Name", "Email ID", "Phone Number", "Job Title", "Role", "Organization Access", "Status"];
-  const example = ["UI-00009", "EMP-001", "Client User", "John Doe", "john.doe@example.com", "+91 98765 43210", "Procurement Manager", "Client User", "Nitin Supplies HQ", "Active"];
-  const csv = [headers.join(","), example.join(",")].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+  const csv = `${headers.join(",")}\r\n`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
