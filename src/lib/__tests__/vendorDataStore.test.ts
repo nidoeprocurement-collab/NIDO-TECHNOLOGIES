@@ -7,10 +7,11 @@ import {
   getVendors,
   restoreArchivedVendor,
   updateVendor,
+  type StoredVendor,
   type VendorRecord,
 } from "../vendorDataStore"
 
-function makeVendor(id: string, name: string, email = `${id.toLowerCase()}@example.com`): VendorRecord {
+function makeVendor(id: string, name: string, email = `${id.toLowerCase()}@example.com`): StoredVendor {
   return {
     id,
     name,

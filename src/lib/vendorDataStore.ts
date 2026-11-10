@@ -68,6 +68,8 @@ export interface StoredVendor {
   [key: string]: any;
 }
 
+export type VendorRecord = StoredVendor;
+
 const LEGACY_DEMO_VENDORS: ReadonlyArray<{ id: string; name: string; email: string }> = [
   { id: "VND-1001", name: "InfoTech Pvt. Ltd.", email: "rahul@infotech.com" },
   { id: "VND-1002", name: "Logistics Express", email: "priya@logexp.com" },
