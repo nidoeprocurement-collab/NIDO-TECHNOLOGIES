@@ -104,7 +104,6 @@ export function ModuleMultiSelect({
         disabled={disabled}
         className="sr-only"
         tabIndex={-1}
-        aria-hidden="true"
       >
         <option value="">Add module...</option>
         {PORTAL_MODULE_CATALOG.map((m) => (

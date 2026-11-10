@@ -240,14 +240,6 @@ export default function ClientRolesPage() {
     setShowActionsMenu(false);
     const rows = [
       CLIENT_PERMISSION_CSV_COLUMNS.map(column => csvEscape(column)),
-      ...PORTAL_MODULE_CATALOG.map(module => [
-        "New Client Role",
-        "Replace with your role description",
-        "active",
-        module.name,
-        module.description,
-        ...CLIENT_ACTIONS.map(() => false),
-      ].map(value => csvEscape(value))),
     ];
     downloadCsv("client-role-permissions-template.csv", rows);
   };

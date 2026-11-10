@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ClientRolesPage from "@/pages/ClientRolesPage";
@@ -88,5 +88,43 @@ describe("client role module editor", () => {
     }));
 
     await waitFor(() => expect(within(roleButton()).getByText(/1\s+assigned user$/)).toBeTruthy());
+  });
+
+  it("downloads an empty CSV template with only header columns from the 3-dot menu", async () => {
+    let capturedBlob: Blob | undefined;
+    const createObjectUrlSpy = vi.spyOn(URL, "createObjectURL").mockImplementation((obj: Blob | MediaSource) => {
+      if (obj instanceof Blob) capturedBlob = obj;
+      return "blob:mock-template-url";
+    });
+    const revokeObjectUrlSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    try {
+      render(
+        <MemoryRouter initialEntries={[`/clients/${clientId}/roles`]}>
+          <Routes>
+            <Route path="/clients/:id/roles" element={<ClientRolesPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Role and permission actions" }));
+      fireEvent.click(screen.getByRole("button", { name: "Download Template" }));
+
+      expect(capturedBlob).toBeDefined();
+      const csvText = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(capturedBlob!);
+      });
+      const lines = csvText.trim().split(/\r?\n/);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toBe("role_name,description,status,module,module_description,view,create,edit,delete,approve,export,import,manage,configure");
+    } finally {
+      createObjectUrlSpy.mockRestore();
+      revokeObjectUrlSpy.mockRestore();
+      anchorClickSpy.mockRestore();
+    }
   });
 });
