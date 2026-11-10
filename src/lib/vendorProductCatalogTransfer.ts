@@ -84,6 +84,7 @@ function parseCsvRows(text: string): Record<string, unknown>[] {
 
     // Check if this column represents a variation field / variation name
     const isVariationField =
+      header !== "variations" &&
       (header.startsWith("variation") || header.startsWith("field") || header === "var") &&
       !header.includes("option") &&
       !header.includes("price") &&
