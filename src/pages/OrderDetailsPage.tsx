@@ -2104,7 +2104,7 @@ function EditAssignmentModal({ data, onSave, onClose }) {
             />
           </div>
         </div>
-        <ModalFooter onCancel={onClose} onSave={handleSave} />
+        <ModalFooter onCancel={onClose} onSave={handleSave} skipConfirmation />
       </ModalBox>
     </Overlay>
   );

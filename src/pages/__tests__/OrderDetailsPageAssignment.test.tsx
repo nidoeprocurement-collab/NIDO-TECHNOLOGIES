@@ -150,8 +150,10 @@ describe("OrderDetailsPage - Assignment popup for physical and digital orders", 
     expect(roleInput.value).toBe("Operations Lead");
     expect(assignedOnInput.value).toBe("Nov 10, 2026 10:15 AM");
 
-    // Save assignment and verify persistence
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    // Save assignment directly without confirmation popup and verify persistence
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    expect(saveButton.hasAttribute("data-confirmation-skip")).toBe(true);
+    fireEvent.click(saveButton);
     expect(screen.queryByText("Edit Assignment")).toBeNull();
     expect(screen.getByText("Sneha Iyer")).toBeTruthy();
     expect(screen.getByText("Operations Lead")).toBeTruthy();

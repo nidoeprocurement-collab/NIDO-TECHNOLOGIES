@@ -682,7 +682,7 @@ function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d:
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={handleSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save</button>
+          <button onClick={handleSave} data-confirmation-skip="" style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save</button>
         </div>
       </div>
     </div>
