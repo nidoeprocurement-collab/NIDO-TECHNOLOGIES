@@ -135,11 +135,15 @@ describe("OrderDetailsPage - Assignment popup for physical and digital orders", 
     const roleInput = screen.getByLabelText("Role") as HTMLInputElement;
     const assignedOnInput = screen.getByLabelText("Assigned On") as HTMLInputElement;
 
-    // Verify all NIDO users are present in the Assigned To dropdown
+    // Verify all NIDO users are present in the Assigned To dropdown with their role shown beside their name
     const optionValues = Array.from(assignedToSelect.options).map(o => o.value);
+    const optionLabels = Array.from(assignedToSelect.options).map(o => o.textContent);
     expect(optionValues).toContain("System Owner");
     expect(optionValues).toContain("Sneha Iyer");
     expect(optionValues).toContain("Arjun Mehta");
+    expect(optionLabels).toContain("System Owner — System Owner");
+    expect(optionLabels).toContain("Sneha Iyer — Operations Lead");
+    expect(optionLabels).toContain("Arjun Mehta — Procurement Executive");
 
     // Select "Sneha Iyer" and verify her role auto-populates in the Role field
     fireEvent.change(assignedToSelect, { target: { value: "Sneha Iyer" } });

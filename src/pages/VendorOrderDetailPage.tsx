@@ -566,16 +566,27 @@ function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d:
 
   const userOptions = useMemo(() => {
     const list = nidoUsers
-      .map(u => ({
-        id: u.id,
-        name: (u.name || u.email || u.employeeId || "").trim(),
-        role: (u.role || "").trim(),
-      }))
+      .map(u => {
+        const name = (u.name || u.email || u.employeeId || "").trim();
+        const role = (u.role || "").trim();
+        return {
+          id: u.id,
+          name,
+          role,
+          label: role ? `${name} — ${role}` : name,
+        };
+      })
       .filter(u => Boolean(u.name));
     if (form.assignedTo && !list.some(u => u.name === form.assignedTo)) {
-      list.push({ id: "current-assignee", name: form.assignedTo, role: form.role || "" });
+      const role = (form.role || "").trim();
+      list.push({
+        id: "current-assignee",
+        name: form.assignedTo,
+        role,
+        label: role ? `${form.assignedTo} — ${role}` : form.assignedTo,
+      });
     }
-    return sortByDropdownLabel(list, u => u.name);
+    return sortByDropdownLabel(list, u => u.label);
   }, [nidoUsers, form.assignedTo, form.role]);
 
   const handleAssignedToChange = (selectedName: string) => {
@@ -644,7 +655,7 @@ function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d:
               <option value="">Select user</option>
               {userOptions.map(u => (
                 <option key={u.id} value={u.name}>
-                  {u.name}
+                  {u.label}
                 </option>
               ))}
             </select>

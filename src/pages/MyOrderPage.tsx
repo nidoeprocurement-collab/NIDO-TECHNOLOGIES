@@ -1,7 +1,8 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMyOrders, type MyOrder as Order, type MyOrderStatus as OrderStatus } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUsers, NIDO_USERS_EVENT } from "@/lib/nidoUsersStore";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
@@ -124,6 +125,22 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
   filters: FilterState; setFilters: (f: FilterState) => void;
   onClose: () => void; onApply: () => void; onClear: () => void;
 }) {
+  const [nidoUserNames, setNidoUserNames] = useState<string[]>(() =>
+    getUsers().map(u => (u.name || u.email || u.employeeId || "").trim()).filter(Boolean),
+  );
+  useEffect(() => {
+    const sync = () => {
+      setNidoUserNames(
+        getUsers().map(u => (u.name || u.email || u.employeeId || "").trim()).filter(Boolean),
+      );
+    };
+    window.addEventListener(NIDO_USERS_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(NIDO_USERS_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
   const p = { filters, setFilters };
   const _bg = "hsl(var(--card))"; const _bdr = "hsl(var(--border))"; const _fg = "hsl(var(--foreground))"; const _m = "hsl(var(--muted-foreground))";
   return (
@@ -155,7 +172,7 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
         <Sel label="Order Status" fkey="orderStatus" placeholder="Select status"
           options={ALL_STATUSES} {...p} />
         <Sel label="Assigned To" fkey="assignedTo" placeholder="Select users"
-          options={["Sneha Iyer", "Priya Nair", "Arjun Mehta", "Rahul Verma", "Sanjay Patel", "Anita Desai"]} {...p} />
+          options={nidoUserNames} {...p} />
         <Sel label="SLA Status" fkey="slaStatus" placeholder="Select SLA status"
           options={["On Track", "At Risk", "Breached"]} {...p} />
         <div>
