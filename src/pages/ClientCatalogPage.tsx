@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
-import { getAllVendorProducts } from "@/lib/vendorStore";
-import { getVendorById } from "@/lib/vendorDataStore";
+import { getAllVendorProducts, type VendorProduct } from "@/lib/vendorStore";
+import { getVendorById, getVendors } from "@/lib/vendorDataStore";
 import {
   getClientCatalog,
   saveClientCatalog,
@@ -289,24 +289,70 @@ function RoleDropdown({
 type CatalogEntry = ClientCatalogEntry;
 type CatalogProductTab = "physical" | "digital";
 
+function getCatalogEntryKey(product: CatalogEntry): string {
+  return product.cpc || product.productCode || product.sku;
+}
+
 function isDigitalCatalogEntry(product: CatalogEntry): boolean {
   return isDigitalOnlyType(getProductType(product.physicalType || product.productType));
 }
 
-function getCatalogVendorSummary(productCode: string): { names: string[]; price: string; stock: number } {
-  const matches = Object.values(getAllVendorProducts())
-    .flat()
-    .filter((product) => product.masterProductCode === productCode && product.status === "Active");
+function getActiveVendorProducts(): VendorProduct[] {
+  const vendorProductStore = getAllVendorProducts();
+  const hasStoredVendorList = localStorage.getItem("nido_vendors_v2") !== null;
+  const liveVendors = getVendors().filter((vendor) => !vendor.archived);
+  const liveVendorIds = new Set(liveVendors.map((vendor) => vendor.id.trim().toLowerCase()));
+
+  return Object.entries(vendorProductStore).flatMap(([vendorId, products]) => {
+    if (hasStoredVendorList && !liveVendorIds.has(vendorId.trim().toLowerCase())) {
+      return [];
+    }
+    return products.filter((product) => product.status === "Active");
+  });
+}
+
+function getCatalogVendorSummary(
+  productCode: string,
+  productName?: string,
+  sku?: string,
+): { names: string[]; price: string; stock: number } {
+  const targetCode = normalizeMasterProductCode(productCode || "");
+  const targetSku = normalizeMasterProductCode(sku || "");
+  const targetName = (productName || "").trim().toLowerCase();
+  const matches = getActiveVendorProducts().filter((product) => {
+    const mpc = normalizeMasterProductCode(product.masterProductCode || "");
+    const vpc = normalizeMasterProductCode(product.vendorProductCode || "");
+    const pSku = normalizeMasterProductCode(product.skuCode || "");
+    const pId = normalizeMasterProductCode(product.id || "");
+    if (targetCode && (mpc === targetCode || vpc === targetCode || pSku === targetCode || pId === targetCode)) {
+      return true;
+    }
+    if (targetSku && (pSku === targetSku || vpc === targetSku || mpc === targetSku)) {
+      return true;
+    }
+    if (!mpc && targetName && product.productName.trim().toLowerCase() === targetName) {
+      return true;
+    }
+    return false;
+  });
   const names = Array.from(new Set(matches.map((product) => getVendorById(product.vendorId)?.name || product.vendorId)));
   const prices = matches
     .map((product) => Number.parseFloat(product.price))
+    .filter((price) => Number.isFinite(price) && price > 0);
+  const variationPrices = matches
+    .flatMap((product) => (product.variations || []).flatMap((variation) => variation.options || []))
+    .map((option) => Number(option.priceAdjustment))
     .filter((price) => Number.isFinite(price) && price > 0);
   const stock = matches.reduce((total, product) => {
     const physical = Number.parseInt(product.physicalStock ?? product.stock ?? "0", 10) || 0;
     const reserved = Number.parseInt(product.reservedStock ?? "0", 10) || 0;
     return total + Math.max(0, physical - reserved);
   }, 0);
-  const lowestPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const lowestPrice = prices.length > 0
+    ? Math.min(...prices)
+    : variationPrices.length > 0
+      ? Math.min(...variationPrices)
+      : 0;
   return {
     names,
     price: lowestPrice > 0 ? `₹${lowestPrice.toLocaleString("en-IN")}` : "—",
@@ -777,19 +823,125 @@ function AddNewProductModal({
     };
 
     // Only products that at least one vendor has actually added (and marked
-    // Active) should be assignable to a client. If the same master product
-    // has been added by multiple vendors, it must still appear only once.
+    // Active) should be assignable to a client. For digital products, build
+    // the list directly from all vendors' digital products so that only
+    // digital products added in vendors' Digital Products appear.
     const loadAssignable = () => {
-      const vendorProductStore = getAllVendorProducts();
-      const activeMasterCodes = new Set<string>();
-      for (const products of Object.values(vendorProductStore)) {
-        for (const p of products) {
-          if (p.status === "Active") {
-            activeMasterCodes.add(normalizeMasterProductCode(p.masterProductCode));
+      const activeVendorProducts = getActiveVendorProducts();
+      const allCatalogProducts = getCatalogProducts();
+      const catalogById = new Map<string, CatalogProduct>();
+      const catalogByCode = new Map<string, CatalogProduct>();
+      const catalogBySku = new Map<string, CatalogProduct>();
+      const catalogByName = new Map<string, CatalogProduct>();
+
+      for (const item of allCatalogProducts) {
+        if (item.id) catalogById.set(item.id.trim().toLowerCase(), item);
+        if (item.masterProductCode) catalogByCode.set(normalizeMasterProductCode(item.masterProductCode), item);
+        if (item.skuCode) catalogBySku.set(normalizeMasterProductCode(item.skuCode), item);
+        if (item.productName) catalogByName.set(item.productName.trim().toLowerCase(), item);
+      }
+
+      if (isDigital) {
+        const vendorDigitalProducts = activeVendorProducts.filter((vp) =>
+          isDigitalOnlyType(getProductType(vp.physicalType))
+        );
+        const digitalByKey = new Map<string, CatalogProduct>();
+
+        for (const vp of vendorDigitalProducts) {
+          const masterMatch =
+            (vp.id ? catalogById.get(vp.id.trim().toLowerCase()) : undefined) ||
+            (vp.masterProductCode ? catalogByCode.get(normalizeMasterProductCode(vp.masterProductCode)) : undefined) ||
+            (vp.skuCode ? catalogBySku.get(normalizeMasterProductCode(vp.skuCode)) : undefined) ||
+            (vp.productName ? catalogByName.get(vp.productName.trim().toLowerCase()) : undefined);
+
+          const resolvedCode = (
+            vp.masterProductCode ||
+            masterMatch?.masterProductCode ||
+            vp.vendorProductCode ||
+            vp.skuCode ||
+            vp.id ||
+            ""
+          ).trim();
+          const resolvedSku = (
+            vp.skuCode ||
+            masterMatch?.skuCode ||
+            vp.vendorProductCode ||
+            resolvedCode
+          ).trim();
+          const dedupeKey =
+            normalizeMasterProductCode(resolvedCode) ||
+            normalizeMasterProductCode(resolvedSku) ||
+            (vp.productName || "").trim().toLowerCase();
+          if (!dedupeKey) continue;
+
+          const existing = digitalByKey.get(dedupeKey);
+          if (existing) {
+            if ((!existing.variations || existing.variations.length === 0) && vp.variations && vp.variations.length > 0) {
+              existing.variations = vp.variations;
+            }
+            continue;
           }
+
+          const variationPrices = (vp.variations || [])
+            .flatMap((variation) => variation.options || [])
+            .map((option) => Number(option.priceAdjustment))
+            .filter((price) => Number.isFinite(price) && price > 0);
+          const resolvedPrice =
+            Number(vp.price) > 0
+              ? Number(vp.price)
+              : masterMatch && masterMatch.price > 0
+                ? masterMatch.price
+                : variationPrices.length > 0
+                  ? Math.min(...variationPrices)
+                  : 0;
+          const resolvedPhysicalType = vp.physicalType || masterMatch?.physicalType || "Digital License";
+          const variationSummary = vp.variations?.length
+            ? vp.variations
+                .map((v) => `${v.name}: ${v.options.map((o) => o.label).join(", ")}`)
+                .join(" | ")
+            : "";
+
+          digitalByKey.set(dedupeKey, {
+            id: vp.id || masterMatch?.id || resolvedCode,
+            masterProductCode: resolvedCode,
+            skuCode: resolvedSku,
+            productName: vp.productName || masterMatch?.productName || "Digital Product",
+            productType: resolvedPhysicalType,
+            physicalType: resolvedPhysicalType,
+            category: vp.category || masterMatch?.category || "General",
+            subcategory: masterMatch?.subcategory || "",
+            brand: vp.brand || masterMatch?.brand || "",
+            tags: masterMatch?.tags || [],
+            description: masterMatch?.description || variationSummary,
+            specifications: masterMatch?.specifications || [],
+            generalSpecs: masterMatch?.generalSpecs || [],
+            variations: vp.variations && vp.variations.length > 0 ? vp.variations : masterMatch?.variations || [],
+            productNotes: masterMatch?.productNotes || "",
+            videoUrl: masterMatch?.videoUrl || "",
+            images: vp.images && vp.images.length > 0 ? vp.images : masterMatch?.images || [],
+            publishStatus: "published",
+            price: resolvedPrice,
+            moq: Number(vp.moq) || masterMatch?.moq || 1,
+            leadTime: vp.leadTime || masterMatch?.leadTime || "Instant",
+            warranty: masterMatch?.warranty || "",
+          });
+        }
+
+        setCatalog(Array.from(digitalByKey.values()));
+        loadAssignedProductCodes();
+        return;
+      }
+
+      const vendorPhysicalProducts = activeVendorProducts.filter(
+        (vp) => !isDigitalOnlyType(getProductType(vp.physicalType))
+      );
+      const activeMasterCodes = new Set<string>();
+      for (const p of vendorPhysicalProducts) {
+        if (p.masterProductCode) {
+          activeMasterCodes.add(normalizeMasterProductCode(p.masterProductCode));
         }
       }
-      const published = getCatalogProducts().filter((p) => p.publishStatus === "published");
+      const published = allCatalogProducts.filter((p) => p.publishStatus === "published");
       const seen = new Set<string>();
       const deduped = published.filter((p) => {
         const code = normalizeMasterProductCode(p.masterProductCode);
@@ -804,16 +956,18 @@ function AddNewProductModal({
     loadAssignable();
     window.addEventListener("catalogUpdated", loadAssignable);
     window.addEventListener("vendorProductsUpdated", loadAssignable);
+    window.addEventListener("nidoVendorsUpdated", loadAssignable);
     window.addEventListener("clientCatalogUpdated", loadAssignedProductCodes);
     const refreshRoles = () => setRoles(getAssignableCatalogRoles(clientId));
     window.addEventListener("nidoPortalRolesUpdated", refreshRoles);
     return () => {
       window.removeEventListener("catalogUpdated", loadAssignable);
       window.removeEventListener("vendorProductsUpdated", loadAssignable);
+      window.removeEventListener("nidoVendorsUpdated", loadAssignable);
       window.removeEventListener("clientCatalogUpdated", loadAssignedProductCodes);
       window.removeEventListener("nidoPortalRolesUpdated", refreshRoles);
     };
-  }, [clientId]);
+  }, [clientId, isDigital]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((product) => {
@@ -928,7 +1082,7 @@ function AddNewProductModal({
     const cpcs = reserveClientProductCodes(rowsToAdd.length);
     const entries: CatalogEntry[] = rowsToAdd.map((row, i) => ({
       productCode: row.product.masterProductCode,
-      sku: row.product.skuCode,
+      sku: row.product.skuCode || row.product.masterProductCode || cpcs[i],
       name: row.product.productName,
       category: row.product.category,
       subcategory: row.product.subcategory,
@@ -981,7 +1135,7 @@ function AddNewProductModal({
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
               {isDigital
-                ? "Search and select digital products from the master catalog to add to this client"
+                ? "Search and select digital products from all vendors' digital products to add to this client"
                 : "Search and select physical products from the master catalog to add to this client"}
             </p>
           </div>
@@ -1044,7 +1198,9 @@ function AddNewProductModal({
             <div className="w-full overflow-x-auto">
               {catalog.length === 0 ? (
                 <div className="px-8 py-16 text-center text-gray-400 text-sm">
-                  No products in master catalog yet. Add products via Master Catalog first.
+                  {isDigital
+                    ? "No digital products have been added to any vendor yet. Add digital products under a vendor's Digital Products first."
+                    : "No products in master catalog yet. Add products via Master Catalog first."}
                 </div>
               ) : availableCatalog.length === 0 ? (
                 <div className="px-8 py-16 text-center text-gray-400 text-sm">
@@ -1355,14 +1511,14 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const lowStock = products.filter((p) => p.availability === "Low Stock").length;
   const outOfStock = products.filter((p) => p.availability === "Out of Stock").length;
 
-  const removeRole = (sku: string, role: string) => {
+  const removeRole = (entryKey: string, role: string) => {
     setProducts((prev) =>
-      prev.map((p) => p.sku === sku ? { ...p, roles: p.roles.filter((r) => r !== role) } : p)
+      prev.map((p) => getCatalogEntryKey(p) === entryKey ? { ...p, roles: p.roles.filter((r) => r !== role) } : p)
     );
   };
 
-  const handleSaveEdit = (sku: string, updated: Partial<CatalogEntry>) => {
-    setProducts((prev) => prev.map((p) => p.sku === sku ? { ...p, ...updated } : p));
+  const handleSaveEdit = (entryKey: string, updated: Partial<CatalogEntry>) => {
+    setProducts((prev) => prev.map((p) => getCatalogEntryKey(p) === entryKey ? { ...p, ...updated } : p));
   };
 
   // Merge new entries, persist, run price engine, then reload synced prices into state.
@@ -1398,7 +1554,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           product={editProduct}
           clientId={clientId}
           onClose={() => setEditProduct(null)}
-          onSave={(updated) => handleSaveEdit(editProduct.sku, updated)}
+          onSave={(updated) => handleSaveEdit(getCatalogEntryKey(editProduct), updated)}
         />
       )}
       {/* Stat cards */}
@@ -1506,8 +1662,10 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
               </tr>
             </thead>
             <tbody>
-              {filtered.map((product, i) => (
-                <tr key={product.sku} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
+              {filtered.map((product, i) => {
+                const entryKey = getCatalogEntryKey(product);
+                return (
+                <tr key={entryKey} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
                   <td className="px-4 py-2 text-gray-500 font-mono text-[10px]">{product.cpc || "—"}</td>
                   <td className="px-4 py-2 text-gray-500 font-mono text-[10px]">{product.productCode}</td>
                   <td className="px-4 py-3">
@@ -1526,7 +1684,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       {product.roles.map((role) => (
                         <span key={role} className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">
                           {role}
-                          <button onClick={(e) => { e.stopPropagation(); removeRole(product.sku, role); }} className="text-blue-400 hover:text-blue-700 leading-none">×</button>
+                          <button onClick={(e) => { e.stopPropagation(); removeRole(entryKey, role); }} className="text-blue-400 hover:text-blue-700 leading-none">×</button>
                         </span>
                       ))}
                     </div>
@@ -1537,7 +1695,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                     const terms = getTenureBilling(type);
                     const quantityLabel = getQuantityLabel(type);
                     const leadTime = formatLeadTimeByType(product.leadTime, type);
-                    const vendorSummary = getCatalogVendorSummary(product.productCode);
+                    const vendorSummary = getCatalogVendorSummary(product.productCode, product.name, product.sku);
                     return (
                       <>
                         <td className="px-4 py-2">
@@ -1577,12 +1735,12 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                   })()}
                   <td className="px-4 py-2 relative">
                     <button
-                      onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === product.sku ? null : product.sku); }}
+                      onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === entryKey ? null : entryKey); }}
                       className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
                     >
                       <MoreVertical size={13} />
                     </button>
-                    {rowMenu === product.sku && (
+                    {rowMenu === entryKey && (
                       <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => { setViewProduct(product); setRowMenu(null); }}
@@ -1598,7 +1756,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                         </button>
                         <div className="my-1 border-t border-gray-100" />
                         <button
-                          onClick={() => { setProducts((prev) => prev.filter((p) => p.sku !== product.sku)); setRowMenu(null); }}
+                          onClick={() => { setProducts((prev) => prev.filter((p) => getCatalogEntryKey(p) !== entryKey)); setRowMenu(null); }}
                           className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500"
                         >
                           Remove Product
@@ -1607,7 +1765,8 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={10} className="px-4 py-12 text-center text-xs text-gray-400">

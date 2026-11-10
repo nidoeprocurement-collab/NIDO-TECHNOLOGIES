@@ -695,7 +695,7 @@ export default function AddVendorProductsPage() {
         productName: r.catalogProduct.productName,
         category: r.catalogProduct.category,
         brand: r.catalogProduct.brand,
-        physicalType: r.catalogProduct.physicalType,
+        physicalType: r.catalogProduct.physicalType || r.catalogProduct.productType,
         images: r.catalogProduct.images,
         price: isDigitalCatalogProduct(r.catalogProduct) ? "0" : r.price,
         moq: isDigitalCatalogProduct(r.catalogProduct) ? r.moq || "1" : r.moq,

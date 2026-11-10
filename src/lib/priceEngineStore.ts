@@ -433,9 +433,17 @@ export function computeVendorComparisons(
   const storeMap = getAllVendorProducts();
   const allVendors = getVendors();
   const rows: VendorComparisonRow[] = [];
+  const targetCode = (masterProductCode || '').trim().toLowerCase();
 
   Object.entries(storeMap).forEach(([vendorId, products]) => {
-    const match = products.find(p => p.masterProductCode === masterProductCode && p.status === 'Active');
+    const match = products.find(p =>
+      p.status === 'Active' && Boolean(targetCode) && (
+        (p.masterProductCode && p.masterProductCode.trim().toLowerCase() === targetCode) ||
+        (p.vendorProductCode && p.vendorProductCode.trim().toLowerCase() === targetCode) ||
+        (p.skuCode && p.skuCode.trim().toLowerCase() === targetCode) ||
+        (p.id && p.id.trim().toLowerCase() === targetCode)
+      )
+    );
     if (!match) return;
     const info = allVendors.find(v => v.id === vendorId);
     const rawTerms = info?.paymentTerms || '';
@@ -565,12 +573,17 @@ export function getProductStockInfo(masterProductCode: string, productCategory?:
 
 export function getAllProductPricing(): ProductPricing[] {
   const catalog = getCatalogProducts();
-  return catalog.map(p => {
+  const seenCodes = new Set<string>();
+  const results: ProductPricing[] = [];
+
+  catalog.forEach(p => {
+    const code = p.masterProductCode;
+    if (code) seenCodes.add(code.trim().toLowerCase());
     // Pass the product category so Tax Engine can apply category-specific vendor tax rates
-    const comparisons = computeVendorComparisons(p.masterProductCode, p.category);
+    const comparisons = computeVendorComparisons(code, p.category);
     const winner = comparisons[0] || null;
-    return {
-      masterProductCode: p.masterProductCode,
+    results.push({
+      masterProductCode: code,
       productName: p.productName,
       sku: p.skuCode,
       category: p.category,
@@ -578,8 +591,29 @@ export function getAllProductPricing(): ProductPricing[] {
       winningVendor: winner,
       landedCostPerUnit: winner ? winner.landedCostPerUnit : 0,
       moq: winner ? winner.moq : 0,
-    };
+    });
   });
+
+  Object.values(getAllVendorProducts()).flat().forEach(vp => {
+    if (vp.status !== 'Active') return;
+    const code = (vp.masterProductCode || vp.vendorProductCode || vp.skuCode || vp.id || '').trim();
+    if (!code || seenCodes.has(code.toLowerCase())) return;
+    seenCodes.add(code.toLowerCase());
+    const comparisons = computeVendorComparisons(code, vp.category);
+    const winner = comparisons[0] || null;
+    results.push({
+      masterProductCode: code,
+      productName: vp.productName,
+      sku: vp.skuCode || vp.vendorProductCode || code,
+      category: vp.category,
+      vendorComparisons: comparisons,
+      winningVendor: winner,
+      landedCostPerUnit: winner ? winner.landedCostPerUnit : 0,
+      moq: winner ? winner.moq : 0,
+    });
+  });
+
+  return results;
 }
 
 // ─── Client-side computation ────────────────────────────────────────────────
