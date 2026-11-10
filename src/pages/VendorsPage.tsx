@@ -571,33 +571,24 @@ export default function App() {
             <p className="text-xs text-gray-500">Vendors / Vendor List</p>
             <h1 className="text-2xl font-bold">Vendors</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => navigate("/vendors/onboarding")}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-1.5" /> Onboard Vendor
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/vendors/onboarding')}>
-                  <Plus className="h-4 w-4 mr-2" /> Vendor Onboarding
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={exportVendors}>
-                  <Download className="h-4 w-4 mr-2" /> Export Vendors
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
-                  <Archive className="h-4 w-4 mr-2" /> Archived Vendors ({archivedVendors.length})
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-full">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/vendors/onboarding')}>
+                <Plus className="h-4 w-4 mr-2" /> Vendor Onboarding
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={exportVendors}>
+                <Download className="h-4 w-4 mr-2" /> Export Vendors
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
+                <Archive className="h-4 w-4 mr-2" /> Archived Vendors ({archivedVendors.length})
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

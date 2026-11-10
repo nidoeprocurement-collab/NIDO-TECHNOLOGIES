@@ -643,39 +643,30 @@ export default function ClientsPageUI() {
             <p className="text-xs text-gray-500">Clients / Client List</p>
             <h1 className="text-2xl font-bold">Clients</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => navigate("/clients/add")}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-1.5" /> Add Client
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/clients/add")}>
-                  <Plus     className="h-4 w-4 mr-2" /> Add Client
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={handleExport}>
-                  <Download className="h-4 w-4 mr-2" /> Export Clients
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={() => setShowBulkImport(true)}>
-                  <Upload   className="h-4 w-4 mr-2" /> Bulk Import
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={handleDownloadTemplate}>
-                  <FileDown className="h-4 w-4 mr-2" /> Download Template
-                </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
-                  <Archive  className="h-4 w-4 mr-2" /> Archived Clients ({archivedClients.length})
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-full">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/clients/add")}>
+                <Plus     className="h-4 w-4 mr-2" /> Add Client
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" /> Export Clients
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowBulkImport(true)}>
+                <Upload   className="h-4 w-4 mr-2" /> Bulk Import
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={handleDownloadTemplate}>
+                <FileDown className="h-4 w-4 mr-2" /> Download Template
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
+                <Archive  className="h-4 w-4 mr-2" /> Archived Clients ({archivedClients.length})
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
