@@ -6,7 +6,7 @@ import {
 import { Users, FileBarChart, Search, Star, Clock, ChevronDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 import { belongsToVendor } from "@/lib/vendorScope";
-import type { StoredVendor } from "@/lib/vendorDataStore";
+import { getVendors, type StoredVendor } from "@/lib/vendorDataStore";
 
 /* ─── Dropdown periods ──────────────────────────────────────────────────── */
 type Period = "Weekly" | "Monthly" | "Quarterly" | "Yearly";
@@ -211,55 +211,67 @@ export default function VendorPerformancePage({ vendor }: { vendor?: StoredVendo
   useEffect(() => {
     const refresh = () => setDataVersion(value => value + 1);
     window.addEventListener("poCreated", refresh);
+    window.addEventListener("nidoVendorsUpdated", refresh);
     window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("nidoVendorsUpdated", refresh);
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  const vendorOrders = useMemo(
-    () => vendor ? getAllPOs().filter(order => belongsToVendor(order, { vendorId: vendor.id, vendorName: vendor.name })) : [],
-    [vendor, dataVersion],
+  const allVendors = useMemo(
+    () => getVendors().filter(v => !v.archived),
+    [dataVersion],
   );
-  const scoped = Boolean(vendor);
-  const qualityScore = vendor?.performanceQuality ?? (vendor?.rating ? vendor.rating * 20 : 0);
+  const vendorOrders = useMemo(
+    () => vendor
+      ? getAllPOs().filter(order => belongsToVendor(order, { vendorId: vendor.id, vendorName: vendor.name }))
+      : getAllPOs().filter(order => allVendors.some(v => belongsToVendor(order, { vendorId: v.id, vendorName: v.name }))),
+    [vendor, allVendors, dataVersion],
+  );
+  const qualityScore = useMemo(() => {
+    if (vendor) {
+      return vendor.performanceQuality ?? (vendor.rating ? vendor.rating * 20 : 0);
+    }
+    if (allVendors.length === 0) return 0;
+    const total = allVendors.reduce((sum, v) => sum + (v.performanceQuality ?? (v.rating ? v.rating * 20 : 0)), 0);
+    return Math.round(total / allVendors.length);
+  }, [vendor, allVendors]);
   const totalSpend = vendorOrders.reduce((sum, order) => sum + Number(order.grandTotal || 0), 0);
   const completedOrders = vendorOrders.filter(order => order.status !== "Draft" && order.status !== "Cancelled");
   const deliveredOrders = completedOrders.filter(order => order.status === "Delivered").length;
   const onTime = completedOrders.length ? Math.round((deliveredOrders / completedOrders.length) * 100) : 0;
 
-  const spendData = scoped
-    ? (spendPeriod === "Monthly" ? vendorSpendTrend(vendorOrders) : [])
-    : SPEND_DATA[spendPeriod];
-  const perfData  = scoped
-    ? (perfPeriod === "Monthly" ? vendorPerfTrend(vendorOrders, qualityScore) : [])
-    : PERF_DATA[perfPeriod];
+  const spendData = spendPeriod === "Monthly" ? vendorSpendTrend(vendorOrders) : [];
+  const perfData  = perfPeriod === "Monthly" ? vendorPerfTrend(vendorOrders, qualityScore) : [];
 
   const stats = [
-    { icon: <Users className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "Total Spend", value: scoped ? `₹${totalSpend.toLocaleString("en-IN")}` : "₹12.45 Cr", trend: scoped ? "Live purchase-order total" : "+12.6% vs last year", up: true },
-    { icon: <FileBarChart className="w-5 h-5 text-teal-500" />, bg: "bg-teal-50", label: "Total Orders", value: scoped ? String(completedOrders.length) : "156", trend: scoped ? "Live purchase-order count" : "+8.3% vs last year", up: true },
-    { icon: <Search className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "On-time Delivery", value: scoped ? `${onTime}%` : "94.2%", trend: scoped ? "Delivered orders" : "+3.5% vs last year", up: true },
-    { icon: <Star className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", label: "Quality Score", value: scoped ? `${(qualityScore / 20).toFixed(1)} / 5` : "4.6 / 5", trend: scoped ? "Vendor score" : "+0.4 vs last year", up: true },
-    { icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", label: "Avg. Response Time", value: scoped ? "—" : "12.5 Hrs", trend: scoped ? "Not recorded" : "↓2.1 hrs vs last year", up: false },
+    { icon: <Users className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "Total Spend", value: `₹${totalSpend.toLocaleString("en-IN")}`, trend: "Live purchase-order total", up: true },
+    { icon: <FileBarChart className="w-5 h-5 text-teal-500" />, bg: "bg-teal-50", label: "Total Orders", value: String(completedOrders.length), trend: "Live purchase-order count", up: true },
+    { icon: <Search className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "On-time Delivery", value: `${onTime}%`, trend: "Delivered orders", up: true },
+    { icon: <Star className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", label: "Quality Score", value: `${(qualityScore / 20).toFixed(1)} / 5`, trend: "Vendor score", up: true },
+    { icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", label: "Avg. Response Time", value: "—", trend: "Live tracking", up: true },
   ];
 
+  const lateOrders = Math.max(0, completedOrders.length - deliveredOrders);
   const deliverySegments = [
-    { name: "On-time", value: scoped ? deliveredOrders : 147, color: "#22c55e", pct: `${scoped ? deliveredOrders : 147} (${scoped ? onTime : 94.2}%)` },
-    { name: "Late", value: scoped ? Math.max(0, completedOrders.length - deliveredOrders) : 7, color: "#f97316", pct: `${scoped ? Math.max(0, completedOrders.length - deliveredOrders) : 7}` },
-    { name: "Early", value: scoped ? 0 : 2, color: "#3b82f6", pct: `${scoped ? 0 : 2}` },
+    { name: "On-time", value: deliveredOrders, color: "#22c55e", pct: `${deliveredOrders} (${onTime}%)` },
+    { name: "Late", value: lateOrders, color: "#f97316", pct: `${lateOrders}` },
+    { name: "Early", value: 0, color: "#3b82f6", pct: "0" },
   ];
 
   const qualitySegments = [
-    { name: scoped ? "Vendor score" : "Excellent (5)", value: scoped ? (qualityScore ? 1 : 0) : 82, color: "#22c55e", pct: scoped ? `${qualityScore ? 1 : 0}` : "82 (52.6%)" },
-    { name: "Good (4)", value: scoped ? 0 : 61, color: "#3b82f6", pct: scoped ? "0" : "61 (39.1%)" },
-    { name: "Average (3)", value: scoped ? 0 : 10, color: "#f59e0b", pct: scoped ? "0" : "10 (6.4%)" },
-    { name: "Poor (1-2)", value: scoped ? 0 : 3, color: "#ef4444", pct: scoped ? "0" : "3 (1.9%)" },
+    { name: "Vendor score", value: qualityScore ? 1 : 0, color: "#22c55e", pct: `${(qualityScore / 20).toFixed(1)} / 5` },
+    { name: "Good (4)", value: 0, color: "#3b82f6", pct: "0" },
+    { name: "Average (3)", value: 0, color: "#f59e0b", pct: "0" },
+    { name: "Poor (1-2)", value: 0, color: "#ef4444", pct: "0" },
   ];
 
-  const categoryRows = scoped
-    ? [{
-        name: vendor?.category || "Uncategorized",
+  const categoryRows = useMemo(() => {
+    if (vendor) {
+      return [{
+        name: vendor.category || "Uncategorized",
         spend: `₹${totalSpend.toLocaleString("en-IN")}`,
         orders: completedOrders.length,
         ontime: `${onTime}%`,
@@ -267,8 +279,32 @@ export default function VendorPerformancePage({ vendor }: { vendor?: StoredVendo
         returns: "—",
         vsLastYear: "—",
         up: true,
-      }]
-    : CATEGORIES;
+      }];
+    }
+    const byCategory = new Map<string, { spend: number; orders: number; delivered: number; ratings: number[] }>();
+    for (const v of allVendors) {
+      const cat = v.category || "Uncategorized";
+      const entry = byCategory.get(cat) ?? { spend: 0, orders: 0, delivered: 0, ratings: [] };
+      const vOrders = completedOrders.filter(o => belongsToVendor(o, { vendorId: v.id, vendorName: v.name }));
+      entry.spend += vOrders.reduce((s, o) => s + Number(o.grandTotal || 0), 0);
+      entry.orders += vOrders.length;
+      entry.delivered += vOrders.filter(o => o.status === "Delivered").length;
+      if (v.rating) entry.ratings.push(v.rating);
+      byCategory.set(cat, entry);
+    }
+    return Array.from(byCategory.entries()).map(([name, data]) => ({
+      name,
+      spend: `₹${data.spend.toLocaleString("en-IN")}`,
+      orders: data.orders,
+      ontime: data.orders ? `${Math.round((data.delivered / data.orders) * 100)}%` : "0%",
+      quality: data.ratings.length
+        ? `${(data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length).toFixed(1)} / 5`
+        : "0.0 / 5",
+      returns: "—",
+      vsLastYear: "—",
+      up: true,
+    }));
+  }, [vendor, allVendors, completedOrders, totalSpend, onTime, qualityScore]);
 
   return (
     <div className="min-h-screen bg-white font-sans">

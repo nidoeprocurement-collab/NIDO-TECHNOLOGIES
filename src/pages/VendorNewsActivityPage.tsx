@@ -130,9 +130,9 @@ const INITIAL_ACTIVITIES: Activity[] = [
 ];
 
 function readScopedNotes(scope: VendorScope): Note[] {
-  if (!scope.vendorId) return [];
+  const key = scope.vendorId ? `nido_vendor_notes_${scope.vendorId}` : "nido_vendor_notes_global";
   try {
-    const raw = localStorage.getItem(`nido_vendor_notes_${scope.vendorId}`);
+    const raw = localStorage.getItem(key);
     const records = raw ? JSON.parse(raw) : [];
     return Array.isArray(records) ? records : [];
   } catch {
@@ -141,8 +141,9 @@ function readScopedNotes(scope: VendorScope): Note[] {
 }
 
 function getScopedActivities(scope: VendorScope): Activity[] {
+  const scoped = hasVendorScope(scope);
   return getAllPOs()
-    .filter(po => belongsToVendor(po, scope))
+    .filter(po => !scoped || belongsToVendor(po, scope))
     .map(po => {
       const date = new Date(po.createdOn);
       return {
@@ -150,7 +151,7 @@ function getScopedActivities(scope: VendorScope): Activity[] {
         iconBg: "bg-purple-100",
         category: "Purchase order updated",
         title: `${po.poNumber} is ${getPODisplayStatus(po.status).toLowerCase()}`,
-        subtitle: "Live purchase-order record",
+        subtitle: po.vendorName ? `Vendor: ${po.vendorName}` : "Live purchase-order record",
         date: Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
         time: Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
         link: "View Order",
@@ -160,8 +161,8 @@ function getScopedActivities(scope: VendorScope): Activity[] {
 
 export default function VendorNewsActivityPage(scope: VendorScope = {}) {
   const scoped = hasVendorScope(scope);
-  const [notes, setNotes]               = useState<Note[]>(() => scoped ? readScopedNotes(scope) : INITIAL_NOTES);
-  const [activities, setActivities]     = useState<Activity[]>(() => scoped ? getScopedActivities(scope) : INITIAL_ACTIVITIES);
+  const [notes, setNotes]               = useState<Note[]>(() => readScopedNotes(scope));
+  const [activities, setActivities]     = useState<Activity[]>(() => getScopedActivities(scope));
   const [noteText, setNoteText]         = useState("");
   const [visibility, setVisibility]     = useState<NoteVisibility>("Internal");
   const [activeTab, setActiveTab]       = useState<NoteTab>("All Notes");
@@ -174,10 +175,8 @@ export default function VendorNewsActivityPage(scope: VendorScope = {}) {
 
   useEffect(() => {
     const refresh = () => {
-      if (scoped) {
-        setNotes(readScopedNotes(scope));
-        setActivities(getScopedActivities(scope));
-      }
+      setNotes(readScopedNotes(scope));
+      setActivities(getScopedActivities(scope));
     };
     window.addEventListener("storage", refresh);
     window.addEventListener("poCreated", refresh);
@@ -219,10 +218,9 @@ export default function VendorNewsActivityPage(scope: VendorScope = {}) {
       isCurrentUser: true,
     };
     setNotes(prev => [newNote, ...prev]);
-    if (scoped && scope.vendorId) {
-      localStorage.setItem(`nido_vendor_notes_${scope.vendorId}`, JSON.stringify([newNote, ...notes]));
-      window.dispatchEvent(new Event("vendorNoteUpdated"));
-    }
+    const storageKey = scope.vendorId ? `nido_vendor_notes_${scope.vendorId}` : "nido_vendor_notes_global";
+    localStorage.setItem(storageKey, JSON.stringify([newNote, ...notes]));
+    window.dispatchEvent(new Event("vendorNoteUpdated"));
     setActivities(prev => [{
       icon: <MessageSquare className="w-4 h-4 text-blue-600" />,
       iconBg: "bg-blue-100",

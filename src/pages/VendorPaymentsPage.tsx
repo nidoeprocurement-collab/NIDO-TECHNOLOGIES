@@ -90,8 +90,9 @@ function getLivePayments(scope: VendorScope): Payment[] {
       ...(Array.isArray(purchaseEntries) ? purchaseEntries : []),
       ...getReceipts().filter(receipt => !receipt.archived),
     ];
+    const scoped = hasVendorScope(scope);
     return entries
-      .filter(entry => belongsToVendor(entry, scope))
+      .filter(entry => !scoped || belongsToVendor(entry, scope))
       .map(entry => ({
         id: String(entry.paymentNumber || entry.id || ""),
         poRef: String(entry.billNumber || entry.invoiceNumber || entry.referenceNumber || "—"),
@@ -158,12 +159,12 @@ export default function VendorPaymentsPage(scope: VendorScope = {}) {
 
   // Remap hardcoded prefixes to whatever is configured right now
   const remappedPayments = useMemo(
-    () => (scoped ? livePayments : ALL_PAYMENTS).map(p => ({
+    () => livePayments.map(p => ({
       ...p,
       id:    p.id.replace(/^INV-/, invPrefix),
       poRef: p.poRef.replace(/^PO-/, poPrefix),
     })),
-    [invPrefix, poPrefix, scoped, livePayments]
+    [invPrefix, poPrefix, livePayments]
   );
 
   const [statusFilter, setStatusFilter] = useState("All");

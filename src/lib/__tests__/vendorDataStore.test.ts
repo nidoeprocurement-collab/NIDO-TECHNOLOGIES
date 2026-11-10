@@ -69,10 +69,10 @@ describe("vendorDataStore live operations and mock purge", () => {
     expect(getVendorById("VND-1001")?.status).toBe("On Hold")
     expect(getVendorById("VND-1001")?.city).toBe("Mumbai")
 
-    expect(archiveVendorById("VND-1001")).toBe(true)
+    expect(archiveVendorById("VND-1001")).toMatchObject({ id: "VND-1001", archived: true })
     expect(getVendorById("VND-1001")?.archived).toBe(true)
 
-    expect(restoreArchivedVendor("VND-1001")).toBe(true)
+    expect(restoreArchivedVendor("VND-1001")).toMatchObject({ id: "VND-1001", archived: false })
     expect(getVendorById("VND-1001")?.archived).toBe(false)
 
     expect(deleteVendorById("VND-1001")).toBe(true)

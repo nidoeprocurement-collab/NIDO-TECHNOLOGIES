@@ -161,10 +161,10 @@ export default function VendorServicesPage(scope: VendorScope = {}) {
   }, []);
 
   const services = useMemo(() => {
-    if (!scoped) return ALL_SERVICES;
-    return liveServices
-      .filter(request => belongsToVendor(request, scope))
-      .map(toService);
+    const filteredRequests = scoped
+      ? liveServices.filter(request => belongsToVendor(request, scope))
+      : liveServices;
+    return filteredRequests.map(toService);
   }, [liveServices, scoped, scope.vendorId, scope.vendorName]);
   const clientOptions = ["All", ...Array.from(new Set(services.map(service => service.client))).sort()];
   const regionOptions = ["All", ...Array.from(new Set(services.map(service => service.region))).filter(region => region !== "—").sort()];
@@ -199,6 +199,15 @@ export default function VendorServicesPage(scope: VendorScope = {}) {
   const rental      = services.filter(s => s.type   === "Rental").length;
   const openReqs    = services.filter(s => s.status === "In Progress" || s.status === "Pending").length;
   const completed   = services.filter(s => s.status === "Completed").length;
+  const serviceRevenue = useMemo(() => {
+    const filteredRequests = scoped
+      ? liveServices.filter(request => belongsToVendor(request, scope))
+      : liveServices;
+    return filteredRequests.reduce((sum, req) => {
+      const amount = Number(req.payload?.amount ?? req.payload?.cost ?? req.payload?.totalAmount ?? 0);
+      return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+  }, [liveServices, scoped, scope.vendorId, scope.vendorName]);
 
   const stats = [
     { label: "Active Services",       value: String(active),    sub: "View all active",    icon: <Wrench      className="w-5 h-5 text-green-500"  />, bg: "bg-green-50",  onClick: () => { setStatusFilter("Active");      reset(); } },
@@ -206,7 +215,7 @@ export default function VendorServicesPage(scope: VendorScope = {}) {
     { label: "Rental Assets",         value: String(rental),    sub: "View rental list",   icon: <Boxes       className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", onClick: () => { setTypeFilter("Rental");        reset(); } },
     { label: "Open Service Requests", value: String(openReqs),  sub: "View open tickets",  icon: <Ticket      className="w-5 h-5 text-orange-500" />, bg: "bg-orange-50", onClick: () => { setStatusFilter("In Progress"); reset(); } },
     { label: "Completed This Month",  value: String(completed), sub: "View completed",     icon: <CheckCircle className="w-5 h-5 text-teal-500"   />, bg: "bg-teal-50",   onClick: () => { setStatusFilter("Completed");   reset(); } },
-    { label: "Service Revenue",       value: "₹1.85 Cr",        sub: "This Financial Year", icon: <IndianRupee className="w-5 h-5 text-yellow-600" />, bg: "bg-yellow-50", onClick: () => {} },
+    { label: "Service Revenue",       value: `₹${serviceRevenue.toLocaleString("en-IN")}`, sub: "This Financial Year", icon: <IndianRupee className="w-5 h-5 text-yellow-600" />, bg: "bg-yellow-50", onClick: () => {} },
   ];
 
   const pageNums = (() => {
