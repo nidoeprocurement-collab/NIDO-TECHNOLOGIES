@@ -1426,44 +1426,31 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Client Catalog</h2>
-          <div className="flex items-center gap-2">
+          <div className="relative">
             <button
-              type="button"
-              onClick={() => setShowAddProduct(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              onClick={(e) => { e.stopPropagation(); setHeaderMenu((v) => !v); }}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+              title="More options"
+              aria-label="More options"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add New {productTab === "digital" ? "Digital" : "Physical"} Product
+              <MoreVertical size={16} />
             </button>
-            <div className="relative">
-              <button
-                onClick={(e) => { e.stopPropagation(); setHeaderMenu((v) => !v); }}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
-                title="More options"
-                aria-label="More options"
-              >
-                <MoreVertical size={16} />
-              </button>
-              {headerMenu && (
-                <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => { setShowAddProduct(true); setHeaderMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                    <span className="text-gray-400">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                    </span>
-                    Add New {productTab === "digital" ? "Digital" : "Physical"} Product
-                  </button>
-                  <button onClick={() => setHeaderMenu(false)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                    <Download size={13} className="text-gray-400" /> Export
-                  </button>
-                </div>
-              )}
-            </div>
+            {headerMenu && (
+              <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => { setShowAddProduct(true); setHeaderMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <span className="text-gray-400">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </span>
+                  Add New {productTab === "digital" ? "Digital" : "Physical"} Product
+                </button>
+                <button onClick={() => setHeaderMenu(false)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <Download size={13} className="text-gray-400" /> Export
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
