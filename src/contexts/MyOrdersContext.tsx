@@ -100,6 +100,9 @@ export interface MyOrder {
   assignedRole: string;
   assignedInitial: string;
   assignedColor: string;
+  assignedOn?: string;
+  assignmentNotes?: string;
+  assignmentCompleted?: boolean;
   orderDate: string;
   orderTime: string;
   status: MyOrderStatus;
@@ -307,6 +310,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       assignedRole: assignedUser?.role || "",
       assignedInitial: assignedName.charAt(0).toUpperCase(),
       autoAssignmentStatus: assignment?.status || "unassigned",
+      assignmentCompleted: false,
       id,
       cartItems,
     } as MyOrder;

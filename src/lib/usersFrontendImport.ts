@@ -52,7 +52,8 @@ export function importFrontendUsers(): void {
   const importedUsers = parseUsers();
   let existingUsers: any[] = [];
   try {
-    existingUsers = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+    existingUsers = Array.isArray(parsed) ? parsed.filter(Boolean) : [];
   } catch {
     existingUsers = [];
   }

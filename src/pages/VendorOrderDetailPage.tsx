@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore";
+import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
 import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, getPOAggregateAfterLineCancellation, isPOConfirmed, reopenSubOrderForVendorSelection, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
@@ -535,7 +537,94 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
 
 // ── Edit Assignment Modal ─────────────────────────────────────────────────────
 function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d: any) => void; onClose: () => void }) {
-  const [form, setForm] = useState({ ...data });
+  const [nidoUsers, setNidoUsers] = useState<NidoUser[]>(() => getUsers());
+  useEffect(() => {
+    const syncUsers = () => setNidoUsers(getUsers());
+    window.addEventListener(NIDO_USERS_EVENT, syncUsers);
+    window.addEventListener("storage", syncUsers);
+    return () => {
+      window.removeEventListener(NIDO_USERS_EVENT, syncUsers);
+      window.removeEventListener("storage", syncUsers);
+    };
+  }, []);
+
+  const isPlaceholderAssignee = (val?: string) =>
+    !val || val === "Unassigned" || val === "Assignment pending" || val === "—";
+
+  const [form, setForm] = useState(() => {
+    const initialAssignedTo = isPlaceholderAssignee(data?.assignedTo) ? "" : String(data.assignedTo);
+    const matchedUser = nidoUsers.find(
+      u => (u.name || u.email || u.employeeId || "").trim() === initialAssignedTo,
+    );
+    const initialRole = matchedUser?.role || (!data?.role || data.role === "—" ? "" : String(data.role));
+    return {
+      ...data,
+      assignedTo: initialAssignedTo,
+      role: initialRole,
+    };
+  });
+
+  const userOptions = useMemo(() => {
+    const list = nidoUsers
+      .map(u => ({
+        id: u.id,
+        name: (u.name || u.email || u.employeeId || "").trim(),
+        role: (u.role || "").trim(),
+      }))
+      .filter(u => Boolean(u.name));
+    if (form.assignedTo && !list.some(u => u.name === form.assignedTo)) {
+      list.push({ id: "current-assignee", name: form.assignedTo, role: form.role || "" });
+    }
+    return sortByDropdownLabel(list, u => u.name);
+  }, [nidoUsers, form.assignedTo, form.role]);
+
+  const handleAssignedToChange = (selectedName: string) => {
+    const matchedUser = nidoUsers.find(
+      u => (u.name || u.email || u.employeeId || "").trim() === selectedName,
+    );
+    const initials = (selectedName || "U")
+      .split(" ")
+      .filter(Boolean)
+      .map(w => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
+    setForm(f => ({
+      ...f,
+      assignedTo: selectedName,
+      initials,
+      role: matchedUser ? (matchedUser.role || "") : (selectedName ? f.role : ""),
+    }));
+  };
+
+  const handleSave = () => {
+    const assignedTo = (form.assignedTo || "").trim() || "Unassigned";
+    const initials = assignedTo
+      .split(" ")
+      .filter(Boolean)
+      .map((w: string) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
+    onSave({
+      ...form,
+      assignedTo,
+      initials,
+      role: (form.role || "").trim() || "—",
+    });
+    onClose();
+  };
+
+  const fieldInputSt: React.CSSProperties = {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid #d1d5db",
+    borderRadius: 7,
+    fontSize: 13,
+    fontFamily: "inherit",
+    boxSizing: "border-box",
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
@@ -544,18 +633,45 @@ function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d:
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
-          {[["assignedTo", "Assigned To"], ["role", "Role"], ["notes", "Notes"]].map(([key, label]) => (
-            <div key={key}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
-              {key === "notes"
-                ? <textarea value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} rows={3} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
-                : <input value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }} />}
-            </div>
-          ))}
+          <div>
+            <label htmlFor="po-assignment-user" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Assigned To</label>
+            <select
+              id="po-assignment-user"
+              value={form.assignedTo}
+              onChange={e => handleAssignedToChange(e.target.value)}
+              style={{ ...fieldInputSt, background: "#fff", cursor: "pointer" }}
+            >
+              <option value="">Select user</option>
+              {userOptions.map(u => (
+                <option key={u.id} value={u.name}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="po-assignment-role" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Role</label>
+            <input
+              id="po-assignment-role"
+              value={form.role}
+              onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+              style={fieldInputSt}
+            />
+          </div>
+          <div>
+            <label htmlFor="po-assignment-notes" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Notes</label>
+            <textarea
+              id="po-assignment-notes"
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              rows={3}
+              style={{ ...fieldInputSt, resize: "vertical" }}
+            />
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={() => { onSave(form); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save</button>
+          <button onClick={handleSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save</button>
         </div>
       </div>
     </div>

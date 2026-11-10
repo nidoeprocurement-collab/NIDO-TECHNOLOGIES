@@ -6,6 +6,8 @@ import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore";
+import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
@@ -1981,23 +1983,117 @@ function DocumentsNotesTab({
 
 // ── Misc modals ───────────────────────────────────────────────────────────────
 function EditAssignmentModal({ data, onSave, onClose }) {
-  const [form, setForm] = useState(data);
+  const [nidoUsers, setNidoUsers] = useState<NidoUser[]>(() => getUsers());
+  useEffect(() => {
+    const syncUsers = () => setNidoUsers(getUsers());
+    window.addEventListener(NIDO_USERS_EVENT, syncUsers);
+    window.addEventListener("storage", syncUsers);
+    return () => {
+      window.removeEventListener(NIDO_USERS_EVENT, syncUsers);
+      window.removeEventListener("storage", syncUsers);
+    };
+  }, []);
+
+  const isPlaceholderAssignee = (val?: string) =>
+    !val || val === "Unassigned" || val === "Assignment pending" || val === "—";
+
+  const [form, setForm] = useState(() => {
+    const initialAssignedTo = isPlaceholderAssignee(data?.assignedTo) ? "" : String(data.assignedTo);
+    const matchedUser = nidoUsers.find(
+      u => (u.name || u.email || u.employeeId || "").trim() === initialAssignedTo,
+    );
+    const initialRole = matchedUser?.role || (!data?.role || data.role === "—" ? "" : String(data.role));
+    return {
+      ...data,
+      assignedTo: initialAssignedTo,
+      role: initialRole,
+    };
+  });
+
+  const userOptions = useMemo(() => {
+    const list = nidoUsers
+      .map(u => ({
+        id: u.id,
+        name: (u.name || u.email || u.employeeId || "").trim(),
+        role: (u.role || "").trim(),
+      }))
+      .filter(u => Boolean(u.name));
+    if (form.assignedTo && !list.some(u => u.name === form.assignedTo)) {
+      list.push({ id: "current-assignee", name: form.assignedTo, role: form.role || "" });
+    }
+    return sortByDropdownLabel(list, u => u.name);
+  }, [nidoUsers, form.assignedTo, form.role]);
+
+  const handleAssignedToChange = (selectedName: string) => {
+    const matchedUser = nidoUsers.find(
+      u => (u.name || u.email || u.employeeId || "").trim() === selectedName,
+    );
+    setForm((prev: any) => ({
+      ...prev,
+      assignedTo: selectedName,
+      role: matchedUser ? (matchedUser.role || "") : (selectedName ? prev.role : ""),
+    }));
+  };
+
+  const handleSave = () => {
+    onSave({
+      ...form,
+      assignedTo: (form.assignedTo || "").trim() || "Unassigned",
+      role: (form.role || "").trim() || "—",
+    });
+    onClose();
+  };
+
   return (
     <Overlay onClose={onClose}>
       <ModalBox title="Edit Assignment" onClose={onClose}>
         <div style={{ padding: "20px 22px 8px" }}>
-          {[["assignedTo", "Assigned To"], ["role", "Role"], ["assignedOn", "Assigned On"]].map(([k, label]) => (
-            <div key={k} style={{ marginBottom: 14 }}>
-              <label style={lbSt}>{label}</label>
-              <input value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} style={inSt} />
-            </div>
-          ))}
           <div style={{ marginBottom: 14 }}>
-            <label style={lbSt}>Notes</label>
-            <textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inSt, resize: "vertical" }} />
+            <label htmlFor="order-assignment-user" style={lbSt}>Assigned To</label>
+            <select
+              id="order-assignment-user"
+              value={form.assignedTo}
+              onChange={e => handleAssignedToChange(e.target.value)}
+              style={{ ...inSt, background: "#fff", cursor: "pointer" }}
+            >
+              <option value="">Select user</option>
+              {userOptions.map(u => (
+                <option key={u.id} value={u.name}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label htmlFor="order-assignment-role" style={lbSt}>Role</label>
+            <input
+              id="order-assignment-role"
+              value={form.role}
+              onChange={e => setForm({ ...form, role: e.target.value })}
+              style={inSt}
+            />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label htmlFor="order-assignment-date" style={lbSt}>Assigned On</label>
+            <input
+              id="order-assignment-date"
+              value={form.assignedOn}
+              onChange={e => setForm({ ...form, assignedOn: e.target.value })}
+              style={inSt}
+            />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label htmlFor="order-assignment-notes" style={lbSt}>Notes</label>
+            <textarea
+              id="order-assignment-notes"
+              rows={3}
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              style={{ ...inSt, resize: "vertical" }}
+            />
           </div>
         </div>
-        <ModalFooter onCancel={onClose} onSave={() => { onSave(form); onClose(); }} />
+        <ModalFooter onCancel={onClose} onSave={handleSave} />
       </ModalBox>
     </Overlay>
   );
@@ -3932,6 +4028,7 @@ export default function MyOrderPage() {
   };
 
   const [showEditAssignment, setShowEditAssignment] = useState(false);
+  const autoPromptedOrderIdRef = useRef<string | null>(null);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [pendingShippedTarget, setPendingShippedTarget] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -3942,9 +4039,54 @@ export default function MyOrderPage() {
   const [assignment, setAssignment] = useState({
     assignedTo: order?.assigned || "Unassigned",
     role: order?.assignedRole || "—",
-    assignedOn: order ? `${order.orderDate} ${order.orderTime}` : "—",
-    notes: "Oversees end-to-end execution and vendor coordination for this order.",
+    assignedOn: order?.assignedOn || (order ? `${order.orderDate} ${order.orderTime}` : "—"),
+    notes: order?.assignmentNotes ?? "Oversees end-to-end execution and vendor coordination for this order.",
   });
+
+  const handleSaveAssignment = (nextAssignment: typeof assignment) => {
+    const normalizedAssignedTo = (nextAssignment.assignedTo || "").trim() || "Unassigned";
+    const normalizedRole = (nextAssignment.role || "").trim() || "—";
+    const normalizedAssignedOn =
+      (nextAssignment.assignedOn || "").trim() || (order ? `${order.orderDate} ${order.orderTime}` : "—");
+    const normalizedNotes = nextAssignment.notes ?? "";
+    const updatedAssignment = {
+      assignedTo: normalizedAssignedTo,
+      role: normalizedRole,
+      assignedOn: normalizedAssignedOn,
+      notes: normalizedNotes,
+    };
+    setAssignment(updatedAssignment);
+    if (!order) return;
+    const isAssigned =
+      normalizedAssignedTo !== "Unassigned" &&
+      normalizedAssignedTo !== "Assignment pending" &&
+      normalizedAssignedTo !== "—";
+    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
+    const updatedAt = new Date().toISOString();
+    setOrders(prev => prev.map(existing => existing.id !== orderId
+      ? existing
+      : {
+          ...existing,
+          assigned: normalizedAssignedTo,
+          assignedRole: normalizedRole === "—" ? "" : normalizedRole,
+          assignedInitial: normalizedAssignedTo.charAt(0).toUpperCase() || "U",
+          assignedOn: normalizedAssignedOn,
+          assignmentNotes: normalizedNotes,
+          assignmentCompleted: isAssigned,
+          autoAssignmentStatus: isAssigned ? "assigned" : "unassigned",
+          updatedBy: actor,
+          updatedAt,
+          updateCount: (Number(existing.updateCount) || 0) + 1,
+        }
+    ));
+    if (isAssigned && order.assigned !== normalizedAssignedTo) {
+      appendOrderActivity(
+        orderId,
+        `Order ${orderId} was assigned to ${normalizedAssignedTo}${normalizedRole && normalizedRole !== "—" ? ` (${normalizedRole})` : ""}.`,
+        { actor, eventType: "activity" },
+      );
+    }
+  };
 
   // Reset all derived state whenever the orderId changes or order first resolves from context
   useEffect(() => {
@@ -3958,6 +4100,22 @@ export default function MyOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, order?.id]);
 
+  // Auto-open the Edit Assignment popup as soon as a newly placed / unassigned
+  // order (physical or digital) is opened by a NIDO platform user.
+  useEffect(() => {
+    if (!order || isClientPortalUser || isOrderCancelled) return;
+    if (autoPromptedOrderIdRef.current === order.id) return;
+    autoPromptedOrderIdRef.current = order.id;
+    const isUnassigned =
+      !order.assigned ||
+      order.assigned === "Unassigned" ||
+      order.assigned === "Assignment pending" ||
+      order.assigned === "—";
+    if (isUnassigned || !order.assignmentCompleted) {
+      setShowEditAssignment(true);
+    }
+  }, [order, isClientPortalUser, isOrderCancelled]);
+
   // Auto-assignment completes asynchronously after checkout. Keep this panel
   // synchronized when MyOrdersContext receives the server assignment result.
   useEffect(() => {
@@ -3969,10 +4127,10 @@ export default function MyOrderPage() {
           ? "Assignment pending"
           : "Unassigned",
       role: order.assignedRole || "—",
-      assignedOn: `${order.orderDate} ${order.orderTime}`,
-      notes: "Oversees end-to-end execution and vendor coordination for this order.",
+      assignedOn: order.assignedOn || `${order.orderDate} ${order.orderTime}`,
+      notes: order.assignmentNotes ?? "Oversees end-to-end execution and vendor coordination for this order.",
     });
-  }, [order?.id, order?.assigned, order?.assignedRole, order?.autoAssignmentStatus, order?.orderDate, order?.orderTime]);
+  }, [order?.id, order?.assigned, order?.assignedRole, order?.assignedOn, order?.assignmentNotes, order?.autoAssignmentStatus, order?.orderDate, order?.orderTime]);
 
 
   // Persist customer-facing status/tracking changes for Order Details and the
@@ -5282,7 +5440,7 @@ export default function MyOrderPage() {
       </div>
 
 
-      {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
+      {showEditAssignment && <EditAssignmentModal data={assignment} onSave={handleSaveAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={saveTrackingForSubOrder} onClose={() => setTrackingTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={(reason) => handleCancelItem(cancelTarget, reason)} onClose={() => setCancelTarget(null)} />}
       {vendorTarget && (
