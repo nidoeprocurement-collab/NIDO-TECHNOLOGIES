@@ -262,6 +262,7 @@ export default function AddVendorPage() {
     qualityRating: 0,
     deliveryRating: 0,
     serviceRating: 0,
+    complianceRating: 0,
     blacklisted: '',
     contractStatus: '',
     onboardingDate: '',
@@ -378,7 +379,12 @@ export default function AddVendorPage() {
     }, 1000);
     const newId = `${getPrefix('vendor') || 'VND-'}${maxId + 1}`;
 
-    const avgRating = [formData.qualityRating, formData.deliveryRating, formData.serviceRating].filter(r => r > 0);
+    const avgRating = [
+      formData.qualityRating,
+      formData.deliveryRating,
+      formData.serviceRating,
+      formData.complianceRating,
+    ].filter(r => r > 0);
     const rating = avgRating.length > 0
       ? parseFloat((avgRating.reduce((a, b) => a + b, 0) / avgRating.length).toFixed(1))
       : 0;
@@ -416,12 +422,12 @@ export default function AddVendorPage() {
       mobile: formData.mobileNumber ? `${formData.mobile} ${formData.mobileNumber}` : '',
       alternateEmail: formData.alternateEmail,
       rating,
-       region: addressDetails.billing.state || addressDetails.billing.country || '',
+      region: addressDetails.billing.state || addressDetails.billing.country || '',
       status: mappedStatus,
       onboardedDate,
       monthSpend: 0,
       score: rating,
-       address: formatAddressDetails(addressDetails.billing),
+      address: formatAddressDetails(addressDetails.billing),
       totalSpend: 0,
       complianceIssues: 0,
       archived: false,
@@ -455,38 +461,38 @@ export default function AddVendorPage() {
       internalNotes: formData.internalNotes,
       visibility: formData.visibility,
       // Registered address
-       city: addressDetails.billing.city || formData.city,
-       state: addressDetails.billing.state || formData.state,
-       country: addressDetails.billing.country || formData.country,
-       zipCode: addressDetails.billing.pinCode || formData.pincode,
-       addressLine1: addressDetails.billing.addressLine1 || formData.registeredAddress,
-       addressLine2: addressDetails.billing.addressLine2,
-       billingAttention: addressDetails.billing.attention,
-       billingAddressLine1: addressDetails.billing.addressLine1,
-       billingAddressLine2: addressDetails.billing.addressLine2,
-       billingCity: addressDetails.billing.city,
-       billingState: addressDetails.billing.state,
-       billingZip: addressDetails.billing.pinCode,
-       billingCountry: addressDetails.billing.country,
-       billingPhoneCountryCode: addressDetails.billing.phoneCountryCode,
-       billingPhone: addressDetails.billing.phone,
-       billingFaxNumber: addressDetails.billing.faxNumber,
-       shippingAttention: addressDetails.shipping.attention,
-       shippingAddressLine1: addressDetails.shipping.addressLine1,
-       shippingAddressLine2: addressDetails.shipping.addressLine2,
-       shippingCity: addressDetails.shipping.city,
-       shippingState: addressDetails.shipping.state,
-       shippingZip: addressDetails.shipping.pinCode,
-       shippingCountry: addressDetails.shipping.country,
-       shippingPhoneCountryCode: addressDetails.shipping.phoneCountryCode,
-       shippingPhone: addressDetails.shipping.phone,
-       shippingFaxNumber: addressDetails.shipping.faxNumber,
+      city: addressDetails.billing.city || formData.city,
+      state: addressDetails.billing.state || formData.state,
+      country: addressDetails.billing.country || formData.country,
+      zipCode: addressDetails.billing.pinCode || formData.pincode,
+      addressLine1: addressDetails.billing.addressLine1 || formData.registeredAddress,
+      addressLine2: addressDetails.billing.addressLine2,
+      billingAttention: addressDetails.billing.attention,
+      billingAddressLine1: addressDetails.billing.addressLine1,
+      billingAddressLine2: addressDetails.billing.addressLine2,
+      billingCity: addressDetails.billing.city,
+      billingState: addressDetails.billing.state,
+      billingZip: addressDetails.billing.pinCode,
+      billingCountry: addressDetails.billing.country,
+      billingPhoneCountryCode: addressDetails.billing.phoneCountryCode,
+      billingPhone: addressDetails.billing.phone,
+      billingFaxNumber: addressDetails.billing.faxNumber,
+      shippingAttention: addressDetails.shipping.attention,
+      shippingAddressLine1: addressDetails.shipping.addressLine1,
+      shippingAddressLine2: addressDetails.shipping.addressLine2,
+      shippingCity: addressDetails.shipping.city,
+      shippingState: addressDetails.shipping.state,
+      shippingZip: addressDetails.shipping.pinCode,
+      shippingCountry: addressDetails.shipping.country,
+      shippingPhoneCountryCode: addressDetails.shipping.phoneCountryCode,
+      shippingPhone: addressDetails.shipping.phone,
+      shippingFaxNumber: addressDetails.shipping.faxNumber,
       // Related document metadata (file binaries are not stored in localStorage)
       relatedDocuments: additionalDocs.map(d => ({ name: d.name, size: d.size, sizeBytes: d.sizeBytes, type: d.type })),
       performanceQuality: formData.qualityRating * 20,
       performanceDelivery: formData.deliveryRating * 20,
       performanceResponsiveness: formData.serviceRating * 20,
-      performanceCompliance: 0,
+      performanceCompliance: formData.complianceRating * 20,
     });
 
     toast.success(`Vendor "${formData.vendorName}" (${newId}) onboarded successfully`);
@@ -807,10 +813,16 @@ export default function AddVendorPage() {
             } />
           </div>
 
-          <FormField label="Preferred Vendor" input={
-            <AddableSelect name="preferredVendor" value={formData.preferredVendor} onChange={handleChange}
-              baseOptions={preferredBase} addLabel="+ Add New Option" placeholder="Select status" className={selectClass} />
-          } />
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Compliance Rating</label>
+              <StarRating value={formData.complianceRating} onChange={handleRatingChange} name="complianceRating" />
+            </div>
+            <FormField label="Preferred Vendor" input={
+              <AddableSelect name="preferredVendor" value={formData.preferredVendor} onChange={handleChange}
+                baseOptions={preferredBase} addLabel="+ Add New Option" placeholder="Select status" className={selectClass} />
+            } />
+          </div>
         </FormSection>
 
         {/* ── Section 7: Additional Information ───────────────────────────── */}

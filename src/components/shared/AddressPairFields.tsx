@@ -40,7 +40,18 @@ const DEFAULT_STATES = [
   "Others",
 ];
 
-const PHONE_CODES = ["+91", "+1", "+44", "+971", "+65", "+61", "+86", "+81", "+49", "+33"];
+const PHONE_CODES = [
+  { value: "+91", label: "+91 (India)" },
+  { value: "+1", label: "+1 (USA)" },
+  { value: "+44", label: "+44 (UK)" },
+  { value: "+971", label: "+971 (UAE)" },
+  { value: "+65", label: "+65 (Singapore)" },
+  { value: "+61", label: "+61 (Australia)" },
+  { value: "+86", label: "+86 (China)" },
+  { value: "+81", label: "+81 (Japan)" },
+  { value: "+49", label: "+49 (Germany)" },
+  { value: "+33", label: "+33 (France)" },
+];
 
 const controlClass =
   "h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -155,23 +166,28 @@ function AddressColumn({
         <label htmlFor={`${stateListId}-phone`} className="text-sm font-medium text-gray-700">
           Phone
         </label>
-        <div className="flex min-w-0">
+        <div className="flex gap-2 min-w-0">
           <select
-            value={address.phoneCountryCode}
+            value={address.phoneCountryCode?.split(" ")[0] || "+91"}
             onChange={(event) => set("phoneCountryCode", event.target.value)}
             aria-label={`${title} phone country code`}
-            className={`${controlClass} w-20 shrink-0 rounded-r-none cursor-pointer`}
+            className="h-9 w-auto shrink-0 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
           >
-            {PHONE_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
+            {PHONE_CODES.map((code) => (
+              <option key={code.value} value={code.value}>
+                {code.label}
+              </option>
+            ))}
           </select>
           <input
             id={`${stateListId}-phone`}
             type="tel"
             inputMode="numeric"
             maxLength={10}
+            placeholder="10-digit phone number"
             value={address.phone}
             onChange={(event) => set("phone", sanitizePhoneNumber(event.target.value))}
-            className={`${controlClass} min-w-0 rounded-l-none border-l-0`}
+            className="h-9 flex-1 min-w-0 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
         </div>
 

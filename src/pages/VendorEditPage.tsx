@@ -115,6 +115,7 @@ function createEditFormData(vendor?: StoredVendor) {
     qualityRating: scoreToStars(vendor?.performanceQuality),
     deliveryRating: scoreToStars(vendor?.performanceDelivery),
     serviceRating: scoreToStars(vendor?.performanceResponsiveness),
+    complianceRating: scoreToStars(vendor?.performanceCompliance),
     blacklisted: vendor?.blacklisted ?? '',
     contractStatus: (vendor?.contractStatus ?? vendor?.status ?? '') as string,
     onboardingDate: toDateInputValue(vendor?.onboardingDate ?? vendor?.onboardedDate),
@@ -247,6 +248,15 @@ export default function VendorEditPage() {
     }
     const phone = formData.phoneNumber ? `${formData.phone} ${formData.phoneNumber}` : '';
     const mobile = formData.mobileNumber ? `${formData.mobile} ${formData.mobileNumber}` : '';
+    const ratedValues = [
+      formData.qualityRating,
+      formData.deliveryRating,
+      formData.serviceRating,
+      formData.complianceRating,
+    ].filter(r => r > 0);
+    const rating = ratedValues.length > 0
+      ? parseFloat((ratedValues.reduce((a, b) => a + b, 0) / ratedValues.length).toFixed(1))
+      : vendor.rating;
     updateVendor(vendor.id, {
       ...getVendorUpdateAuditFields(currentAuthenticatedUser),
       lastUpdatedFormData: { ...formData },
@@ -284,10 +294,13 @@ export default function VendorEditPage() {
       isoStatus: formData.isoStatus,
       qualityCertification: formData.qualityCertification,
       environmentalCertification: formData.environmentalCertification,
+      rating,
+      score: rating,
       // Convert 1-5 stars back to 0-100 scale
       performanceQuality: starsToScore(formData.qualityRating),
       performanceDelivery: starsToScore(formData.deliveryRating),
       performanceResponsiveness: starsToScore(formData.serviceRating),
+      performanceCompliance: starsToScore(formData.complianceRating),
       onboardedDate: formData.onboardingDate,
       onboardingDate: formData.onboardingDate,
       founded: formData.yearOfEstablishment,
@@ -685,13 +698,19 @@ export default function VendorEditPage() {
             } />
           </div>
 
-          <FormField label="Preferred Vendor" input={
-            <select name="preferredVendor" value={formData.preferredVendor} onChange={handleChange}
-              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">Select status</option>
-              {preferredOptions.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          } />
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Compliance Rating</label>
+              <StarRatingInput value={formData.complianceRating} onChange={handleRatingChange} name="complianceRating" />
+            </div>
+            <FormField label="Preferred Vendor" input={
+              <select name="preferredVendor" value={formData.preferredVendor} onChange={handleChange}
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Select status</option>
+                {preferredOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            } />
+          </div>
         </FormSection>
 
         {/* Section 7: Documents */}
