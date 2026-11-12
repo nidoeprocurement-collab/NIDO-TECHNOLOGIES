@@ -82,8 +82,21 @@ export const CLIENT_IMPORT_HEADERS = [
   "Status",
 ] as const;
 
-const importValue = (row: Record<string, string>, header: string) =>
-  (row[header] || "").trim();
+const importValue = (row: Record<string, string>, ...headers: string[]) => {
+  for (const header of headers) {
+    const direct = row[header];
+    if (direct !== undefined && String(direct).trim() !== "") {
+      return String(direct).trim();
+    }
+    const matchingKey = Object.keys(row).find(
+      (key) => key.trim().toLowerCase() === header.trim().toLowerCase(),
+    );
+    if (matchingKey && String(row[matchingKey] ?? "").trim() !== "") {
+      return String(row[matchingKey]).trim();
+    }
+  }
+  return "";
+};
 
 const importBoolean = (value: string) =>
   ["true", "yes", "1", "y"].includes(value.toLowerCase());
@@ -134,8 +147,8 @@ export function clientFromImportRow(
   row: Record<string, string>,
   fallbackId: string,
 ): StoredClient {
-  const id = importValue(row, "Client ID") || fallbackId;
-  const name = importValue(row, "Company Name");
+  const id = importValue(row, "Client ID", "ID", "client_id") || fallbackId;
+  const name = importValue(row, "Company Name", "Client Name", "Name", "company_name", "name");
   const category = importValue(row, "Category");
   const tier = importValue(row, "Client Tier");
   const rep = importValue(row, "Contact Person");
@@ -234,6 +247,107 @@ export function clientFromImportRow(
     same_address: importBoolean(importValue(row, "Same Address")),
     status: importValue(row, "Status") || "active",
   };
+}
+
+export interface SkippedClientImportItem {
+  id: string;
+  name: string;
+  reason: string;
+}
+
+export interface ClientBulkImportResult {
+  imported: StoredClient[];
+  skipped: SkippedClientImportItem[];
+}
+
+/**
+ * Evaluate bulk-imported rows against already-added clients in the platform.
+ * Any row whose Client ID or Client Name matches an existing client (or an
+ * earlier row in the same import file) is not imported and is returned in `skipped`.
+ */
+export function evaluateClientBulkImport(
+  rows: Record<string, string>[],
+  existingClients: StoredClient[],
+  prefix = "CL-",
+): ClientBulkImportResult {
+  const existingIds = new Set(
+    existingClients
+      .map((client) => String(client.id || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const existingNames = new Set(
+    existingClients
+      .map((client) => String(client.company_name || client.name || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  let maxIdNum = existingClients.reduce((max, client) => {
+    const num = parseInt(String(client.id || "").replace(/^\D+/, ""), 10);
+    return Number.isFinite(num) ? Math.max(max, num) : max;
+  }, 0);
+
+  const imported: StoredClient[] = [];
+  const skipped: SkippedClientImportItem[] = [];
+
+  for (const row of rows) {
+    const hasAnyValue = Object.values(row).some((val) => String(val ?? "").trim() !== "");
+    if (!hasAnyValue) continue;
+
+    const rawId = importValue(row, "Client ID", "ID", "client_id");
+    const rawName = importValue(row, "Company Name", "Client Name", "Name", "company_name", "name");
+
+    if (!rawName && !rawId) continue;
+
+    const normalizedId = rawId.trim().toLowerCase();
+    const normalizedName = rawName.trim().toLowerCase();
+
+    const duplicateId = Boolean(normalizedId && existingIds.has(normalizedId));
+    const duplicateName = Boolean(normalizedName && existingNames.has(normalizedName));
+
+    if (duplicateId || duplicateName) {
+      const reason =
+        duplicateId && duplicateName
+          ? "Client ID and Client Name already exist"
+          : duplicateId
+            ? "Client ID already exists"
+            : "Client Name already exists";
+      skipped.push({
+        id: rawId || "—",
+        name: rawName || "—",
+        reason,
+      });
+      continue;
+    }
+
+    if (!rawName) {
+      skipped.push({
+        id: rawId || "—",
+        name: "—",
+        reason: "Missing Client Name",
+      });
+      continue;
+    }
+
+    let finalId = rawId.trim();
+    if (!finalId) {
+      do {
+        maxIdNum += 1;
+        finalId = `${prefix}${String(maxIdNum).padStart(5, "0")}`;
+      } while (existingIds.has(finalId.toLowerCase()));
+    } else {
+      const parsedNum = parseInt(finalId.replace(/^\D+/, ""), 10);
+      if (Number.isFinite(parsedNum)) {
+        maxIdNum = Math.max(maxIdNum, parsedNum);
+      }
+    }
+
+    const client = clientFromImportRow(row, finalId);
+    existingIds.add(client.id.trim().toLowerCase());
+    existingNames.add(client.name.trim().toLowerCase());
+    imported.push(client);
+  }
+
+  return { imported, skipped };
 }
 
 const exportValue = (value: unknown) => String(value ?? "");

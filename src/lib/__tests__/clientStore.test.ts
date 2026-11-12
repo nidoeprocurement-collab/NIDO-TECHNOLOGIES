@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import {
   addClient,
   archiveClientById,
+  evaluateClientBulkImport,
   getArchivedClients,
   getClients,
   isSharedClient,
@@ -83,5 +84,45 @@ describe("clientStore account scoping and live operations", () => {
     expect(restoreArchivedClient("CL-00002")).toBe(true)
     expect(getClients().some((c) => c.id === "CL-00002")).toBe(true)
     expect(getArchivedClients().some((c) => c.id === "CL-00002")).toBe(false)
+  })
+
+  it("skips rows with duplicate Client ID or Client Name during bulk import and returns imported/skipped lists", () => {
+    const existing = [
+      makeClient("CL-00001", "Infosys Limited"),
+      makeClient("CL-00002", "Tata Consultancy Services"),
+    ]
+
+    const rows = [
+      { "Client ID": "CL-00001", "Company Name": "Wipro Limited" },
+      { "Client ID": "CL-00005", "Company Name": "Infosys Limited" },
+      { "Client ID": "CL-00002", "Company Name": "Tata Consultancy Services" },
+      { "Client ID": "CL-00003", "Company Name": "HCL Technologies" },
+      { "Client ID": "", "Company Name": "Tech Mahindra" },
+    ]
+
+    const result = evaluateClientBulkImport(rows, existing, "CL-")
+
+    expect(result.imported.map((c) => ({ id: c.id, name: c.name }))).toEqual([
+      { id: "CL-00003", name: "HCL Technologies" },
+      { id: "CL-00004", name: "Tech Mahindra" },
+    ])
+
+    expect(result.skipped).toEqual([
+      {
+        id: "CL-00001",
+        name: "Wipro Limited",
+        reason: "Client ID already exists",
+      },
+      {
+        id: "CL-00005",
+        name: "Infosys Limited",
+        reason: "Client Name already exists",
+      },
+      {
+        id: "CL-00002",
+        name: "Tata Consultancy Services",
+        reason: "Client ID and Client Name already exist",
+      },
+    ])
   })
 })

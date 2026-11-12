@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
 import { getPrefix } from "@/lib/configService"
 import { toast } from "sonner"
+import * as XLSX from "xlsx"
 import {
   getClients as getStoredClients,
   saveClients as saveStoredClients,
@@ -12,9 +13,10 @@ import {
   saveArchivedClients,
   restoreArchivedClient,
   CLIENT_IMPORT_HEADERS,
-  clientFromImportRow,
   clientToImportValues,
   parseClientCsv,
+  evaluateClientBulkImport,
+  type ClientBulkImportResult,
   type StoredClient,
   type ArchivedClient,
 } from "@/lib/clientStore"
@@ -485,6 +487,7 @@ export default function ClientsPageUI() {
   const [archivedOverview, setArchivedOverview] = useState<ArchivedClient | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
+  const [bulkImportSummary, setBulkImportSummary] = useState<ClientBulkImportResult | null>(null)
   const [provisionResult, setProvisionResult] = useState<ProvisionFlow | null>(null)
   const [provisionConfirmation, setProvisionConfirmation] = useState<ProvisionFlow | null>(null)
 
@@ -600,38 +603,77 @@ export default function ClientsPageUI() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
-  const handleBulkImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const csv = e.target?.result as string
-        const rows = parseClientCsv(csv)
-        const prefix = getPrefix("client") || "CL-"
-        const maxId = clients.length > 0
-          ? Math.max(...clients.map(c => parseInt(c.id.replace(/^\D+/, ""), 10) || 0))
-          : 0
-        const newClients: StoredClient[] = rows.map((row, index) =>
-          clientFromImportRow(
-            row,
-            `${prefix}${String(maxId + index + 1).padStart(5, "0")}`,
-          ),
-        )
-        const existingIds = new Set(clients.map(c => c.id))
-        const uniqueClients = newClients.filter(c => {
-          if (!c.name.trim()) return false
-          if (existingIds.has(c.id)) return false
-          existingIds.add(c.id)
-          return true
-        })
-        persistClients([...clients, ...uniqueClients])
-        setShowBulkImport(false)
-        toast.success(`${uniqueClients.length} client(s) imported successfully.`)
-      } catch {
-        toast.error("Error parsing CSV file. Please check the format.")
-      }
+  const processBulkImportRows = (rows: Record<string, string>[]) => {
+    const prefix = getPrefix("client") || "CL-"
+    const result = evaluateClientBulkImport(rows, clients, prefix)
+
+    if (result.imported.length > 0) {
+      persistClients([...clients, ...result.imported])
     }
-    reader.readAsText(file)
+
+    setShowBulkImport(false)
+    setBulkImportSummary(result)
+
+    if (result.imported.length > 0 && result.skipped.length > 0) {
+      toast.warning(
+        `${result.imported.length} client(s) imported, ${result.skipped.length} duplicate client(s) not imported.`,
+      )
+    } else if (result.imported.length > 0) {
+      toast.success(`${result.imported.length} client(s) imported successfully.`)
+    } else if (result.skipped.length > 0) {
+      toast.error(
+        `0 clients imported. ${result.skipped.length} client(s) skipped because Client ID or Client Name already exists.`,
+      )
+    } else {
+      toast.error("No valid client rows found in the uploaded file.")
+    }
+  }
+
+  const handleBulkImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name)
+    const reader = new FileReader()
+
+    if (isExcel) {
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: "array" })
+          const firstSheetName = workbook.SheetNames[0]
+          const worksheet = firstSheetName ? workbook.Sheets[firstSheetName] : undefined
+          if (!worksheet) {
+            toast.error("No worksheet found in the Excel file.")
+            return
+          }
+          const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" })
+          const rows: Record<string, string>[] = rawRows.map((raw) =>
+            Object.fromEntries(
+              Object.entries(raw).map(([k, v]) => [k.trim(), String(v ?? "").trim()]),
+            ),
+          )
+          processBulkImportRows(rows)
+        } catch {
+          toast.error("Error parsing Excel file. Please check the format.")
+        } finally {
+          event.target.value = ""
+        }
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      reader.onload = (e) => {
+        try {
+          const csv = e.target?.result as string
+          const rows = parseClientCsv(csv)
+          processBulkImportRows(rows)
+        } catch {
+          toast.error("Error parsing CSV file. Please check the format.")
+        } finally {
+          event.target.value = ""
+        }
+      }
+      reader.readAsText(file)
+    }
   }
 
   return (
@@ -926,16 +968,136 @@ export default function ClientsPageUI() {
             <div className="p-6 space-y-4">
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-gray-400 transition-colors">
                 <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-600">Click to upload CSV</span>
-                <span className="text-xs text-gray-500 mt-1">Use the template for correct format</span>
-                <input type="file" accept=".csv" onChange={handleBulkImport} className="hidden" />
+                <span className="text-sm text-gray-600">Click to upload CSV or Excel</span>
+                <span className="text-xs text-gray-500 mt-1">Use the template for correct format (.csv, .xlsx, .xls)</span>
+                <input type="file" accept=".csv,.xlsx,.xls" onChange={handleBulkImport} className="hidden" />
               </label>
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-700"><strong>Note:</strong> Duplicate Client IDs are skipped. New clients are saved immediately.</p>
+                <p className="text-xs text-blue-700"><strong>Note:</strong> Clients with an existing Client ID or Client Name are not imported. New clients are saved immediately.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t">
               <button onClick={() => setShowBulkImport(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Notification Summary Popup */}
+      {bulkImportSummary && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bulk-import-summary-title"
+        >
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 id="bulk-import-summary-title" className="text-lg font-semibold text-gray-900">
+                  Bulk Import Notification
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Summary of imported and skipped clients
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBulkImportSummary(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-emerald-700">Imported Clients</p>
+                    <p className="text-xl font-bold text-emerald-900">{bulkImportSummary.imported.length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                  <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-red-700">Not Imported Clients</p>
+                    <p className="text-xl font-bold text-red-900">{bulkImportSummary.skipped.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {bulkImportSummary.skipped.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">
+                    Not Imported ({bulkImportSummary.skipped.length})
+                  </h3>
+                  <div className="border border-red-100 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-red-50/70 text-red-800 border-b border-red-100">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold">Client ID</th>
+                          <th className="px-3 py-2 text-left font-semibold">Client Name</th>
+                          <th className="px-3 py-2 text-left font-semibold">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-red-50">
+                        {bulkImportSummary.skipped.map((item, idx) => (
+                          <tr key={`${item.id}-${item.name}-${idx}`} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{item.id}</td>
+                            <td className="px-3 py-2 text-gray-700">{item.name}</td>
+                            <td className="px-3 py-2 text-red-600 font-medium">{item.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {bulkImportSummary.imported.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
+                    Imported ({bulkImportSummary.imported.length})
+                  </h3>
+                  <div className="border border-emerald-100 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-emerald-50/70 text-emerald-800 border-b border-emerald-100">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold">Client ID</th>
+                          <th className="px-3 py-2 text-left font-semibold">Client Name</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-emerald-50">
+                        {bulkImportSummary.imported.map((client) => (
+                          <tr key={client.id} className="bg-white">
+                            <td className="px-3 py-2 font-medium text-blue-600 whitespace-nowrap">{client.id}</td>
+                            <td className="px-3 py-2 text-gray-800 font-medium">{client.name}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {bulkImportSummary.imported.length === 0 && bulkImportSummary.skipped.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No valid client rows were found in the selected file.
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end px-5 py-3 border-t border-gray-100 bg-gray-50">
+              <Button
+                type="button"
+                data-confirmation-skip="true"
+                onClick={() => setBulkImportSummary(null)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                OK
+              </Button>
             </div>
           </div>
         </div>
