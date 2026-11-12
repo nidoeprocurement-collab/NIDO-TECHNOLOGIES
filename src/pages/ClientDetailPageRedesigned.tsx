@@ -266,6 +266,15 @@ function Panel({
   );
 }
 
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-gray-50 py-1.5 last:border-b-0">
+      <span className="shrink-0 text-[10px] font-medium text-gray-500">{label}</span>
+      <span className="min-w-0 text-right text-[10px] font-semibold text-gray-800 break-words">{value || "—"}</span>
+    </div>
+  );
+}
+
 function EmptyState({ message }: { message: string }) {
   return <div className="py-8 text-center text-xs text-gray-400">{message}</div>;
 }
@@ -439,9 +448,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       availability: product.availability,
       quantity: 0,
     }));
-  const startDate = client.contractStartDate || client.contract_start_date;
-  const contractStart = startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "N/A";
-  const address = [client.billingAddress || client.billing_address, client.billingCity || client.billing_city, client.billingState || client.billing_state, client.billingPincode || client.billing_pincode].filter(Boolean).join(", ");
+  const startDate = client.contractStartDate || client.contract_start_date || "";
+  const endDate = client.contractEndDate || client.contract_end_date || "";
   const initials = initialsFor(client);
   const currentPortalUser = portalUsers.find((portalUser) => portalUser.id === user?.id);
   const profileEmail = portalMode
@@ -450,8 +458,71 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const detailsPhone = currentPortalUser?.details?.phone;
   const profilePhone = portalMode
     ? currentPortalUser?.phone || (typeof detailsPhone === "string" ? detailsPhone : "")
-    : client.phone || client.mobile || "";
-  const formatDate = (value: string) => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+    : client.phone || "";
+  const profileMobile = client.mobile || "";
+  const formatDate = (value?: string) => {
+    if (!value) return "—";
+    const parsed = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime())
+      ? value
+      : parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const rawOpeningBalance = client.opening_balance ?? client.openingBalance;
+  const openingBalanceDisplay =
+    rawOpeningBalance !== undefined && rawOpeningBalance !== null && String(rawOpeningBalance).trim() !== ""
+      ? formatMoney(Number(rawOpeningBalance) || 0, currency)
+      : "—";
+
+  const rawTdsRate = client.tds_rate ?? client.tdsRate;
+  const tdsRateDisplay =
+    rawTdsRate !== undefined && rawTdsRate !== null && String(rawTdsRate).trim() !== ""
+      ? `${rawTdsRate}%`
+      : "—";
+
+  const stripDuplicateLine2 = (line1: string, line2: string) => {
+    const trimmed1 = line1.trim();
+    const trimmed2 = line2.trim();
+    if (trimmed1 && trimmed2 && trimmed1.endsWith(`, ${trimmed2}`)) {
+      return trimmed1.slice(0, trimmed1.length - `, ${trimmed2}`.length).trim();
+    }
+    return trimmed1;
+  };
+
+  const billingLine2 = String(client.billing_address_line2 || client.billingAddressLine2 || "").trim();
+  const billingLine1 = stripDuplicateLine2(
+    String(client.billing_address || client.billingAddress || ""),
+    billingLine2,
+  );
+  const billingAttention = String(client.billing_attention || client.billingAttention || "").trim();
+  const billingCity = String(client.billing_city || client.billingCity || "").trim();
+  const billingState = String(client.billing_state || client.billingState || "").trim();
+  const billingPincode = String(client.billing_pincode || client.billingPincode || "").trim();
+  const billingCountry = String(client.billing_country || client.billingCountry || "").trim();
+  const billingPhoneCode = String(client.billing_phone_country_code || client.billingPhoneCountryCode || "+91").trim();
+  const billingPhoneRaw = String(client.billing_phone || client.billingPhone || "").trim();
+  const billingPhoneDisplay = billingPhoneRaw ? `${billingPhoneCode} ${billingPhoneRaw}`.trim() : "";
+  const billingFax = String(client.billing_fax_number || client.billingFaxNumber || "").trim();
+
+  const sameAddress = Boolean(client.same_address);
+  const shippingLine2Raw = String(client.shipping_address_line2 || client.shippingAddressLine2 || "").trim();
+  const shippingLine2 = shippingLine2Raw || (sameAddress ? billingLine2 : "");
+  const shippingLine1Raw = stripDuplicateLine2(
+    String(client.shipping_address || client.shippingAddress || ""),
+    shippingLine2,
+  );
+  const shippingLine1 = shippingLine1Raw || (sameAddress ? billingLine1 : "");
+  const shippingAttention = String(client.shipping_attention || client.shippingAttention || "").trim() || (sameAddress ? billingAttention : "");
+  const shippingCity = String(client.shipping_city || client.shippingCity || "").trim() || (sameAddress ? billingCity : "");
+  const shippingState = String(client.shipping_state || client.shippingState || "").trim() || (sameAddress ? billingState : "");
+  const shippingPincode = String(client.shipping_pincode || client.shippingPincode || "").trim() || (sameAddress ? billingPincode : "");
+  const shippingCountry = String(client.shipping_country || client.shippingCountry || "").trim() || (sameAddress ? billingCountry : "");
+  const shippingPhoneCode = String(client.shipping_phone_country_code || client.shippingPhoneCountryCode || "+91").trim();
+  const shippingPhoneRaw = String(client.shipping_phone || client.shippingPhone || "").trim();
+  const shippingPhoneDisplay = shippingPhoneRaw
+    ? `${shippingPhoneCode} ${shippingPhoneRaw}`.trim()
+    : (sameAddress ? billingPhoneDisplay : "");
+  const shippingFax = String(client.shipping_fax_number || client.shippingFaxNumber || "").trim() || (sameAddress ? billingFax : "");
   const visibleAdminTabs = ADMIN_TABS.filter(tab => {
     if (tab === "Overview") return true;
     const module = getPlatformModuleForPath(
@@ -615,21 +686,67 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-600">{client.status || "Active"}</span>}>
-              <div className="flex items-start gap-3">
+            <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold capitalize text-emerald-600">{client.status || "Active"}</span>}>
+              <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-gray-900">{client.name}</p>
-                  <p className="mt-1 text-[10px] text-gray-500">Client since {contractStart}</p>
+                  <p className="text-xs font-bold text-gray-900">{client.company_name || client.name}</p>
+                  <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.id}</p>
                 </div>
               </div>
-              <div className="mt-4 space-y-2 text-[10px] text-gray-600">
-                <a href={profileEmail ? `mailto:${profileEmail}` : undefined} className="flex items-center gap-2 truncate hover:text-blue-600"><Mail size={12} className="shrink-0 text-gray-400" />{profileEmail || "No email available"}</a>
-                <a href={profilePhone ? `tel:${profilePhone}` : undefined} className="flex items-center gap-2 hover:text-blue-600"><Phone size={12} className="shrink-0 text-gray-400" />{profilePhone || "No phone available"}</a>
-                <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
-                {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
+              <div className="mt-2 divide-y divide-gray-50">
+                <DetailRow label="Category" value={client.category || "—"} />
+                <DetailRow label="Client Tier" value={client.client_tier || client.tier || "—"} />
+                <DetailRow label="Contact Person" value={client.contact_person || client.rep || "—"} />
+                <DetailRow
+                  label="Email"
+                  value={
+                    profileEmail ? (
+                      <a href={`mailto:${profileEmail}`} className="text-blue-600 hover:underline">
+                        {profileEmail}
+                      </a>
+                    ) : "—"
+                  }
+                />
+                <DetailRow
+                  label="Phone"
+                  value={
+                    profilePhone ? (
+                      <a href={`tel:${profilePhone}`} className="hover:text-blue-600">
+                        {profilePhone}
+                      </a>
+                    ) : "—"
+                  }
+                />
+                <DetailRow
+                  label="Mobile"
+                  value={
+                    profileMobile ? (
+                      <a href={`tel:${profileMobile}`} className="hover:text-blue-600">
+                        {profileMobile}
+                      </a>
+                    ) : "—"
+                  }
+                />
+                <DetailRow
+                  label="Website"
+                  value={
+                    client.website ? (
+                      <a
+                        href={client.website.startsWith("http") ? client.website : `https://${client.website}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {client.website}
+                      </a>
+                    ) : "—"
+                  }
+                />
+                <DetailRow label="Contract Start Date" value={formatDate(startDate)} />
+                <DetailRow label="Contract End Date" value={formatDate(endDate)} />
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-3 flex gap-2">
                 <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : goTo("Contracts")} className="flex-1 rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
                   View Contracts
                 </button>
@@ -659,8 +776,71 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               <div className="space-y-2.5 text-[10px]">
                 {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
                 <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
+                <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-blue-500" />Uploaded Documents</span><strong>{documents.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
+              </div>
+            </Panel>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <Panel title="Business & Tax Details">
+              <div className="divide-y divide-gray-50">
+                <DetailRow label="GST Treatment" value={client.gst_treatment || "—"} />
+                <DetailRow label="GSTIN" value={client.gstin || "—"} />
+                <DetailRow label="PAN Number" value={client.pan_number || "—"} />
+                <DetailRow label="ID / Reference No." value={client.id_reference_number || "—"} />
+                <DetailRow label="Source of Supply" value={client.source_of_supply || "—"} />
+                <DetailRow label="Currency" value={client.currency || "INR"} />
+                <DetailRow label="Opening Balance" value={openingBalanceDisplay} />
+              </div>
+            </Panel>
+
+            <Panel title="Financial & Bank Details">
+              <div className="divide-y divide-gray-50">
+                <DetailRow label="Payment Terms" value={client.payment_terms || client.paymentTerms || "—"} />
+                <DetailRow label="TDS Rate" value={tdsRateDisplay} />
+                <DetailRow label="Bank Name" value={client.bank_name || client.bankName || "—"} />
+                <DetailRow label="Account Number" value={client.account_number || client.accountNumber || "—"} />
+                <DetailRow label="IFSC Code" value={client.ifsc_code || client.ifscCode || "—"} />
+                <DetailRow label="Branch" value={client.branch || "—"} />
+              </div>
+            </Panel>
+
+            <Panel title="Billing Address">
+              <div className="divide-y divide-gray-50">
+                <DetailRow label="Attention" value={billingAttention || "—"} />
+                <DetailRow label="Address Line 1" value={billingLine1 || "—"} />
+                <DetailRow label="Address Line 2" value={billingLine2 || "—"} />
+                <DetailRow label="City" value={billingCity || "—"} />
+                <DetailRow label="State" value={billingState || "—"} />
+                <DetailRow label="Pin Code" value={billingPincode || "—"} />
+                <DetailRow label="Country / Region" value={billingCountry || "—"} />
+                <DetailRow label="Phone" value={billingPhoneDisplay || "—"} />
+                <DetailRow label="Fax Number" value={billingFax || "—"} />
+              </div>
+            </Panel>
+
+            <Panel
+              title="Shipping Address"
+              action={
+                sameAddress ? (
+                  <span className="rounded bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-600">
+                    Same as Billing
+                  </span>
+                ) : undefined
+              }
+            >
+              <div className="divide-y divide-gray-50">
+                <DetailRow label="Attention" value={shippingAttention || "—"} />
+                <DetailRow label="Address Line 1" value={shippingLine1 || "—"} />
+                <DetailRow label="Address Line 2" value={shippingLine2 || "—"} />
+                <DetailRow label="City" value={shippingCity || "—"} />
+                <DetailRow label="State" value={shippingState || "—"} />
+                <DetailRow label="Pin Code" value={shippingPincode || "—"} />
+                <DetailRow label="Country / Region" value={shippingCountry || "—"} />
+                <DetailRow label="Phone" value={shippingPhoneDisplay || "—"} />
+                <DetailRow label="Fax Number" value={shippingFax || "—"} />
               </div>
             </Panel>
           </div>
