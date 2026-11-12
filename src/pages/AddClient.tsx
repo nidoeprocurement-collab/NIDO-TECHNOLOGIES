@@ -24,6 +24,13 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, Check, Download, Upload, Loader2 } from "lucide-react";
 import AddressPairFields from "@/components/shared/AddressPairFields";
+import LabeledDocumentUploader from "@/components/shared/LabeledDocumentUploader";
+import {
+  createDocumentDraft,
+  draftsToStoredDocuments,
+  validateDocumentDrafts,
+  type LabeledDocumentDraft,
+} from "@/lib/labeledDocuments";
 import {
   isValidGst,
   isValidPan,
@@ -152,7 +159,7 @@ export default function AddClient() {
     same_address: false,
 
     // Step 5: Documents
-    documents: [] as File[],
+    documents: [createDocumentDraft()] as LabeledDocumentDraft[],
   });
 
   const [clientTiers, setClientTiers] = useState([
@@ -361,13 +368,8 @@ export default function AddClient() {
     setFormData((prev) => ({ ...prev, ...updates }));
   };
 
-  const handleFileSelect = (files: FileList | null) => {
-    if (files) {
-      setFormData((prev) => ({
-        ...prev,
-        documents: Array.from(files),
-      }));
-    }
+  const handleDocumentsChange = (documents: LabeledDocumentDraft[]) => {
+    setFormData((prev) => ({ ...prev, documents }));
   };
 
   const canProceed = () => {
@@ -625,6 +627,13 @@ export default function AddClient() {
       return;
     }
 
+    const documentError = validateDocumentDrafts(formData.documents);
+    if (documentError) {
+      setStep(4);
+      toast.error(documentError);
+      return;
+    }
+
     try {
       console.log("[v0] Saving client data:", formData.company_name);
 
@@ -729,30 +738,36 @@ export default function AddClient() {
         ...clientData,
       });
 
-      // Persist any uploaded onboarding documents to the client's document store
-      if (formData.documents.length > 0) {
+      // Persist uploaded onboarding documents (with their labels and file contents)
+      const storedDocuments = await draftsToStoredDocuments(formData.documents);
+      if (storedDocuments.length > 0) {
         const todayStr = new Date().toLocaleDateString("en-IN", {
           day: "2-digit",
           month: "short",
           year: "numeric",
         });
-        for (const file of formData.documents) {
-          const ext = file.name.split(".").pop()?.toUpperCase() || "FILE";
-          const sizeKb = file.size / 1024;
-          const sizeStr =
-            sizeKb > 1024
-              ? `${(sizeKb / 1024).toFixed(1)} MB`
-              : `${Math.round(sizeKb)} KB`;
-          saveClientDocument({
-            clientId: formData.client_id,
-            id: `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: file.name,
-            category: "Compliance",
-            uploadedBy: formData.contact_person || "Admin",
-            uploadedOn: todayStr,
-            size: sizeStr,
-            type: ext,
-          });
+        try {
+          for (const doc of storedDocuments) {
+            const ext = doc.name.split(".").pop()?.toUpperCase() || "FILE";
+            saveClientDocument({
+              clientId: formData.client_id,
+              id: doc.id || `DOC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              name: doc.label || doc.name,
+              label: doc.label,
+              fileName: doc.name,
+              category: doc.label || "Onboarding",
+              uploadedBy: formData.contact_person || "Admin",
+              uploadedOn: todayStr,
+              uploadedAt: doc.uploadedOn,
+              size: doc.size || "",
+              type: ext,
+              fileData: doc.fileData,
+            });
+          }
+        } catch {
+          toast.error(
+            "Client saved, but some documents are too large to store in the browser. Please upload smaller files from the Documents tab.",
+          );
         }
       }
       const savedClient = getClients().find((client) => client.id === formData.client_id);
@@ -1528,36 +1543,16 @@ export default function AddClient() {
                     Step 5: Documents
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Upload Documents (GST Certificate, PAN Card, etc.)
+                    Enter the document type (GST Certificate, PAN Card, etc.) and upload its file.
+                    Use "Add Another Document" or "Select Multiple Files" to upload more than one.
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Choose Files
-                  </label>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(e) => handleFileSelect(e.target.files)}
-                    className="block w-full border border-gray-300 rounded-lg p-2 cursor-pointer"
-                  />
-                  {formData.documents.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {formData.documents.map((doc, idx) => (
-                        <div
-                          key={idx}
-                          className="text-sm text-gray-600 flex items-center gap-2"
-                        >
-                          <span>📄</span> {doc.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {!formData.documents.length && (
-                    <p className="text-sm text-gray-500 mt-2">No file chosen</p>
-                  )}
-                </div>
+                <LabeledDocumentUploader
+                  documents={formData.documents}
+                  onChange={handleDocumentsChange}
+                  onError={(message) => toast.error(message)}
+                />
               </div>
             )}
           </CardContent>

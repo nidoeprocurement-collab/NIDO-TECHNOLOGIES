@@ -6,11 +6,18 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
-import { addVendor, getVendors } from '@/lib/vendorDataStore';
+import { addVendor, getVendors, type StoredVendor } from '@/lib/vendorDataStore';
 import { getPrefix } from '@/lib/configService';
 import { getVendorCreationAuditFields } from '@/lib/vendorAudit';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 import AddressPairFields from '@/components/shared/AddressPairFields';
+import LabeledDocumentUploader from '@/components/shared/LabeledDocumentUploader';
+import {
+  createDocumentDraft,
+  draftsToStoredDocuments,
+  validateDocumentDrafts,
+  type LabeledDocumentDraft,
+} from '@/lib/labeledDocuments';
 import {
   createEmptyAddress,
   formatAddressDetails,
@@ -164,47 +171,8 @@ export default function AddVendorPage() {
   const [tagOptions, setTagOptions] = useState<string[]>(tagOptionsBase);
   const [newTagInput, setNewTagInput] = useState('');
 
-  // ── Additional-docs state ───────────────────────────────────────────────────
-  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
-  type DocFile = { id: string; name: string; size: string; sizeBytes: number; type: string };
-  const [additionalDocs, setAdditionalDocs] = useState<DocFile[]>([]);
-  const [isDraggingAdditional, setIsDraggingAdditional] = useState(false);
-  const additionalFileRef = useRef<HTMLInputElement>(null);
-
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
-  };
-
-  const handleAdditionalFiles = (files: FileList | null) => {
-    if (!files) return;
-    const oversized: string[] = [];
-    const newDocs: DocFile[] = [];
-    Array.from(files).forEach(f => {
-      if (f.size > MAX_FILE_BYTES) {
-        oversized.push(f.name);
-      } else {
-        newDocs.push({
-          id: Math.random().toString(36).slice(2),
-          name: f.name,
-          size: formatBytes(f.size),
-          sizeBytes: f.size,
-          type: f.type || 'application/octet-stream',
-        });
-      }
-    });
-    if (oversized.length > 0) {
-      alert(`The following file(s) exceed the 10 MB limit and were not added:\n${oversized.join('\n')}`);
-    }
-    if (newDocs.length > 0) {
-      setAdditionalDocs(prev => [...prev, ...newDocs]);
-    }
-  };
-
-  const removeAdditionalDoc = (id: string) => {
-    setAdditionalDocs(prev => prev.filter(d => d.id !== id));
-  };
+  // ── Related-documents state (label + file per row) ─────────────────────────
+  const [additionalDocs, setAdditionalDocs] = useState<LabeledDocumentDraft[]>([createDocumentDraft()]);
 
   // ── Form state ──────────────────────────────────────────────────────────────
   const [formData, setFormData] = useState({
@@ -346,7 +314,7 @@ export default function AddVendorPage() {
     setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.vendorName.trim()) {
       alert('Vendor Name is required.');
       return;
@@ -369,6 +337,18 @@ export default function AddVendorPage() {
     }
     if (formData.gstNumber && !isValidGst(formData.gstNumber)) {
       alert('GST Number must be exactly 15 alphanumeric characters.');
+      return;
+    }
+    const documentError = validateDocumentDrafts(additionalDocs);
+    if (documentError) {
+      toast.error(documentError);
+      return;
+    }
+    let relatedDocuments: Awaited<ReturnType<typeof draftsToStoredDocuments>>;
+    try {
+      relatedDocuments = await draftsToStoredDocuments(additionalDocs);
+    } catch {
+      toast.error('Could not read one of the related documents. Please re-select the file.');
       return;
     }
 
@@ -401,7 +381,7 @@ export default function AddVendorPage() {
           : formData.contractStatus === 'Pending' || formData.contractStatus === 'Under Review'
             ? 'Pending'
             : 'Active';
-    addVendor({
+    const vendorRecord: StoredVendor = {
       id: newId,
       ...getVendorCreationAuditFields(currentAuthenticatedUser),
       onboardingFormData: { ...formData },
@@ -490,13 +470,20 @@ export default function AddVendorPage() {
       shippingPhoneCountryCode: addressDetails.shipping.phoneCountryCode,
       shippingPhone: addressDetails.shipping.phone,
       shippingFaxNumber: addressDetails.shipping.faxNumber,
-      // Related document metadata (file binaries are not stored in localStorage)
-      relatedDocuments: additionalDocs.map(d => ({ name: d.name, size: d.size, sizeBytes: d.sizeBytes, type: d.type })),
+      // Related documents: user label + file metadata + file contents (data URL) for download
+      relatedDocuments,
       performanceQuality: formData.qualityRating * 20,
       performanceDelivery: formData.deliveryRating * 20,
       performanceResponsiveness: formData.serviceRating * 20,
       performanceCompliance: formData.complianceRating * 20,
-    });
+    };
+
+    try {
+      addVendor(vendorRecord);
+    } catch {
+      toast.error('Related documents are too large to store in the browser. Please upload smaller files and try again.');
+      return;
+    }
 
     toast.success(`Vendor "${formData.vendorName}" (${newId}) onboarded successfully`);
     navigate('/vendors');
@@ -893,49 +880,14 @@ export default function AddVendorPage() {
               Related Documents
             </label>
 
-            {/* Drop zone */}
-            <div
-              onClick={() => additionalFileRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); setIsDraggingAdditional(true); }}
-              onDragLeave={() => setIsDraggingAdditional(false)}
-              onDrop={e => {
-                e.preventDefault();
-                setIsDraggingAdditional(false);
-                handleAdditionalFiles(e.dataTransfer.files);
-              }}
-              className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors
-                ${isDraggingAdditional ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}`}
-            >
-              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 font-medium">Drag & drop documents here, or <span className="text-blue-600">browse</span></p>
-              <p className="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG — max 10 MB each</p>
-              <input
-                ref={additionalFileRef}
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                className="hidden"
-                onChange={e => handleAdditionalFiles(e.target.files)}
-              />
-            </div>
-
-            {/* Uploaded file list */}
-            {additionalDocs.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {additionalDocs.map(doc => (
-                  <li key={doc.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText size={16} className="text-blue-500 flex-shrink-0" />
-                      <span className="text-sm text-gray-700 truncate">{doc.name}</span>
-                      <span className="text-xs text-gray-400 flex-shrink-0">{doc.size}</span>
-                    </div>
-                    <button type="button" onClick={() => removeAdditionalDoc(doc.id)} className="text-gray-400 hover:text-red-500 transition flex-shrink-0">
-                      <X size={16} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <p className="text-xs text-gray-500 mb-3">
+              Enter which type of document it is (e.g. GST Certificate, PAN Card) and upload its file. You can add multiple documents.
+            </p>
+            <LabeledDocumentUploader
+              documents={additionalDocs}
+              onChange={setAdditionalDocs}
+              onError={(message) => toast.error(message)}
+            />
           </div>
         </FormSection>
 

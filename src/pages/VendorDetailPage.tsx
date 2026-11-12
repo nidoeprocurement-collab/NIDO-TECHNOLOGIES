@@ -18,6 +18,9 @@ import VendorPerformancePage from "./VendorPerformancePage";
 import VendorConfigurationTab from "./VendorConfigurationTab";
 import { getVendorById, type StoredVendor } from "@/lib/vendorDataStore";
 import { getAllPOs, getPODisplayStatus, type StoredPO } from "@/lib/purchaseOrderStore";
+import { StoredDocumentList } from "@/components/shared/LabeledDocumentUploader";
+import type { StoredLabeledDocument } from "@/lib/labeledDocuments";
+import { toast } from "sonner";
 
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -211,7 +214,7 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
       ? (onboardingForm.tags as string[])
       : [];
 
-  const relatedDocs = Array.isArray(vendor.relatedDocuments) ? vendor.relatedDocuments : [];
+  const relatedDocs: StoredLabeledDocument[] = Array.isArray(vendor.relatedDocuments) ? vendor.relatedDocuments : [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -437,18 +440,14 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
               </span>
             </div>
 
-            <div className="flex justify-between items-start gap-2 pt-2 border-t border-gray-50">
-              <span className="text-xs text-gray-400 flex-shrink-0">Related Documents</span>
-              <div className="flex flex-col items-end gap-1">
-                {relatedDocs.length > 0 ? (
-                  relatedDocs.map((doc, idx) => (
-                    <span key={`${doc.name}-${idx}`} className="text-xs font-medium text-blue-600">
-                      {doc.name} {doc.size ? <span className="text-gray-400 font-normal">({doc.size})</span> : null}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs font-medium text-gray-700">—</span>
-                )}
+            <div className="pt-2 border-t border-gray-50">
+              <span className="text-xs text-gray-400">Related Documents ({relatedDocs.length})</span>
+              <div className="mt-1">
+                <StoredDocumentList
+                  documents={relatedDocs}
+                  emptyMessage="No related documents uploaded."
+                  onMissingFile={() => toast.error("The file for this document is not available to download. Please re-upload it.")}
+                />
               </div>
             </div>
           </div>

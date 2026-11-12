@@ -163,6 +163,10 @@ export interface ClientDocumentRecord {
   uploadedAt?: string;
   /** Persisted data URL for browser-only document uploads. */
   fileData?: string;
+  /** User-entered document type/label (e.g. "GST Certificate"). */
+  label?: string;
+  /** Original uploaded file name (used as the download file name). */
+  fileName?: string;
 }
 
 export interface ClientContractRecord {

@@ -15,6 +15,7 @@ type Doc = {
   uploadedBy: string;
   uploadedOn: string;
   fileData?: string;
+  fileName?: string;
 };
 
 function typeColor(type: string) {
@@ -225,7 +226,7 @@ function DocsTable({
     } else if (doc.fileData) {
       const a = document.createElement("a");
       a.href = doc.fileData;
-      a.download = doc.name;
+      a.download = doc.fileName || doc.name;
       a.click();
     } else {
       const content = [

@@ -51,6 +51,8 @@ import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getPlatformModuleForPath } from "@/lib/platformModuleCatalog";
+import { StoredDocumentList } from "@/components/shared/LabeledDocumentUploader";
+import { toast } from "sonner";
 
 const ADMIN_TABS = [
   "Overview",
@@ -523,6 +525,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     ? `${shippingPhoneCode} ${shippingPhoneRaw}`.trim()
     : (sameAddress ? billingPhoneDisplay : "");
   const shippingFax = String(client.shipping_fax_number || client.shippingFaxNumber || "").trim() || (sameAddress ? billingFax : "");
+  const activeDocuments = documents.filter((doc) => !doc.archived);
   const visibleAdminTabs = ADMIN_TABS.filter(tab => {
     if (tab === "Overview") return true;
     const module = getPlatformModuleForPath(
@@ -842,6 +845,25 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <DetailRow label="Phone" value={shippingPhoneDisplay || "—"} />
                 <DetailRow label="Fax Number" value={shippingFax || "—"} />
               </div>
+            </Panel>
+          </div>
+
+          <div className="mt-3">
+            <Panel
+              title={`Documents (${activeDocuments.length})`}
+              action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">Manage Documents</button>}
+            >
+              <StoredDocumentList
+                documents={activeDocuments.map((doc) => ({
+                  id: doc.id,
+                  label: doc.label || doc.name,
+                  name: doc.fileName || doc.name,
+                  size: doc.size,
+                  fileData: doc.fileData,
+                }))}
+                emptyMessage="No documents have been uploaded for this client."
+                onMissingFile={() => toast.error("The file for this document is not available to download.")}
+              />
             </Panel>
           </div>
 
