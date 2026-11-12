@@ -410,7 +410,10 @@ export default function AddVendorPage() {
         shipping: { ...addressDetails.shipping },
       },
       name: formData.vendorName,
-      vendorCode: formData.vendorCode,
+      vendorCode:
+        !formData.vendorCode || formData.vendorCode === 'Auto-generated'
+          ? newId
+          : formData.vendorCode,
       category: formData.category || 'Uncategorized',
       subCategory: formData.subCategory,
       vendorType: formData.vendorType,

@@ -188,10 +188,35 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
   const complianceScore = vendor.performanceCompliance ?? 91;
   const grandScore = Math.round((qualityScore + deliveryScore + responsivenessScore + complianceScore) / 4);
 
+  const onboardingForm = (vendor.lastUpdatedFormData ?? vendor.onboardingFormData ?? {}) as Record<string, unknown>;
+  const billingAddrDetails = (vendor.onboardingAddressDetails as { billing?: Record<string, string>; shipping?: Record<string, string> } | undefined)?.billing;
+  const shippingAddrDetails = (vendor.onboardingAddressDetails as { billing?: Record<string, string>; shipping?: Record<string, string> } | undefined)?.shipping;
+
+  const billingPhoneCode = String(vendor.billingPhoneCountryCode || billingAddrDetails?.phoneCountryCode || "+91").trim();
+  const billingPhoneRaw = String(vendor.billingPhone || billingAddrDetails?.phone || "").trim();
+  const billingPhoneDisplay = billingPhoneRaw ? `${billingPhoneCode} ${billingPhoneRaw}`.trim() : "—";
+
+  const shippingPhoneCode = String(vendor.shippingPhoneCountryCode || shippingAddrDetails?.phoneCountryCode || "+91").trim();
+  const shippingPhoneRaw = String(vendor.shippingPhone || shippingAddrDetails?.phone || "").trim();
+  const shippingPhoneDisplay = shippingPhoneRaw ? `${shippingPhoneCode} ${shippingPhoneRaw}`.trim() : "—";
+
+  const vendorCodeDisplay =
+    vendor.vendorCode && vendor.vendorCode !== "Auto-generated"
+      ? vendor.vendorCode
+      : vendor.id;
+
+  const tagsList = Array.isArray(vendor.tags)
+    ? vendor.tags
+    : Array.isArray(onboardingForm.tags)
+      ? (onboardingForm.tags as string[])
+      : [];
+
+  const relatedDocs = Array.isArray(vendor.relatedDocuments) ? vendor.relatedDocuments : [];
+
   return (
     <div className="flex flex-col gap-5">
-      {/* Top 3-column info */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Row 1: Section 1 (Vendor Information), Section 2 (Primary Contact), Section 4 (Financial Details) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="w-4 h-4 text-blue-500" />
@@ -199,16 +224,23 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
           </div>
           <div className="flex flex-col gap-2.5">
             {[
-              { label: "Address", value: vendor.addressLine1 || vendor.address || "—" },
-              { label: "City", value: vendor.city || "—" },
-              { label: "State / Province", value: vendor.state || "—" },
-              { label: "Zip / Postal Code", value: vendor.zipCode || "—" },
-              { label: "Country", value: vendor.country || "India" },
-              { label: "Website", value: vendor.website || "—" },
+              { label: "Vendor Name", value: vendor.name || "—" },
+              { label: "Vendor Code", value: vendorCodeDisplay || "—" },
+              { label: "Legal Entity Name", value: vendor.legalEntityName || String(onboardingForm.legalEntityName || "") || "—" },
+              { label: "Category", value: vendor.category || "—" },
+              { label: "Sub Category", value: vendor.subCategory || String(onboardingForm.subCategory || "") || "—" },
+              { label: "Vendor Type", value: vendor.vendorType || String(onboardingForm.vendorType || "") || "—" },
+              { label: "Registration No.", value: vendor.registrationNo || String(onboardingForm.registrationNo || "") || "—" },
+              { label: "Tax ID / GST", value: vendor.gstNumber || vendor.taxId || String(onboardingForm.gstNumber || "") || "—" },
+              { label: "PAN Number", value: vendor.pan || String(onboardingForm.pan || "") || "—" },
+              { label: "Year of Establishment", value: vendor.founded || String(onboardingForm.yearOfEstablishment || "") || "—" },
+              { label: "Number of Employees", value: vendor.employees || String(onboardingForm.employees || "") || "—" },
+              { label: "Annual Revenue", value: vendor.annualRevenue || String(onboardingForm.annualRevenue || "") || "—" },
+              { label: "Website", value: vendor.website || String(onboardingForm.website || "") || "—" },
             ].map(r => (
               <div key={r.label} className="flex justify-between items-start gap-2">
                 <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
-                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
+                <span className="text-xs font-medium text-gray-700 text-right break-all">{r.value}</span>
               </div>
             ))}
           </div>
@@ -216,21 +248,21 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
-            <FileText className="w-4 h-4 text-blue-500" />
-            <h3 className="text-sm font-semibold text-gray-800">Additional Information</h3>
+            <Phone className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Primary Contact</h3>
           </div>
           <div className="flex flex-col gap-2.5">
             {[
-              { label: "Registration No.", value: vendor.registrationNo || "—" },
-              { label: "Tax ID / GST", value: vendor.taxId || "—" },
-              { label: "PAN Number", value: vendor.pan || "—" },
-              { label: "Founded", value: vendor.founded || "—" },
-              { label: "Employees", value: vendor.employees || "—" },
-              { label: "Annual Revenue", value: vendor.annualRevenue || "—" },
+              { label: "Contact Person", value: vendor.primaryContact || String(onboardingForm.contactPerson || "") || "—" },
+              { label: "Designation", value: vendor.designation || String(onboardingForm.designation || "") || "—" },
+              { label: "Email", value: vendor.email || String(onboardingForm.email || "") || "—" },
+              { label: "Alternate Email", value: vendor.alternateEmail || String(onboardingForm.alternateEmail || "") || "—" },
+              { label: "Phone", value: vendor.phone || "—" },
+              { label: "Mobile", value: vendor.mobile || "—" },
             ].map(r => (
               <div key={r.label} className="flex justify-between items-start gap-2">
                 <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
-                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
+                <span className="text-xs font-medium text-gray-700 text-right break-all">{r.value}</span>
               </div>
             ))}
           </div>
@@ -239,28 +271,31 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard className="w-4 h-4 text-blue-500" />
-            <h3 className="text-sm font-semibold text-gray-800">Payment & Bank Details</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Financial & Bank Details</h3>
           </div>
           <div className="flex flex-col gap-2.5">
             {[
-              { label: "Payment Mode", value: vendor.paymentMode || "—" },
-              { label: "Payment Terms", value: vendor.paymentTerms || "—" },
-              { label: "Bank Account", value: vendor.bankAccount || "—" },
-              { label: "IFSC Code", value: vendor.ifscCode || "—" },
-              { label: "Bank Name", value: vendor.bankName || "—" },
-              { label: "Branch", value: vendor.bankBranch || "—" },
+              { label: "Payment Terms", value: vendor.paymentTerms || String(onboardingForm.paymentTerms || "") || "—" },
+              { label: "Payment Mode", value: vendor.paymentMode || String(onboardingForm.paymentMode || "") || "—" },
+              { label: "Currency", value: vendor.currency || String(onboardingForm.currency || "") || "—" },
+              { label: "Credit Limit (INR)", value: vendor.creditLimit || String(onboardingForm.creditLimit || "") || "—" },
+              { label: "Bank Name", value: vendor.bankName || String(onboardingForm.bankName || "") || "—" },
+              { label: "Account Number", value: vendor.bankAccount || String(onboardingForm.accountNumber || "") || "—" },
+              { label: "Account Type", value: vendor.accountType || String(onboardingForm.accountType || "") || "—" },
+              { label: "IFSC Code", value: vendor.ifscCode || String(onboardingForm.ifscCode || "") || "—" },
+              { label: "Branch", value: vendor.bankBranch || String(onboardingForm.bankBranch || "") || "—" },
             ].map(r => (
               <div key={r.label} className="flex justify-between items-start gap-2">
                 <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
-                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
+                <span className="text-xs font-medium text-gray-700 text-right break-all">{r.value}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Billing / Shipping + Performance */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Row 2: Section 3 (Billing Address & Shipping Address) + Section 6 (Vendor Performance) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-4 h-4 text-blue-500" />
@@ -268,12 +303,15 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
           </div>
           <div className="flex flex-col gap-2.5">
             {[
-              { label: "Address Line 1", value: vendor.billingAddressLine1 || vendor.addressLine1 || "—" },
-              { label: "Address Line 2", value: vendor.billingAddressLine2 || vendor.addressLine2 || "—" },
-              { label: "City", value: vendor.billingCity || vendor.city || "—" },
-              { label: "State", value: vendor.billingState || vendor.state || "—" },
-              { label: "Zip Code", value: vendor.billingZip || vendor.zipCode || "—" },
-              { label: "Country", value: vendor.billingCountry || vendor.country || "India" },
+              { label: "Attention", value: vendor.billingAttention || billingAddrDetails?.attention || "—" },
+              { label: "Address Line 1", value: vendor.billingAddressLine1 || billingAddrDetails?.addressLine1 || vendor.addressLine1 || "—" },
+              { label: "Address Line 2", value: vendor.billingAddressLine2 || billingAddrDetails?.addressLine2 || vendor.addressLine2 || "—" },
+              { label: "City", value: vendor.billingCity || billingAddrDetails?.city || vendor.city || "—" },
+              { label: "State", value: vendor.billingState || billingAddrDetails?.state || vendor.state || "—" },
+              { label: "Pin Code", value: vendor.billingZip || billingAddrDetails?.pinCode || vendor.zipCode || "—" },
+              { label: "Country / Region", value: vendor.billingCountry || billingAddrDetails?.country || vendor.country || "—" },
+              { label: "Phone", value: billingPhoneDisplay },
+              { label: "Fax Number", value: vendor.billingFaxNumber || billingAddrDetails?.faxNumber || "—" },
             ].map(r => (
               <div key={r.label} className="flex justify-between items-start gap-2">
                 <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
@@ -290,12 +328,15 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
           </div>
           <div className="flex flex-col gap-2.5">
             {[
-              { label: "Address Line 1", value: vendor.shippingAddressLine1 || vendor.addressLine1 || "—" },
-              { label: "Address Line 2", value: vendor.shippingAddressLine2 || vendor.addressLine2 || "—" },
-              { label: "City", value: vendor.shippingCity || vendor.city || "—" },
-              { label: "State", value: vendor.shippingState || vendor.state || "—" },
-              { label: "Zip Code", value: vendor.shippingZip || vendor.zipCode || "—" },
-              { label: "Country", value: vendor.shippingCountry || vendor.country || "India" },
+              { label: "Attention", value: vendor.shippingAttention || shippingAddrDetails?.attention || "—" },
+              { label: "Address Line 1", value: vendor.shippingAddressLine1 || shippingAddrDetails?.addressLine1 || "—" },
+              { label: "Address Line 2", value: vendor.shippingAddressLine2 || shippingAddrDetails?.addressLine2 || "—" },
+              { label: "City", value: vendor.shippingCity || shippingAddrDetails?.city || "—" },
+              { label: "State", value: vendor.shippingState || shippingAddrDetails?.state || "—" },
+              { label: "Pin Code", value: vendor.shippingZip || shippingAddrDetails?.pinCode || "—" },
+              { label: "Country / Region", value: vendor.shippingCountry || shippingAddrDetails?.country || "—" },
+              { label: "Phone", value: shippingPhoneDisplay },
+              { label: "Fax Number", value: vendor.shippingFaxNumber || shippingAddrDetails?.faxNumber || "—" },
             ].map(r => (
               <div key={r.label} className="flex justify-between items-start gap-2">
                 <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
@@ -327,6 +368,88 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
             <div className="mt-2 pt-3 border-t border-gray-100 flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-600">Grand Score</span>
               <span className="text-sm font-bold text-blue-600">{grandScore}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Row 3: Section 5 & 6 (Classification & Compliance) + Section 7 (Additional Information & Documents) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle2 className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Classification & Compliance Details</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {[
+              { label: "MSME Status", value: vendor.msmeStatus || String(onboardingForm.msmeStatus || "") || "—" },
+              { label: "ISO Certification", value: vendor.isoStatus || String(onboardingForm.isoStatus || "") || "—" },
+              { label: "Quality Certification", value: vendor.qualityCertification || String(onboardingForm.qualityCertification || "") || "—" },
+              { label: "Environmental Certification", value: vendor.environmentalCertification || String(onboardingForm.environmentalCertification || "") || "—" },
+              { label: "Blacklisted", value: vendor.blacklisted || String(onboardingForm.blacklisted || "") || "—" },
+              { label: "Contract Status", value: vendor.contractStatus || String(onboardingForm.contractStatus || "") || vendor.status || "—" },
+              { label: "Onboarding Date", value: vendor.onboardedDate || vendor.onboardingDate || String(onboardingForm.onboardingDate || "") || "—" },
+              { label: "Preferred Vendor", value: vendor.preferredVendor || String(onboardingForm.preferredVendor || "") || "—" },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between items-start gap-2">
+                <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
+                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Additional Information & Documents</h3>
+          </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-xs text-gray-400 flex-shrink-0">Visibility</span>
+              <span className="text-xs font-medium text-gray-700 text-right">
+                {vendor.visibility || String(onboardingForm.visibility || "") || "—"}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-xs text-gray-400 flex-shrink-0">Tags</span>
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {tagsList.length > 0 ? (
+                  tagsList.map(tag => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700"
+                    >
+                      {tag}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs font-medium text-gray-700">—</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-xs text-gray-400 flex-shrink-0">Internal Notes</span>
+              <span className="text-xs font-medium text-gray-700 text-right whitespace-pre-wrap">
+                {vendor.internalNotes || String(onboardingForm.internalNotes || "") || "—"}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-start gap-2 pt-2 border-t border-gray-50">
+              <span className="text-xs text-gray-400 flex-shrink-0">Related Documents</span>
+              <div className="flex flex-col items-end gap-1">
+                {relatedDocs.length > 0 ? (
+                  relatedDocs.map((doc, idx) => (
+                    <span key={`${doc.name}-${idx}`} className="text-xs font-medium text-blue-600">
+                      {doc.name} {doc.size ? <span className="text-gray-400 font-normal">({doc.size})</span> : null}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs font-medium text-gray-700">—</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -437,16 +560,15 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
           <div className="flex flex-col gap-4">
             {[
               { label: "Total Spend", value: totalSpend, highlight: true },
-              { label: "Category", value: vendor.category, highlight: false },
               { label: "Avg Order Value", value: avgOrderValue, highlight: false },
               { label: "Purchase Orders", value: String(spendOrders.length), highlight: false },
-              { label: "Onboarded", value: vendor.onboardedDate, highlight: false },
-              { label: "Region", value: vendor.region, highlight: false },
-            ].map(m => (
+              { label: "Active Contracts", value: String(activeContracts.length), highlight: false },
+              { label: "Related Documents", value: String(relatedDocs.length), highlight: false },
+            ].map((m, idx, arr) => (
               <div key={m.label} className="flex flex-col gap-0.5">
                 <p className="text-xs text-gray-400">{m.label}</p>
                 <p className={`text-sm font-bold ${m.highlight ? "text-blue-600" : "text-gray-800"}`}>{m.value}</p>
-                {m.label !== "Region" && <div className="h-px bg-gray-50 mt-1" />}
+                {idx < arr.length - 1 && <div className="h-px bg-gray-50 mt-1" />}
               </div>
             ))}
           </div>
