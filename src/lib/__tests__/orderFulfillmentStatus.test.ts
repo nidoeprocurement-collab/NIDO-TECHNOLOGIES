@@ -103,4 +103,31 @@ describe("master order fulfillment status", () => {
     }));
     expect(syncMasterOrderFulfillmentStatus(orderId)).toBe("Partially Provisioned");
   });
+
+  it("replicates PO item status changes to derived PO fulfillment status", () => {
+    expect(derivePOFulfillmentStatus({
+      status: "Draft",
+      items: [{ subOrderId: "SO-1", qty: 1, status: "Pending" }],
+    })).toBe("Pending");
+
+    expect(derivePOFulfillmentStatus({
+      status: "Confirmed",
+      items: [{ subOrderId: "SO-1", qty: 1, status: "Processing" }],
+    })).toBe("Processing");
+
+    expect(derivePOFulfillmentStatus({
+      status: "Draft",
+      items: [{ subOrderId: "SO-1", qty: 1, status: "Processing" }],
+    })).toBe("Processing");
+
+    expect(derivePOFulfillmentStatus({
+      status: "Confirmed",
+      items: [{ subOrderId: "SO-1", qty: 1, status: "Pending Shipping" }],
+    })).toBe("Pending Shipping");
+
+    expect(derivePOFulfillmentStatus({
+      status: "Confirmed",
+      items: [{ subOrderId: "SO-1", qty: 1, status: "Delivered" }],
+    })).toBe("Delivered");
+  });
 });

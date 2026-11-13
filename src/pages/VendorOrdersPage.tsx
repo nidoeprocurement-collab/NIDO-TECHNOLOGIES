@@ -32,20 +32,28 @@ interface Order {
 }
 
 const LEGACY_PO_STATUSES: OrderStatus[] = [
-  "Pending", "Processing", "Provisioning", "Partially Provisioned", "Provisioned",
-  "Activated", "Completed", "Shipped", "Delivered", "Closed", "Cancelled",
+  "Pending", "Processing", "Pending Shipping", "Provisioning", "Partially Provisioned", "Provisioned",
+  "Activated", "Completed", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Closed", "Cancelled",
 ];
 const PAGE_SIZE = 10;
 
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
-  Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
-  Pending:    { bg: "#fafafa", color: "#777",    border: "#ddd" },
-  Confirmed:  { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
-  Shipped:    { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
-  Delivered:  { bg: "#e1f5ee", color: "#0f6e56", border: "#9fe1cb" },
-  Draft:      { bg: "#fafafa", color: "#777",    border: "#ddd" },
-  Closed:     { bg: "#fbeaf0", color: "#993556", border: "#f4c0d1" },
-  Cancelled:  { bg: "#fff1f0", color: "#a32d2d", border: "#f7c1c1" },
+  Processing:            { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
+  "Pending Shipping":    { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+  "Partially Shipped":   { bg: "#eff6ff", color: "#1d4ed8", border: "#93c5fd" },
+  Pending:               { bg: "#fafafa", color: "#777",    border: "#ddd" },
+  Confirmed:             { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
+  Shipped:               { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
+  "Partially Delivered": { bg: "#f0fdfa", color: "#0f766e", border: "#99f6e4" },
+  Delivered:             { bg: "#e1f5ee", color: "#0f6e56", border: "#9fe1cb" },
+  Provisioning:          { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Provisioned:           { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Activated:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Completed:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Draft:                 { bg: "#fafafa", color: "#777",    border: "#ddd" },
+  Closed:                { bg: "#fbeaf0", color: "#993556", border: "#f4c0d1" },
+  Cancelled:             { bg: "#fff1f0", color: "#a32d2d", border: "#f7c1c1" },
 };
 
 function Badge({ status }: { status: OrderStatus }) {
@@ -647,7 +655,17 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         )}
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
+          <style>{`
+            .vendor-orders-list-table th,
+            .vendor-orders-list-table td {
+              border-right: 1px solid ${bdr};
+            }
+            .vendor-orders-list-table th:last-child,
+            .vendor-orders-list-table td:last-child {
+              border-right: none;
+            }
+          `}</style>
+          <table className="vendor-orders-list-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
             <thead>
               <tr>
                 <th style={{ ...s.th, width: 48, paddingLeft: 16 }}></th>

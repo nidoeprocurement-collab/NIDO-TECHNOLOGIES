@@ -198,8 +198,14 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
  */
 export function derivePOFulfillmentStatus(po: any): FulfillmentStatus {
   if (isCancelled(po?.status)) return "Cancelled";
-  if (normalize(po?.status) === "draft") return "Pending";
   const lines = Array.isArray(po?.items) ? po.items : [];
+  if (normalize(po?.status) === "draft") {
+    const hasLineProgress = lines.some(line => {
+      const status = normalize(line?.status);
+      return Boolean(status) && status !== "pending" && status !== "cancelled";
+    });
+    if (!hasLineProgress) return "Pending";
+  }
   if (!lines.length) {
     return normalize(po?.status) === "draft" || normalize(po?.status) === "confirmed"
       ? "Processing"
@@ -209,6 +215,7 @@ export function derivePOFulfillmentStatus(po: any): FulfillmentStatus {
     const status = lineStatus(line, po);
     const effectiveStatus = isDigitalDocumentProduct(line)
       && ["pending", "confirmed"].includes(normalize(status))
+      && normalize(po?.status) !== "draft"
       ? "Processing"
       : status;
     return {

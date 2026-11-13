@@ -797,13 +797,8 @@ function AddNoteModal({ onSave, onClose }: { onSave: (text: string, vis: string)
 // ── Stepper ───────────────────────────────────────────────────────────────────
 function Stepper({ currentStatus }: { currentStatus: string }) {
   const steps = STEPPER_STEPS;
-  const currentIdx = Math.max(0, steps.indexOf(currentStatus));
-  const dates: Record<string, string> = {
-    Confirmed: "Apr 16, 2026",
-    Processing: "Apr 16, 2026",
-    Shipped: "Apr 17, 2026",
-    Delivered: "Pending",
-  };
+  const currentIdx = currentStatus === "Pending" ? -1 : Math.max(0, steps.indexOf(currentStatus));
+  const dates: Record<string, string> = {};
 
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 0, flex: 1 }}>
@@ -1083,12 +1078,17 @@ export default function VendorOrderDetailPage() {
   }));
   const isDigitalOrder = hasDigitalItems && !hasPhysicalItems;
   const isMixedOrder = hasDigitalItems && hasPhysicalItems;
-  const vendorDisplayStatus = isDigitalOrder
-    ? deriveDigitalFulfillmentStatus(items.map(item => ({
-        status: item.status || "Pending",
-        quantity: item.qty,
-      })))
-    : orderStatus;
+  const activeDigitalItems = items.filter(item => String(item.status || "").toLowerCase() !== "cancelled");
+  const vendorDisplayStatus = isCancelled
+    ? "Cancelled"
+    : isDigitalOrder
+      ? activeDigitalItems.length === 0
+        ? "Cancelled"
+        : deriveDigitalFulfillmentStatus(activeDigitalItems.map(item => ({
+            status: item.status || "Pending",
+            quantity: item.qty,
+          })))
+      : orderStatus;
   const digitalStageIndex = isDigitalOrder
     ? getDigitalFulfillmentStatusIndex(vendorDisplayStatus)
     : -1;
@@ -1163,10 +1163,14 @@ export default function VendorOrderDetailPage() {
     if (po && itemIndex >= 0) {
       const previousStatus = po.items[itemIndex]?.status || currentItem?.status || "Pending";
       const updatedLines = po.items.map((line, index) => index === itemIndex ? { ...line, status: savedStatus } : line);
+      const derivedStatus = derivePOFulfillmentStatus({ ...po, items: updatedLines });
       updatePO(poKey, {
         items: updatedLines,
+        ...(po.status !== "Draft" && derivedStatus === "Delivered"
+          ? { status: "Delivered" as StoredPO["status"] }
+          : {}),
       });
-      setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
+      setOrderStatus(derivedStatus);
       const text = `${currentItem?.name || "Item"} status changed from ${previousStatus} to ${savedStatus}.`;
       const activity = makePOActivity(text, "status-change", `activity_item_status_${poKey}_${id}_${savedStatus}_${Date.now()}`);
       appendPOActivity(poKey, activity);
@@ -1414,8 +1418,18 @@ export default function VendorOrderDetailPage() {
     };
     const updatedNotes = [auditNote, ...(po.notes || [])];
 
-    // 3. Update PO status to Confirmed + persist audit note
-    updatePO(poKey, { status: "Confirmed", notes: updatedNotes });
+    // 3. Update PO status to Confirmed, mark active items Processing + persist audit note
+    const updatedLineItems = (po.items || []).map(li =>
+      String(li.status || "").toLowerCase() === "cancelled"
+        ? li
+        : { ...li, status: "Processing" }
+    );
+    updatePO(poKey, { status: "Confirmed", items: updatedLineItems, notes: updatedNotes });
+    setItems(prev => prev.map(it =>
+      String(it.status || "").toLowerCase() === "cancelled"
+        ? it
+        : { ...it, status: "Processing" }
+    ));
     setOrderStatus("Processing");
     setNotes(updatedNotes);
     // 4. Send vendor email notification
@@ -1750,13 +1764,20 @@ export default function VendorOrderDetailPage() {
               align-self: stretch;
               box-sizing: border-box;
               border-right: 1px solid #e5e7eb;
-              padding-right: 6px;
+              padding: 14px 10px;
+            }
+            .vendor-po-items-grid.vendor-po-items-header > * {
+              padding: 10px 10px;
+            }
+            .vendor-po-items-grid > *:first-child {
+              padding-left: 0;
             }
             .vendor-po-items-grid > *:last-child {
               border-right: none;
+              padding-right: 0;
             }
           `}</style>
-          <div className="vendor-po-items-grid" style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+          <div className="vendor-po-items-grid vendor-po-items-header" style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "0 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
             {(isDigitalOrder
               ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "ACTIONS"]
               : isMixedOrder
@@ -1768,7 +1789,7 @@ export default function VendorOrderDetailPage() {
             <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
           )}
           {filteredItems.map((item, idx) => (
-            <div className="vendor-po-items-grid" key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div className="vendor-po-items-grid" key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "0 20px", alignItems: "stretch", borderBottom: idx < filteredItems.length - 1 ? "1px solid #e5e7eb" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
