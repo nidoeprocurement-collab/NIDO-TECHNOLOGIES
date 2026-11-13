@@ -150,9 +150,11 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
     const refresh = () => refreshPermissions(value => value + 1);
     window.addEventListener("nidoPortalRolesUpdated", refresh);
     window.addEventListener("nidoPortalUsersUpdated", refresh);
+    window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener("nidoPortalRolesUpdated", refresh);
       window.removeEventListener("nidoPortalUsersUpdated", refresh);
+      window.removeEventListener("storage", refresh);
     };
   }, []);
   if (!isAuthenticated) return <Navigate to="/login" replace />;

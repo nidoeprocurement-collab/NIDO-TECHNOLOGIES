@@ -253,4 +253,25 @@ describe("client portal authentication", () => {
     expect(getPortalModuleForPath("/portal/my-services/requests/request-1")).toBe("Services - My Services");
     expect(getPortalModuleForPath("/portal/unmapped")).toBeNull();
   });
+
+  it("maps granular overview and service sub-module selections to Dashboard and Services tab access", () => {
+    const clientId = "client-submodules";
+    savePortalRoles(clientId, [
+      {
+        id: "r-sub",
+        name: "Custom Submodule Role",
+        description: "Only Company Information and Services - AMC",
+        status: "active",
+        permissions: [
+          createPortalRolePermission("Company Information", { view: true }),
+          createPortalRolePermission("Services - AMC", { view: true }),
+        ],
+      },
+    ]);
+
+    expect(hasPortalPermission(clientId, "custom submodule role", "Dashboard", "view")).toBe(true);
+    expect(hasPortalPermission(clientId, "Custom Submodule Role", "Services", "view")).toBe(true);
+    expect(hasPortalPermission(clientId, "Custom Submodule Role", "Orders", "view")).toBe(false);
+    expect(hasPortalPermission(clientId, "Custom Submodule Role", "Services - Rental Service", "view")).toBe(false);
+  });
 });

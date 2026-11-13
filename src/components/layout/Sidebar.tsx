@@ -276,8 +276,21 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [, setPortalPermissionsTick] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    const refresh = () => setPortalPermissionsTick(tick => tick + 1);
+    window.addEventListener('nidoPortalRolesUpdated', refresh);
+    window.addEventListener('nidoPortalUsersUpdated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('nidoPortalRolesUpdated', refresh);
+      window.removeEventListener('nidoPortalUsersUpdated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   // Apply each tenant's portal role permissions to client navigation.
   const rawNavItems = isClientPortalUser ? clientNavigationItems : adminNavigationItems;

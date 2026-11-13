@@ -354,6 +354,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       "nidoInvoicesUpdated",
       "supportTicketsUpdated",
       "nidoPortalUsersUpdated",
+      "nidoPortalRolesUpdated",
     ] as const;
     events.forEach((event) => window.addEventListener(event, reload));
     const onStorage = (event: StorageEvent) => {
@@ -371,7 +372,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
         event.key === "nido_client_catalogs" ||
         event.key === "nido_sales_invoices" ||
         event.key === "nido_support_tickets" ||
-        event.key === "nido_portal_users"
+        event.key === "nido_portal_users" ||
+        event.key.startsWith("nido_portal_roles_")
       ) {
         reload();
       }

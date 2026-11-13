@@ -434,9 +434,25 @@ export function hasPortalPermission(
   module: string,
   action: keyof Omit<PortalRolePermission, 'module'> = 'view',
 ): boolean {
-  const role = getPortalRoles(clientId).find(item => item.name === roleName);
+  const normalizedRole = roleName.trim().toLowerCase();
+  if (!normalizedRole) return false;
+  const role = getPortalRoles(clientId).find(item => item.name.trim().toLowerCase() === normalizedRole);
   if (!role || role.status !== 'active') return false;
-  return !!role?.permissions.find(permission => permission.module === module)?.[action];
+  const normalizedModule = module.trim().toLowerCase();
+  const hasDirect = !!role.permissions.find(
+    permission => permission.module.trim().toLowerCase() === normalizedModule,
+  )?.[action];
+  if (hasDirect) return true;
+
+  if (action === 'view' && normalizedModule === 'dashboard') {
+    const overviewSet = new Set<string>(DASHBOARD_OVERVIEW_SUBMODULES);
+    return role.permissions.some(permission => overviewSet.has(permission.module) && !!permission.view);
+  }
+  if (action === 'view' && normalizedModule === 'services') {
+    const servicesSet = new Set<string>(SERVICES_SUBMODULES);
+    return role.permissions.some(permission => servicesSet.has(permission.module) && !!permission.view);
+  }
+  return false;
 }
 
 export function getPortalUsers(): PortalUser[] {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -105,6 +105,20 @@ export default function ServicesPage() {
   const location = useLocation();
   const { user, isClientPortalUser, isImpersonating } = useAuth();
   const isPortal = isClientPortalUser || isImpersonating || location.pathname.startsWith("/portal");
+  const [, setPortalPermissionsTick] = useState(0);
+
+  useEffect(() => {
+    if (!isPortal) return;
+    const refresh = () => setPortalPermissionsTick((tick) => tick + 1);
+    window.addEventListener("nidoPortalRolesUpdated", refresh);
+    window.addEventListener("nidoPortalUsersUpdated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("nidoPortalRolesUpdated", refresh);
+      window.removeEventListener("nidoPortalUsersUpdated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [isPortal]);
   const canViewPortalModule = (moduleName: string) => {
     if (!isPortal || isImpersonating || !isClientPortalUser) return true;
     if (!user?.clientId) return false;
