@@ -234,8 +234,8 @@ function TextField({ label, required, value, onChange, placeholder, type = "text
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function NewAMCRequestPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const isPortal = location.pathname.startsWith("/portal");
+  const routeLocation = useLocation();
+  const isPortal = routeLocation.pathname.startsWith("/portal");
   const servicesPath = isPortal ? "/portal/services" : "/services";
   const myServicesPath = isPortal ? "/portal/my-services" : "/my-services";
 

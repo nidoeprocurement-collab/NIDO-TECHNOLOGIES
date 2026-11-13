@@ -74,8 +74,8 @@ function SelectField({ label, required, value, onChange, options, placeholder, d
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function NewRentalServicePage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const isPortal = location.pathname.startsWith("/portal");
+  const routeLocation = useLocation();
+  const isPortal = routeLocation.pathname.startsWith("/portal");
   const servicesPath = isPortal ? "/portal/services" : "/services";
   const myServicesPath = isPortal ? "/portal/my-services" : "/my-services";
 
