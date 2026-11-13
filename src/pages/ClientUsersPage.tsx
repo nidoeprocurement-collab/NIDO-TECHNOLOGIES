@@ -1619,45 +1619,59 @@ function ImportUsersModal({
   onImportRows,
 }: {
   onClose: () => void;
-  onImportRows?: (headers: string[], rows: string[][]) => void;
+  onImportRows?: (
+    headers: string[],
+    rows: string[][],
+  ) => { importedCount: number; skippedCount: number; error?: string } | void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string[][]>([]);
   const [dragging, setDragging] = useState(false);
   const [imported, setImported] = useState(false);
+  const [importSummary, setImportSummary] = useState<{
+    importedCount: number;
+    skippedCount: number;
+    error?: string;
+  } | null>(null);
 
   const parseCSV = (text: string) => {
-    const lines = text.trim().split(/\r?\n/).filter(Boolean);
-    return lines.map((line) => {
-      const cells: string[] = [];
-      let current = "";
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i += 1) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQuotes && line[i + 1] === '"') {
-            current += '"';
-            i += 1;
+    const cleaned = text.replace(/^\uFEFF/, "").trim();
+    if (!cleaned) return [];
+    const lines = cleaned.split(/\r?\n/).filter(Boolean);
+    return lines
+      .map((line) => {
+        const cells: string[] = [];
+        let current = "";
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i += 1) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              current += '"';
+              i += 1;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === "," && !inQuotes) {
+            cells.push(current.trim());
+            current = "";
           } else {
-            inQuotes = !inQuotes;
+            current += ch;
           }
-        } else if (ch === "," && !inQuotes) {
-          cells.push(current.trim());
-          current = "";
-        } else {
-          current += ch;
         }
-      }
-      cells.push(current.trim());
-      return cells;
-    });
+        cells.push(current.trim());
+        return cells;
+      })
+      .filter((cells, index) => index === 0 || cells.some((cell) => cell.length > 0));
   };
 
   const handleFile = (f: File) => {
     setFile(f);
+    setImported(false);
+    setImportSummary(null);
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
+      const text = (e.target?.result as string) || "";
       setPreview(parseCSV(text));
     };
     reader.readAsText(f);
@@ -1672,7 +1686,7 @@ function ImportUsersModal({
     e.preventDefault();
     setDragging(false);
     const f = e.dataTransfer.files?.[0];
-    if (f && f.name.endsWith(".csv")) handleFile(f);
+    if (f && f.name.toLowerCase().endsWith(".csv")) handleFile(f);
   };
 
   const headers = preview[0] ?? [];
@@ -1680,7 +1694,7 @@ function ImportUsersModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-fullmx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-gray-100">
           <div>
@@ -1690,14 +1704,14 @@ function ImportUsersModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={16} /></button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-2 py-2 flex flex-col gap-5">
+        <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-5">
           {/* Upload area */}
           {!file && (
             <div
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
-              className={`border-2 border-dashed rounded-xl p-2 flex flex-col items-center gap-3 transition-colors ${dragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:border-gray-300"}`}
+              className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors ${dragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:border-gray-300"}`}
             >
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               <p className="text-sm text-gray-600 font-medium">Drag & drop your CSV file here</p>
@@ -1753,18 +1767,35 @@ function ImportUsersModal({
           )}
 
           {imported && (
-            <div className="flex flex-col items-center justify-center py-10 gap-3">
-              <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
-                <CheckCircle size={24} className="text-green-500" />
-              </div>
-              <p className="text-sm font-semibold text-gray-900">Import Successful</p>
-              <p className="text-xs text-gray-400">{rows.length} user{rows.length !== 1 ? "s" : ""} imported successfully.</p>
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+              {importSummary?.error || importSummary?.importedCount === 0 ? (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                    <AlertCircle size={24} className="text-red-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">Import Incomplete</p>
+                  <p className="text-xs text-gray-500 max-w-md">
+                    {importSummary?.error || "No valid users were imported. Ensure Full Name and Email ID are filled for each row."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
+                    <CheckCircle size={24} className="text-green-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">Import Successful</p>
+                  <p className="text-xs text-gray-400">
+                    {importSummary ? importSummary.importedCount : rows.length} user{(importSummary ? importSummary.importedCount : rows.length) !== 1 ? "s" : ""} imported successfully
+                    {importSummary && importSummary.skippedCount > 0 ? ` (${importSummary.skippedCount} skipped)` : ""}.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
           <button onClick={() => { downloadUserTemplate(); }} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
             <Download size={12} /> Download Template
           </button>
@@ -1776,7 +1807,8 @@ function ImportUsersModal({
               <button
                 disabled={!file || rows.length === 0}
                 onClick={() => {
-                  onImportRows?.(headers, rows);
+                  const result = onImportRows?.(headers, rows);
+                  if (result) setImportSummary(result);
                   setImported(true);
                 }}
                 className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
@@ -3347,8 +3379,10 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         <ImportUsersModal
           onClose={() => setShowImportUsers(false)}
           onImportRows={(headers, rows) => {
-            if (!clientId) return;
-            const normalizedHeaders = headers.map((h) => h.trim().toLowerCase());
+            if (!clientId) {
+              return { importedCount: 0, skippedCount: rows.length, error: "Client context is missing." };
+            }
+            const normalizedHeaders = headers.map((h) => h.replace(/\*/g, "").trim().toLowerCase());
             const findCol = (names: string[]) =>
               normalizedHeaders.findIndex((h) => names.includes(h));
             const empIdx = findCol(["employee id", "employeeid"]);
@@ -3371,25 +3405,36 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
             const approvalThresholdIdx = findCol(["approval threshold", "approvalthreshold"]);
             const categoriesIdx = findCol(["allowed expense categories", "expense categories", "categories"]);
 
-            const portalRoles = getPortalRoles(clientId);
-            const defaultRole =
-              portalRoles.find((r) => r.status === "active")?.name ||
-              "Client User";
+            const activePortalRoles = getPortalRoles(clientId).filter((r) => r.status === "active");
+            if (activePortalRoles.length === 0) {
+              return {
+                importedCount: 0,
+                skippedCount: rows.length,
+                error: "Create and activate a client role before importing users.",
+              };
+            }
+            const defaultRole = activePortalRoles[0].name;
             const organizationAccess =
               getCurrentOrganizationName(clientId, clientName) || clientName || "Client";
+
+            let importedCount = 0;
+            let skippedCount = 0;
 
             rows.forEach((row) => {
               const readCell = (idx: number) => (idx >= 0 ? (row[idx] ?? "").trim() : "");
               const name = readCell(nameIdx);
               const email = readCell(emailIdx);
-              if (!name || !email) return;
+              if (!name || !email) {
+                skippedCount += 1;
+                return;
+              }
 
               const phone = readCell(phoneIdx);
               const requestedRole = readCell(roleIdx);
               const matchedRole =
-                portalRoles.find((r) => r.name.toLowerCase() === requestedRole.toLowerCase()) ||
-                portalRoles.find((r) => r.name.toLowerCase() === defaultRole.toLowerCase());
-              const resolvedRole = matchedRole?.name || requestedRole || defaultRole;
+                activePortalRoles.find((r) => r.name.toLowerCase() === requestedRole.toLowerCase()) ||
+                activePortalRoles[0];
+              const resolvedRole = matchedRole?.name || defaultRole;
               const inheritedPermissions = matchedRole?.permissions ? [...matchedRole.permissions] : [];
 
               const statusVal = (readCell(statusIdx) || "Active").toLowerCase();
@@ -3432,11 +3477,13 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                     permissions: inheritedPermissions,
                   },
                 });
+                importedCount += 1;
               } catch {
-                // skip invalid row
+                skippedCount += 1;
               }
             });
             setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
+            return { importedCount, skippedCount };
           }}
         />
       )}

@@ -545,7 +545,11 @@ export function provisionPortalUser(
   const existing = getPortalUsers().find(
     user => user.clientId === clientId && user.email.trim().toLowerCase() === email,
   );
-  const userId = existing?.id || `portal-${clientId}-${Date.now()}`;
+  const uniqueIdPart =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().slice(0, 8)
+      : `${Date.now()}-${randomSuffix()}`;
+  const userId = existing?.id || `portal-${clientId}-${uniqueIdPart}`;
   const availableRoles = getPortalRoles(clientId).filter(item => item.status === 'active');
   const requestedRole = details.role?.trim() || existing?.role || '';
   const role = availableRoles.find(item => item.name === requestedRole)?.name;

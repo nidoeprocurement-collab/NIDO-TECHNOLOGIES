@@ -123,7 +123,7 @@ describe("ClientUsersPage download template and auto-fill import", () => {
     fireEvent.click(menuBtn!);
     fireEvent.click(screen.getByText("Import Users"));
 
-    const csvContent = [
+    const csvContent = "\uFEFF" + [
       USER_TEMPLATE_HEADERS.join(","),
       [
         "EMP-402",
@@ -146,6 +146,28 @@ describe("ClientUsersPage download template and auto-fill import", () => {
         "500",
         "\"Travel, Meals\"",
       ].join(","),
+      [
+        "EMP-403",
+        "Rohan Verma",
+        "rohan@acmecorp.com",
+        "9123456780",
+        "Buyer",
+        "Procurement",
+        "Asha Rao",
+        "Male",
+        "2026-05-01",
+        "Active",
+        "Procurement Lead",
+        "Own Only",
+        "All Locations",
+        "INR",
+        "10000",
+        "120000",
+        "No",
+        "",
+        "Travel",
+      ].join(","),
+      ",,,,,,,,,,,,,,,,,,",
     ].join("\r\n");
 
     const fileInput = container.querySelector('input[type="file"][accept=".csv"]') as HTMLInputElement;
@@ -161,14 +183,18 @@ describe("ClientUsersPage download template and auto-fill import", () => {
     fireEvent.change(fileInput, { target: { files: [csvFile] } });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Import 1 User/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Import 2 Users/i })).toBeTruthy();
     });
-    fireEvent.click(screen.getByRole("button", { name: /Import 1 User/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Import 2 Users/i }));
 
     await waitFor(() => {
       const users = getPortalUsersByClient(clientId);
+      expect(users).toHaveLength(2);
       const imported = users.find((u) => u.email === "asha@acmecorp.com");
+      const secondImported = users.find((u) => u.email === "rohan@acmecorp.com");
       expect(imported).toBeDefined();
+      expect(secondImported).toBeDefined();
+      expect(imported?.id).not.toBe(secondImported?.id);
       expect(imported?.id).toBeTruthy();
       expect(imported?.userType).toBe("client_user");
       expect(imported?.clientName).toBe(clientName);
