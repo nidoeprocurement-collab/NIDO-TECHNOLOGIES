@@ -286,6 +286,21 @@ export default function ClientRolesPage() {
 
   const addModule = () => addModules();
 
+  const removeModule = (moduleName: string) => {
+    let currentDraft = draftRole;
+    if (!currentDraft && displayedRole) {
+      currentDraft = {
+        ...displayedRole,
+        permissions: displayedRole.permissions.map(permission => ({ ...permission })),
+      };
+    }
+    if (!currentDraft) return;
+    setDraftRole({
+      ...currentDraft,
+      permissions: currentDraft.permissions.filter(item => item.module !== moduleName),
+    });
+  };
+
   const addRole = () => {
     const name = newRoleName.trim();
     if (!name || roles.some(role => role.name.toLowerCase() === name.toLowerCase())) {
@@ -630,6 +645,7 @@ export default function ClientRolesPage() {
                 selectedModules={modulesToAdd}
                 onSelectionChange={setModulesToAdd}
                 onAddModules={addModules}
+                onRemoveModule={removeModule}
                 disabled={!isEditing}
                 onEnableEdit={() => beginEditing(displayedRole)}
               />

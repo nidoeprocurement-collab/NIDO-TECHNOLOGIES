@@ -111,6 +111,19 @@ export default function ClientPortalRolesPage() {
     setModuleToAdd('');
   };
 
+  const removeModule = (moduleName: string) => {
+    if (!isAdmin || !selected) return;
+    const updated = roles.map(role => role.id !== selected.id
+      ? role
+      : {
+          ...role,
+          permissions: role.permissions.filter(permission => permission.module !== moduleName),
+        });
+    savePortalRoles(clientId, updated);
+    setRoles(updated);
+    setSelected(updated.find(role => role.id === selected.id) ?? null);
+  };
+
   const toggleRoleStatus = (roleId: string) => {
     if (!isAdmin) return;
     const updated = roles.map(role => role.id === roleId
@@ -215,6 +228,7 @@ export default function ClientPortalRolesPage() {
                     selectedModules={modulesToAdd}
                     onSelectionChange={setModulesToAdd}
                     onAddModules={addModules}
+                    onRemoveModule={removeModule}
                     disabled={!isAdmin}
                   />
                   <span className="text-[11px] text-gray-400 ml-auto">

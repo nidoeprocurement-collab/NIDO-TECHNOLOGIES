@@ -7,6 +7,7 @@ export interface ModuleMultiSelectProps {
   selectedModules: string[];
   onSelectionChange: (modules: string[]) => void;
   onAddModules: () => void;
+  onRemoveModule?: (moduleName: string) => void;
   disabled?: boolean;
   onEnableEdit?: () => void;
 }
@@ -16,6 +17,7 @@ export function ModuleMultiSelect({
   selectedModules,
   onSelectionChange,
   onAddModules,
+  onRemoveModule,
   disabled = false,
   onEnableEdit,
 }: ModuleMultiSelectProps) {
@@ -53,7 +55,10 @@ export function ModuleMultiSelect({
   });
 
   const toggleModule = (moduleName: string) => {
-    if (existingModules.includes(moduleName)) return;
+    if (existingModules.includes(moduleName)) {
+      onRemoveModule?.(moduleName);
+      return;
+    }
     if (selectedModules.includes(moduleName)) {
       onSelectionChange(selectedModules.filter((m) => m !== moduleName));
     } else {
@@ -226,16 +231,17 @@ export function ModuleMultiSelect({
               ) : (
                 filteredModules.map((module) => {
                   const isAdded = existingModules.includes(module.name);
+                  const canDeselect = isAdded && !!onRemoveModule;
                   const isSelected = selectedModules.includes(module.name);
 
                   return (
                     <div
                       key={module.name}
-                      onClick={() => !isAdded && toggleModule(module.name)}
+                      onClick={() => (!isAdded || canDeselect) && toggleModule(module.name)}
                       className={`flex items-start gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
-                        isAdded
+                        isAdded && !canDeselect
                           ? "opacity-50 cursor-not-allowed bg-gray-50"
-                          : isSelected
+                          : isAdded || isSelected
                           ? "bg-blue-50/70 hover:bg-blue-50 cursor-pointer"
                           : "hover:bg-gray-50 cursor-pointer"
                       }`}
@@ -243,7 +249,7 @@ export function ModuleMultiSelect({
                       <input
                         type="checkbox"
                         checked={isAdded || isSelected}
-                        disabled={isAdded}
+                        disabled={isAdded && !canDeselect}
                         onChange={() => toggleModule(module.name)}
                         onClick={(e) => e.stopPropagation()}
                         className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-blue-600 accent-blue-600 focus:ring-blue-500 shrink-0"
@@ -252,9 +258,9 @@ export function ModuleMultiSelect({
                         <div className="flex items-center justify-between gap-1.5">
                           <span
                             className={`font-semibold text-xs ${
-                              isAdded
+                              isAdded && !canDeselect
                                 ? "text-gray-400"
-                                : isSelected
+                                : isAdded || isSelected
                                 ? "text-blue-900"
                                 : "text-gray-800"
                             }`}
@@ -262,8 +268,14 @@ export function ModuleMultiSelect({
                             {module.name}
                           </span>
                           {isAdded && (
-                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.2 rounded font-medium shrink-0">
-                              Already added
+                            <span
+                              className={`text-[10px] px-1.5 py-0.2 rounded font-medium shrink-0 ${
+                                canDeselect
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {canDeselect ? "Added" : "Already added"}
                             </span>
                           )}
                         </div>
