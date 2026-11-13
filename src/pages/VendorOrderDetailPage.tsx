@@ -1732,6 +1732,8 @@ export default function VendorOrderDetailPage() {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
               {isCancelled ? (
                 <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
+              ) : isAssignmentPending ? (
+                <span style={{ fontSize: 12.5, color: "#92400e", fontStyle: "italic" }}>Complete Assignment on the master order before confirming or updating this PO.</span>
               ) : isDraft ? (
                 <>
                   <span style={{ fontSize: 12.5, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 7, padding: "6px 12px", fontWeight: 500 }}>

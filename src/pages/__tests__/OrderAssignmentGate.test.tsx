@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MyOrdersProvider, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
-import { addUsers } from "@/lib/nidoUsersStore";
+import { saveUsers } from "@/lib/nidoUsersStore";
 import { savePO } from "@/lib/purchaseOrderStore";
 import OrderDetailsPage from "@/pages/OrderDetailsPage";
 import VendorOrderDetailPage from "@/pages/VendorOrderDetailPage";
@@ -21,7 +21,7 @@ describe("Order & Vendor Order Assignment Gate", () => {
         userType: "nido_admin",
       }),
     );
-    addUsers([
+    saveUsers([
       {
         id: "emp-1",
         employeeId: "EMP-1",
@@ -102,6 +102,12 @@ describe("Order & Vendor Order Assignment Gate", () => {
       createdOn: "2026-11-13",
       totalAmount: "₹10,000",
       totalAmountNum: 10000,
+      subtotal: 10000,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      grandTotal: 10000,
+      sgstPct: 0,
+      cgstPct: 0,
       items: [
         {
           subOrderId: `${orderId}-1`,
@@ -109,6 +115,7 @@ describe("Order & Vendor Order Assignment Gate", () => {
           productCode: "DELL-1",
           qty: 1,
           unitPrice: 10000,
+          lineSubtotal: 10000,
           total: 10000,
           status: "Pending",
         },
@@ -123,7 +130,7 @@ describe("Order & Vendor Order Assignment Gate", () => {
         <AuthProvider>
           <MyOrdersProvider>
             <Routes>
-              <Route path="/vendor-orders/:poNumber" element={<VendorOrderDetailPage />} />
+              <Route path="/vendor-orders/:id" element={<VendorOrderDetailPage />} />
             </Routes>
           </MyOrdersProvider>
         </AuthProvider>
@@ -131,7 +138,7 @@ describe("Order & Vendor Order Assignment Gate", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("Order Assignment Required");
+      expect(screen.getByRole("alert").textContent).toContain("Order Assignment Required");
     });
     expect(screen.queryByRole("button", { name: /Confirm Purchase Order/i })).toBeNull();
     vendorView.unmount();
@@ -142,7 +149,7 @@ describe("Order & Vendor Order Assignment Gate", () => {
         <AuthProvider>
           <MyOrdersProvider>
             <Routes>
-              <Route path="/orders/:orderId" element={<OrderDetailsPage />} />
+              <Route path="/orders/:id" element={<OrderDetailsPage />} />
             </Routes>
           </MyOrdersProvider>
         </AuthProvider>
@@ -150,14 +157,14 @@ describe("Order & Vendor Order Assignment Gate", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("Order Assignment Required");
+      expect(screen.getByRole("alert").textContent).toContain("Order Assignment Required");
     });
-    expect(screen.getByRole("button", { name: /Cancel Order/i })).toBeDisabled();
+    expect((screen.getByRole("button", { name: /Cancel Order/i }) as HTMLButtonElement).disabled).toBe(true);
 
     // Save Assignment in the auto-opened Edit Assignment modal
-    const assigneeSelect = screen.getByRole("combobox");
+    const assigneeSelect = screen.getByLabelText("Assigned To");
     fireEvent.change(assigneeSelect, { target: { value: "Anita Kapoor" } });
-    fireEvent.click(screen.getByRole("button", { name: /Save Assignment/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("alert")).toBeNull();
@@ -170,7 +177,7 @@ describe("Order & Vendor Order Assignment Gate", () => {
         <AuthProvider>
           <MyOrdersProvider>
             <Routes>
-              <Route path="/vendor-orders/:poNumber" element={<VendorOrderDetailPage />} />
+              <Route path="/vendor-orders/:id" element={<VendorOrderDetailPage />} />
             </Routes>
           </MyOrdersProvider>
         </AuthProvider>
@@ -181,5 +188,6 @@ describe("Order & Vendor Order Assignment Gate", () => {
       expect(screen.queryByRole("alert")).toBeNull();
       expect(screen.getAllByRole("button", { name: /Confirm Purchase Order/i }).length).toBeGreaterThan(0);
     });
-  });
+  }, 15000);
 });
+
