@@ -731,9 +731,30 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   );
 }
 
+export const USER_TEMPLATE_HEADERS = [
+  "Employee ID",
+  "Full Name",
+  "Email ID",
+  "Phone Number",
+  "Job Title",
+  "Department",
+  "Reporting Manager",
+  "Gender",
+  "Joining Date",
+  "Status",
+  "Role",
+  "Data Visibility",
+  "Location Access",
+  "Currency",
+  "Monthly Limit",
+  "Annual Limit",
+  "Require Approval",
+  "Approval Threshold",
+  "Allowed Expense Categories",
+];
+
 export function downloadUserTemplate() {
-  const headers = ["User ID", "Employee ID", "User Type", "Full Name", "Email ID", "Phone Number", "Job Title", "Role", "Organization Access", "Status"];
-  const csv = `${headers.join(",")}\r\n`;
+  const csv = `${USER_TEMPLATE_HEADERS.join(",")}\r\n`;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1606,10 +1627,30 @@ function ImportUsersModal({
   const [imported, setImported] = useState(false);
 
   const parseCSV = (text: string) => {
-    const lines = text.trim().split("\n").filter(Boolean);
-    return lines.map((line) =>
-      line.split(",").map((cell) => cell.replace(/^"|"$/g, "").trim())
-    );
+    const lines = text.trim().split(/\r?\n/).filter(Boolean);
+    return lines.map((line) => {
+      const cells: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === "," && !inQuotes) {
+          cells.push(current.trim());
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      cells.push(current.trim());
+      return cells;
+    });
   };
 
   const handleFile = (f: File) => {
@@ -3310,35 +3351,85 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
             const normalizedHeaders = headers.map((h) => h.trim().toLowerCase());
             const findCol = (names: string[]) =>
               normalizedHeaders.findIndex((h) => names.includes(h));
+            const empIdx = findCol(["employee id", "employeeid"]);
             const nameIdx = findCol(["full name", "name"]);
             const emailIdx = findCol(["email id", "email"]);
             const phoneIdx = findCol(["phone number", "phone"]);
-            const roleIdx = findCol(["role"]);
-            const empIdx = findCol(["employee id", "employeeid"]);
             const titleIdx = findCol(["job title", "jobtitle"]);
+            const deptIdx = findCol(["department"]);
+            const managerIdx = findCol(["reporting manager", "reportingmanager"]);
+            const genderIdx = findCol(["gender"]);
+            const joiningDateIdx = findCol(["joining date", "joiningdate"]);
             const statusIdx = findCol(["status"]);
+            const roleIdx = findCol(["role"]);
+            const dataVisibilityIdx = findCol(["data visibility", "datavisibility"]);
+            const locationAccessIdx = findCol(["location access", "locationaccess"]);
+            const currencyIdx = findCol(["currency"]);
+            const monthlyLimitIdx = findCol(["monthly limit", "monthlylimit"]);
+            const annualLimitIdx = findCol(["annual limit", "annuallimit"]);
+            const requireApprovalIdx = findCol(["require approval", "approval required", "approvalrequired"]);
+            const approvalThresholdIdx = findCol(["approval threshold", "approvalthreshold"]);
+            const categoriesIdx = findCol(["allowed expense categories", "expense categories", "categories"]);
+
+            const portalRoles = getPortalRoles(clientId);
             const defaultRole =
-              getPortalRoles(clientId).find((r) => r.status === "active")?.name ||
+              portalRoles.find((r) => r.status === "active")?.name ||
               "Client User";
+            const organizationAccess =
+              getCurrentOrganizationName(clientId, clientName) || clientName || "Client";
 
             rows.forEach((row) => {
-              const name = (nameIdx >= 0 ? row[nameIdx] : row[3] || row[0] || "").trim();
-              const email = (emailIdx >= 0 ? row[emailIdx] : row[4] || row[1] || "").trim();
+              const readCell = (idx: number) => (idx >= 0 ? (row[idx] ?? "").trim() : "");
+              const name = readCell(nameIdx);
+              const email = readCell(emailIdx);
               if (!name || !email) return;
-              const phone = (phoneIdx >= 0 ? row[phoneIdx] : row[5] || "").trim();
-              const role = (roleIdx >= 0 ? row[roleIdx] : defaultRole).trim() || defaultRole;
-              const statusVal = (statusIdx >= 0 ? row[statusIdx] : "Active").trim().toLowerCase();
+
+              const phone = readCell(phoneIdx);
+              const requestedRole = readCell(roleIdx);
+              const matchedRole =
+                portalRoles.find((r) => r.name.toLowerCase() === requestedRole.toLowerCase()) ||
+                portalRoles.find((r) => r.name.toLowerCase() === defaultRole.toLowerCase());
+              const resolvedRole = matchedRole?.name || requestedRole || defaultRole;
+              const inheritedPermissions = matchedRole?.permissions ? [...matchedRole.permissions] : [];
+
+              const statusVal = (readCell(statusIdx) || "Active").toLowerCase();
+              const approvalVal = readCell(requireApprovalIdx).toLowerCase();
+              const approvalRequired = approvalVal
+                ? !["false", "no", "0"].includes(approvalVal)
+                : true;
+              const categoriesRaw = readCell(categoriesIdx);
+              const categories = categoriesRaw
+                ? categoriesRaw.split(/[;,]/).map((c) => c.trim()).filter(Boolean)
+                : [];
+
               try {
-                provisionPortalUser(clientId, clientName || "Client", {
+                provisionPortalUser(clientId, organizationAccess, {
                   email,
                   name,
-                  role,
+                  role: resolvedRole,
                   status: statusVal === "inactive" ? "inactive" : "active",
                   phone,
                   details: {
-                    employeeId: empIdx >= 0 ? row[empIdx] : "",
-                    jobTitle: titleIdx >= 0 ? row[titleIdx] : "",
-                    orgAccess: clientName || "Client",
+                    userType: "Client User",
+                    employeeId: readCell(empIdx),
+                    jobTitle: readCell(titleIdx),
+                    department: readCell(deptIdx),
+                    reportingManager: readCell(managerIdx),
+                    gender: readCell(genderIdx),
+                    joiningDate: readCell(joiningDateIdx),
+                    orgAccess: organizationAccess,
+                    dataVisibility: readCell(dataVisibilityIdx) || "All Data",
+                    locationAccess: readCell(locationAccessIdx) || "All Locations",
+                    expenseForm: {
+                      currency: readCell(currencyIdx) || "INR",
+                      monthlyLimit: readCell(monthlyLimitIdx),
+                      annualLimit: readCell(annualLimitIdx),
+                      approvalRequired,
+                      approvalThreshold: readCell(approvalThresholdIdx),
+                      categories,
+                    },
+                    assignedDevices: [],
+                    permissions: inheritedPermissions,
                   },
                 });
               } catch {
