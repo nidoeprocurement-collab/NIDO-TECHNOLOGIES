@@ -2505,6 +2505,7 @@ function ThreeDotMenu({
   onRequestPickupDone,
   statusUpdatesEnabled,
   statusLockReason,
+  shippedLockReason,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const [statusWarning, setStatusWarning] = useState<{ status: string; reason: string } | null>(null);
@@ -2566,6 +2567,7 @@ function ThreeDotMenu({
     if (status === sub.itemStatus) return "This item is already at this status.";
     if (statusLockReason) return statusLockReason;
     if (!statusUpdatesEnabled) return "Status updates are unavailable for a cancelled item or order.";
+    if (status === "Shipped" && shippedLockReason) return shippedLockReason;
      if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
      if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
     const currentIndex = isDigitalItem
@@ -2895,6 +2897,18 @@ function poCoversSubOrder(po: any, subOrderId: string, subOrder?: any): boolean 
   if (po?.subOrderId === subOrderId) return true;
   if (Array.isArray(po?.subOrderIds) && po.subOrderIds.includes(subOrderId)) return true;
   return Array.isArray(po?.items) && po.items.some((item: any) => poLineMatchesSubOrder(item, subOrderId, subOrder));
+}
+
+export function isVendorOrderItemDelivered(orderPOs: any[], sub: any): boolean {
+  const coveringPOs = orderPOs.filter(po => poCoversSubOrder(po, sub.id, sub));
+  if (coveringPOs.length === 0) return false;
+  return coveringPOs.every(po => {
+    const matchingLine = findPOLineForSubOrder(po, sub.id, sub);
+    if (matchingLine) {
+      return String(matchingLine.status || "").trim().toLowerCase() === "delivered";
+    }
+    return String(po.status || "").trim().toLowerCase() === "delivered";
+  });
 }
 
 function poStatusRank(po: any): number {
@@ -3350,6 +3364,14 @@ export default function MyOrderPage() {
     if (isOrderInactive || statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target || target.itemStatus === "Cancelled") return;
+    if (
+      status === "Shipped" &&
+      hasOrderProcurementFlow &&
+      !isVendorOrderItemDelivered(orderPOs, target)
+    ) {
+      toast.error("Mark this item as Delivered in Vendor Order Details before updating it to Shipped.");
+      return;
+    }
     if (isDigitalDocumentProduct(target)) {
       const currentIndex = getDigitalFulfillmentStatusIndex(target.itemStatus, target.qty);
       const nextIndex = getDigitalFulfillmentStatusIndex(status, target.qty);
@@ -3489,6 +3511,10 @@ export default function MyOrderPage() {
     if (isOrderInactive || statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(sub => sub.id === subId);
     if (!target || isDigitalDocumentProduct(target)) return;
+    if (hasOrderProcurementFlow && !isVendorOrderItemDelivered(orderPOs, target)) {
+      toast.error("Mark this item as Delivered in Vendor Order Details before updating it to Shipped.");
+      return;
+    }
     setPendingShippedTarget(subId);
     setTrackingTarget(subId);
   };
@@ -3515,7 +3541,9 @@ export default function MyOrderPage() {
       return;
     }
     const updatedOn = new Date().toLocaleDateString("en-IN");
-    const shouldMarkShipped = pendingShippedTarget === trackingTarget;
+    const shouldMarkShipped =
+      pendingShippedTarget === trackingTarget &&
+      (!hasOrderProcurementFlow || isVendorOrderItemDelivered(orderPOs, target));
     const previousStatus = target.itemStatus;
     const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
     setSubOrders(prev => prev.map(s => s.id === trackingTarget
@@ -5202,6 +5230,11 @@ export default function MyOrderPage() {
                              onRequestPickupDone={() => setPickupDoneTarget(sub.id)}
                             statusUpdatesEnabled={!isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed}
                             statusLockReason={statusLockedUntilPOConfirmed ? statusLockReason : undefined}
+                            shippedLockReason={
+                              hasOrderProcurementFlow && !isVendorOrderItemDelivered(orderPOs, sub)
+                                ? "Mark this item as Delivered in Vendor Order Details before updating it to Shipped."
+                                : undefined
+                            }
                           />
                         </div>
                       )}
