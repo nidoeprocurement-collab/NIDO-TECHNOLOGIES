@@ -277,7 +277,7 @@ export default function ClientRolesPage() {
         ...currentDraft,
         permissions: [
           ...currentDraft.permissions,
-          ...toAdd.map(name => createPortalRolePermission(name)),
+          ...toAdd.map(name => createPortalRolePermission(name, { view: true })),
         ],
       });
     }

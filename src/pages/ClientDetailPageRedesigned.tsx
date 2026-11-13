@@ -303,12 +303,12 @@ interface ClientDetailProps {
 
 export default function ClientDetailPageRedesigned({ portalMode = false }: ClientDetailProps) {
   const params = useParams<{ id: string }>();
-  const { user, isImpersonating } = useAuth();
+  const { user } = useAuth();
   const { hasRoutePermission } = usePermissions();
   const navigate = useNavigate();
   const clientId = portalMode ? user?.clientId?.trim() ?? "" : params.id ?? "";
   const canViewOverviewModule = (moduleName: string) => {
-    if (!portalMode || isImpersonating) return true;
+    if (!portalMode) return true;
     if (!user?.clientId) return false;
     return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
   };

@@ -104,7 +104,7 @@ export default function ClientPortalRolesPage() {
       ? role
       : role.permissions.some(permission => permission.module === moduleToAdd)
         ? role
-        : { ...role, permissions: [...role.permissions, createPortalRolePermission(moduleToAdd)] });
+        : { ...role, permissions: [...role.permissions, createPortalRolePermission(moduleToAdd, { view: true })] });
     savePortalRoles(clientId, updated);
     setRoles(updated);
     setSelected(updated.find(role => role.id === selected.id) ?? null);

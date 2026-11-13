@@ -120,7 +120,7 @@ export default function ServicesPage() {
     };
   }, [isPortal]);
   const canViewPortalModule = (moduleName: string) => {
-    if (!isPortal || isImpersonating || !isClientPortalUser) return true;
+    if (!isPortal || !isClientPortalUser) return true;
     if (!user?.clientId) return false;
     return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
   };

@@ -161,12 +161,11 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
   if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
   const adminOnly = /\/(users|roles|addresses)(\/|$)/.test(location.pathname);
   const portalModule = getPortalModuleForPath(location.pathname);
-  const permitted = isImpersonating || (
+  const permitted =
     !!user?.clientId &&
     (adminOnly
       ? user.userType === "client_admin"
-      : !portalModule || hasPortalPermission(user.clientId, user.role ?? "", portalModule, "view"))
-  );
+      : !portalModule || hasPortalPermission(user.clientId, user.role ?? "", portalModule, "view"));
   if (!permitted) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-6">
