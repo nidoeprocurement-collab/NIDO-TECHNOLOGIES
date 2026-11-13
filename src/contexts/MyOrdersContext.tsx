@@ -459,3 +459,22 @@ export function useMyOrders() {
   if (!ctx) throw new Error("useMyOrders must be used within a MyOrdersProvider");
   return ctx;
 }
+
+/**
+ * Returns true once an order has a saved assignee (and is not still waiting for
+ * initial Assignment confirmation on Order Details).
+ */
+export function isOrderAssignmentCompleted(
+  order?: Pick<MyOrder, "assigned" | "assignmentCompleted"> | null,
+): boolean {
+  if (!order) return false;
+  const assignedName = String(order.assigned || "").trim();
+  const hasAssignee =
+    Boolean(assignedName) &&
+    assignedName !== "Unassigned" &&
+    assignedName !== "Assignment pending" &&
+    assignedName !== "—";
+  if (!hasAssignee) return false;
+  if (order.assignmentCompleted === false) return false;
+  return true;
+}

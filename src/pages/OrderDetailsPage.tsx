@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { Building2, Mail, Phone, Truck, UserRound } from "lucide-react";
-import { useMyOrders } from "@/contexts/MyOrdersContext";
+import { useMyOrders, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
@@ -3180,7 +3180,15 @@ export default function MyOrderPage() {
   };
   const approvalPending = ["Pending", "In Progress", "Sent Back", "Escalated"].includes(approvalStatus || "");
   const awaitingApproval = Boolean(order?.deferPurchaseOrders && orderPOs.length === 0 && (approvalStatus == null || approvalPending));
-  const statusLockReason = "Order status changes are locked until its Draft Purchase Orders are confirmed.";
+  const isAssignmentPending = Boolean(
+    !isClientPortalUser &&
+    order &&
+    String(order.status || "") !== "Cancelled" &&
+    !isOrderAssignmentCompleted(order),
+  );
+  const statusLockReason = isAssignmentPending
+    ? "Complete and save Assignment for this order before performing any actions."
+    : "Order status changes are locked until its Draft Purchase Orders are confirmed.";
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
@@ -3250,7 +3258,9 @@ export default function MyOrderPage() {
   const hasOrderProcurementFlow = awaitingApproval ||
     orderPOs.length > 0 ||
     activeOrderSubOrders.some(sub => Boolean(sub.selectedVendorId || sub.selectedVendorName));
-  const statusLockedUntilPOConfirmed = awaitingApproval ||
+  const statusLockedUntilPOConfirmed =
+    isAssignmentPending ||
+    awaitingApproval ||
     hasDraftOrderPO ||
     (hasOrderProcurementFlow && activeOrderSubOrders.length > 0 && hasUnconfirmedActiveOrderPO);
   const storedMasterStatus = String(order?.status || "Processing");
@@ -3305,8 +3315,10 @@ export default function MyOrderPage() {
     sub => sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled",
   );
   const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
-  const canCancelOrder = canCancelOrderByPO && !hasCancellationCutoffItem;
-  const cancelOrderUnavailableReason = !canCancelOrderByPO && hasCancellationCutoffItem
+  const canCancelOrder = !isAssignmentPending && canCancelOrderByPO && !hasCancellationCutoffItem;
+  const cancelOrderUnavailableReason = isAssignmentPending
+    ? "Complete and save Assignment for this order before performing any actions."
+    : !canCancelOrderByPO && hasCancellationCutoffItem
     ? "Active purchase orders and shipment or digital provisioning progress both block cancellation."
     : !canCancelOrderByPO
       ? "Cancel all active purchase orders before cancelling this order."
@@ -4642,6 +4654,25 @@ export default function MyOrderPage() {
           </div>
         </div>
 
+        {/* Assignment Gate Banner */}
+        {isAssignmentPending && (
+          <div
+            role="alert"
+            style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#92400e", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+          >
+            <div>
+              <b>Order Assignment Required:</b> Complete and save Assignment for this order before using Order Details or Vendor Order Details.
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowEditAssignment(true)}
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 12.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+            >
+              Assign Order
+            </button>
+          </div>
+        )}
+
         {/* SLA Status Panel */}
         {awaitingApproval && (
           <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#92400e", fontSize: 13 }}>
@@ -4759,7 +4790,17 @@ export default function MyOrderPage() {
         {/* Tabs section */}
         {/* overflow left as "visible" (not "hidden") so the per-row Actions
             menu and its "Update Status" flyout are never clipped */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "visible", marginBottom: 20 }}>
+        <div
+          aria-disabled={isAssignmentPending || undefined}
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 10,
+            overflow: "visible",
+            marginBottom: 20,
+            ...(isAssignmentPending ? { opacity: 0.55, pointerEvents: "none", userSelect: "none" } : {}),
+          }}
+        >
           {/* Tab bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
           <div style={{ display: "flex" }}>

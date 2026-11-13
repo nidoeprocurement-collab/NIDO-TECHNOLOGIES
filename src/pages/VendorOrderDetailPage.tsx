@@ -18,7 +18,7 @@ import { sendEmail } from "@/lib/emailUnavailable";
 import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import { getProductSpecLines } from "@/lib/productConfiguration";
-import { useMyOrders } from "@/contexts/MyOrdersContext";
+import { useMyOrders, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
 import { createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -1018,6 +1018,11 @@ export default function VendorOrderDetailPage() {
   const isPOCancelled = lifecycleStatus === "Cancelled" || orderStatus === "Cancelled" || cancelled;
   const isCancelled = isPOCancelled || isMasterOrderCancelled;
   const isDelivered = orderStatus === "Delivered";
+  const isAssignmentPending = Boolean(
+    linkedMasterOrder &&
+    linkedMasterOrder.status !== "Cancelled" &&
+    !isOrderAssignmentCompleted(linkedMasterOrder),
+  );
 
   useEffect(() => {
     if (isDelivered) setShowUploadDocument(false);
@@ -1097,7 +1102,7 @@ export default function VendorOrderDetailPage() {
     : "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px";
 
   const handleItemStatusChange = (id: string, status: string) => {
-    if (isCancelled) return; // PO is cancelled — no further status changes allowed
+    if (isCancelled || isAssignmentPending) return; // PO is cancelled or master order assignment pending
     const currentItem = items.find(item => item.id === id);
     const digital = Boolean(currentItem && isDigitalDocumentProduct(currentItem));
     if (digital && (status === "Shipped" || status === "Delivered")) return;
@@ -1177,7 +1182,7 @@ export default function VendorOrderDetailPage() {
     }
   };
   const confirmItemCancel = (reason: string) => {
-    if (!pendingItemCancel) return;
+    if (!pendingItemCancel || isAssignmentPending) return;
     const itemIndex = items.findIndex(it => it.id === pendingItemCancel.id);
     const itemToCancel = items[itemIndex];
     if (
@@ -1324,7 +1329,7 @@ export default function VendorOrderDetailPage() {
     }
   };
   const handleUploadDocument = (doc: any) => {
-    if (isDelivered) return;
+    if (isDelivered || isAssignmentPending) return;
     const nextDocuments = [...documents, doc];
     if (getPOByNumber(poKey)) updatePO(poKey, { documents: nextDocuments });
     setDocuments(nextDocuments);
@@ -1351,19 +1356,19 @@ export default function VendorOrderDetailPage() {
     }
   };
   const handleDeleteDoc = (id: string) => {
-    if (isDelivered) return;
+    if (isDelivered || isAssignmentPending) return;
     const nextDocuments = documents.filter(doc => doc.id !== id);
     if (getPOByNumber(poKey)) updatePO(poKey, { documents: nextDocuments });
     setDocuments(nextDocuments);
   };
   const handleDeleteNote = (id: string) => {
-    if (isDelivered) return;
+    if (isDelivered || isAssignmentPending) return;
     const nextNotes = notes.filter(n => n.id !== id);
     updatePO(poKey, { notes: nextNotes });
     setNotes(nextNotes);
   };
   const handleAddNote = () => {
-    if (isDelivered || !noteText.trim()) return;
+    if (isDelivered || isAssignmentPending || !noteText.trim()) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const actor = getActivityActor("System Owner");
@@ -1385,6 +1390,7 @@ export default function VendorOrderDetailPage() {
 
   // ── Confirm Draft PO ──────────────────────────────────────────────────────────
   const handleConfirmPO = () => {
+    if (isAssignmentPending) return;
     const po = getPOByNumber(poKey);
     if (!po || po.status !== "Draft") return;
 
@@ -1553,7 +1559,7 @@ export default function VendorOrderDetailPage() {
               <span>From <b style={{ color: "#374151" }}>{initialData.vendorName}</b></span>
             </div>
           </div>
-          {!isCancelled && (
+          {!isCancelled && !isAssignmentPending && (
             <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
               {isDraft && (
                 <button
@@ -1596,6 +1602,28 @@ export default function VendorOrderDetailPage() {
           </div>
         )}
 
+        {isAssignmentPending && linkedMasterOrder && (
+          <div
+            role="alert"
+            style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 9, padding: "12px 18px", marginTop: 14, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: "#92400e" }}
+          >
+            <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+              <b>Order Assignment Required:</b> Complete and save Assignment on Order <b>{linkedMasterOrder.id}</b> in My Orders before working on this Vendor Order.
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/orders/${linkedMasterOrder.id}`)}
+              style={{ padding: "7px 14px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 12.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+            >
+              Go to Order {linkedMasterOrder.id}
+            </button>
+          </div>
+        )}
+
+        <div
+          aria-disabled={isAssignmentPending || undefined}
+          style={isAssignmentPending ? { opacity: 0.55, pointerEvents: "none", userSelect: "none" } : undefined}
+        >
         {/* Info Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginTop: 20, marginBottom: 20 }}>
           <InfoCard title="Vendor Information">
@@ -2076,6 +2104,7 @@ export default function VendorOrderDetailPage() {
 
           </>
         )}
+        </div>
 
       </div>
 
