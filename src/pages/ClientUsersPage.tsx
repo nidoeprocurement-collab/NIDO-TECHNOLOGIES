@@ -11,6 +11,7 @@ import {
   Upload,
   X,
   CheckCircle,
+  AlertCircle,
   Timer,
   Filter,
   FileText,
@@ -308,9 +309,8 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                  activeTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${activeTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 {tab}
                 {activeTab === tab && (
@@ -482,11 +482,10 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                           <td key={col} className="px-3 py-2.5 text-center">
                             <span
                               aria-label={`${col} ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] ? "enabled" : "disabled"}`}
-                              className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${
-                                inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
+                              className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
                                   ? "border-blue-500 bg-blue-500"
                                   : "border-gray-300 bg-white"
-                              }`}
+                                }`}
                             >
                               {inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                             </span>
@@ -606,11 +605,10 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                           key={cat}
                           type="button"
                           onClick={() => toggleCategory(cat)}
-                          className={`px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium ${
-                            active
+                          className={`px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium ${active
                               ? "bg-blue-600 border-blue-600 text-white"
                               : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                          }`}
+                            }`}
                         >
                           {cat}
                         </button>
@@ -637,7 +635,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="relative">
-                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                       <input
                         type="text"
                         value={deviceSearch}
@@ -696,7 +694,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center gap-2 border border-dashed border-gray-200 rounded-xl">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
                   <p className="text-xs text-gray-400">No devices assigned yet</p>
                   <p className="text-[11px] text-gray-300">Search and select devices above</p>
                 </div>
@@ -944,8 +942,8 @@ function ResetPasswordModal({
                   />
                   <button type="button" onClick={() => setShowNew((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showNew
-                      ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                      : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                      : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                     }
                   </button>
                 </div>
@@ -962,8 +960,8 @@ function ResetPasswordModal({
                   />
                   <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showConfirm
-                      ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                      : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                      : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                     }
                   </button>
                 </div>
@@ -1005,14 +1003,14 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
           Back to Archived Users
         </button>
       </div>
 
       {/* Read-only notice */}
       <div className="flex items-center gap-2 px-2 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
         This is an archived user — the profile is read-only and cannot be edited.
       </div>
 
@@ -1222,7 +1220,7 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
       initials,
       details: {
         ...savedDetails,
-         employeeId: form.employeeId,
+        employeeId: form.employeeId,
         jobTitle: form.jobTitle,
         department: form.department,
         reportingManager: form.reportingManager,
@@ -1250,7 +1248,7 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
             <div>
               <h2 className="text-base font-semibold text-gray-900">Edit User</h2>
@@ -1335,7 +1333,7 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
                   <div>
                     <label className={labelCls}>Status <span className="text-red-400">*</span></label>
                     <select value={form.status} onChange={set("status")} className={inputCls + " appearance-none text-gray-700"}>
-                       <option>Active</option><option>Inactive</option>
+                      <option>Active</option><option>Inactive</option>
                     </select>
                   </div>
                 </div>
@@ -1404,11 +1402,10 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
                       <td key={col} className="px-3 py-2.5 text-center">
                         <span
                           aria-label={`${col} ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] ? "enabled" : "disabled"}`}
-                          className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${
-                            inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
+                          className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
                               ? "border-blue-500 bg-blue-500"
                               : "border-gray-300 bg-white"
-                          }`}
+                            }`}
                         >
                           {inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                         </span>
@@ -1504,7 +1501,7 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
               <div className="p-4">
                 <div className="relative" onClick={(e) => e.stopPropagation()}>
                   <div className="relative">
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                     <input type="text" value={deviceSearch} onChange={(e) => { setDeviceSearch(e.target.value); setDeviceDropOpen(true); }} onFocus={() => setDeviceDropOpen(true)} placeholder="Search device by name or SKU..." className="w-full pl-8 pr-4 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-400" />
                   </div>
                   {deviceDropOpen && deviceSearch && (
@@ -1554,7 +1551,7 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
     <div className="p-5 flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
           Back to Users
         </button>
       </div>
@@ -1713,7 +1710,7 @@ function ImportUsersModal({
               onDrop={onDrop}
               className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors ${dragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:border-gray-300"}`}
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
               <p className="text-sm text-gray-600 font-medium">Drag & drop your CSV file here</p>
               <p className="text-xs text-gray-400">or</p>
               <label className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors cursor-pointer">
@@ -1729,7 +1726,7 @@ function ImportUsersModal({
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
                   <span className="font-medium text-gray-800">{file.name}</span>
                   <span className="text-gray-400">· {rows.length} user{rows.length !== 1 ? "s" : ""} found</span>
                 </div>
@@ -2133,7 +2130,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
             Back to Users
           </button>
           <span className="text-gray-300 text-xs">/</span>
@@ -2156,21 +2153,21 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                   onClick={() => { setDotMenuOpen(false); onResetPassword?.(); }}
                   className="w-full flex items-center gap-2.5 px-2 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                   Reset Password
                 </button>
                 <button
                   onClick={() => { setDotMenuOpen(false); onEdit?.(); }}
                   className="w-full flex items-center gap-2.5 px-2 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                   Edit User
                 </button>
                 <button
                   onClick={() => { setDotMenuOpen(false); onDeactivate?.(); }}
                   className="w-full flex items-center gap-2.5 px-2 py-2.5 text-xs text-orange-600 hover:bg-orange-50 transition-colors text-left"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
                   {user.status === "Inactive" ? "Activate" : "Deactivate"}
                 </button>
               </div>
@@ -2187,9 +2184,8 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
             <button
               key={tab}
               onClick={() => setDetailTab(tab)}
-              className={`px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                detailTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${detailTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               {tab}
               {detailTab === tab && (
@@ -2256,7 +2252,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                     </div>
                     <span className="text-[10px] text-gray-500">User ID</span>
                   </div>
-                   <p className="text-sm font-bold text-gray-900 truncate" title={userId}>{userId}</p>
+                  <p className="text-sm font-bold text-gray-900 truncate" title={userId}>{userId}</p>
                 </div>
                 {/* Status */}
                 <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
@@ -2282,7 +2278,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                 <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
                     </div>
                     <span className="text-[10px] text-gray-500">Total Orders</span>
                   </div>
@@ -2311,7 +2307,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                 <div className="p-5 border-r border-gray-100">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                     </div>
                     <p className="text-xs font-semibold text-gray-700">Personal Information</p>
                   </div>
@@ -2333,7 +2329,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-6 h-6 rounded-full bg-orange-50 flex items-center justify-center shrink-0">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
                     </div>
                     <p className="text-xs font-semibold text-gray-700">Professional Information</p>
                   </div>
@@ -2530,16 +2526,16 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                     .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
                     .slice(0, 5)
                     .map((expense) => (
-                    <div key={expense.id}>
-                      <div className="flex items-center justify-between text-[11px] mb-0.5">
-                        <span className="text-gray-700 truncate max-w-[130px]">{expense.expenseAccount || expense.vendorName || expense.referenceNumber || expense.id}</span>
-                        <span className="text-gray-500 font-medium shrink-0">{formatDetailAmount(expense.amount)}</span>
+                      <div key={expense.id}>
+                        <div className="flex items-center justify-between text-[11px] mb-0.5">
+                          <span className="text-gray-700 truncate max-w-[130px]">{expense.expenseAccount || expense.vendorName || expense.referenceNumber || expense.id}</span>
+                          <span className="text-gray-500 font-medium shrink-0">{formatDetailAmount(expense.amount)}</span>
+                        </div>
+                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-400 rounded-full" style={{ width: `${totalExpense ? Math.max(4, Number(expense.amount || 0) / totalExpense * 100) : 0}%` }} />
+                        </div>
                       </div>
-                      <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${totalExpense ? Math.max(4, Number(expense.amount || 0) / totalExpense * 100) : 0}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             </div>
@@ -2573,7 +2569,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                   onClick={() => onOpenAssignPage?.()}
                   className="ml-4 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-2 rounded-lg transition-colors shrink-0"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
                   Assign Device
                 </button>
               </div>
@@ -2624,11 +2620,10 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-xs font-semibold text-gray-900 leading-snug">{device.name}</p>
-                          <span className={`shrink-0 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                            device.status === "Active"
+                          <span className={`shrink-0 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${device.status === "Active"
                               ? "bg-green-50 text-green-700 border-green-200"
                               : "bg-orange-50 text-orange-600 border-orange-200"
-                          }`}>
+                            }`}>
                             {device.status}
                           </span>
                         </div>
@@ -2667,7 +2662,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                     onClick={() => setSelectedApproval(null)}
                     className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
                     Back
                   </button>
                   <span className="text-gray-300 text-xs">/</span>
@@ -2736,7 +2731,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                     <div className="flex flex-col gap-1.5">
                       {selectedApproval.attachments.map((file) => (
                         <div key={file} className="flex items-center gap-2 text-xs text-blue-600 hover:underline cursor-pointer">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                           {file}
                         </div>
                       ))}
@@ -2786,10 +2781,10 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
             Low: "bg-green-50 text-green-700 border-green-200",
           };
           const typeIcon: Record<string, React.ReactNode> = {
-            "Work Order": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2"/></svg>,
-            "Purchase Order": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
-            "Purchase Requisition": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-            "Service Request": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>,
+            "Work Order": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2" /></svg>,
+            "Purchase Order": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>,
+            "Purchase Requisition": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>,
+            "Service Request": <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" /></svg>,
           };
 
           return (
@@ -2831,7 +2826,7 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                         <p className="text-xs font-bold text-gray-900">{approval.amount}</p>
                         <div className="flex items-center gap-1 text-[10px] text-blue-500 font-medium group-hover:underline">
                           View details
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                         </div>
                       </div>
                     </div>
@@ -2862,7 +2857,7 @@ function ArchiveConfirmModal({ user, onConfirm, onCancel }: { user: { name: stri
         <div className="px-6 py-2 flex flex-col items-center gap-2 text-center">
           <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
             </svg>
           </div>
           <div>
@@ -2936,7 +2931,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
       {/* Back breadcrumb */}
       <div className="flex items-center gap-2">
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
           Back
         </button>
         <span className="text-gray-300 text-xs">/</span>
@@ -2965,7 +2960,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
               Search Master Catalog <span className="text-red-400">*</span>
             </label>
             <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               <input
                 type="text"
                 value={search}
@@ -3035,11 +3030,10 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
                     <button
                       key={field}
                       onClick={() => setActiveField(field)}
-                      className={`flex-1 px-2 py-2 text-xs font-medium transition-colors relative border-r last:border-r-0 border-gray-200 ${
-                        activeField === field
+                      className={`flex-1 px-2 py-2 text-xs font-medium transition-colors relative border-r last:border-r-0 border-gray-200 ${activeField === field
                           ? "text-blue-600 bg-white"
                           : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/60"
-                      }`}
+                        }`}
                     >
                       <span className="block">{labels[field]}</span>
                       {values[field] && (
@@ -3114,7 +3108,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
             disabled={!selected}
             className="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
             Assign Device
           </button>
         </div>
@@ -3341,11 +3335,11 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
       onEdit={() => setEditingUser(liveSelectedUser)}
       onResetPassword={() => setResetPasswordUser(liveSelectedUser)}
       onDeactivate={() => deactivateUser(liveSelectedUser.id)}
-       assignedDevices={
-         Array.isArray(liveSelectedUser.details?.assignedDevices)
-           ? liveSelectedUser.details.assignedDevices as AssignedDeviceEntry[]
-           : userDevices[liveSelectedUser.id] ?? []
-       }
+      assignedDevices={
+        Array.isArray(liveSelectedUser.details?.assignedDevices)
+          ? liveSelectedUser.details.assignedDevices as AssignedDeviceEntry[]
+          : userDevices[liveSelectedUser.id] ?? []
+      }
       onOpenAssignPage={() => setAssigningDeviceFor(liveSelectedUser)}
     />
   );
@@ -3659,18 +3653,18 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                       </button>
                       <div className="my-1 border-t border-gray-100" />
                       {canImpersonate && user.status === "Active" && (
-                         <>
-                           {!getPortalTarget(user) && (
-                             <button
-                               onClick={() => provisionPortalAccess(user)}
-                               className="w-full text-left px-2 py-1.5 text-xs hover:bg-green-50 transition-colors text-green-700"
-                             >
-                               Provision Portal Access
-                             </button>
-                           )}
-                         </>
-                       )}
-                       {canImpersonate && user.status === "Active" && (
+                        <>
+                          {!getPortalTarget(user) && (
+                            <button
+                              onClick={() => provisionPortalAccess(user)}
+                              className="w-full text-left px-2 py-1.5 text-xs hover:bg-green-50 transition-colors text-green-700"
+                            >
+                              Provision Portal Access
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {canImpersonate && user.status === "Active" && (
                         <button
                           onClick={() => {
                             const target = getPortalTarget(user);

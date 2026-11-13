@@ -224,5 +224,58 @@ describe("ClientUsersPage download template and auto-fill import", () => {
       ]);
     });
   });
+
+  it("renders the incomplete-import state cleanly without crashing when rows are invalid", async () => {
+    savePortalRoles(clientId, [
+      {
+        id: "procurement-lead",
+        name: "Procurement Lead",
+        description: "Lead role",
+        status: "active",
+        permissions: [createPortalRolePermission("Dashboard", { view: true })],
+      },
+    ]);
+
+    const { container } = render(
+      <MemoryRouter>
+        <AuthProvider>
+          <PermissionsProvider>
+            <ClientUsersPage clientId={clientId} clientName={clientName} />
+          </PermissionsProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const menuBtn = Array.from(container.querySelectorAll("button")).find((btn) =>
+      btn.querySelector("svg.lucide-ellipsis-vertical"),
+    );
+    fireEvent.click(menuBtn!);
+    fireEvent.click(screen.getByText("Import Users"));
+
+    const invalidCsv = [
+      USER_TEMPLATE_HEADERS.join(","),
+      "EMP-999,,,,,,,,,,,,,,,,,,",
+    ].join("\r\n");
+
+    const fileInput = container.querySelector('input[type="file"][accept=".csv"]') as HTMLInputElement;
+    const csvFile = new File([invalidCsv], "invalid.csv", { type: "text/csv" });
+    class MockFileReader {
+      onload: ((event: ProgressEvent<FileReader>) => void) | null = null;
+      readAsText() {
+        this.onload?.({ target: { result: invalidCsv } } as ProgressEvent<FileReader>);
+      }
+    }
+    vi.stubGlobal("FileReader", MockFileReader);
+    fireEvent.change(fileInput, { target: { files: [csvFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Import 1 User/i })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Import 1 User/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Import Incomplete")).toBeTruthy();
+    });
+  });
 });
 
