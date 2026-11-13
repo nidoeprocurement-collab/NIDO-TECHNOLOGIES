@@ -655,17 +655,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         )}
 
         <div style={{ overflowX: "auto" }}>
-          <style>{`
-            .vendor-orders-list-table th,
-            .vendor-orders-list-table td {
-              border-right: 1px solid ${bdr};
-            }
-            .vendor-orders-list-table th:last-child,
-            .vendor-orders-list-table td:last-child {
-              border-right: none;
-            }
-          `}</style>
-          <table className="vendor-orders-list-table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
             <thead>
               <tr>
                 <th style={{ ...s.th, width: 48, paddingLeft: 16 }}></th>
