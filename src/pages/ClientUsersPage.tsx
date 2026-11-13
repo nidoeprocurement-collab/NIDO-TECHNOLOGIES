@@ -3686,22 +3686,22 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-10 px-2 py-3">
+              <th className="w-10 px-3 py-3 text-left">
                 <input type="checkbox" checked={allChecked} onChange={toggleAll} className="rounded border-gray-300 text-blue-500 cursor-pointer" />
               </th>
-              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User ID</th>
-              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
-              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
-              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Last Active <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="w-10 px-2 py-3" />
+              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User ID</th>
+              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
+              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
+              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Last Active <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-right px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user, i) => (
               <tr key={user.id} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${selected.has(user.id) ? "bg-blue-50/40" : i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
-                <td className="px-3 py-3">
+                <td className="w-10 px-3 py-3">
                   <input type="checkbox" checked={selected.has(user.id)} onChange={() => toggleOne(user.id)} className="rounded border-gray-300 text-blue-500 cursor-pointer" />
                 </td>
                 <td className="px-3 py-3">
@@ -3733,11 +3733,11 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                     {user.phone}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-gray-500 font-mono text-[10px]">{user.lastActive}</td>
+                <td className="px-3 py-3 text-gray-500 font-mono text-[10px]">{user.lastActive}</td>
                 <td className="px-3 py-3">
                   <StatusBadge status={user.status} />
                 </td>
-                <td className="px-3 py-2 relative">
+                <td className="px-3 py-2 text-right relative">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
