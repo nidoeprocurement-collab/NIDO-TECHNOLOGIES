@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Calendar, CalendarDays, ListChecks, User, Phone, Mail, MapPin, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
@@ -234,6 +234,10 @@ function TextField({ label, required, value, onChange, placeholder, type = "text
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function NewAMCRequestPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isPortal = location.pathname.startsWith("/portal");
+  const servicesPath = isPortal ? "/portal/services" : "/services";
+  const myServicesPath = isPortal ? "/portal/my-services" : "/my-services";
 
   // ── Live data ──
   const [clients,    setClients]    = useState<StoredClient[]>(() => getClients());
@@ -417,7 +421,7 @@ export default function NewAMCRequestPage() {
       }, "AMC");
 
       toast.success("AMC request submitted successfully!");
-      setTimeout(() => navigate("/my-services"), 800);
+      setTimeout(() => navigate(myServicesPath), 800);
     } catch {
       toast.error("Failed to submit request. Please try again.");
       setSubmitting(false);
@@ -434,7 +438,7 @@ export default function NewAMCRequestPage() {
             <p className="text-sm text-gray-500 mt-0.5">Raise a new AMC service request</p>
           </div>
           <button
-            onClick={() => navigate("/my-services")}
+            onClick={() => navigate(myServicesPath)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 transition-colors flex-shrink-0"
           >
             <ListChecks className="w-4 h-4" /> View My AMC Requests
@@ -767,7 +771,7 @@ export default function NewAMCRequestPage() {
         {/* ── Action Buttons ── */}
         <div className="flex justify-end gap-3 pb-8">
           <button
-            onClick={() => navigate("/services")}
+            onClick={() => navigate(servicesPath)}
             className="px-6 py-2.5 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 transition-colors"
           >
             Cancel

@@ -256,7 +256,6 @@ const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
 const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
 const EditServiceRequestPage = lazy(() => import("@/pages/EditServiceRequestPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
-const ClientServicesPage = lazy(() => import("@/pages/ClientServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
 const NewRepairServicePage = lazy(() => import("@/pages/NewRepairServicePage"));
 const NewRecycleDisposalPage = lazy(() => import("@/pages/NewRecycleDisposalPage"));
@@ -1192,7 +1191,57 @@ function AppRoutes() {
                 element={
                   <ClientPortalRoute>
                     <PageErrorBoundary title="Services failed to load" resetKey={location.pathname}>
-                      <ClientServicesPage />
+                      <ServicesPage />
+                    </PageErrorBoundary>
+                  </ClientPortalRoute>
+                }
+              />
+              <Route
+                path="portal/services/amc/new"
+                element={
+                  <ClientPortalRoute>
+                    <PageErrorBoundary title="AMC request failed to load" resetKey={location.pathname}>
+                      <NewAMCRequestPage />
+                    </PageErrorBoundary>
+                  </ClientPortalRoute>
+                }
+              />
+              <Route
+                path="portal/services/repair/new"
+                element={
+                  <ClientPortalRoute>
+                    <PageErrorBoundary title="Repair service failed to load" resetKey={location.pathname}>
+                      <NewRepairServicePage />
+                    </PageErrorBoundary>
+                  </ClientPortalRoute>
+                }
+              />
+              <Route
+                path="portal/services/recycle/new"
+                element={
+                  <ClientPortalRoute>
+                    <PageErrorBoundary title="Recycle & disposal failed to load" resetKey={location.pathname}>
+                      <NewRecycleDisposalPage />
+                    </PageErrorBoundary>
+                  </ClientPortalRoute>
+                }
+              />
+              <Route
+                path="portal/services/rental/new"
+                element={
+                  <ClientPortalRoute>
+                    <PageErrorBoundary title="Rental service failed to load" resetKey={location.pathname}>
+                      <NewRentalServicePage />
+                    </PageErrorBoundary>
+                  </ClientPortalRoute>
+                }
+              />
+              <Route
+                path="portal/services/purchase/new"
+                element={
+                  <ClientPortalRoute>
+                    <PageErrorBoundary title="Regular purchase failed to load" resetKey={location.pathname}>
+                      <NewRegularPurchasePage />
                     </PageErrorBoundary>
                   </ClientPortalRoute>
                 }

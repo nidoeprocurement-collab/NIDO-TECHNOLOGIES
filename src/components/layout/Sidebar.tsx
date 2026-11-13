@@ -96,7 +96,7 @@ const clientNavigationItems: NavItem[] = [
   { label: 'Shop',        icon: <ShoppingCart size={20} />,    path: '/portal/catalog', moduleKey: 'Catalog' },
   { label: 'My Requests', icon: <ClipboardList size={20} />,   path: '/portal/orders', moduleKey: 'Orders' },
   { label: 'My Invoices', icon: <Receipt size={20} />,         path: '/portal/invoices', moduleKey: 'Invoices' },
-  { label: 'My Services', icon: <Wrench size={20} />,          path: '/portal/my-services', moduleKey: 'Services' },
+  { label: 'Services',    icon: <Wrench size={20} />,          path: '/portal/services', moduleKey: 'Services' },
   { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support', moduleKey: 'Support' },
   { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts', moduleKey: 'Contracts' },
   { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals', moduleKey: 'Approvals' },
@@ -143,7 +143,10 @@ function findActivePath(pathname: string, items: NavItem[]): string | null {
   const allPaths = collectPaths(items);
   let best: string | null = null;
   for (const p of allPaths) {
-    const matches = pathname === p || pathname.startsWith(p + '/');
+    const matches =
+      pathname === p ||
+      pathname.startsWith(p + '/') ||
+      (p === '/portal/services' && (pathname === '/portal/my-services' || pathname.startsWith('/portal/my-services/')));
     if (!matches) continue;
     if (!best || p.length > best.length) best = p;
   }

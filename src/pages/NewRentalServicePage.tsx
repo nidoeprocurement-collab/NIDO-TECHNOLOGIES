@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Calendar, ListChecks, Upload, X, Building2, User, Phone, Mail, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
@@ -74,6 +74,10 @@ function SelectField({ label, required, value, onChange, options, placeholder, d
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function NewRentalServicePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isPortal = location.pathname.startsWith("/portal");
+  const servicesPath = isPortal ? "/portal/services" : "/services";
+  const myServicesPath = isPortal ? "/portal/my-services" : "/my-services";
 
   const [clients,    setClients]    = useState<StoredClient[]>(() => getClients());
   const [categories, setCategories] = useState<string[]>(() => loadCategories());
@@ -181,7 +185,7 @@ export default function NewRentalServicePage() {
       }, "RNT");
 
       toast.success("Rental service request submitted successfully!");
-      navigate("/my-services");
+      navigate(myServicesPath);
     } catch {
       toast.error("Failed to submit request. Please try again.");
       setSubmitting(false);
@@ -197,7 +201,7 @@ export default function NewRentalServicePage() {
             <h1 className="text-2xl font-bold text-gray-900">Rental Service</h1>
             <p className="text-sm text-gray-500 mt-0.5">Raise a new rental service request</p>
           </div>
-          <button onClick={() => navigate("/my-services")}
+          <button onClick={() => navigate(myServicesPath)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 transition-colors flex-shrink-0">
             <ListChecks className="w-4 h-4" /> View My Rental Requests
           </button>
@@ -410,7 +414,7 @@ export default function NewRentalServicePage() {
 
         {/* ── Action Buttons ── */}
         <div className="flex justify-end gap-3 pb-8">
-          <button onClick={() => navigate("/services")}
+          <button onClick={() => navigate(servicesPath)}
             className="px-6 py-2.5 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 transition-colors">
             Cancel
           </button>

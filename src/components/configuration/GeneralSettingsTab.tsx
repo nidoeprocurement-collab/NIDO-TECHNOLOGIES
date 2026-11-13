@@ -69,7 +69,7 @@ export default function GeneralSettingsPage() {
 
   const handleSave = async () => {
     if ((org.phone && !isValidPhoneNumber(org.phone)) ||
-        (org.supportPhone && !isValidPhoneNumber(org.supportPhone))) {
+      (org.supportPhone && !isValidPhoneNumber(org.supportPhone))) {
       toast.error("Phone numbers must contain exactly 10 digits.")
       return
     }

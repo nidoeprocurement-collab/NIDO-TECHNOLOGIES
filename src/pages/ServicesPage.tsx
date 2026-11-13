@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ShoppingCart,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SERVICE_CARDS = [
   {
@@ -95,6 +96,9 @@ const SERVICE_CARDS = [
 
 export default function ServicesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isClientPortalUser, isImpersonating } = useAuth();
+  const isPortal = isClientPortalUser || isImpersonating || location.pathname.startsWith("/portal");
 
   useEffect(() => {
     toast.success("Services page loaded");
@@ -121,14 +125,28 @@ export default function ServicesPage() {
         </div>
       </div>
 
+      {isPortal && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate("/portal/my-services")}
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-xs font-semibold text-blue-600 shadow-sm hover:bg-blue-50 transition-colors"
+          >
+            <Wrench className="h-3.5 w-3.5" />
+            My Services
+          </button>
+        </div>
+      )}
+
       {/* Service Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {SERVICE_CARDS.map((card) => {
           const Icon = card.icon;
+          const targetHref = isPortal ? `/portal${card.href}` : card.href;
           return (
             <div
               key={card.title}
-              onClick={() => navigate(card.href)}
+              onClick={() => navigate(targetHref)}
               className="relative flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 cursor-pointer group hover:shadow-lg hover:-translate-y-0.5 overflow-hidden"
             >
               {/* Top-right accent blob */}
