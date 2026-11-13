@@ -3258,11 +3258,23 @@ export default function MyOrderPage() {
   const hasOrderProcurementFlow = awaitingApproval ||
     orderPOs.length > 0 ||
     activeOrderSubOrders.some(sub => Boolean(sub.selectedVendorId || sub.selectedVendorName));
-  const statusLockedUntilPOConfirmed =
-    isAssignmentPending ||
-    awaitingApproval ||
-    hasDraftOrderPO ||
-    (hasOrderProcurementFlow && activeOrderSubOrders.length > 0 && hasUnconfirmedActiveOrderPO);
+  const isSubOrderLockedUntilPOConfirmed = (sub: any): boolean => {
+    if (isAssignmentPending || awaitingApproval) return true;
+    if (!sub) return false;
+    const subHasDraftPO = orderPOs.some(
+      po => String(po?.status || "").toLowerCase() === "draft" && poCoversSubOrder(po, sub.id, sub),
+    );
+    if (subHasDraftPO) return true;
+    const canonicalPO = getCanonicalPOForSubOrder(orderPOs, sub);
+    if (canonicalPO) return !isConfirmedPO(canonicalPO);
+    return hasOrderProcurementFlow;
+  };
+  const getItemStatusLockReason = (sub: any): string =>
+    isAssignmentPending
+      ? "Complete and save Assignment for this order before performing any actions."
+      : awaitingApproval
+        ? "Order status changes are locked until approval is complete."
+        : "Order status changes are locked until this item's Draft Purchase Order is confirmed.";
   const storedMasterStatus = String(order?.status || "Processing");
   // Reflect the current item statuses immediately instead of waiting for the
   // localStorage → context synchronization round-trip. The same derived status
@@ -3373,9 +3385,9 @@ export default function MyOrderPage() {
     [subOrders]
   );
   const updateStatus = (subId: string, status: string, metadata: Record<string, any> = {}) => {
-    if (isOrderInactive || statusLockedUntilPOConfirmed) return;
+    if (isOrderInactive) return;
     const target = subOrders.find(s => s.id === subId);
-    if (!target || target.itemStatus === "Cancelled") return;
+    if (!target || target.itemStatus === "Cancelled" || isSubOrderLockedUntilPOConfirmed(target)) return;
     if (
       status === "Shipped" &&
       hasOrderProcurementFlow &&
@@ -3482,9 +3494,8 @@ export default function MyOrderPage() {
   };
 
   const handleRaiseReturn = (subId: string, reason: string, details: string) => {
-    if (statusLockedUntilPOConfirmed) return;
     const target = subOrders.find(s => s.id === subId);
-    if (!target || !isPhysicalProduct(target) || !isReturnAllowed(target)) return;
+    if (!target || isSubOrderLockedUntilPOConfirmed(target) || !isPhysicalProduct(target) || !isReturnAllowed(target)) return;
     updateStatus(subId, "Return Request Raised", {
       returnRequestedAt: new Date().toISOString(),
       returnReason: reason,
@@ -3496,33 +3507,33 @@ export default function MyOrderPage() {
   };
 
   const handlePickupScheduled = (subId: string, details: { pickupPersonName: string; pickupContactNumber: string; pickupDate: string; pickupTimeWindow: string }) => {
-    if (statusLockedUntilPOConfirmed) return;
+    const target = subOrders.find(s => s.id === subId);
+    if (isSubOrderLockedUntilPOConfirmed(target)) return;
     updateStatus(subId, "Pickup Scheduled", {
       ...details,
       pickupScheduledAt: new Date().toISOString(),
     });
-    const target = subOrders.find(s => s.id === subId);
     queueDocumentsAuditNote(
       `Pickup Scheduled\nItem: ${target?.itemName || subId}\nPickup person: ${details.pickupPersonName}\nContact number: ${details.pickupContactNumber || "Not provided"}\nPickup date: ${details.pickupDate}\nPickup time/window: ${details.pickupTimeWindow}`,
     );
   };
 
   const handlePickupDone = (subId: string, details: { pickupDoneDate: string; pickupDoneTime: string }) => {
-    if (statusLockedUntilPOConfirmed) return;
+    const target = subOrders.find(s => s.id === subId);
+    if (isSubOrderLockedUntilPOConfirmed(target)) return;
     updateStatus(subId, "Pickup Done", {
       ...details,
       pickupDoneAt: new Date().toISOString(),
     });
-    const target = subOrders.find(s => s.id === subId);
     queueDocumentsAuditNote(
       `Pickup Done\nItem: ${target?.itemName || subId}\nPickup done date: ${details.pickupDoneDate}\nPickup done time: ${details.pickupDoneTime}`,
     );
   };
 
   const requestShipped = (subId: string) => {
-    if (isOrderInactive || statusLockedUntilPOConfirmed) return;
+    if (isOrderInactive) return;
     const target = subOrders.find(sub => sub.id === subId);
-    if (!target || isDigitalDocumentProduct(target)) return;
+    if (!target || isDigitalDocumentProduct(target) || isSubOrderLockedUntilPOConfirmed(target)) return;
     if (hasOrderProcurementFlow && !isVendorOrderItemDelivered(orderPOs, target)) {
       toast.error("Mark this item as Delivered in Vendor Order Details before updating it to Shipped.");
       return;
@@ -3545,9 +3556,9 @@ export default function MyOrderPage() {
   };
 
   const saveTrackingForSubOrder = (tracking: any) => {
-    if (!trackingTarget || statusLockedUntilPOConfirmed) return;
+    if (!trackingTarget) return;
     const target = subOrders.find(sub => sub.id === trackingTarget);
-    if (!target || isDigitalDocumentProduct(target)) {
+    if (!target || isDigitalDocumentProduct(target) || isSubOrderLockedUntilPOConfirmed(target)) {
       setPendingShippedTarget(null);
       setTrackingTarget(null);
       return;
@@ -5090,7 +5101,7 @@ export default function MyOrderPage() {
                         </div>
                       )}
                       <div style={{ minWidth: 0, overflow: "hidden" }}>
-                        {!isClientPortalUser && isDigitalOrder && sub.itemStatus === "Provisioned" && !isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed ? (
+                        {!isClientPortalUser && isDigitalOrder && sub.itemStatus === "Provisioned" && !isOrderInactive && !itemCancelled && !isSubOrderLockedUntilPOConfirmed(sub) ? (
                           <button
                             type="button"
                             title="Update digital delivery details"
@@ -5217,8 +5228,8 @@ export default function MyOrderPage() {
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                        ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
-                            {statusLockedUntilPOConfirmed ? (
-                              <span title={statusLockReason} style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>
+                            {isSubOrderLockedUntilPOConfirmed(sub) ? (
+                              <span title={getItemStatusLockReason(sub)} style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>
                                 Locked until PO confirmation
                               </span>
                             ) : returnOk ? (
@@ -5269,8 +5280,8 @@ export default function MyOrderPage() {
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
                              onRequestPickupDone={() => setPickupDoneTarget(sub.id)}
-                            statusUpdatesEnabled={!isOrderInactive && !itemCancelled && !statusLockedUntilPOConfirmed}
-                            statusLockReason={statusLockedUntilPOConfirmed ? statusLockReason : undefined}
+                            statusUpdatesEnabled={!isOrderInactive && !itemCancelled && !isSubOrderLockedUntilPOConfirmed(sub)}
+                            statusLockReason={isSubOrderLockedUntilPOConfirmed(sub) ? getItemStatusLockReason(sub) : undefined}
                             shippedLockReason={
                               hasOrderProcurementFlow && !isVendorOrderItemDelivered(orderPOs, sub)
                                 ? "Mark this item as Delivered in Vendor Order Details before updating it to Shipped."

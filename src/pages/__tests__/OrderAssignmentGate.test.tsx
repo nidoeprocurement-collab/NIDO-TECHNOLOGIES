@@ -189,5 +189,148 @@ describe("Order & Vendor Order Assignment Gate", () => {
       expect(screen.getAllByRole("button", { name: /Confirm Purchase Order/i }).length).toBeGreaterThan(0);
     });
   }, 15000);
+
+  it("unlocks status updates per item when its PO is Confirmed even if another PO in the same order is Draft", async () => {
+    const orderId = "ORD-MIXED-PO-201";
+    localStorage.setItem(
+      "nido_my_orders",
+      JSON.stringify([
+        {
+          id: orderId,
+          client: "Acme Corp",
+          clientId: "client-1",
+          requester: "Ravi",
+          requesterRole: "Buyer",
+          requesterInitial: "R",
+          requesterColor: "#2563eb",
+          assigned: "Anita Kapoor",
+          assignedRole: "Procurement Manager",
+          assignedInitial: "A",
+          assignedColor: "#2563eb",
+          assignmentCompleted: true,
+          orderDate: "2026-11-13",
+          orderTime: "10:00 AM",
+          status: "Processing",
+          slaTime: null,
+          slaAlert: false,
+          totalAmount: "₹20,000",
+          cartItems: [
+            {
+              id: "item-1",
+              name: "Dell Latitude",
+              qty: 1,
+              price: 10000,
+              vendorId: "v-1",
+              vendorName: "TechHub",
+              productCode: "DELL-1",
+              productType: "Physical",
+            },
+            {
+              id: "item-2",
+              name: "HP Monitor",
+              qty: 1,
+              price: 10000,
+              vendorId: "v-2",
+              vendorName: "DisplayCo",
+              productCode: "HP-MON-1",
+              productType: "Physical",
+            },
+          ],
+        },
+      ]),
+    );
+
+    savePO({
+      poNumber: "PO-CONFIRMED-201",
+      orderId,
+      vendorId: "v-1",
+      vendorName: "TechHub",
+      vendorCity: "Bengaluru",
+      vendorEmail: "vendor@techhub.com",
+      status: "Confirmed",
+      createdOn: "2026-11-13",
+      totalAmount: "₹10,000",
+      totalAmountNum: 10000,
+      subtotal: 10000,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      grandTotal: 10000,
+      sgstPct: 0,
+      cgstPct: 0,
+      items: [
+        {
+          subOrderId: `${orderId}-1`,
+          item: "Dell Latitude",
+          productCode: "DELL-1",
+          qty: 1,
+          unitPrice: 10000,
+          lineSubtotal: 10000,
+          status: "Processing",
+        },
+      ],
+      subOrderId: `${orderId}-1`,
+      subOrderIds: [`${orderId}-1`],
+    });
+
+    savePO({
+      poNumber: "PO-DRAFT-202",
+      orderId,
+      vendorId: "v-2",
+      vendorName: "DisplayCo",
+      vendorCity: "Bengaluru",
+      vendorEmail: "sales@displayco.com",
+      status: "Draft",
+      createdOn: "2026-11-13",
+      totalAmount: "₹10,000",
+      totalAmountNum: 10000,
+      subtotal: 10000,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      grandTotal: 10000,
+      sgstPct: 0,
+      cgstPct: 0,
+      items: [
+        {
+          subOrderId: `${orderId}-2`,
+          item: "HP Monitor",
+          productCode: "HP-MON-1",
+          qty: 1,
+          unitPrice: 10000,
+          lineSubtotal: 10000,
+          status: "Pending",
+        },
+      ],
+      subOrderId: `${orderId}-2`,
+      subOrderIds: [`${orderId}-2`],
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/orders/${orderId}`]}>
+        <AuthProvider>
+          <MyOrdersProvider>
+            <Routes>
+              <Route path="/orders/:id" element={<OrderDetailsPage />} />
+            </Routes>
+          </MyOrdersProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const actionButtons = await screen.findAllByRole("button", { name: "⋮" });
+    expect(actionButtons).toHaveLength(2);
+
+    // Item 1 (Confirmed PO) -> Update Status is enabled
+    fireEvent.click(actionButtons[0]);
+    const updateBtn1 = await screen.findByRole("button", { name: /Update Status/i });
+    expect(updateBtn1.getAttribute("aria-disabled")).toBe("false");
+
+    // Close menu 1 before opening menu 2
+    fireEvent.mouseDown(document.body);
+
+    // Item 2 (Draft PO) -> Update Status is locked
+    fireEvent.click(actionButtons[1]);
+    const updateBtn2 = await screen.findByRole("button", { name: /Update Status/i });
+    expect(updateBtn2.getAttribute("aria-disabled")).toBe("true");
+  }, 15000);
 });
 
