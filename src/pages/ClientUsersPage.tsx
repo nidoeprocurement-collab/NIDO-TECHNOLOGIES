@@ -483,8 +483,8 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                             <span
                               aria-label={`${col} ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] ? "enabled" : "disabled"}`}
                               className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
-                                  ? "border-blue-500 bg-blue-500"
-                                  : "border-gray-300 bg-white"
+                                ? "border-blue-500 bg-blue-500"
+                                : "border-gray-300 bg-white"
                                 }`}
                             >
                               {inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -606,8 +606,8 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                           type="button"
                           onClick={() => toggleCategory(cat)}
                           className={`px-3 py-1.5 text-xs rounded-lg border transition-colors font-medium ${active
-                              ? "bg-blue-600 border-blue-600 text-white"
-                              : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
                             }`}
                         >
                           {cat}
@@ -1403,8 +1403,8 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
                         <span
                           aria-label={`${col} ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] ? "enabled" : "disabled"}`}
                           className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
-                              ? "border-blue-500 bg-blue-500"
-                              : "border-gray-300 bg-white"
+                            ? "border-blue-500 bg-blue-500"
+                            : "border-gray-300 bg-white"
                             }`}
                         >
                           {inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -1611,6 +1611,28 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
   );
 }
 
+type ImportedUserSummary = {
+  rowNumber: number;
+  name: string;
+  email: string;
+  role: string;
+};
+
+type SkippedUserSummary = {
+  rowNumber: number;
+  name: string;
+  email: string;
+  reason: string;
+};
+
+type ImportUsersResult = {
+  importedCount: number;
+  skippedCount: number;
+  importedUsers: ImportedUserSummary[];
+  skippedUsers: SkippedUserSummary[];
+  error?: string;
+};
+
 function ImportUsersModal({
   onClose,
   onImportRows,
@@ -1619,22 +1641,25 @@ function ImportUsersModal({
   onImportRows?: (
     headers: string[],
     rows: string[][],
-  ) => { importedCount: number; skippedCount: number; error?: string } | void;
+  ) => ImportUsersResult | void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string[][]>([]);
   const [dragging, setDragging] = useState(false);
   const [imported, setImported] = useState(false);
-  const [importSummary, setImportSummary] = useState<{
-    importedCount: number;
-    skippedCount: number;
-    error?: string;
-  } | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportUsersResult | null>(null);
 
   const parseCSV = (text: string) => {
     const cleaned = text.replace(/^\uFEFF/, "").trim();
     if (!cleaned) return [];
     const lines = cleaned.split(/\r?\n/).filter(Boolean);
+    const headerLine = lines[0] || "";
+    const delimiter =
+      !headerLine.includes(",") && headerLine.includes(";")
+        ? ";"
+        : !headerLine.includes(",") && headerLine.includes("\t")
+          ? "\t"
+          : ",";
     return lines
       .map((line) => {
         const cells: string[] = [];
@@ -1649,7 +1674,7 @@ function ImportUsersModal({
             } else {
               inQuotes = !inQuotes;
             }
-          } else if (ch === "," && !inQuotes) {
+          } else if (ch === delimiter && !inQuotes) {
             cells.push(current.trim());
             current = "";
           } else {
@@ -1764,28 +1789,74 @@ function ImportUsersModal({
           )}
 
           {imported && (
-            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-              {importSummary?.error || importSummary?.importedCount === 0 ? (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
-                    <AlertCircle size={24} className="text-red-500" />
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col items-center justify-center gap-2 text-center">
+                {importSummary?.error || importSummary?.importedCount === 0 ? (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                      <AlertCircle size={24} className="text-red-500" />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900">Import Incomplete</p>
+                    <p className="text-xs text-gray-500 max-w-md">
+                      {importSummary?.error || "No valid users were imported. Review the reasons below."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
+                      <CheckCircle size={24} className="text-green-500" />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-900">Import Successful</p>
+                    <p className="text-xs text-gray-500">
+                      {importSummary ? importSummary.importedCount : rows.length} user{(importSummary ? importSummary.importedCount : rows.length) !== 1 ? "s" : ""} imported
+                      {importSummary && importSummary.skippedCount > 0 ? ` · ${importSummary.skippedCount} not imported` : ""}.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {importSummary && importSummary.importedUsers.length > 0 && (
+                <div className="border border-green-200 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-green-50 border-b border-green-200 text-xs font-semibold text-green-800">
+                    Imported Users ({importSummary.importedUsers.length})
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">Import Incomplete</p>
-                  <p className="text-xs text-gray-500 max-w-md">
-                    {importSummary?.error || "No valid users were imported. Ensure Full Name and Email ID are filled for each row."}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
-                    <CheckCircle size={24} className="text-green-500" />
+                  <div className="max-h-40 overflow-y-auto divide-y divide-green-100">
+                    {importSummary.importedUsers.map((u) => (
+                      <div key={`${u.rowNumber}-${u.email}`} className="px-3 py-2 text-xs flex items-center justify-between gap-3 bg-white">
+                        <div className="min-w-0">
+                          <span className="text-gray-400 mr-2">Row {u.rowNumber}</span>
+                          <span className="font-medium text-gray-800">{u.name}</span>
+                          <span className="text-gray-500 ml-2">({u.email})</span>
+                        </div>
+                        <span className="text-[11px] font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {u.role}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">Import Successful</p>
-                  <p className="text-xs text-gray-400">
-                    {importSummary ? importSummary.importedCount : rows.length} user{(importSummary ? importSummary.importedCount : rows.length) !== 1 ? "s" : ""} imported successfully
-                    {importSummary && importSummary.skippedCount > 0 ? ` (${importSummary.skippedCount} skipped)` : ""}.
-                  </p>
-                </>
+                </div>
+              )}
+
+              {importSummary && importSummary.skippedUsers.length > 0 && (
+                <div className="border border-red-200 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-red-50 border-b border-red-200 text-xs font-semibold text-red-800">
+                    Not Imported ({importSummary.skippedUsers.length})
+                  </div>
+                  <div className="max-h-40 overflow-y-auto divide-y divide-red-100">
+                    {importSummary.skippedUsers.map((u, idx) => (
+                      <div key={`${u.rowNumber}-${idx}`} className="px-3 py-2 text-xs flex items-start justify-between gap-3 bg-white">
+                        <div className="min-w-0">
+                          <span className="text-gray-400 mr-2">Row {u.rowNumber}</span>
+                          <span className="font-medium text-gray-800">{u.name || "—"}</span>
+                          {u.email && <span className="text-gray-500 ml-2">({u.email})</span>}
+                        </div>
+                        <span className="text-[11px] text-red-600 font-medium text-right">
+                          {u.reason}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -2621,8 +2692,8 @@ function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, 
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-xs font-semibold text-gray-900 leading-snug">{device.name}</p>
                           <span className={`shrink-0 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${device.status === "Active"
-                              ? "bg-green-50 text-green-700 border-green-200"
-                              : "bg-orange-50 text-orange-600 border-orange-200"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-orange-50 text-orange-600 border-orange-200"
                             }`}>
                             {device.status}
                           </span>
@@ -3031,8 +3102,8 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
                       key={field}
                       onClick={() => setActiveField(field)}
                       className={`flex-1 px-2 py-2 text-xs font-medium transition-colors relative border-r last:border-r-0 border-gray-200 ${activeField === field
-                          ? "text-blue-600 bg-white"
-                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/60"
+                        ? "text-blue-600 bg-white"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/60"
                         }`}
                     >
                       <span className="block">{labels[field]}</span>
@@ -3374,7 +3445,13 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
           onClose={() => setShowImportUsers(false)}
           onImportRows={(headers, rows) => {
             if (!clientId) {
-              return { importedCount: 0, skippedCount: rows.length, error: "Client context is missing." };
+              return {
+                importedCount: 0,
+                skippedCount: rows.length,
+                importedUsers: [],
+                skippedUsers: [],
+                error: "Client context is missing.",
+              };
             }
             const normalizedHeaders = headers.map((h) => h.replace(/\*/g, "").trim().toLowerCase());
             const findCol = (names: string[]) =>
@@ -3399,11 +3476,27 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
             const approvalThresholdIdx = findCol(["approval threshold", "approvalthreshold"]);
             const categoriesIdx = findCol(["allowed expense categories", "expense categories", "categories"]);
 
+            if (nameIdx < 0 || emailIdx < 0) {
+              const missingCols = [
+                nameIdx < 0 ? "Full Name" : null,
+                emailIdx < 0 ? "Email ID" : null,
+              ].filter(Boolean).join(", ");
+              return {
+                importedCount: 0,
+                skippedCount: rows.length,
+                importedUsers: [],
+                skippedUsers: [],
+                error: `Invalid CSV template: missing required column(s): ${missingCols}. Please download and use the Download Template CSV.`,
+              };
+            }
+
             const activePortalRoles = getPortalRoles(clientId).filter((r) => r.status === "active");
             if (activePortalRoles.length === 0) {
               return {
                 importedCount: 0,
                 skippedCount: rows.length,
+                importedUsers: [],
+                skippedUsers: [],
                 error: "Create and activate a client role before importing users.",
               };
             }
@@ -3411,17 +3504,37 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
             const organizationAccess =
               getCurrentOrganizationName(clientId, clientName) || clientName || "Client";
 
-            let importedCount = 0;
-            let skippedCount = 0;
+            const importedUsers: ImportedUserSummary[] = [];
+            const skippedUsers: SkippedUserSummary[] = [];
+            const seenEmails = new Set<string>();
 
-            rows.forEach((row) => {
+            rows.forEach((row, index) => {
+              const rowNumber = index + 2;
               const readCell = (idx: number) => (idx >= 0 ? (row[idx] ?? "").trim() : "");
               const name = readCell(nameIdx);
               const email = readCell(emailIdx);
-              if (!name || !email) {
-                skippedCount += 1;
+              if (!name && !email) {
+                skippedUsers.push({ rowNumber, name: "", email: "", reason: "Missing Full Name and Email ID" });
                 return;
               }
+              if (!name) {
+                skippedUsers.push({ rowNumber, name: "", email, reason: "Missing Full Name" });
+                return;
+              }
+              if (!email) {
+                skippedUsers.push({ rowNumber, name, email: "", reason: "Missing Email ID" });
+                return;
+              }
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                skippedUsers.push({ rowNumber, name, email, reason: "Invalid Email ID format" });
+                return;
+              }
+              const normalizedEmail = email.toLowerCase();
+              if (seenEmails.has(normalizedEmail)) {
+                skippedUsers.push({ rowNumber, name, email, reason: "Duplicate Email ID in CSV" });
+                return;
+              }
+              seenEmails.add(normalizedEmail);
 
               const phone = readCell(phoneIdx);
               const requestedRole = readCell(roleIdx);
@@ -3471,13 +3584,23 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                     permissions: inheritedPermissions,
                   },
                 });
-                importedCount += 1;
-              } catch {
-                skippedCount += 1;
+                importedUsers.push({ rowNumber, name, email, role: resolvedRole });
+              } catch (err) {
+                skippedUsers.push({
+                  rowNumber,
+                  name,
+                  email,
+                  reason: err instanceof Error ? err.message : "Failed to import user",
+                });
               }
             });
             setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
-            return { importedCount, skippedCount };
+            return {
+              importedCount: importedUsers.length,
+              skippedCount: skippedUsers.length,
+              importedUsers,
+              skippedUsers,
+            };
           }}
         />
       )}

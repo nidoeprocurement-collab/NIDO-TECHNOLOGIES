@@ -275,6 +275,77 @@ describe("ClientUsersPage download template and auto-fill import", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Import Incomplete")).toBeTruthy();
+      expect(screen.getByText("Not Imported (1)")).toBeTruthy();
+      expect(screen.getByText("Row 2")).toBeTruthy();
+      expect(screen.getByText("Missing Full Name and Email ID")).toBeTruthy();
+    });
+  });
+
+  it("imports semicolon-delimited CSV, adds valid users to the list, and lists imported and skipped users with reasons", async () => {
+    savePortalRoles(clientId, [
+      {
+        id: "procurement-lead",
+        name: "Procurement Lead",
+        description: "Lead role",
+        status: "active",
+        permissions: [createPortalRolePermission("Dashboard", { view: true })],
+      },
+    ]);
+
+    const { container } = render(
+      <MemoryRouter>
+        <AuthProvider>
+          <PermissionsProvider>
+            <ClientUsersPage clientId={clientId} clientName={clientName} />
+          </PermissionsProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const menuBtn = Array.from(container.querySelectorAll("button")).find((btn) =>
+      btn.querySelector("svg.lucide-ellipsis-vertical"),
+    );
+    fireEvent.click(menuBtn!);
+    fireEvent.click(screen.getByText("Import Users"));
+
+    const mixedCsv = [
+      USER_TEMPLATE_HEADERS.join(";"),
+      ["EMP-501", "Meera Nair", "meera@acmecorp.com", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].join(";"),
+      ["EMP-502", "No Email User", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].join(";"),
+      ["EMP-503", "Bad Email User", "not-an-email", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].join(";"),
+      ["EMP-504", "Duplicate User", "meera@acmecorp.com", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""].join(";"),
+    ].join("\r\n");
+
+    const fileInput = container.querySelector('input[type="file"][accept=".csv"]') as HTMLInputElement;
+    const csvFile = new File([mixedCsv], "mixed_users.csv", { type: "text/csv" });
+    class MockFileReader {
+      onload: ((event: ProgressEvent<FileReader>) => void) | null = null;
+      readAsText() {
+        this.onload?.({ target: { result: mixedCsv } } as ProgressEvent<FileReader>);
+      }
+    }
+    vi.stubGlobal("FileReader", MockFileReader);
+    fireEvent.change(fileInput, { target: { files: [csvFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Import 4 Users/i })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Import 4 Users/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Imported Users (1)")).toBeTruthy();
+      expect(screen.getByText("Not Imported (3)")).toBeTruthy();
+      expect(screen.getByText("Missing Email ID")).toBeTruthy();
+      expect(screen.getByText("Invalid Email ID format")).toBeTruthy();
+      expect(screen.getByText("Duplicate Email ID in CSV")).toBeTruthy();
+      expect(getPortalUsersByClient(clientId)).toHaveLength(1);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Meera Nair")).toBeTruthy();
+      expect(screen.getByText("meera@acmecorp.com")).toBeTruthy();
     });
   });
 });
