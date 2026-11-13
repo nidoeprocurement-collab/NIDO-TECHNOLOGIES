@@ -297,6 +297,15 @@ function NotFound({ id }: { id: string }) {
   );
 }
 
+function adaptiveGridCols(count: number, maxCols: 2 | 3 | 4 | 5): string {
+  const cols = Math.max(1, Math.min(count, maxCols));
+  if (cols === 1) return "grid-cols-1";
+  if (cols === 2) return "grid-cols-1 sm:grid-cols-2";
+  if (cols === 3) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+  if (cols === 4) return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4";
+  return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-5";
+}
+
 interface ClientDetailProps {
   portalMode?: boolean;
 }
@@ -312,6 +321,28 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     if (!user?.clientId) return false;
     return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
   };
+  const visibleKpiCount = [
+    "Overview - Total Orders",
+    "Overview - Total Spent",
+    "Overview - Products",
+    "Overview - Invoices",
+    "Overview - Open Support Tickets",
+  ].filter(canViewOverviewModule).length;
+  const visibleSummaryRowCount = [
+    "Company Information",
+    "Orders Overview",
+    "Account Summary",
+  ].filter(canViewOverviewModule).length;
+  const visibleDetailsRowCount = [
+    "Business & Tax Details",
+    "Financial & Bank Details",
+    "Billing Address",
+    "Shipping Address",
+  ].filter(canViewOverviewModule).length;
+  const visibleTablesRowCount = [
+    "Top Products",
+    "Recent Orders",
+  ].filter(canViewOverviewModule).length;
   const [activeTab, setActiveTab] = useState("Overview");
   const [period, setPeriod] = useState<Period>("Year");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -687,7 +718,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             Data shown below: <span className="font-semibold">{formatDateRange(selectedDateRange)}</span>
           </p>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {visibleKpiCount > 0 && (
+          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleKpiCount, 5)}`}>
             {canViewOverviewModule("Overview - Total Orders") && (
               <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
             )}
@@ -704,8 +736,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate(portalMode ? "/portal/support" : "/support/tickets")} />
             )}
           </div>
+          )}
 
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {visibleSummaryRowCount > 0 && (
+          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleSummaryRowCount, 3)}`}>
             {canViewOverviewModule("Company Information") && (
             <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold capitalize text-emerald-600">{client.status || "Active"}</span>}>
               <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
@@ -808,8 +842,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             </Panel>
             )}
           </div>
+          )}
 
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {visibleDetailsRowCount > 0 && (
+          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleDetailsRowCount, 4)}`}>
             {canViewOverviewModule("Business & Tax Details") && (
             <Panel title="Business & Tax Details">
               <div className="divide-y divide-gray-50">
@@ -878,6 +914,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             </Panel>
             )}
           </div>
+          )}
 
           {canViewOverviewModule("Documents") && (
           <div className="mt-3">
@@ -900,7 +937,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </div>
           )}
 
-          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {visibleTablesRowCount > 0 && (
+          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleTablesRowCount, 2)}`}>
             {canViewOverviewModule("Top Products") && (
             <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
               {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
@@ -927,6 +965,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             </Panel>
             )}
           </div>
+          )}
 
           {canViewOverviewModule("Quick Links") && (
           <div className="mt-3">

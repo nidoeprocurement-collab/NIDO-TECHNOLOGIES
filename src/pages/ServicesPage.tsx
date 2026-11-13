@@ -166,7 +166,19 @@ export default function ServicesPage() {
       )}
 
       {/* Service Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div
+        className={`grid gap-4 ${
+          visibleCards.length <= 1
+            ? "grid-cols-1"
+            : visibleCards.length === 2
+              ? "sm:grid-cols-2"
+              : visibleCards.length === 3
+                ? "sm:grid-cols-2 lg:grid-cols-3"
+                : visibleCards.length === 4
+                  ? "sm:grid-cols-2 lg:grid-cols-4"
+                  : "sm:grid-cols-2 lg:grid-cols-5"
+        }`}
+      >
         {visibleCards.map((card) => {
           const Icon = card.icon;
           const targetHref = isPortal ? `/portal${card.href}` : card.href;
