@@ -50,6 +50,9 @@ export default function GeneralSettingsPage() {
 
   const [draft, setDraft] = useState<GeneralSettings>(() => config)
 
+  // True when the local draft differs from what is saved.
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(config)
+
   // Keep draft in sync when config changes from outside (e.g. cross-tab save).
   useEffect(() => {
     if (!isDirty) setDraft(config)
@@ -63,9 +66,6 @@ export default function GeneralSettingsPage() {
   const update = <K extends keyof GeneralSettings>(section: K, patch: Partial<GeneralSettings[K]>) => {
     setDraft(prev => ({ ...prev, [section]: { ...prev[section], ...patch } }))
   }
-
-  // True when the local draft differs from what is saved.
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(config)
 
   const handleSave = async () => {
     if ((org.phone && !isValidPhoneNumber(org.phone)) ||
