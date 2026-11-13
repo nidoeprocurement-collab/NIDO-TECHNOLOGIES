@@ -237,20 +237,20 @@ describe("client portal authentication", () => {
 
     const migratedRole = getPortalRoles(clientId)[0];
 
-    expect(migratedRole.permissions.map(permission => permission.module)).toEqual([
-      "Dashboard",
-      "Orders",
-      "Approvals",
-      "My Profile",
-    ]);
+    expect(migratedRole.permissions.map(permission => permission.module)).toEqual(
+      expect.arrayContaining(["Dashboard", "Orders", "Approvals", "My Profile", "Company Information", "Orders Overview"]),
+    );
+    expect(migratedRole.permissions.some(permission => permission.module === "Catalog")).toBe(false);
     expect(hasPortalPermission(clientId, legacyRole.name, "Approvals", "view")).toBe(true);
     expect(hasPortalPermission(clientId, legacyRole.name, "My Profile", "view")).toBe(true);
+    expect(hasPortalPermission(clientId, legacyRole.name, "Company Information", "view")).toBe(true);
   });
 
   it("resolves portal routes to the permission module used by the sidebar", () => {
     expect(getPortalModuleForPath("/portal/approvals")).toBe("Approvals");
     expect(getPortalModuleForPath("/portal/profile")).toBe("My Profile");
-    expect(getPortalModuleForPath("/portal/my-services/requests/request-1")).toBe("Services");
+    expect(getPortalModuleForPath("/portal/services")).toBe("Services");
+    expect(getPortalModuleForPath("/portal/my-services/requests/request-1")).toBe("Services - My Services");
     expect(getPortalModuleForPath("/portal/unmapped")).toBeNull();
   });
 });

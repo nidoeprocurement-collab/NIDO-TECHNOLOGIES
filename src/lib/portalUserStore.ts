@@ -20,6 +20,7 @@ export interface PortalUser {
 const STORE_KEY = 'nido_portal_users';
 const ROLE_STORE_PREFIX = 'nido_portal_roles_';
 const ROLE_MODULES_MIGRATION_PREFIX = 'nido_portal_role_modules_migrated_';
+const ROLE_MODULES_V2_MIGRATION_PREFIX = 'nido_portal_role_modules_v2_migrated_';
 const LEGACY_ROLE_SEED_CLEANUP_PREFIX = 'nido_portal_role_seed_cleanup_';
 
 export interface PortalRolePermission {
@@ -45,10 +46,32 @@ export interface PortalRole {
 
 export const PORTAL_MODULE_CATALOG = [
   { name: 'Dashboard', description: 'Client portal overview and account activity.' },
+  { name: 'Overview - Total Orders', description: 'Total Orders KPI card on the client portal overview.' },
+  { name: 'Overview - Total Spent', description: 'Total Spent KPI card on the client portal overview.' },
+  { name: 'Overview - Products', description: 'Products KPI card on the client portal overview.' },
+  { name: 'Overview - Invoices', description: 'Invoices KPI card on the client portal overview.' },
+  { name: 'Overview - Open Support Tickets', description: 'Open Support Tickets KPI card on the client portal overview.' },
+  { name: 'Company Information', description: 'Company Information card on the client portal overview.' },
+  { name: 'Orders Overview', description: 'Orders Overview chart card on the client portal overview.' },
+  { name: 'Account Summary', description: 'Account Summary card on the client portal overview.' },
+  { name: 'Business & Tax Details', description: 'Business & Tax Details card on the client portal overview.' },
+  { name: 'Financial & Bank Details', description: 'Financial & Bank Details card on the client portal overview.' },
+  { name: 'Billing Address', description: 'Billing Address card on the client portal overview.' },
+  { name: 'Shipping Address', description: 'Shipping Address card on the client portal overview.' },
+  { name: 'Documents', description: 'Documents card on the client portal overview.' },
+  { name: 'Top Products', description: 'Top Products table card on the client portal overview.' },
+  { name: 'Recent Orders', description: 'Recent Orders table card on the client portal overview.' },
+  { name: 'Quick Links', description: 'Quick Links section on the client portal overview.' },
   { name: 'Catalog', description: 'Browse and manage the products available to this client.' },
   { name: 'Orders', description: 'Create, review, and track client orders.' },
   { name: 'Approvals', description: 'Review and approve requests assigned for client approval.' },
-  { name: 'Services', description: 'View and manage active client services.' },
+  { name: 'Services', description: 'Access the client portal Services Hub.' },
+  { name: 'Services - My Services', description: 'View service requests submitted by the signed-in user.' },
+  { name: 'Services - AMC', description: 'Create and access Annual Maintenance Contract (AMC) service requests.' },
+  { name: 'Services - Repair Service', description: 'Create and access Repair Service requests.' },
+  { name: 'Services - Recycle / Disposal', description: 'Create and access Recycle / Disposal service requests.' },
+  { name: 'Services - Rental Service', description: 'Create and access Rental Service requests.' },
+  { name: 'Services - Regular Purchase', description: 'Create and access Regular Purchase service requests.' },
   { name: 'Invoices', description: 'View invoices, balances, and payment status.' },
   { name: 'Reports', description: 'View client purchasing and spend reports.' },
   { name: 'Notifications', description: 'View important account and order notifications.' },
@@ -56,6 +79,34 @@ export const PORTAL_MODULE_CATALOG = [
   { name: 'Contracts', description: 'View current client contracts and terms.' },
   { name: 'Support', description: 'Create and track client support requests.' },
   { name: 'My Profile', description: 'View and manage the signed-in client user profile.' },
+] as const;
+
+const DASHBOARD_OVERVIEW_SUBMODULES = [
+  'Overview - Total Orders',
+  'Overview - Total Spent',
+  'Overview - Products',
+  'Overview - Invoices',
+  'Overview - Open Support Tickets',
+  'Company Information',
+  'Orders Overview',
+  'Account Summary',
+  'Business & Tax Details',
+  'Financial & Bank Details',
+  'Billing Address',
+  'Shipping Address',
+  'Documents',
+  'Top Products',
+  'Recent Orders',
+  'Quick Links',
+] as const;
+
+const SERVICES_SUBMODULES = [
+  'Services - My Services',
+  'Services - AMC',
+  'Services - Repair Service',
+  'Services - Recycle / Disposal',
+  'Services - Rental Service',
+  'Services - Regular Purchase',
 ] as const;
 
 export const PORTAL_MODULES = PORTAL_MODULE_CATALOG.map(module => module.name);
@@ -243,12 +294,14 @@ function normalizePortalRoles(value: unknown): PortalRole[] {
 export function getPortalRoles(clientId: string): PortalRole[] {
   const roleStorageKey = `${ROLE_STORE_PREFIX}${clientId}`;
   const migrationKey = `${ROLE_MODULES_MIGRATION_PREFIX}${clientId}`;
+  const v2MigrationKey = `${ROLE_MODULES_V2_MIGRATION_PREFIX}${clientId}`;
   const seedCleanupKey = `${LEGACY_ROLE_SEED_CLEANUP_PREFIX}${clientId}`;
   try {
     const raw = localStorage.getItem(roleStorageKey);
     if (!raw) {
       localStorage.setItem(roleStorageKey, JSON.stringify([]));
       localStorage.setItem(migrationKey, '1');
+      localStorage.setItem(v2MigrationKey, '1');
       localStorage.setItem(seedCleanupKey, '1');
       return [];
     }
@@ -293,6 +346,30 @@ export function getPortalRoles(clientId: string): PortalRole[] {
       localStorage.setItem(seedCleanupKey, '1');
     }
 
+    if (localStorage.getItem(v2MigrationKey) !== '1') {
+      normalized = normalized.map(role => {
+        const permissionByModule = new Map(role.permissions.map(permission => [permission.module, permission]));
+        const dashboardPermission = permissionByModule.get('Dashboard');
+        if (dashboardPermission && PORTAL_PERMISSION_ACTIONS.some(action => dashboardPermission[action])) {
+          for (const targetModule of DASHBOARD_OVERVIEW_SUBMODULES) {
+            if (!permissionByModule.has(targetModule)) {
+              permissionByModule.set(targetModule, createPortalRolePermission(targetModule, dashboardPermission));
+            }
+          }
+        }
+        const servicesPermission = permissionByModule.get('Services');
+        if (servicesPermission && PORTAL_PERMISSION_ACTIONS.some(action => servicesPermission[action])) {
+          for (const targetModule of SERVICES_SUBMODULES) {
+            if (!permissionByModule.has(targetModule)) {
+              permissionByModule.set(targetModule, createPortalRolePermission(targetModule, servicesPermission));
+            }
+          }
+        }
+        return { ...role, permissions: [...permissionByModule.values()] };
+      });
+      localStorage.setItem(v2MigrationKey, '1');
+    }
+
     localStorage.setItem(roleStorageKey, JSON.stringify(normalized));
     return normalized;
   } catch {
@@ -304,6 +381,7 @@ export function savePortalRoles(clientId: string, roles: PortalRole[]): void {
   const normalized = normalizePortalRoles(roles);
   localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(normalized));
   localStorage.setItem(`${ROLE_MODULES_MIGRATION_PREFIX}${clientId}`, '1');
+  localStorage.setItem(`${ROLE_MODULES_V2_MIGRATION_PREFIX}${clientId}`, '1');
   localStorage.setItem(`${LEGACY_ROLE_SEED_CLEANUP_PREFIX}${clientId}`, '1');
   window.dispatchEvent(new Event('nidoPortalRolesUpdated'));
 }
@@ -313,7 +391,12 @@ const PORTAL_ROUTE_MODULES: Array<{ path: string; module: string }> = [
   { path: '/portal/orders', module: 'Orders' },
   { path: '/portal/approvals', module: 'Approvals' },
   { path: '/portal/invoices', module: 'Invoices' },
-  { path: '/portal/my-services', module: 'Services' },
+  { path: '/portal/my-services', module: 'Services - My Services' },
+  { path: '/portal/services/amc', module: 'Services - AMC' },
+  { path: '/portal/services/repair', module: 'Services - Repair Service' },
+  { path: '/portal/services/recycle', module: 'Services - Recycle / Disposal' },
+  { path: '/portal/services/rental', module: 'Services - Rental Service' },
+  { path: '/portal/services/purchase', module: 'Services - Regular Purchase' },
   { path: '/portal/services', module: 'Services' },
   { path: '/portal/support', module: 'Support' },
   { path: '/portal/contracts', module: 'Contracts' },

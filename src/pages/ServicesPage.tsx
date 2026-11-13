@@ -10,10 +10,12 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { hasPortalPermission } from "@/lib/portalUserStore";
 
 const SERVICE_CARDS = [
   {
     title: "AMC",
+    module: "Services - AMC",
     subtitle: "Annual Maintenance Contract",
     description: "Comprehensive maintenance coverage to ensure optimal performance and reliability.",
     icon: ShieldCheck,
@@ -30,6 +32,7 @@ const SERVICE_CARDS = [
   },
   {
     title: "Repair Service",
+    module: "Services - Repair Service",
     subtitle: "",
     description: "On-demand repair services for quick resolution of equipment issues.",
     icon: Wrench,
@@ -46,6 +49,7 @@ const SERVICE_CARDS = [
   },
   {
     title: "Recycle / Disposal",
+    module: "Services - Recycle / Disposal",
     subtitle: "",
     description: "Environmentally responsible recycling and disposal of electronic equipment.",
     icon: Recycle,
@@ -62,6 +66,7 @@ const SERVICE_CARDS = [
   },
   {
     title: "Rental Service",
+    module: "Services - Rental Service",
     subtitle: "",
     description: "Flexible rental solutions for short-term and long-term equipment needs.",
     icon: CalendarDays,
@@ -78,6 +83,7 @@ const SERVICE_CARDS = [
   },
   {
     title: "Regular Purchase",
+    module: "Services - Regular Purchase",
     subtitle: "",
     description: "Daily essentials and consumables for smooth business operations.",
     icon: ShoppingCart,
@@ -97,8 +103,15 @@ const SERVICE_CARDS = [
 export default function ServicesPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isClientPortalUser, isImpersonating } = useAuth();
+  const { user, isClientPortalUser, isImpersonating } = useAuth();
   const isPortal = isClientPortalUser || isImpersonating || location.pathname.startsWith("/portal");
+  const canViewPortalModule = (moduleName: string) => {
+    if (!isPortal || isImpersonating || !isClientPortalUser) return true;
+    if (!user?.clientId) return false;
+    return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
+  };
+  const visibleCards = SERVICE_CARDS.filter((card) => canViewPortalModule(card.module));
+  const canViewMyServices = canViewPortalModule("Services - My Services");
 
   useEffect(() => {
     toast.success("Services page loaded");
@@ -125,7 +138,7 @@ export default function ServicesPage() {
         </div>
       </div>
 
-      {isPortal && (
+      {isPortal && canViewMyServices && (
         <div className="flex justify-end">
           <button
             type="button"
@@ -140,7 +153,7 @@ export default function ServicesPage() {
 
       {/* Service Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {SERVICE_CARDS.map((card) => {
+        {visibleCards.map((card) => {
           const Icon = card.icon;
           const targetHref = isPortal ? `/portal${card.href}` : card.href;
           return (

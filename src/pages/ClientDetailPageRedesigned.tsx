@@ -38,7 +38,7 @@ import {
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import { getSupportTickets, type SupportTicket } from "@/lib/supportTicketStore";
-import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { getPortalUsersByClient, hasPortalPermission } from "@/lib/portalUserStore";
 import { belongsToPortalUser, invoiceBelongsToPortalUser } from "@/lib/clientDashboardScoping";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
@@ -303,10 +303,15 @@ interface ClientDetailProps {
 
 export default function ClientDetailPageRedesigned({ portalMode = false }: ClientDetailProps) {
   const params = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isImpersonating } = useAuth();
   const { hasRoutePermission } = usePermissions();
   const navigate = useNavigate();
   const clientId = portalMode ? user?.clientId?.trim() ?? "" : params.id ?? "";
+  const canViewOverviewModule = (moduleName: string) => {
+    if (!portalMode || isImpersonating) return true;
+    if (!user?.clientId) return false;
+    return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
+  };
   const [activeTab, setActiveTab] = useState("Overview");
   const [period, setPeriod] = useState<Period>("Year");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -681,14 +686,25 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </p>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
-            <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
-            <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
-            <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
-            <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate(portalMode ? "/portal/support" : "/support/tickets")} />
+            {canViewOverviewModule("Overview - Total Orders") && (
+              <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
+            )}
+            {canViewOverviewModule("Overview - Total Spent") && (
+              <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
+            )}
+            {canViewOverviewModule("Overview - Products") && (
+              <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
+            )}
+            {canViewOverviewModule("Overview - Invoices") && (
+              <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
+            )}
+            {canViewOverviewModule("Overview - Open Support Tickets") && (
+              <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate(portalMode ? "/portal/support" : "/support/tickets")} />
+            )}
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {canViewOverviewModule("Company Information") && (
             <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold capitalize text-emerald-600">{client.status || "Active"}</span>}>
               <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
@@ -760,7 +776,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 )}
               </div>
             </Panel>
+            )}
 
+            {canViewOverviewModule("Orders Overview") && (
             <Panel title="Orders Overview" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
               <div className="flex min-h-[138px] items-center gap-4">
                 <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#10b981 0 ${((statusCounts[0].count / totalStatusCount) * 100)}%, #2563eb ${((statusCounts[0].count / totalStatusCount) * 100)}% ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}%, #f59e0b ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}% ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}%, #7c3aed ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}% 100%)` }}>
@@ -774,7 +792,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 </div>
               </div>
             </Panel>
+            )}
 
+            {canViewOverviewModule("Account Summary") && (
             <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
               <div className="space-y-2.5 text-[10px]">
                 {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
@@ -784,9 +804,11 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
               </div>
             </Panel>
+            )}
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {canViewOverviewModule("Business & Tax Details") && (
             <Panel title="Business & Tax Details">
               <div className="divide-y divide-gray-50">
                 <DetailRow label="GST Treatment" value={client.gst_treatment || "—"} />
@@ -798,7 +820,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <DetailRow label="Opening Balance" value={openingBalanceDisplay} />
               </div>
             </Panel>
+            )}
 
+            {canViewOverviewModule("Financial & Bank Details") && (
             <Panel title="Financial & Bank Details">
               <div className="divide-y divide-gray-50">
                 <DetailRow label="Payment Terms" value={client.payment_terms || client.paymentTerms || "—"} />
@@ -809,7 +833,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <DetailRow label="Branch" value={client.branch || "—"} />
               </div>
             </Panel>
+            )}
 
+            {canViewOverviewModule("Billing Address") && (
             <Panel title="Billing Address">
               <div className="divide-y divide-gray-50">
                 <DetailRow label="Attention" value={billingAttention || "—"} />
@@ -823,7 +849,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <DetailRow label="Fax Number" value={billingFax || "—"} />
               </div>
             </Panel>
+            )}
 
+            {canViewOverviewModule("Shipping Address") && (
             <Panel
               title="Shipping Address"
               action={
@@ -846,8 +874,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <DetailRow label="Fax Number" value={shippingFax || "—"} />
               </div>
             </Panel>
+            )}
           </div>
 
+          {canViewOverviewModule("Documents") && (
           <div className="mt-3">
             <Panel
               title={`Documents (${activeDocuments.length})`}
@@ -866,8 +896,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               />
             </Panel>
           </div>
+          )}
 
           <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {canViewOverviewModule("Top Products") && (
             <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
               {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
                 <div className="overflow-x-auto">
@@ -878,7 +910,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 </div>
               )}
             </Panel>
+            )}
 
+            {canViewOverviewModule("Recent Orders") && (
             <Panel title="Recent Orders" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
               {recentOrders.length === 0 ? <EmptyState message="No orders found for this client in the selected period." /> : (
                 <div className="overflow-x-auto">
@@ -889,8 +923,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 </div>
               )}
             </Panel>
+            )}
           </div>
 
+          {canViewOverviewModule("Quick Links") && (
           <div className="mt-3">
             <h2 className="mb-2 text-xs font-bold text-gray-900">Quick Links</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -900,6 +936,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               <button type="button" onClick={() => openOverviewLink("/portal/reports", "Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
             </div>
           </div>
+          )}
         </main>
       )}
     </div>
