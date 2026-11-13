@@ -15,7 +15,7 @@ import {
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailUnavailable";
-import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
+import { derivePOFulfillmentStatus, promoteOrderSubItemsToProcessingForPO } from "@/lib/orderFulfillmentStatus";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import { getProductSpecLines } from "@/lib/productConfiguration";
 import { useMyOrders, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
@@ -1438,6 +1438,14 @@ export default function VendorOrderDetailPage() {
     ));
     setOrderStatus("Processing");
     setNotes(updatedNotes);
+    const nextMasterStatus = promoteOrderSubItemsToProcessingForPO({ ...po, items: updatedLineItems });
+    if (po.orderId && nextMasterStatus) {
+      setOrders(prev => prev.map(order =>
+        order.id === po.orderId && order.status !== nextMasterStatus
+          ? { ...order, status: nextMasterStatus as any }
+          : order
+      ));
+    }
     // 4. Send vendor email notification
     if (po.vendorEmail) {
       sendEmail({

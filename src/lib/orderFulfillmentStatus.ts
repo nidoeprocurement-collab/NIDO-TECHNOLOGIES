@@ -193,6 +193,56 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
 }
 
 /**
+ * Promotes covered sub-order items from Pending/Confirmed to Processing when
+ * any PO for the order is confirmed, and syncs the master order status.
+ */
+export function promoteOrderSubItemsToProcessingForPO(po: {
+  orderId?: string;
+  subOrderId?: string;
+  subOrderIds?: string[];
+  items?: Array<{ subOrderId?: string; status?: string }>;
+}): FulfillmentStatus | null {
+  const orderId = po?.orderId;
+  if (!orderId || typeof window === "undefined") return null;
+
+  const coveredSubOrderIds = new Set<string>();
+  if (po.subOrderId) coveredSubOrderIds.add(po.subOrderId);
+  if (Array.isArray(po.subOrderIds)) {
+    po.subOrderIds.forEach(id => {
+      if (id) coveredSubOrderIds.add(id);
+    });
+  }
+  if (Array.isArray(po.items)) {
+    po.items.forEach(line => {
+      if (line?.subOrderId && normalize(line.status) !== "cancelled") {
+        coveredSubOrderIds.add(line.subOrderId);
+      }
+    });
+  }
+
+  const key = `nido_subitems_${orderId}`;
+  const saved = readJson<Record<string, any>>(key, {});
+  const nextSaved: Record<string, any> = { ...saved };
+  const updatedOn = new Date().toLocaleDateString("en-IN");
+
+  coveredSubOrderIds.forEach(subId => {
+    const existing = nextSaved[subId] || {};
+    const currentStatus = normalize(existing.itemStatus);
+    if (!currentStatus || currentStatus === "pending" || currentStatus === "confirmed") {
+      nextSaved[subId] = {
+        ...existing,
+        itemStatus: "Processing",
+        updatedOn,
+      };
+    }
+  });
+
+  localStorage.setItem(key, JSON.stringify(nextSaved));
+  window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId } }));
+  return syncMasterOrderFulfillmentStatus(orderId);
+}
+
+/**
  * Derives the fulfillment status displayed on a vendor PO detail page without
  * replacing the PO's separate Draft/Confirmed procurement lifecycle.
  */

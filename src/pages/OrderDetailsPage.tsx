@@ -5455,7 +5455,12 @@ export default function MyOrderPage() {
                                        `Purchase Order ${po.poNumber} status changed from ${po.status} to Confirmed.`,
                                        { actor, eventType: "status-change", id: `activity_po_confirmed_${po.poNumber}_${Date.now()}` },
                                      );
-                                     updatePO(po.poNumber, { status: "Confirmed" });
+                                     const updatedLineItems = (po.items || []).map((li: any) =>
+                                       String(li.status || "").toLowerCase() === "cancelled"
+                                         ? li
+                                         : { ...li, status: "Processing" },
+                                     );
+                                     updatePO(po.poNumber, { status: "Confirmed", items: updatedLineItems });
                                      appendOrderActivity(po.orderId, confirmationActivity.text, {
                                        actor,
                                        eventType: "status-change",

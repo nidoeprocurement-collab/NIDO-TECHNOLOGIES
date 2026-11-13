@@ -332,5 +332,129 @@ describe("Order & Vendor Order Assignment Gate", () => {
     const updateBtn2 = await screen.findByRole("button", { name: /Update Status/i });
     expect(updateBtn2.getAttribute("aria-disabled")).toBe("true");
   }, 15000);
+
+  it("changes both PO Detail and Order Detail statuses to Processing once any PO is confirmed", async () => {
+    const orderId = "ORD-CONFIRM-PROC-301";
+    const poNumber = "PO-CONFIRM-PROC-301";
+    localStorage.setItem(
+      "nido_my_orders",
+      JSON.stringify([
+        {
+          id: orderId,
+          client: "Acme Corp",
+          clientId: "client-1",
+          requester: "Ravi",
+          requesterRole: "Buyer",
+          requesterInitial: "R",
+          requesterColor: "#2563eb",
+          assigned: "Anita Kapoor",
+          assignedRole: "Procurement Manager",
+          assignedInitial: "A",
+          assignedColor: "#2563eb",
+          assignmentCompleted: true,
+          orderDate: "2026-11-13",
+          orderTime: "10:00 AM",
+          status: "Pending",
+          slaTime: null,
+          slaAlert: false,
+          totalAmount: "₹20,000",
+          cartItems: [
+            {
+              id: "item-1",
+              subOrderId: `SO-${orderId}-001`,
+              name: "Dell Latitude",
+              qty: 1,
+              price: 10000,
+              vendorId: "v-1",
+              vendorName: "TechHub",
+              productCode: "DELL-1",
+              productType: "Physical",
+            },
+            {
+              id: "item-2",
+              subOrderId: `SO-${orderId}-002`,
+              name: "HP Monitor",
+              qty: 1,
+              price: 10000,
+              vendorId: "v-2",
+              vendorName: "DisplayCo",
+              productCode: "HP-MON-1",
+              productType: "Physical",
+            },
+          ],
+        },
+      ]),
+    );
+
+    savePO({
+      poNumber,
+      orderId,
+      vendorId: "v-1",
+      vendorName: "TechHub",
+      vendorCity: "Bengaluru",
+      vendorEmail: "vendor@techhub.com",
+      status: "Draft",
+      createdOn: "2026-11-13",
+      totalAmount: "₹10,000",
+      totalAmountNum: 10000,
+      subtotal: 10000,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      grandTotal: 10000,
+      sgstPct: 0,
+      cgstPct: 0,
+      items: [
+        {
+          subOrderId: `SO-${orderId}-001`,
+          item: "Dell Latitude",
+          productCode: "DELL-1",
+          qty: 1,
+          unitPrice: 10000,
+          lineSubtotal: 10000,
+          status: "Pending",
+        },
+      ],
+      subOrderId: `SO-${orderId}-001`,
+      subOrderIds: [`SO-${orderId}-001`],
+    });
+
+    const vendorView = render(
+      <MemoryRouter initialEntries={[`/vendor-orders/${poNumber}`]}>
+        <AuthProvider>
+          <MyOrdersProvider>
+            <Routes>
+              <Route path="/vendor-orders/:id" element={<VendorOrderDetailPage />} />
+            </Routes>
+          </MyOrdersProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const confirmButtons = await screen.findAllByRole("button", { name: /Confirm Purchase Order/i });
+    fireEvent.click(confirmButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Processing").length).toBeGreaterThan(0);
+    });
+    vendorView.unmount();
+
+    render(
+      <MemoryRouter initialEntries={[`/orders/${orderId}`]}>
+        <AuthProvider>
+          <MyOrdersProvider>
+            <Routes>
+              <Route path="/orders/:id" element={<OrderDetailsPage />} />
+            </Routes>
+          </MyOrdersProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const savedSubItems = JSON.parse(localStorage.getItem(`nido_subitems_${orderId}`) || "{}");
+      expect(savedSubItems[`SO-${orderId}-001`]?.itemStatus).toBe("Processing");
+      expect(screen.getAllByText("Processing").length).toBeGreaterThan(0);
+    });
+  }, 15000);
 });
 
