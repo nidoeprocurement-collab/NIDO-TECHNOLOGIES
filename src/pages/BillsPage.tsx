@@ -609,6 +609,7 @@ export default function BillsPage() {
         id: `doc-bill-${billEntry.id}`,
         billId: billEntry.id,
         name: `Bill-${billEntry.billNumber}.pdf`,
+        ext: "pdf",
         type: "Bill",
         uploadedBy: "System",
         uploadedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),

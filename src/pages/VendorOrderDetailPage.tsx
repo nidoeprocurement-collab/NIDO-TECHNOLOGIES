@@ -1653,19 +1653,11 @@ export default function VendorOrderDetailPage() {
     recordDocumentActivity("uploaded", doc);
   };
   const handleDownloadDocument = (doc: any) => {
-    if (doc?.dataUrl) {
-      const link = document.createElement("a");
-      link.href = doc.dataUrl;
-      link.download = doc.name || "document";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      recordDocumentActivity("downloaded", doc);
-    } else if (doc?.billId) {
+    if (doc?.billId || doc?.type === "Bill") {
       try {
-        const storedBills = JSON.parse(localStorage.getItem("nido_bills") || "[]");
+        const storedBills = JSON.parse(localStorage.getItem("nido_purchase_bills_v1") || "[]");
         const linkedBill = Array.isArray(storedBills)
-          ? storedBills.find((b: any) => b.id === doc.billId)
+          ? storedBills.find((b: any) => (doc?.billId && b.id === doc.billId) || `Bill-${b.billNumber}.pdf` === doc?.name)
           : null;
         if (linkedBill) {
           void generateBillPdf(linkedBill)
@@ -1674,9 +1666,17 @@ export default function VendorOrderDetailPage() {
           return;
         }
       } catch {
-        // Fall through to default download
+        // Fall through to dataUrl download
       }
-      alert(`Downloading: ${doc.name}`);
+    }
+    if (doc?.dataUrl) {
+      const link = document.createElement("a");
+      link.href = doc.dataUrl;
+      link.download = doc.name || "document";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      recordDocumentActivity("downloaded", doc);
     } else {
       const currentPO = getPOByNumber(poKey);
       if (!currentPO) {
