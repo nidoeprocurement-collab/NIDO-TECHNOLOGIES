@@ -2494,7 +2494,7 @@ export default function VendorOrderDetailPage() {
       {pendingProvisionItem && (
         <ProvisionedDetailsModal
           itemName={pendingProvisionItem.name}
-          uploadedBy={vendor.name || "Vendor"}
+          uploadedBy={initialData.vendor?.name || initialData.vendorName || "Vendor"}
           onSave={confirmItemProvisioned}
           onClose={() => setPendingProvisionItem(null)}
         />
