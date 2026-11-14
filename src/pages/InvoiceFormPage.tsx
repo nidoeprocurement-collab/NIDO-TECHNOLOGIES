@@ -809,10 +809,11 @@ export default function InvoiceFormPage() {
       return;
     }
 
-    if (isOrderProformaFlow) {
+    const targetOrderId = invoice.originatingOrderId || (isOrderProformaFlow ? restrictedOrderId : '');
+    if (invoice.status === 'Proforma Invoice' && targetOrderId) {
       try {
         const dataUrl = await generateInvoicePdfBase64(invoice);
-        const docsKey = `nido_docs_${restrictedOrderId}`;
+        const docsKey = `nido_docs_${targetOrderId}`;
         let existingDocs: any[] = [];
         try {
           const stored = JSON.parse(localStorage.getItem(docsKey) || '[]');
@@ -829,17 +830,20 @@ export default function InvoiceFormPage() {
           type: 'Proforma Invoice',
           uploadedBy: 'System',
           uploadedOn: new Date().toLocaleDateString('en-IN'),
-          description: `Generated from order ${restrictedOrderId}.`,
+          description: `Generated from order ${targetOrderId}.`,
           dataUrl,
         };
         localStorage.setItem(docsKey, JSON.stringify([
           ...existingDocs.filter((doc) => doc.id !== proformaDocument.id),
           proformaDocument,
         ]));
+        window.dispatchEvent(new CustomEvent('orderDocsUpdated', { detail: { orderId: targetOrderId } }));
       } catch {
         // The invoice remains saved even if browser document storage is unavailable.
       }
+    }
 
+    if (isOrderProformaFlow) {
       const mailResult = await sendInvoiceEmail(invoice, 'invoice');
       if (mailResult.sentCount > 0) {
         invoice = {

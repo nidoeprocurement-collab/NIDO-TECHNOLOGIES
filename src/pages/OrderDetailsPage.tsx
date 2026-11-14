@@ -1436,6 +1436,7 @@ function DocTypeTag({ type }) {
   const map: any = {
     "Purchase Order": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
     "Quotation": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+    "Proforma Invoice": { bg: "#eef2ff", color: "#3730a3", border: "#c7d2fe" },
     "Invoice": { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
     "Contract": { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" },
     "Shipping Document": { bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" },
