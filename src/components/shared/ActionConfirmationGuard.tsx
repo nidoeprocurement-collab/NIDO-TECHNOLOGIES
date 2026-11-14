@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-type ActionKind = "delete" | "save" | "resubmit";
+type ActionKind = "delete" | "resubmit";
 
 type PendingAction = {
   kind: ActionKind;
@@ -46,7 +46,6 @@ function getActionKind(label: string): ActionKind | null {
     return "resubmit";
   }
   if (/\b(delete|remove)\b/.test(normalized)) return "delete";
-  if (/\bsave\b/.test(normalized)) return "save";
   return null;
 }
 
@@ -61,24 +60,10 @@ function getConfirmationCopy(kind: ActionKind, label: string) {
       confirmLabel: label.match(/\bremove\b/i) ? "Remove" : "Delete",
     };
   }
-  if (kind === "resubmit") {
-    return {
-      title: "Confirm resubmission",
-      description: "Are you sure you want to resubmit this request?",
-      confirmLabel: "Resubmit",
-    };
-  }
-  if (kind === "save") {
-    return {
-      title: "Confirm save",
-      description: "Are you sure you want to save these changes?",
-      confirmLabel: "Save",
-    };
-  }
   return {
-    title: "Confirm save",
-    description: "Are you sure you want to save these changes?",
-    confirmLabel: "Save",
+    title: "Confirm resubmission",
+    description: "Are you sure you want to resubmit this request?",
+    confirmLabel: "Resubmit",
   };
 }
 
