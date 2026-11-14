@@ -83,10 +83,12 @@ export default function OrderDetailsSummaryCard({
           <span style={labelStyle}>GST</span>
           <span style={valueStyle}>{formatPrice(pricing.totalGst)}</span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Shipping / delivery</span>
-          <span style={valueStyle}>{formatPrice(pricing.shippingDeliveryFee)}</span>
-        </div>
+        {pricing.shippingDeliveryFee > 0 && (
+          <div style={rowStyle}>
+            <span style={labelStyle}>Shipping / delivery</span>
+            <span style={valueStyle}>{formatPrice(pricing.shippingDeliveryFee)}</span>
+          </div>
+        )}
         {pricing.platformFee !== 0 && (
           <div style={rowStyle}>
             <span style={labelStyle}>Platform fee</span>

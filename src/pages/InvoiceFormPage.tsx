@@ -20,7 +20,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
-import { isPhysicalOrHybridProduct } from '@/lib/productTypeRules';
+import { isDigitalOnlyProduct, isPhysicalOrHybridProduct } from '@/lib/productTypeRules';
 import { getOrderProductTypeMetadata } from '@/lib/orderProductType';
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from '@/lib/productDocumentRules';
 import { toast } from 'sonner';
@@ -460,6 +460,7 @@ export default function InvoiceFormPage() {
         })
       );
       if (order.checkoutPricingSnapshot) {
+        const round2 = (value: number) => Math.round(value * 100) / 100;
         const invoiceSubtotal = eligibleItems.reduce((sum, ci) => {
           const gstRate = typeof ci.checkoutGstRate === 'number'
             ? ci.checkoutGstRate
@@ -473,16 +474,39 @@ export default function InvoiceFormPage() {
               : ci.clientSellingPriceExclGst || 0;
           return sum + unitPrice * (Number(ci.quantity) || 0);
         }, 0);
-        setShippingCharges(Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0));
+        const allOrderItems = order.cartItems;
+        const allPhysicalCount = allOrderItems.filter(
+          (ci) => !isDigitalOnlyProduct(getOrderProductTypeMetadata(ci)),
+        ).length;
+        const selectedPhysicalCount = eligibleItems.filter(
+          (ci) => !isDigitalOnlyProduct(getOrderProductTypeMetadata(ci)),
+        ).length;
+        const orderShipping = Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0);
+        const scopedShipping =
+          allPhysicalCount === 0 || selectedPhysicalCount === 0
+            ? 0
+            : selectedPhysicalCount === allPhysicalCount
+              ? orderShipping
+              : round2(orderShipping * (selectedPhysicalCount / allPhysicalCount));
+        setShippingCharges(scopedShipping);
         const snapshotPlatformFee = order.checkoutPricingSnapshot.platformFee;
-        setPlatformFee(
+        const orderPlatformFee =
           typeof snapshotPlatformFee === 'number' && Number.isFinite(snapshotPlatformFee)
             ? Math.max(0, snapshotPlatformFee)
-            : invoiceSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100,
-        );
+            : invoiceSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100;
+        const scopedPlatformFee =
+          eligibleItems.length === 0 || allOrderItems.length === 0
+            ? 0
+            : eligibleItems.length === allOrderItems.length
+              ? orderPlatformFee
+              : round2(orderPlatformFee * (eligibleItems.length / allOrderItems.length));
+        setPlatformFee(scopedPlatformFee);
         setAdjustment(Number((order as any).adjustment) || 0);
       } else {
-        setShippingCharges(Number((order as any).shippingCharges) || 0);
+        const selectedPhysicalCount = eligibleItems.filter(
+          (ci) => !isDigitalOnlyProduct(getOrderProductTypeMetadata(ci)),
+        ).length;
+        setShippingCharges(selectedPhysicalCount > 0 ? (Number((order as any).shippingCharges) || 0) : 0);
         setPlatformFee(Number((order as any).platformFee) || 0);
         setAdjustment(Number((order as any).adjustment) || 0);
       }
@@ -1410,10 +1434,12 @@ export default function InvoiceFormPage() {
                     </td>
                     <td className="px-4 py-2.5 text-right text-gray-900">{fmt(totalGst)}</td>
                   </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="px-4 py-2.5 text-gray-600">Shipping &amp; Handling Charges</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900">{fmt(shippingCharges)}</td>
-                  </tr>
+                  {(hasPhysicalInvoiceItems || shippingCharges > 0) && (
+                    <tr className="border-b border-gray-200">
+                      <td className="px-4 py-2.5 text-gray-600">Shipping &amp; Handling Charges</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">{fmt(shippingCharges)}</td>
+                    </tr>
+                  )}
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 text-gray-600">Platform Fee</td>
                     <td className="px-4 py-2.5 text-right text-gray-900">{fmt(platformFee)}</td>
@@ -1435,13 +1461,15 @@ export default function InvoiceFormPage() {
 
           {/* Shipping + Platform Fee + Round Off inputs below the table */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
-            <Label text={`Shipping & Handling Charges (${currencySymbol})`}>
-              <input
-                type="number" min={0} value={shippingCharges}
-                onChange={(e) => setShippingCharges(Number(e.target.value) || 0)}
-                className={inputCls}
-              />
-            </Label>
+            {(hasPhysicalInvoiceItems || shippingCharges > 0) && (
+              <Label text={`Shipping & Handling Charges (${currencySymbol})`}>
+                <input
+                  type="number" min={0} value={shippingCharges}
+                  onChange={(e) => setShippingCharges(Number(e.target.value) || 0)}
+                  className={inputCls}
+                />
+              </Label>
+            )}
             <Label text={`Platform Fee (${currencySymbol})`}>
               <input
                 type="number" min={0} value={platformFee}

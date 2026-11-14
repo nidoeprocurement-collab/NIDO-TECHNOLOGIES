@@ -44,9 +44,9 @@ describe("calculateRemainingOrderPricing", () => {
     expect(remaining.totalGst).toBe(20);
     expect(remaining.cgstAmount).toBe(10);
     expect(remaining.sgstAmount).toBe(10);
-    expect(remaining.shippingDeliveryFee).toBe(10);
+    expect(remaining.shippingDeliveryFee).toBe(5);
     expect(remaining.platformFee).toBe(5);
-    expect(remaining.grandTotal).toBe(135);
+    expect(remaining.grandTotal).toBe(130);
   });
 
   it("uses a fixed platform fee from new checkout snapshots", () => {

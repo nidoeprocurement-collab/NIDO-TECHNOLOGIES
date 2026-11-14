@@ -148,12 +148,13 @@ function drawSummary(
     .map((rate) => `${rate}%`)
     .join(', ');
 
+  const hasPhysicalItems = invoice.lineItems.some((item) => !isDigitalDocumentProduct(item));
   const rows: Array<[string, string, boolean?]> = [
     ['Gross Subtotal', money(grossSubtotal)],
     ['Item Level Discounts (-)', `${adjustment < 0 ? '-' : ''}${money(totalDiscount)}`, true],
     ['Total Taxable Value', money(taxableSubtotal), true],
     [`Total GST${rates ? ` (${rates})` : ''}`, money(invoice.totalTax)],
-    ['Shipping & Handling Charges', money(shipping)],
+    ...(hasPhysicalItems || shipping > 0 ? [['Shipping & Handling Charges', money(shipping)] as [string, string]] : []),
     ...(platformFee > 0 || isProforma ? [['Platform Fee', money(platformFee)] as [string, string]] : []),
     [`Round Off Adjustment`, `${adjustment < 0 ? '-' : ''}${money(Math.abs(adjustment))}`],
   ];

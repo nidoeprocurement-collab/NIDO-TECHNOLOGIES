@@ -1,13 +1,14 @@
 import { getClientCartPricingSettings, getSlabDiscountPct } from "./priceEngineStore";
 import { computeCartGST, type GstSlab } from "./cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "./taxEngine";
+import { isDigitalOnlyProduct, type ProductTypeMetadata } from "./productTypeRules";
 import {
   getCartTaxRate,
   getCartUnitPriceInclusive,
   type VendorCartLine,
 } from "./vendorCartPricing";
 
-export type CartPricingItem = VendorCartLine & {
+export type CartPricingItem = VendorCartLine & ProductTypeMetadata & {
   quantity: number;
   clientId?: string;
   category?: string;
@@ -116,8 +117,11 @@ export function calculateCartPricing(items: CartPricingItem[]): CartPricingSumma
   const clientPricing = primaryClientId
     ? getClientCartPricingSettings(primaryClientId)
     : { discountPct: 0, shippingDeliveryFee: 0, platformFee: 0 };
-  const platformFee = clientPricing.platformFee;
-  const shippingDeliveryFee = clientPricing.shippingDeliveryFee;
+  const physicalItemCount = items.filter((item) => !isDigitalOnlyProduct(item)).length;
+  const platformFee = items.length > 0 ? clientPricing.platformFee : 0;
+  const shippingDeliveryFee = physicalItemCount > 0
+    ? clientPricing.shippingDeliveryFee * physicalItemCount
+    : 0;
   const totalDiscountAmount = Math.max(
     0,
     beforeSlabDiscount.preTaxSubtotal - effectiveGst.preTaxSubtotal,

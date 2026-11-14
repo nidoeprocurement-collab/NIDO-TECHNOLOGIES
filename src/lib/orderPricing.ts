@@ -1,8 +1,9 @@
 import { computeCartGST } from "./cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "./taxEngine";
+import { isDigitalOnlyProduct, type ProductTypeMetadata } from "./productTypeRules";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "./vendorCartPricing";
 
-export interface OrderPricingItem {
+export interface OrderPricingItem extends ProductTypeMetadata {
   priceNum: number;
   quantity?: number;
   cartDiscountPct?: number;
@@ -123,15 +124,28 @@ export function calculateRemainingOrderPricing(
   const sgstAmount = gst.totalGst - cgstAmount;
 
   if (hasCheckoutSnapshots && order.checkoutPricingSnapshot) {
-    const shippingDeliveryFee = activeItems.length
-      ? Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0)
-      : 0;
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+    const allPhysicalCount = items.filter((item) => !isDigitalOnlyProduct(item)).length;
+    const activePhysicalCount = activeItems.filter((item) => !isDigitalOnlyProduct(item)).length;
+    const totalOrderShipping = Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0);
+    const shippingDeliveryFee =
+      allPhysicalCount === 0 || activePhysicalCount === 0
+        ? 0
+        : activePhysicalCount === allPhysicalCount
+          ? totalOrderShipping
+          : round2(totalOrderShipping * (activePhysicalCount / allPhysicalCount));
     const snapshotPlatformFee = order.checkoutPricingSnapshot.platformFee;
-    const platformFee = activeItems.length === 0
-      ? 0
-      : typeof snapshotPlatformFee === "number" && Number.isFinite(snapshotPlatformFee)
-        ? Math.max(0, snapshotPlatformFee)
-        : (gst.preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0)) / 100;
+    const hasFixedPlatformFee =
+      typeof snapshotPlatformFee === "number" && Number.isFinite(snapshotPlatformFee);
+    const totalOrderPlatformFee = hasFixedPlatformFee
+      ? Math.max(0, snapshotPlatformFee)
+      : (gst.preTaxSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0)) / 100;
+    const platformFee =
+      activeItems.length === 0
+        ? 0
+        : !hasFixedPlatformFee || activeItems.length === items.length
+          ? totalOrderPlatformFee
+          : round2(totalOrderPlatformFee * (activeItems.length / items.length));
     const grandTotal = gst.preTaxSubtotal + gst.totalGst + shippingDeliveryFee + platformFee;
     return {
       slabs: gst.slabs,

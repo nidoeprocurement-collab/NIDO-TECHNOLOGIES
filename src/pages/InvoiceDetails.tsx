@@ -477,7 +477,7 @@ export default function InvoiceDetails() {
                     <td className="px-4 py-2.5 text-gray-500">Total GST</td>
                     <td className="px-4 py-2.5 text-right">{fmt(invoice.totalTax)}</td>
                   </tr>
-                  {(shippingCharges > 0 || isProforma) && (
+                  {(shippingCharges > 0 || (isProforma && physicalLineItems.length > 0)) && (
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-500">Shipping &amp; Handling Charges</td>
                       <td className="px-4 py-2.5 text-right">{fmt(shippingCharges)}</td>
