@@ -5,7 +5,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
-import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import { getPOByNumber, updatePO, type PODocument, type StoredPO } from './purchaseOrderStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
@@ -26,10 +25,6 @@ function fmt2(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-}
-
-function money(value: number): string {
-  return formatCurrency(value, loadConfig());
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -144,12 +139,12 @@ function drawPOSummary(
     .join(', ');
 
   const rows: Array<[string, string, boolean?]> = [
-    ['Gross Subtotal', money(po.subtotal)],
-    ['Item Level Discounts (-)', `${getCurrencySymbol(loadConfig())} - 0.00`, true],
-    ['Total Taxable Value', money(po.subtotal), true],
-    [`Total GST${rates ? ` (${rates})` : ''}`, money(totalTax)],
-    ['Shipping & Handling Charges', money(0)],
-    ['Round Off Adjustment', money(0)],
+    ['Gross Subtotal', fmt2(po.subtotal)],
+    ['Item Level Discounts (-)', `- ${fmt2(0)}`, true],
+    ['Total Taxable Value', fmt2(po.subtotal), true],
+    [`Total GST${rates ? ` (${rates})` : ''}`, fmt2(totalTax)],
+    ['Shipping & Handling Charges', fmt2(0)],
+    ['Round Off Adjustment', fmt2(0)],
   ];
 
   const rowHeight = 20;
@@ -180,7 +175,7 @@ function drawPOSummary(
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
   drawText(doc, 'Total Order Value', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, money(po.grandTotal), x + width - 10, totalY + 17, {
+  drawText(doc, fmt2(po.grandTotal), x + width - 10, totalY + 17, {
     size: 8.5,
     color: DARK,
     bold: true,
@@ -307,7 +302,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       ? activePoLines
       : po.items && po.items.length > 0
         ? []
-      : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal, configuration: undefined }];
+        : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal, configuration: undefined }];
 
   const gstRate = po.sgstPct + po.cgstPct; // combined GST % for all PO items
 
@@ -371,17 +366,17 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       },
       columnStyles: digital
         ? {
-            0: { cellWidth: 18, halign: 'center' }, 1: { cellWidth: 74 }, 2: { cellWidth: 38 },
-            3: { cellWidth: 54 }, 4: { cellWidth: 34, halign: 'center' }, 5: { cellWidth: 48 },
-            6: { cellWidth: 52 }, 7: { cellWidth: 34, halign: 'center' }, 8: { cellWidth: 47, halign: 'right' },
-            9: { cellWidth: 38, halign: 'center' }, 10: { cellWidth: 42, halign: 'right' }, 11: { cellWidth: 52, halign: 'right' },
-          }
+          0: { cellWidth: 18, halign: 'center' }, 1: { cellWidth: 74 }, 2: { cellWidth: 38 },
+          3: { cellWidth: 54 }, 4: { cellWidth: 34, halign: 'center' }, 5: { cellWidth: 48 },
+          6: { cellWidth: 52 }, 7: { cellWidth: 34, halign: 'center' }, 8: { cellWidth: 47, halign: 'right' },
+          9: { cellWidth: 38, halign: 'center' }, 10: { cellWidth: 42, halign: 'right' }, 11: { cellWidth: 52, halign: 'right' },
+        }
         : {
-            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 104 }, 2: { cellWidth: 42, halign: 'center' },
-            3: { cellWidth: 24, halign: 'center' }, 4: { cellWidth: 55, halign: 'right' }, 5: { cellWidth: 47, halign: 'right' },
-            6: { cellWidth: 58, halign: 'right' }, 7: { cellWidth: 40, halign: 'center' }, 8: { cellWidth: 52, halign: 'right' },
-            9: { cellWidth: 69, halign: 'right' },
-          },
+          0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 104 }, 2: { cellWidth: 42, halign: 'center' },
+          3: { cellWidth: 24, halign: 'center' }, 4: { cellWidth: 55, halign: 'right' }, 5: { cellWidth: 47, halign: 'right' },
+          6: { cellWidth: 58, halign: 'right' }, 7: { cellWidth: 40, halign: 'center' }, 8: { cellWidth: 52, halign: 'right' },
+          9: { cellWidth: 69, halign: 'right' },
+        },
       didParseCell(data) {
         if (data.section === 'body' && data.column.index === 1) {
           data.cell.styles.fontStyle = 'bold';
