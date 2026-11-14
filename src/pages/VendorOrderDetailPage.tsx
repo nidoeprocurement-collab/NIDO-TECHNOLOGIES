@@ -1278,6 +1278,13 @@ export default function VendorOrderDetailPage() {
   const isPOCancelled = lifecycleStatus === "Cancelled" || orderStatus === "Cancelled" || cancelled;
   const isCancelled = isPOCancelled || isMasterOrderCancelled;
   const isDelivered = orderStatus === "Delivered";
+  const isCancelPODisabled =
+    items.some(
+      (item) =>
+        !isDigitalDocumentProduct(item) &&
+        (item.status === "Shipped" || item.status === "Delivered"),
+    ) ||
+    ["Shipped", "Partially Shipped", "Partially Delivered", "Delivered"].includes(orderStatus);
   const isAssignmentPending = Boolean(
     linkedMasterOrder &&
     linkedMasterOrder.status !== "Cancelled" &&
@@ -1892,8 +1899,22 @@ export default function VendorOrderDetailPage() {
                 </button>
               )}
               <button
-                onClick={() => setShowCancelPO(true)}
-                style={{ padding: "9px 20px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+                type="button"
+                disabled={isCancelPODisabled}
+                title={isCancelPODisabled ? "Cannot cancel PO once physical items are shipped" : undefined}
+                onClick={() => { if (!isCancelPODisabled) setShowCancelPO(true); }}
+                style={{
+                  padding: "9px 20px",
+                  border: isCancelPODisabled ? "1px solid #d1d5db" : "1px solid #fca5a5",
+                  borderRadius: 8,
+                  background: isCancelPODisabled ? "#f3f4f6" : "#fef2f2",
+                  color: isCancelPODisabled ? "#9ca3af" : "#dc2626",
+                  cursor: isCancelPODisabled ? "not-allowed" : "pointer",
+                  opacity: isCancelPODisabled ? 0.7 : 1,
+                  fontWeight: 600,
+                  fontSize: 13.5,
+                  fontFamily: "inherit",
+                }}
               >
                 Cancel PO
               </button>
