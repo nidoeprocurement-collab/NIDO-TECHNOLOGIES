@@ -14,7 +14,8 @@ import {
   canCancelOrderByPurchaseOrders,
   isWithinClientCancellationWindow,
 } from "@/lib/orderCancellationEligibility";
-import { getInvoices } from "@/lib/invoiceStore";
+import { getInvoiceById, getInvoices } from "@/lib/invoiceStore";
+import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { attachPOPdfToPO, downloadPOPdf, getPODataUri } from "@/lib/generatePO";
@@ -1676,7 +1677,33 @@ function DocumentsNotesTab({
     return () => window.removeEventListener("storage", onStorage);
   }, [notesKey, docsKey]);
 
-  const filteredDocs = docs.filter(d => !docSearch || d.name.toLowerCase().includes(docSearch.toLowerCase()) || d.type.toLowerCase().includes(docSearch.toLowerCase()));
+  const allDocs = useMemo(() => {
+    const proformaInvoices = getInvoices().filter(
+      inv => inv.status === "Proforma Invoice" && inv.originatingOrderId === orderId,
+    );
+    const missingProformaDocs = proformaInvoices
+      .filter(inv => !docs.some(d => d.id === `doc-${inv.id}-proforma` || d.invoiceId === inv.id))
+      .map(inv => {
+        const itemSummary = (inv.lineItems || [])
+          .map(li => li.description?.trim())
+          .filter(Boolean)
+          .join(", ");
+        return {
+          id: `doc-${inv.id}-proforma`,
+          invoiceId: inv.id,
+          name: `${inv.invoiceNumber}.pdf`,
+          ext: "pdf",
+          size: "PDF",
+          type: "Proforma Invoice",
+          uploadedBy: "System",
+          uploadedOn: inv.invoiceDate || new Date(inv.createdAt).toLocaleDateString("en-IN"),
+          description: `Generated from order ${orderId}${itemSummary ? ` (${itemSummary})` : ""}.`,
+        };
+      });
+    return [...docs, ...missingProformaDocs];
+  }, [docs, orderId]);
+
+  const filteredDocs = allDocs.filter(d => !docSearch || d.name.toLowerCase().includes(docSearch.toLowerCase()) || d.type.toLowerCase().includes(docSearch.toLowerCase()));
 
   // Client portal users are on the "external" side of the conversation —
   // Internal Notes are staff-only and never leave the owner platform.
@@ -1751,6 +1778,17 @@ function DocumentsNotesTab({
   };
 
   const downloadDocument = (doc: any): boolean => {
+    if (!doc?.dataUrl && doc?.invoiceId) {
+      const linkedInvoice = getInvoiceById(doc.invoiceId);
+      if (linkedInvoice) {
+        void downloadInvoicePdf(linkedInvoice).then(() => {
+          onDocumentActivity?.(`Document downloaded: ${doc.name || "document"} (${doc.type || "Document"}).`);
+        }).catch(() => {
+          setDocFeedback({ type: "error", message: "The proforma invoice PDF could not be generated. Please try again." });
+        });
+        return true;
+      }
+    }
     if (!doc?.dataUrl) {
       setDocFeedback({ type: "error", message: "This document is not available for download." });
       return false;
@@ -1838,7 +1876,7 @@ function DocumentsNotesTab({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827" }}>Documents</div>
-            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>{docs.length} document{docs.length !== 1 ? "s" : ""}</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>{allDocs.length} document{allDocs.length !== 1 ? "s" : ""}</div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <div style={{ position: "relative" }}>

@@ -20,6 +20,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
+import { appendOrderActivityOnce } from '@/lib/orderActivityStore';
 import { isDigitalOnlyProduct, isPhysicalOrHybridProduct } from '@/lib/productTypeRules';
 import { getOrderProductTypeMetadata } from '@/lib/orderProductType';
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from '@/lib/productDocumentRules';
@@ -811,6 +812,10 @@ export default function InvoiceFormPage() {
 
     const targetOrderId = invoice.originatingOrderId || (isOrderProformaFlow ? restrictedOrderId : '');
     if (invoice.status === 'Proforma Invoice' && targetOrderId) {
+      const itemSummary = invoice.lineItems
+        .map((li) => li.description?.trim())
+        .filter(Boolean)
+        .join(', ');
       try {
         const dataUrl = await generateInvoicePdfBase64(invoice);
         const docsKey = `nido_docs_${targetOrderId}`;
@@ -824,23 +829,42 @@ export default function InvoiceFormPage() {
         const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : '';
         const proformaDocument = {
           id: `doc-${invoice.id}-proforma`,
+          invoiceId: invoice.id,
           name: `${invoice.invoiceNumber}.pdf`,
           ext: 'pdf',
           size: `${Math.max(1, Math.round((base64.length * 0.75) / 1024))} KB`,
           type: 'Proforma Invoice',
           uploadedBy: 'System',
           uploadedOn: new Date().toLocaleDateString('en-IN'),
-          description: `Generated from order ${targetOrderId}.`,
+          description: `Generated from order ${targetOrderId}${itemSummary ? ` (${itemSummary})` : ''}.`,
           dataUrl,
         };
-        localStorage.setItem(docsKey, JSON.stringify([
+        const nextDocsWithData = [
           ...existingDocs.filter((doc) => doc.id !== proformaDocument.id),
           proformaDocument,
-        ]));
+        ];
+        try {
+          localStorage.setItem(docsKey, JSON.stringify(nextDocsWithData));
+        } catch {
+          // If localStorage quota is tight with multiple PDF data URLs, store
+          // metadata with invoiceId so OrderDetailsPage regenerates the PDF on download.
+          const compactExisting = existingDocs
+            .filter((doc) => doc.id !== proformaDocument.id)
+            .map((doc) => (doc.invoiceId && doc.dataUrl ? { ...doc, dataUrl: undefined } : doc));
+          const { dataUrl: _omitted, ...compactDoc } = proformaDocument;
+          localStorage.setItem(docsKey, JSON.stringify([...compactExisting, compactDoc]));
+        }
         window.dispatchEvent(new CustomEvent('orderDocsUpdated', { detail: { orderId: targetOrderId } }));
       } catch {
         // The invoice remains saved even if browser document storage is unavailable.
       }
+
+      appendOrderActivityOnce(
+        targetOrderId,
+        `activity_proforma_${invoice.id}`,
+        `Proforma Invoice ${invoice.invoiceNumber} generated${itemSummary ? ` for ${itemSummary}` : ''}.`,
+        { eventType: 'activity', visibility: 'External Note' },
+      );
     }
 
     if (isOrderProformaFlow) {
