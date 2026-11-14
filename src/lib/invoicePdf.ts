@@ -282,7 +282,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
   drawText(doc, `Due Date: ${fmtDate(invoice.dueDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
   if (invoice.poReference) {
     dateY += 14;
-    drawText(doc, `PO Reference: ${invoice.poReference}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+    drawText(doc, `Order Reference: ${invoice.poReference}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
   }
   if (invoice.placeOfSupply) {
     dateY += 14;
