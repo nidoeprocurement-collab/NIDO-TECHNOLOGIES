@@ -202,6 +202,7 @@ export default function InvoiceFormPage() {
 
   // ── Totals & charges ─────────────────────────────────────────────────────
   const [shippingCharges, setShippingCharges] = useState(existing?.shippingCharges ?? 0);
+  const [platformFee,     setPlatformFee]     = useState(existing?.platformFee     ?? 0);
   const [adjustment,      setAdjustment]      = useState(existing?.adjustment      ?? 0);
 
   // ── Text sections ────────────────────────────────────────────────────────
@@ -431,6 +432,12 @@ export default function InvoiceFormPage() {
               : gstRate > 0
               ? Math.round((ci.priceNum * 100 / (100 + gstRate)) * 100) / 100
               : (ci.priceNum || 0);
+          const discountPct = typeof ci.cartDiscountPct === 'number' && Number.isFinite(ci.cartDiscountPct)
+            ? Math.max(0, Math.min(99.99, ci.cartDiscountPct))
+            : 0;
+          const originalRate = discountPct > 0
+            ? Math.round((preTaxRate / (1 - discountPct / 100)) * 100) / 100
+            : preTaxRate;
           return {
             id:          `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             description: ci.name         || '',
@@ -440,6 +447,8 @@ export default function InvoiceFormPage() {
             quantity:    ci.quantity     || 1,
             rate:        preTaxRate,
             discount:    0,
+            discountPct: discountPct > 0 ? discountPct : undefined,
+            originalRate: discountPct > 0 && originalRate > preTaxRate ? originalRate : undefined,
             taxPercent:  gstRate,
             taxType:     'IGST' as const,
             productType: productMetadata.productType || productMetadata.physicalType,
@@ -450,8 +459,7 @@ export default function InvoiceFormPage() {
           };
         })
       );
-      const isFullOrderInvoice = !isOrderProformaFlow && !(shippedSubOrderIds?.length);
-      if (isFullOrderInvoice && order.checkoutPricingSnapshot) {
+      if (order.checkoutPricingSnapshot) {
         const invoiceSubtotal = eligibleItems.reduce((sum, ci) => {
           const gstRate = typeof ci.checkoutGstRate === 'number'
             ? ci.checkoutGstRate
@@ -467,24 +475,22 @@ export default function InvoiceFormPage() {
         }, 0);
         setShippingCharges(Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0));
         const snapshotPlatformFee = order.checkoutPricingSnapshot.platformFee;
-        setAdjustment(
+        setPlatformFee(
           typeof snapshotPlatformFee === 'number' && Number.isFinite(snapshotPlatformFee)
             ? Math.max(0, snapshotPlatformFee)
             : invoiceSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100,
         );
-      } else if (isFullOrderInvoice) {
-        setShippingCharges(Number((order as any).shippingCharges) || 0);
         setAdjustment(Number((order as any).adjustment) || 0);
       } else {
-        // A proforma or shipped-line invoice is scoped to part of the order;
-        // do not apply the full-order shipping or platform charge repeatedly.
-        setShippingCharges(0);
-        setAdjustment(0);
+        setShippingCharges(Number((order as any).shippingCharges) || 0);
+        setPlatformFee(Number((order as any).platformFee) || 0);
+        setAdjustment(Number((order as any).adjustment) || 0);
       }
     } else {
       setReturnedItemCount(0);
       setLineItems([]);
       setShippingCharges(0);
+      setPlatformFee(0);
       setAdjustment(0);
     }
 
@@ -689,7 +695,7 @@ export default function InvoiceFormPage() {
   }, [lineItems]);
 
   const totalGst   = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
-  const grandTotal = totalTaxableValue + totalGst + shippingCharges + adjustment;
+  const grandTotal = totalTaxableValue + totalGst + shippingCharges + platformFee + adjustment;
 
   const updateItem = <K extends keyof InvoiceLineItem>(
     itemId: string, field: K, value: InvoiceLineItem[K]
@@ -751,6 +757,7 @@ export default function InvoiceFormPage() {
       subtotal:   totalTaxableValue,
       totalTax:   totalGst,
       shippingCharges,
+      platformFee,
       adjustment,
       grandTotal,
       notes,
@@ -1198,19 +1205,26 @@ export default function InvoiceFormPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   {[
-                    'Sl.No',
-                    'ITEM / DESCRIPTION',
-                    'HSN/SAC',
-                    ...(hasPhysicalInvoiceItems ? ['QTY'] : []),
-                    ...(hasPhysicalInvoiceItems ? [`RATE (${currencySymbol})`, `DISC (${currencySymbol})`] : []),
-                    ...(hasDigitalInvoiceItems ? [DIGITAL_PRODUCT_HEADERS.provisioning] : []),
-                    `TAXABLE (${currencySymbol})`,
-                    'GST RATE',
-                    `GST (${currencySymbol})`,
-                    `AMOUNT (${currencySymbol})`,
-                    '',
-                  ].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                    { label: 'Sl.No', align: 'text-center' },
+                    { label: 'ITEM / DESCRIPTION', align: 'text-left' },
+                    { label: 'HSN/SAC', align: 'text-left' },
+                    ...(hasPhysicalInvoiceItems ? [{ label: 'QTY', align: 'text-center' }] : []),
+                    ...(hasPhysicalInvoiceItems
+                      ? isProformaMode
+                        ? [{ label: `UNIT PRICE (${currencySymbol})`, align: 'text-center' }]
+                        : [
+                            { label: `RATE (${currencySymbol})`, align: 'text-center' },
+                            { label: `DISC (${currencySymbol})`, align: 'text-center' },
+                          ]
+                      : []),
+                    ...(hasDigitalInvoiceItems ? [{ label: DIGITAL_PRODUCT_HEADERS.provisioning, align: 'text-center' }] : []),
+                    { label: `TAXABLE (${currencySymbol})`, align: 'text-right' },
+                    { label: 'GST RATE', align: 'text-center' },
+                    { label: `GST (${currencySymbol})`, align: 'text-right' },
+                    { label: `AMOUNT (${currencySymbol})`, align: 'text-right' },
+                    { label: '', align: 'text-center' },
+                  ].map((h, i) => (
+                    <th key={h.label || `action-${i}`} className={`px-3 py-2.5 ${h.align} text-xs font-semibold text-gray-600 uppercase whitespace-nowrap`}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -1221,6 +1235,9 @@ export default function InvoiceFormPage() {
                   const taxable = Math.max(0, item.quantity * item.rate - disc);
                   const gst     = taxable * (item.taxPercent / 100);
                   const amt     = taxable + gst;
+                  const discountPct = Math.max(0, Math.min(99.99, Number(item.discountPct) || 0));
+                  const originalRate = Number(item.originalRate) || 0;
+                  const hasDiscount = discountPct > 0 && originalRate > item.rate;
                   return (
                     <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
                       {/* Sl.No */}
@@ -1274,7 +1291,31 @@ export default function InvoiceFormPage() {
                         </td>
                       )}
                       {hasPhysicalInvoiceItems && (
-                        itemIsDigital ? (
+                        isProformaMode ? (
+                          <td className="px-3 py-2 text-center">
+                            {itemIsDigital ? (
+                              <span className="text-sm text-gray-400">—</span>
+                            ) : (
+                              <div className="inline-flex flex-col items-center gap-1">
+                                <input
+                                  type="number" min={0} value={item.rate}
+                                  onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value) || 0)}
+                                  className={`w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center ${hasDiscount ? 'font-bold text-green-700' : ''}`}
+                                />
+                                {hasDiscount && (
+                                  <div className="flex flex-col items-center leading-tight">
+                                    <span className="text-[11px] font-semibold text-green-700 whitespace-nowrap">
+                                      ({Number(discountPct.toFixed(2))}% off)
+                                    </span>
+                                    <del className="text-[11px] text-gray-400 whitespace-nowrap">
+                                      {fmt(originalRate)}
+                                    </del>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        ) : itemIsDigital ? (
                           <>
                             <td className="px-3 py-2 text-center text-sm text-gray-400">—</td>
                             <td className="px-3 py-2 text-center text-sm text-gray-400">—</td>
@@ -1282,7 +1323,7 @@ export default function InvoiceFormPage() {
                         ) : (
                           <>
                             {/* Rate (₹) */}
-                            <td className="px-3 py-2">
+                            <td className="px-3 py-2 text-center">
                               <input
                                 type="number" min={0} value={item.rate}
                                 onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value) || 0)}
@@ -1290,7 +1331,7 @@ export default function InvoiceFormPage() {
                               />
                             </td>
                             {/* Disc (₹) */}
-                            <td className="px-3 py-2">
+                            <td className="px-3 py-2 text-center">
                               <input
                                 type="number" min={0} value={item.discount ?? 0}
                                 onChange={(e) => updateItem(item.id, 'discount', Number(e.target.value) || 0)}
@@ -1374,6 +1415,10 @@ export default function InvoiceFormPage() {
                     <td className="px-4 py-2.5 text-right text-gray-900">{fmt(shippingCharges)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
+                    <td className="px-4 py-2.5 text-gray-600">Platform Fee</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900">{fmt(platformFee)}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 text-gray-600">Round Off Adjustment</td>
                     <td className="px-4 py-2.5 text-right text-gray-900">
                       {adjustment < 0 ? '−' : ''}{fmt(Math.abs(adjustment))}
@@ -1388,12 +1433,19 @@ export default function InvoiceFormPage() {
             </div>
           </div>
 
-          {/* Shipping + Round Off inputs below the table */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+          {/* Shipping + Platform Fee + Round Off inputs below the table */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
             <Label text={`Shipping & Handling Charges (${currencySymbol})`}>
               <input
                 type="number" min={0} value={shippingCharges}
                 onChange={(e) => setShippingCharges(Number(e.target.value) || 0)}
+                className={inputCls}
+              />
+            </Label>
+            <Label text={`Platform Fee (${currencySymbol})`}>
+              <input
+                type="number" min={0} value={platformFee}
+                onChange={(e) => setPlatformFee(Number(e.target.value) || 0)}
                 className={inputCls}
               />
             </Label>

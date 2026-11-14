@@ -102,6 +102,7 @@ export default function InvoiceDetails() {
     ['activity', 'Activity'],
   ] as ['overview' | 'items' | 'payments' | 'activity', string][];
 
+  const isProforma = isProformaInvoice(invoice);
   const physicalLineItems = invoice.lineItems.filter((item) => !isDigitalDocumentProduct(item));
   const digitalLineItems = invoice.lineItems.filter((item) => isDigitalDocumentProduct(item));
   const renderLineItemsTable = (items: StoredInvoice['lineItems'], digital: boolean) => (
@@ -112,7 +113,9 @@ export default function InvoiceDetails() {
             <tr className="bg-gray-50 border-b border-gray-200">
               {(digital
                 ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.provisioning, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
-                : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+                : isProforma
+                  ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `UNIT PRICE (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+                  : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
               ).map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
               ))}
@@ -123,6 +126,9 @@ export default function InvoiceDetails() {
               const disc = item.discount ?? 0;
               const taxable = Math.max(0, item.quantity * item.rate - disc);
               const tax = taxable * (item.taxPercent / 100);
+              const discountPct = Math.max(0, Math.min(99.99, Number(item.discountPct) || 0));
+              const originalRate = Number(item.originalRate) || 0;
+              const hasDiscount = discountPct > 0 && originalRate > item.rate;
               const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
               return (
                 <tr key={item.id} className="border-b border-gray-100">
@@ -143,6 +149,22 @@ export default function InvoiceDetails() {
                   <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
                   {digital ? (
                     <td className="px-3 py-3 text-center text-gray-600">{presentation.provisioningTime}</td>
+                  ) : isProforma ? (
+                    <>
+                      <td className="px-3 py-3 text-center">{item.quantity}</td>
+                      <td className="px-3 py-3 text-right">
+                        {hasDiscount ? (
+                          <div className="inline-flex flex-col items-end gap-0.5">
+                            <span className="font-bold text-green-700 whitespace-nowrap">
+                              {fmt(item.rate)} <span className="text-[11px] font-semibold">({Number(discountPct.toFixed(2))}% off)</span>
+                            </span>
+                            <del className="text-xs text-gray-400 whitespace-nowrap">{fmt(originalRate)}</del>
+                          </div>
+                        ) : (
+                          fmt(item.rate)
+                        )}
+                      </td>
+                    </>
                   ) : (
                     <>
                       <td className="px-3 py-3 text-center">{item.quantity}</td>
@@ -249,6 +271,7 @@ export default function InvoiceDetails() {
   const grossSubtotal = invoice.grossSubtotal ?? invoice.subtotal;
   const totalDiscount = invoice.totalDiscount ?? 0;
   const shippingCharges = invoice.shippingCharges ?? 0;
+  const platformFee = invoice.platformFee ?? 0;
   const adjustment = invoice.adjustment ?? 0;
 
   return (
@@ -454,10 +477,16 @@ export default function InvoiceDetails() {
                     <td className="px-4 py-2.5 text-gray-500">Total GST</td>
                     <td className="px-4 py-2.5 text-right">{fmt(invoice.totalTax)}</td>
                   </tr>
-                  {shippingCharges > 0 && (
+                  {(shippingCharges > 0 || isProforma) && (
                     <tr className="border-b border-gray-100">
-                      <td className="px-4 py-2.5 text-gray-500">Shipping & Handling</td>
+                      <td className="px-4 py-2.5 text-gray-500">Shipping &amp; Handling Charges</td>
                       <td className="px-4 py-2.5 text-right">{fmt(shippingCharges)}</td>
+                    </tr>
+                  )}
+                  {(platformFee > 0 || isProforma) && (
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 text-gray-500">Platform Fee</td>
+                      <td className="px-4 py-2.5 text-right">{fmt(platformFee)}</td>
                     </tr>
                   )}
                   {adjustment !== 0 && (

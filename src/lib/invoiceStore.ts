@@ -13,6 +13,8 @@ export interface InvoiceLineItem {
   quantity: number;
   rate: number;
   discount?: number;        // item-level discount amount
+  discountPct?: number;     // percentage discount from checkout/cart
+  originalRate?: number;    // pre-discount unit price before GST
   taxPercent: number;
   taxType?: string;         // e.g. 'IGST' or 'CGST+SGST'
   productType?: string;
@@ -78,6 +80,7 @@ export interface StoredInvoice {
   subtotal: number;         // taxable value = grossSubtotal - totalDiscount
   totalTax: number;
   shippingCharges: number;
+  platformFee?: number;
   adjustment: number;       // round-off
   grandTotal: number;
   // text sections

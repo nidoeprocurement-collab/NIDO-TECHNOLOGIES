@@ -139,7 +139,9 @@ function drawSummary(
   const totalDiscount = invoice.totalDiscount ?? 0;
   const taxableSubtotal = invoice.subtotal;
   const shipping = invoice.shippingCharges ?? 0;
+  const platformFee = invoice.platformFee ?? 0;
   const adjustment = invoice.adjustment ?? 0;
+  const isProforma = invoice.status === 'Proforma Invoice';
 
   const rates = [...new Set(invoice.lineItems.map((item) => item.taxPercent))]
     .sort((a, b) => a - b)
@@ -152,6 +154,7 @@ function drawSummary(
     ['Total Taxable Value', money(taxableSubtotal), true],
     [`Total GST${rates ? ` (${rates})` : ''}`, money(invoice.totalTax)],
     ['Shipping & Handling Charges', money(shipping)],
+    ...(platformFee > 0 || isProforma ? [['Platform Fee', money(platformFee)] as [string, string]] : []),
     [`Round Off Adjustment`, `${adjustment < 0 ? '-' : ''}${money(Math.abs(adjustment))}`],
   ];
 
@@ -317,6 +320,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => isDigitalDocumentProduct(item));
 
+  const isProforma = invoice.status === 'Proforma Invoice';
   const renderLineTable = (
     rows: { item: StoredInvoice['lineItems'][number]; index: number }[],
     digital: boolean,
@@ -333,6 +337,17 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
         (item.commercialTerms ? `\n${getCommercialTermsLines(item.commercialTerms).join('\n')}` : '');
 
       if (!digital) {
+        if (isProforma) {
+          const discountPct = Math.max(0, Math.min(99.99, Number(item.discountPct) || 0));
+          const originalRate = Number(item.originalRate) || 0;
+          const unitPriceLabel = discountPct > 0 && originalRate > item.rate
+            ? `${fmt2(item.rate)} (${Number(discountPct.toFixed(2))}% off)\nWas ${fmt2(originalRate)}`
+            : fmt2(item.rate);
+          return [
+            String(index + 1), description, item.hsnSac || '', String(item.quantity),
+            unitPriceLabel, fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(taxable + gst),
+          ];
+        }
         return [
           String(index + 1), description, item.hsnSac || '', String(item.quantity),
           fmt2(item.rate), fmt2(disc), fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(taxable + gst),
@@ -352,7 +367,9 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
       margin: { left: margin, right: margin },
       head: [digital
         ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
-        : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
+        : isProforma
+          ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'UNIT PRICE', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+          : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
       body,
       theme: 'grid',
       tableWidth: contentWidth,
@@ -380,19 +397,27 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
             6: { cellWidth: 52, halign: 'right' }, 7: { cellWidth: 38, halign: 'center' },
             8: { cellWidth: 48, halign: 'right' }, 9: { cellWidth: 62, halign: 'right' },
           }
-        : {
-            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 105 },
-            2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 24, halign: 'center' },
-            4: { cellWidth: 55, halign: 'right' }, 5: { cellWidth: 47, halign: 'right' },
-            6: { cellWidth: 58, halign: 'right' }, 7: { cellWidth: 40, halign: 'center' },
-            8: { cellWidth: 52, halign: 'right' }, 9: { cellWidth: 68, halign: 'right' },
-          },
+        : isProforma
+          ? {
+              0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 132 },
+              2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 24, halign: 'center' },
+              4: { cellWidth: 75, halign: 'right' }, 5: { cellWidth: 58, halign: 'right' },
+              6: { cellWidth: 40, halign: 'center' }, 7: { cellWidth: 52, halign: 'right' },
+              8: { cellWidth: 68, halign: 'right' },
+            }
+          : {
+              0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 105 },
+              2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 24, halign: 'center' },
+              4: { cellWidth: 55, halign: 'right' }, 5: { cellWidth: 47, halign: 'right' },
+              6: { cellWidth: 58, halign: 'right' }, 7: { cellWidth: 40, halign: 'center' },
+              8: { cellWidth: 52, halign: 'right' }, 9: { cellWidth: 68, halign: 'right' },
+            },
       didParseCell(data) {
         if (data.section === 'body' && data.column.index === 1) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.textColor = DARK;
         }
-        if (data.section === 'body' && data.column.index === (digital ? 9 : 9)) {
+        if (data.section === 'body' && data.column.index === (digital ? 9 : isProforma ? 8 : 9)) {
           data.cell.styles.fontStyle = 'bold';
         }
       },
