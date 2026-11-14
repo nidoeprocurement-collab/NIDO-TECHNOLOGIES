@@ -125,7 +125,7 @@ function getBillTotals(bill: BillForPdf) {
 }
 
 // ── Main generator ─────────────────────────────────────────────────────────────
-export async function generateBillPdf(bill: BillForPdf): Promise<void> {
+async function buildBillPdfDoc(bill: BillForPdf): Promise<jsPDF> {
   const org = loadConfig().organization;
   const brandHeader = getBrandHeader(org.displayName, org.industry);
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
@@ -405,5 +405,15 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
     { size: 8, color: BLUE, bold: true, align: 'center' },
   );
 
+  return doc;
+}
+
+export async function generateBillPdfBase64(bill: BillForPdf): Promise<string> {
+  const doc = await buildBillPdfDoc(bill);
+  return doc.output('datauristring');
+}
+
+export async function generateBillPdf(bill: BillForPdf): Promise<void> {
+  const doc = await buildBillPdfDoc(bill);
   doc.save(`Bill-${bill.billNumber}.pdf`);
 }

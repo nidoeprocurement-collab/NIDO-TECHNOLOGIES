@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore";
 import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
 import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, getPOAggregateAfterLineCancellation, isPOConfirmed, reopenSubOrderForVendorSelection, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
+import { generateBillPdf } from "@/lib/billPdf";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import {
@@ -1660,6 +1661,22 @@ export default function VendorOrderDetailPage() {
       link.click();
       link.remove();
       recordDocumentActivity("downloaded", doc);
+    } else if (doc?.billId) {
+      try {
+        const storedBills = JSON.parse(localStorage.getItem("nido_bills") || "[]");
+        const linkedBill = Array.isArray(storedBills)
+          ? storedBills.find((b: any) => b.id === doc.billId)
+          : null;
+        if (linkedBill) {
+          void generateBillPdf(linkedBill)
+            .then(() => recordDocumentActivity("downloaded", doc))
+            .catch(console.warn);
+          return;
+        }
+      } catch {
+        // Fall through to default download
+      }
+      alert(`Downloading: ${doc.name}`);
     } else {
       const currentPO = getPOByNumber(poKey);
       if (!currentPO) {

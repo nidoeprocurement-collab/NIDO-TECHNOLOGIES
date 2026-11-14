@@ -4,10 +4,10 @@ import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
-import { getAllPOs } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPOByNumber, updatePO } from "@/lib/purchaseOrderStore";
 import { getPrefix } from "@/lib/configService";
 import { safeReadJson } from "@/lib/utils";
-import { generateBillPdf } from "@/lib/billPdf";
+import { generateBillPdf, generateBillPdfBase64 } from "@/lib/billPdf";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
@@ -514,13 +514,17 @@ export default function BillsPage() {
   const deliveredPurchaseOrders = useMemo(() => {
     const vendorName = normalizeLookup(form.vendorName);
     const vendorId = selectedVendor?.id;
-    return getAllPOs().filter((po) =>
-      String(po.status).trim().toLowerCase() === "delivered"
-      && (
-        (vendorId && po.vendorId === vendorId)
-        || normalizeLookup(po.vendorName) === vendorName
-      ),
-    );
+    return getAllPOs().filter((po) => {
+      const matchesVendor =
+        (vendorId && po.vendorId === vendorId) ||
+        normalizeLookup(po.vendorName) === vendorName;
+      if (!matchesVendor) return false;
+      const poStatus = String(po.status).trim().toLowerCase();
+      const hasDeliveredItem = (po.items || []).some(
+        (line) => String(line.status || "").trim().toLowerCase() === "delivered",
+      );
+      return poStatus === "delivered" || hasDeliveredItem;
+    });
   }, [form.vendorName, selectedVendor?.id]);
 
   useEffect(() => {
@@ -577,7 +581,62 @@ export default function BillsPage() {
     setF("items", next.length ? next : [newItem(`tmp-${Date.now()}`)]);
   };
 
-  const saveBill = (status: BillStatus) => {
+  const attachBillPdfToPO = async (billEntry: BillEntry) => {
+    const poNumber = (billEntry.sourcePurchaseOrderId || billEntry.orderNumber || "").trim();
+    if (!poNumber) return;
+    const po = getPOByNumber(poNumber);
+    if (!po) return;
+    try {
+      const dataUrl = await generateBillPdfBase64({
+        billNumber: billEntry.billNumber,
+        orderNumber: billEntry.orderNumber,
+        referenceNumber: billEntry.referenceNumber,
+        vendorName: billEntry.vendorName,
+        vendorAddress: billEntry.vendorAddress,
+        billDate: billEntry.billDate,
+        dueDate: billEntry.dueDate,
+        paymentTerms: billEntry.paymentTerms,
+        reverseCharge: billEntry.reverseCharge,
+        status: billEntry.status,
+        notes: billEntry.notes,
+        items: billEntry.items,
+        tdsType: billEntry.tdsType,
+        adjustment: billEntry.adjustment,
+        paymentMade: billEntry.paymentMade,
+      });
+      const base64 = dataUrl.includes(",") ? dataUrl.slice(dataUrl.indexOf(",") + 1) : "";
+      const billDocument = {
+        id: `doc-bill-${billEntry.id}`,
+        billId: billEntry.id,
+        name: `Bill-${billEntry.billNumber}.pdf`,
+        type: "Bill",
+        uploadedBy: "System",
+        uploadedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        size: `${Math.max(1, Math.round((base64.length * 0.75) / 1024))} KB`,
+        dataUrl,
+      };
+      const existingDocs = Array.isArray(po.documents) ? po.documents : [];
+      const nextDocs = [
+        ...existingDocs.filter((doc: any) => doc.id !== billDocument.id && doc.billId !== billEntry.id),
+        billDocument,
+      ];
+      try {
+        updatePO(po.poNumber, { documents: nextDocs });
+      } catch {
+        const { dataUrl: _omitted, ...compactDoc } = billDocument;
+        updatePO(po.poNumber, {
+          documents: [
+            ...existingDocs.filter((doc: any) => doc.id !== billDocument.id && doc.billId !== billEntry.id),
+            compactDoc,
+          ],
+        });
+      }
+    } catch {
+      // Bill remains saved even if PDF attachment fails.
+    }
+  };
+
+  const saveBill = async (status: BillStatus) => {
     if (!form.vendorName || !form.billDate || !form.dueDate) {
       toast({ title: "Vendor Name, Bill Date and Due Date are required" });
       return;
@@ -589,22 +648,25 @@ export default function BillsPage() {
     setSaving(true);
     try {
       if (editingId) {
+        const existingEntry = bills.find((entry) => entry.id === editingId);
+        const updatedEntry: BillEntry | null = existingEntry
+          ? {
+              ...existingEntry,
+              vendorName: form.vendorName, vendorAddress: form.vendorAddress,
+              billNumber: form.billNumber, orderNumber: form.orderNumber,
+              sourcePurchaseOrderId: form.sourcePurchaseOrderId,
+              referenceNumber: form.referenceNumber,
+              billDate: isoToIndian(form.billDate), dueDate: isoToIndian(form.dueDate),
+              paymentTerms: form.paymentTerms, reverseCharge: form.reverseCharge,
+              status, notes: form.notes, attachmentType: form.attachmentType,
+              items: form.items, tdsType: form.tdsType, adjustment: form.adjustment,
+            }
+          : null;
         const updated = bills.map((entry) =>
-          entry.id === editingId
-            ? {
-                ...entry,
-                vendorName: form.vendorName, vendorAddress: form.vendorAddress,
-                billNumber: form.billNumber, orderNumber: form.orderNumber,
-                sourcePurchaseOrderId: form.sourcePurchaseOrderId,
-                referenceNumber: form.referenceNumber,
-                billDate: isoToIndian(form.billDate), dueDate: isoToIndian(form.dueDate),
-                paymentTerms: form.paymentTerms, reverseCharge: form.reverseCharge,
-                status, notes: form.notes, attachmentType: form.attachmentType,
-                items: form.items, tdsType: form.tdsType, adjustment: form.adjustment,
-              }
-            : entry,
+          entry.id === editingId && updatedEntry ? updatedEntry : entry,
         );
         persist(updated);
+        if (updatedEntry) await attachBillPdfToPO(updatedEntry);
         toast({ title: "Bill updated" });
         navigate(`/transactions/purchase/bills/${editingId}`, { replace: true });
       } else {
@@ -630,6 +692,7 @@ export default function BillsPage() {
           adjustment: form.adjustment,
         };
         persist([created, ...bills]);
+        await attachBillPdfToPO(created);
         toast({ title: status === "DRAFT" ? "Bill saved as draft" : "Bill saved as open" });
         navigate(`/transactions/purchase/bills/${id}`, { replace: true });
       }
@@ -782,14 +845,20 @@ export default function BillsPage() {
                   value={form.orderNumber}
                   onChange={(e) => {
                     const po = deliveredPurchaseOrders.find((candidate) => candidate.poNumber === e.target.value);
-                    const poItems = po?.items?.map((line) => ({
+                    const hasItemStatuses = (po?.items || []).some((line) => Boolean(line.status));
+                    const deliveredLines = (po?.items || []).filter((line) => {
+                      const lineStatus = String(line.status || "").trim().toLowerCase();
+                      if (hasItemStatuses) return lineStatus === "delivered";
+                      return lineStatus !== "cancelled";
+                    });
+                    const poItems = deliveredLines.map((line) => ({
                       ...newItem(`bill-item-${Date.now()}-${line.subOrderId}`),
                       itemDetails: line.item,
                       account: line.category || "",
                       hsnSac: line.hsnCode || "",
                       quantity: line.qty,
                       rate: line.unitPrice,
-                      taxPercent: line.gstPct ?? ((po.sgstPct || 0) + (po.cgstPct || 18)),
+                      taxPercent: line.gstPct ?? ((po?.sgstPct || 0) + (po?.cgstPct || 18)),
                       productType: line.productType,
                       commercialTerms: line.commercialTerms,
                     }));
@@ -797,7 +866,7 @@ export default function BillsPage() {
                       ...current,
                       orderNumber: po?.poNumber || "",
                       sourcePurchaseOrderId: po?.poNumber,
-                      items: poItems?.length ? poItems : current.items,
+                      items: poItems.length ? poItems : current.items,
                     }));
                   }}
                   disabled={!form.vendorName}
