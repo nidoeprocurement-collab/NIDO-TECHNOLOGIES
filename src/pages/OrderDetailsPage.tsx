@@ -1677,31 +1677,39 @@ function DocumentsNotesTab({
     return () => window.removeEventListener("storage", onStorage);
   }, [notesKey, docsKey]);
 
+  const [invoiceDocsTick, setInvoiceDocsTick] = useState(0);
+  useEffect(() => {
+    const syncInvoiceDocs = () => setInvoiceDocsTick((k) => k + 1);
+    window.addEventListener("nidoInvoicesUpdated", syncInvoiceDocs);
+    return () => window.removeEventListener("nidoInvoicesUpdated", syncInvoiceDocs);
+  }, []);
+
   const allDocs = useMemo(() => {
-    const proformaInvoices = getInvoices().filter(
-      inv => inv.status === "Proforma Invoice" && inv.originatingOrderId === orderId,
+    const orderInvoices = (invoiceDocsTick >= 0 ? getInvoices() : []).filter(
+      inv => inv.status !== "Cancelled" && inv.originatingOrderId === orderId,
     );
-    const missingProformaDocs = proformaInvoices
-      .filter(inv => !docs.some(d => d.id === `doc-${inv.id}-proforma` || d.invoiceId === inv.id))
+    const missingInvoiceDocs = orderInvoices
+      .filter(inv => !docs.some(d => d.invoiceId === inv.id || d.id === `doc-${inv.id}-proforma` || d.id === `doc-${inv.id}-invoice`))
       .map(inv => {
+        const isProformaDoc = inv.status === "Proforma Invoice";
         const itemSummary = (inv.lineItems || [])
           .map(li => li.description?.trim())
           .filter(Boolean)
           .join(", ");
         return {
-          id: `doc-${inv.id}-proforma`,
+          id: `doc-${inv.id}-${isProformaDoc ? "proforma" : "invoice"}`,
           invoiceId: inv.id,
           name: `${inv.invoiceNumber}.pdf`,
           ext: "pdf",
           size: "PDF",
-          type: "Proforma Invoice",
+          type: isProformaDoc ? "Proforma Invoice" : "Invoice",
           uploadedBy: "System",
           uploadedOn: inv.invoiceDate || new Date(inv.createdAt).toLocaleDateString("en-IN"),
           description: `Generated from order ${orderId}${itemSummary ? ` (${itemSummary})` : ""}.`,
         };
       });
-    return [...docs, ...missingProformaDocs];
-  }, [docs, orderId]);
+    return [...docs, ...missingInvoiceDocs];
+  }, [docs, orderId, invoiceDocsTick]);
 
   const filteredDocs = allDocs.filter(d => !docSearch || d.name.toLowerCase().includes(docSearch.toLowerCase()) || d.type.toLowerCase().includes(docSearch.toLowerCase()));
 

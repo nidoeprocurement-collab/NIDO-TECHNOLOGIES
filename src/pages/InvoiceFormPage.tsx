@@ -811,7 +811,8 @@ export default function InvoiceFormPage() {
     }
 
     const targetOrderId = invoice.originatingOrderId || (isOrderProformaFlow ? restrictedOrderId : '');
-    if (invoice.status === 'Proforma Invoice' && targetOrderId) {
+    if (invoice.status !== 'Cancelled' && targetOrderId) {
+      const isProformaDoc = invoice.status === 'Proforma Invoice';
       const itemSummary = invoice.lineItems
         .map((li) => li.description?.trim())
         .filter(Boolean)
@@ -827,21 +828,21 @@ export default function InvoiceFormPage() {
           existingDocs = [];
         }
         const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : '';
-        const proformaDocument = {
-          id: `doc-${invoice.id}-proforma`,
+        const invoiceDocument = {
+          id: `doc-${invoice.id}-${isProformaDoc ? 'proforma' : 'invoice'}`,
           invoiceId: invoice.id,
           name: `${invoice.invoiceNumber}.pdf`,
           ext: 'pdf',
           size: `${Math.max(1, Math.round((base64.length * 0.75) / 1024))} KB`,
-          type: 'Proforma Invoice',
+          type: isProformaDoc ? 'Proforma Invoice' : 'Invoice',
           uploadedBy: 'System',
           uploadedOn: new Date().toLocaleDateString('en-IN'),
           description: `Generated from order ${targetOrderId}${itemSummary ? ` (${itemSummary})` : ''}.`,
           dataUrl,
         };
         const nextDocsWithData = [
-          ...existingDocs.filter((doc) => doc.id !== proformaDocument.id),
-          proformaDocument,
+          ...existingDocs.filter((doc) => doc.id !== invoiceDocument.id && doc.invoiceId !== invoice.id),
+          invoiceDocument,
         ];
         try {
           localStorage.setItem(docsKey, JSON.stringify(nextDocsWithData));
@@ -849,9 +850,9 @@ export default function InvoiceFormPage() {
           // If localStorage quota is tight with multiple PDF data URLs, store
           // metadata with invoiceId so OrderDetailsPage regenerates the PDF on download.
           const compactExisting = existingDocs
-            .filter((doc) => doc.id !== proformaDocument.id)
+            .filter((doc) => doc.id !== invoiceDocument.id && doc.invoiceId !== invoice.id)
             .map((doc) => (doc.invoiceId && doc.dataUrl ? { ...doc, dataUrl: undefined } : doc));
-          const { dataUrl: _omitted, ...compactDoc } = proformaDocument;
+          const { dataUrl: _omitted, ...compactDoc } = invoiceDocument;
           localStorage.setItem(docsKey, JSON.stringify([...compactExisting, compactDoc]));
         }
         window.dispatchEvent(new CustomEvent('orderDocsUpdated', { detail: { orderId: targetOrderId } }));
@@ -859,12 +860,14 @@ export default function InvoiceFormPage() {
         // The invoice remains saved even if browser document storage is unavailable.
       }
 
-      appendOrderActivityOnce(
-        targetOrderId,
-        `activity_proforma_${invoice.id}`,
-        `Proforma Invoice ${invoice.invoiceNumber} generated${itemSummary ? ` for ${itemSummary}` : ''}.`,
-        { eventType: 'activity', visibility: 'External Note' },
-      );
+      if (isProformaDoc) {
+        appendOrderActivityOnce(
+          targetOrderId,
+          `activity_proforma_${invoice.id}`,
+          `Proforma Invoice ${invoice.invoiceNumber} generated${itemSummary ? ` for ${itemSummary}` : ''}.`,
+          { eventType: 'activity', visibility: 'External Note' },
+        );
+      }
     }
 
     if (isOrderProformaFlow) {
