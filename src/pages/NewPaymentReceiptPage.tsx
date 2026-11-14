@@ -3,10 +3,11 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { getClients } from "@/lib/clientStore";
-import { getInvoices } from "@/lib/invoiceStore";
+import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import {
   saveReceipt,
   getReceiptById,
+  getActiveReceipts,
   getNextReceiptNumber,
   downloadReceiptAttachment,
   formatAttachmentSize,
@@ -160,13 +161,99 @@ export default function NewPaymentReceiptPage() {
     setForm((f) => ({ ...f, [field]: value }));
 
   const amountValue = Number(form.amountReceived) || 0;
+  const activeReceipts = getActiveReceipts();
 
-  // Filter invoices for selected customer
-  const customerInvoices = invoices.filter((inv) =>
-    inv.status === "Sent" &&
-    (!form.customerName ||
-      inv.clientName.toLowerCase().includes(form.customerName.toLowerCase()))
-  );
+  const getInvoiceAmountDue = (inv: StoredInvoice): number => {
+    const directPaid = (inv.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const receiptPaid = activeReceipts
+      .filter(
+        (r) =>
+          r.invoiceNumber === inv.invoiceNumber &&
+          (!isEditMode || r.id !== editingReceipt?.id),
+      )
+      .reduce((sum, r) => sum + (Number(r.amountReceived) || 0), 0);
+    return Math.max(0, Number(((inv.grandTotal ?? 0) - directPaid - receiptPaid).toFixed(2)));
+  };
+
+  // Unpaid invoices for the selected customer (excludes Paid, Cancelled, and Proforma Invoices)
+  const customerInvoices = form.customerName.trim()
+    ? invoices.filter((inv) => {
+        if (inv.status === "Paid" || inv.status === "Cancelled" || inv.status === "Proforma Invoice") {
+          return false;
+        }
+        const sameCustomer =
+          inv.clientName.trim().toLowerCase() === form.customerName.trim().toLowerCase();
+        if (!sameCustomer) return false;
+        return getInvoiceAmountDue(inv) > 0 || inv.invoiceNumber === form.invoiceNumber;
+      })
+    : [];
+
+  const getCustomerEmails = (customerName: string, inv?: StoredInvoice): string[] => {
+    const matchedClient = clients.find(
+      (c) => c.name.trim().toLowerCase() === customerName.trim().toLowerCase(),
+    );
+    const candidates = [
+      matchedClient?.email,
+      ...(inv?.clientContacts || []),
+      ...(inv?.clientContact ? inv.clientContact.split(",") : []),
+    ];
+    const seen = new Set<string>();
+    const emails: string[] = [];
+    for (const raw of candidates) {
+      const email = String(raw || "").trim();
+      if (!email || !email.includes("@")) continue;
+      const key = email.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      emails.push(email);
+    }
+    return emails;
+  };
+
+  const handleSelectCustomer = (customerName: string) => {
+    const matchedClient = clients.find(
+      (c) => c.name.trim().toLowerCase() === customerName.trim().toLowerCase(),
+    );
+    const emails = customerName ? getCustomerEmails(customerName) : [];
+    setForm((prev) => ({
+      ...prev,
+      customerName,
+      invoiceNumber: "",
+      amountReceived: "",
+      reference: "",
+      descriptionOfSupply: "",
+      placeOfSupply: matchedClient?.billingAddress?.state || prev.placeOfSupply,
+      recipients: emails,
+    }));
+  };
+
+  const handleSelectInvoice = (inv: StoredInvoice) => {
+    if (inv.invoiceNumber === form.invoiceNumber) {
+      setForm((prev) => ({
+        ...prev,
+        invoiceNumber: "",
+        amountReceived: "",
+      }));
+      return;
+    }
+    const due = getInvoiceAmountDue(inv);
+    const itemDescriptions = (inv.lineItems || [])
+      .map((li) => li.description?.trim())
+      .filter(Boolean)
+      .join(", ");
+    const emails = getCustomerEmails(inv.clientName || form.customerName, inv);
+    setForm((prev) => ({
+      ...prev,
+      customerName: inv.clientName || prev.customerName,
+      invoiceNumber: inv.invoiceNumber,
+      amountReceived: due.toFixed(2),
+      placeOfSupply: inv.placeOfSupply || prev.placeOfSupply,
+      descriptionOfSupply: itemDescriptions || prev.descriptionOfSupply,
+      reference: inv.poReference || inv.originatingOrderId || prev.reference,
+      note: inv.notes?.trim() || `Payment received for Invoice ${inv.invoiceNumber}`,
+      recipients: emails.length > 0 ? emails : prev.recipients,
+    }));
+  };
 
   const handleAttachmentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -349,7 +436,7 @@ export default function NewPaymentReceiptPage() {
       </div>
 
       {/* ── Body ── */}
-      <div className="max-w-5xl mx-auto px-6 py-7">
+      <div className="w-full px-6 py-6">
 
         {/* Tab switcher */}
         <div className="flex items-center gap-2 mb-6 p-1 bg-white border border-gray-200 rounded-xl w-fit shadow-sm">
@@ -364,14 +451,14 @@ export default function NewPaymentReceiptPage() {
         {/* ── Invoice Payment Tab ── */}
         {tab === "invoice" && (
           <>
-            <Section title="Payment Details" icon={CreditCard}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Section title="Customer Selection" icon={CreditCard}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-end">
                 <div>
                   <FieldLabel required>Customer Name</FieldLabel>
                   <select
                     className={sel}
                     value={form.customerName}
-                    onChange={(e) => setF("customerName", e.target.value)}
+                    onChange={(e) => handleSelectCustomer(e.target.value)}
                   >
                     <option value="">— Select customer —</option>
                     {clients.map((c) => (
@@ -382,7 +469,91 @@ export default function NewPaymentReceiptPage() {
                     )}
                   </select>
                 </div>
+                {form.invoiceNumber && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs text-blue-800">
+                    Selected Invoice: <span className="font-bold">{form.invoiceNumber}</span> — details below auto-filled
+                  </div>
+                )}
+              </div>
+            </Section>
 
+            {/* Unpaid Invoices */}
+            <Section title="Unpaid Invoices" icon={FileText}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-gray-500">
+                  {form.customerName
+                    ? `Select an unpaid invoice for "${form.customerName}" to auto-fill payment details`
+                    : "Select a customer above to view unpaid invoices"}
+                </p>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
+                  {customerInvoices.length} unpaid invoice{customerInvoices.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="rounded-lg border border-gray-200 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      {["Date", "Invoice Number", "Status", "Invoice Amount", "Amount Due", "Payment Received On", "Payment"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 ${i >= 3 ? "text-right" : "text-left"}`}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
+                          {form.customerName
+                            ? `No unpaid invoices found for "${form.customerName}"`
+                            : "Select a customer name above to load unpaid invoices"}
+                        </td>
+                      </tr>
+                    ) : (
+                      customerInvoices.map((inv) => {
+                        const due = getInvoiceAmountDue(inv);
+                        const isSelected = form.invoiceNumber === inv.invoiceNumber;
+                        return (
+                          <tr
+                            key={inv.id}
+                            className={`border-b border-gray-100 last:border-0 cursor-pointer transition-colors ${isSelected ? "bg-blue-50" : "hover:bg-gray-50/60"}`}
+                            onClick={() => handleSelectInvoice(inv)}
+                          >
+                            <td className="px-4 py-3 text-gray-600">{inv.invoiceDate}</td>
+                            <td className="px-4 py-3 font-medium text-blue-600">{inv.invoiceNumber}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                {inv.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-700">₹{(inv.grandTotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                            <td className="px-4 py-3 text-right font-medium text-gray-900">₹{due.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                            <td className="px-4 py-3 text-right text-gray-500">{form.paymentDate}</td>
+                            <td className="px-4 py-3 text-right">
+                              <input
+                                type="text"
+                                readOnly
+                                value={isSelected ? amountValue.toFixed(2) : ""}
+                                placeholder="—"
+                                className="w-28 px-2 py-1 text-right text-sm border border-gray-200 rounded-lg bg-white"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {form.invoiceNumber && (
+                <p className="mt-2 text-xs text-blue-600 font-medium">
+                  ✓ Invoice {form.invoiceNumber} selected — payment details populated below
+                </p>
+              )}
+            </Section>
+
+            <Section title="Payment Details" icon={CreditCard}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 <div>
                   <FieldLabel required>Amount Received (₹)</FieldLabel>
                   <input
@@ -396,7 +567,7 @@ export default function NewPaymentReceiptPage() {
                   />
                   {amountValue > 0 && (
                     <p className="mt-1.5 text-xs text-green-600 font-medium">
-                      ✓ Received full amount ₹{amountValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      ✓ Received amount ₹{amountValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </p>
                   )}
                 </div>
@@ -467,7 +638,16 @@ export default function NewPaymentReceiptPage() {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
+                  <FieldLabel>Place of Supply</FieldLabel>
+                  <input
+                    className={inp}
+                    value={form.placeOfSupply}
+                    onChange={(e) => setF("placeOfSupply", e.target.value)}
+                  />
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-3">
                   <FieldLabel>Tax Deducted?</FieldLabel>
                   <div className="flex items-center gap-6 mt-1">
                     {(["no", "tds"] as const).map((opt) => (
@@ -484,70 +664,6 @@ export default function NewPaymentReceiptPage() {
                   </div>
                 </div>
               </div>
-            </Section>
-
-            {/* Unpaid Invoices */}
-            <Section title="Unpaid Invoices" icon={FileText}>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-gray-500">
-                  {form.customerName
-                    ? `Showing invoices for "${form.customerName}"`
-                    : "Select a customer above to filter invoices"}
-                </p>
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                  SENT invoices
-                </span>
-              </div>
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      {["Date", "Invoice Number", "Invoice Amount", "Amount Due", "Payment Received On", "Payment"].map((h, i) => (
-                        <th key={h} className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 ${i >= 2 ? "text-right" : "text-left"}`}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customerInvoices.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                          No invoices found{form.customerName ? ` for "${form.customerName}"` : ""}
-                        </td>
-                      </tr>
-                    ) : (
-                      customerInvoices.slice(0, 5).map((inv) => (
-                        <tr
-                          key={inv.id}
-                          className={`border-b border-gray-100 last:border-0 cursor-pointer transition-colors ${form.invoiceNumber === inv.invoiceNumber ? "bg-blue-50" : "hover:bg-gray-50/60"}`}
-                          onClick={() => setF("invoiceNumber", inv.invoiceNumber === form.invoiceNumber ? "" : inv.invoiceNumber)}
-                        >
-                          <td className="px-4 py-3 text-gray-600">{inv.invoiceDate}</td>
-                          <td className="px-4 py-3 font-medium text-blue-600">{inv.invoiceNumber}</td>
-                          <td className="px-4 py-3 text-right text-gray-700">₹{(inv.grandTotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-3 text-right text-gray-700">₹{(inv.grandTotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-3 text-gray-500">{form.paymentDate}</td>
-                          <td className="px-4 py-3 text-right">
-                            <input
-                              type="text"
-                              readOnly
-                              value={form.invoiceNumber === inv.invoiceNumber ? amountValue.toFixed(2) : ""}
-                              placeholder="—"
-                              className="w-28 px-2 py-1 text-right text-sm border border-gray-200 rounded-lg bg-white"
-                            />
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {form.invoiceNumber && (
-                <p className="mt-2 text-xs text-blue-600 font-medium">
-                  ✓ Invoice {form.invoiceNumber} selected
-                </p>
-              )}
             </Section>
           </>
         )}
