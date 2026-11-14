@@ -14,6 +14,7 @@ import {
   canCancelOrderByPurchaseOrders,
   isWithinClientCancellationWindow,
 } from "@/lib/orderCancellationEligibility";
+import { getInvoices } from "@/lib/invoiceStore";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { attachPOPdfToPO, downloadPOPdf, getPODataUri } from "@/lib/generatePO";
@@ -3421,6 +3422,28 @@ export default function MyOrderPage() {
     () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
     [poRefreshKey, orderId],
   );
+  const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
+  useEffect(() => {
+    const syncInvoices = () => setInvoiceRefreshKey((k) => k + 1);
+    window.addEventListener("nidoInvoicesUpdated", syncInvoices);
+    window.addEventListener("storage", syncInvoices);
+    return () => {
+      window.removeEventListener("nidoInvoicesUpdated", syncInvoices);
+      window.removeEventListener("storage", syncInvoices);
+    };
+  }, []);
+  const proformaSubOrderIds = useMemo(() => {
+    const ids = new Set<string>();
+    const invoices = invoiceRefreshKey >= 0 ? getInvoices() : [];
+    for (const inv of invoices) {
+      if (inv.status !== "Proforma Invoice") continue;
+      if (inv.originatingOrderId && inv.originatingOrderId !== orderId) continue;
+      for (const li of inv.lineItems || []) {
+        if (li.subOrderId) ids.add(li.subOrderId);
+      }
+    }
+    return ids;
+  }, [invoiceRefreshKey, orderId]);
   const hasDraftOrderPO = orderPOs.some(po => String(po.status || "").toLowerCase() === "draft");
   const canCancelOrderByPO = canCancelOrderByPurchaseOrders(orderPOs);
   const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
@@ -3950,6 +3973,7 @@ export default function MyOrderPage() {
   const generateProformaForSubOrder = (subId: string) => {
     const target = subOrders.find((sub) => sub.id === subId);
     if (!target) return;
+    if (proformaSubOrderIds.has(subId)) return;
     if (!isPhysicalProduct(target)) {
       toast.error("Proforma invoices can be generated only for physical and hybrid products.");
       return;
@@ -5675,14 +5699,37 @@ export default function MyOrderPage() {
                         </div>
                       ) : (
                         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, textAlign: "right" }}>
-                          {sub.itemStatus === "Shipped" && isPhysicalProduct(sub) && (
-                            <button
-                              onClick={() => generateProformaForSubOrder(sub.id)}
-                              style={{ maxWidth: "100%", padding: "6px 8px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "right" }}
-                            >
-                              Generate Proforma Invoice
-                            </button>
-                          )}
+                          {sub.itemStatus === "Shipped" && isPhysicalProduct(sub) && (() => {
+                            const proformaGenerated = proformaSubOrderIds.has(sub.id);
+                            return (
+                              <button
+                                type="button"
+                                disabled={proformaGenerated}
+                                title={proformaGenerated ? "Proforma invoice already generated (available in Documents tab)" : "Generate Proforma Invoice"}
+                                onClick={() => {
+                                  if (!proformaGenerated) generateProformaForSubOrder(sub.id);
+                                }}
+                                style={{
+                                  maxWidth: "100%",
+                                  padding: "6px 8px",
+                                  border: proformaGenerated ? "1px solid #d1d5db" : "1px solid #c4b5fd",
+                                  borderRadius: 6,
+                                  background: proformaGenerated ? "#f3f4f6" : "#faf5ff",
+                                  color: proformaGenerated ? "#9ca3af" : "#6d28d9",
+                                  cursor: proformaGenerated ? "not-allowed" : "pointer",
+                                  opacity: proformaGenerated ? 0.75 : 1,
+                                  fontWeight: 700,
+                                  fontSize: 11,
+                                  fontFamily: "inherit",
+                                  whiteSpace: "normal",
+                                  overflowWrap: "anywhere",
+                                  textAlign: "right",
+                                }}
+                              >
+                                Generate Proforma Invoice
+                              </button>
+                            );
+                          })()}
                           <ThreeDotMenu
                             sub={sub}
                             onUpdateStatus={s => updateStatus(sub.id, s)}
