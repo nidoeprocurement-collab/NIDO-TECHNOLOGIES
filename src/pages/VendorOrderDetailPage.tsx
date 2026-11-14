@@ -13,7 +13,7 @@ import {
   hasDigitalLicenseBeenProvisioned,
 } from "@/lib/digitalFulfillmentStatuses";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
-import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
+import { attachPOPdfToPO, downloadPOPdf } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { derivePOFulfillmentStatus, promoteOrderSubItemsToProcessingForPO } from "@/lib/orderFulfillmentStatus";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
@@ -1438,6 +1438,11 @@ export default function VendorOrderDetailPage() {
     ));
     setOrderStatus("Processing");
     setNotes(updatedNotes);
+    void attachPOPdfToPO(po.poNumber)
+      .then((nextDocuments) => {
+        if (nextDocuments.length > 0) setDocuments(nextDocuments);
+      })
+      .catch((err) => console.warn("Confirmed PO PDF generation failed:", err));
     const nextMasterStatus = promoteOrderSubItemsToProcessingForPO({ ...po, items: updatedLineItems });
     if (po.orderId && nextMasterStatus) {
       setOrders(prev => prev.map(order =>

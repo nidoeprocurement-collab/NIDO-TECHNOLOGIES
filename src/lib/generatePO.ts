@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
-import type { StoredPO } from './purchaseOrderStore';
+import { getPOByNumber, updatePO, type PODocument, type StoredPO } from './purchaseOrderStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
 import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
 import { getProductConfigurationEntries, getProductSpecLines } from './productConfiguration';
@@ -492,6 +492,34 @@ export async function downloadPOPdf(po: StoredPO): Promise<void> {
 /** Return the PDF as a base64 data-URI string. */
 export async function getPODataUri(po: StoredPO): Promise<string> {
   return generatePOPdfBase64(po);
+}
+
+/** Generate the PO PDF and attach/replace it in the PO's Documents list. */
+export async function attachPOPdfToPO(poNumber: string): Promise<PODocument[]> {
+  const latest = getPOByNumber(poNumber);
+  if (!latest) return [];
+  const dataUrl = await getPODataUri(latest);
+  const uploadedOn = new Date().toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+  const pdfDoc: PODocument = {
+    id: `doc-${latest.poNumber}-pdf`,
+    name: `${latest.poNumber}.pdf`,
+    ext: 'pdf',
+    type: 'Purchase Order',
+    uploadedBy: 'System',
+    uploadedOn,
+    dataUrl,
+  };
+  const existingDocs = Array.isArray(latest.documents) ? latest.documents : [];
+  const nextDocuments = [
+    pdfDoc,
+    ...existingDocs.filter((doc) => doc.id !== pdfDoc.id && doc.name !== pdfDoc.name),
+  ];
+  updatePO(latest.poNumber, { documents: nextDocuments });
+  return nextDocuments;
 }
 
 // ── Legacy sync shim (kept so old callers compile — prefer the async versions) ─

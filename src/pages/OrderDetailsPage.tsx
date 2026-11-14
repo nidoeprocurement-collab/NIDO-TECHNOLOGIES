@@ -13,7 +13,7 @@ import { getVendorById } from "@/lib/vendorDataStore";
 import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
-import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
+import { attachPOPdfToPO, downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate, type SLAStatus } from "@/lib/slaUtils";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
@@ -4423,15 +4423,13 @@ export default function MyOrderPage() {
         }],
       };
 
-      try {
-        const dataUri = getPODataUri(po);
-        po.documents = [{ id: `doc-${poNumber}-pdf`, name: `${poNumber}.pdf`, ext: "pdf", type: "Purchase Order", uploadedBy: "System", uploadedOn: displayDate, dataUrl: dataUri }];
-        downloadPOPdf(po);
-      } catch (e) {
-        console.warn("PDF generation failed:", e);
-      }
-
       savePO(po);
+      void attachPOPdfToPO(poNumber).catch((e) => {
+        console.warn("PDF generation failed:", e);
+      });
+      void downloadPOPdf(po).catch((e) => {
+        console.warn("PDF download failed:", e);
+      });
       appendOrderActivity(
         orderId,
         `Purchase Order ${poNumber} was generated for vendor ${meta.vendorName}. Status: Draft.`,
@@ -5488,6 +5486,11 @@ export default function MyOrderPage() {
                                        };
                                      });
                                      localStorage.setItem(itemStateKey, JSON.stringify(persistedState));
+                                     try {
+                                       await attachPOPdfToPO(po.poNumber);
+                                     } catch (pdfError) {
+                                       console.warn("Confirmed PO PDF generation failed:", pdfError);
+                                     }
                                     navigate(`/vendor-orders/${po.poNumber}`);
                                   } catch (error: any) {
                                     setApprovalError(error?.message || "Approval service is unavailable. The PO was not confirmed.");
