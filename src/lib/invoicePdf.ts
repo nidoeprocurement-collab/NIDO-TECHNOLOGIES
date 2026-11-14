@@ -381,19 +381,19 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
       },
       columnStyles: digital
         ? {
-            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 98 },
-            2: { cellWidth: 38, halign: 'center' }, 3: { cellWidth: 42, halign: 'center' },
-            4: { cellWidth: 52, halign: 'center' }, 5: { cellWidth: 48, halign: 'center' },
-            6: { cellWidth: 52, halign: 'right' }, 7: { cellWidth: 38, halign: 'center' },
-            8: { cellWidth: 48, halign: 'right' }, 9: { cellWidth: 62, halign: 'right' },
-          }
+          0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 98 },
+          2: { cellWidth: 38, halign: 'center' }, 3: { cellWidth: 42, halign: 'center' },
+          4: { cellWidth: 52, halign: 'center' }, 5: { cellWidth: 48, halign: 'center' },
+          6: { cellWidth: 52, halign: 'right' }, 7: { cellWidth: 38, halign: 'center' },
+          8: { cellWidth: 48, halign: 'right' }, 9: { cellWidth: 62, halign: 'right' },
+        }
         : {
-            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 132 },
-            2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 24, halign: 'center' },
-            4: { cellWidth: 75, halign: 'right' }, 5: { cellWidth: 58, halign: 'right' },
-            6: { cellWidth: 40, halign: 'center' }, 7: { cellWidth: 52, halign: 'right' },
-            8: { cellWidth: 68, halign: 'right' },
-          },
+          0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 132 },
+          2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 24, halign: 'center' },
+          4: { cellWidth: 75, halign: 'right' }, 5: { cellWidth: 58, halign: 'right' },
+          6: { cellWidth: 40, halign: 'center' }, 7: { cellWidth: 52, halign: 'right' },
+          8: { cellWidth: 68, halign: 'right' },
+        },
       didParseCell(data) {
         if (data.section === 'body' && data.column.index === 1) {
           data.cell.styles.fontStyle = 'bold';
