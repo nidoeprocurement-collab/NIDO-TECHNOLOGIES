@@ -4,6 +4,7 @@ import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore"
 import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
 import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, getPOAggregateAfterLineCancellation, isPOConfirmed, reopenSubOrderForVendorSelection, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { generateBillPdf } from "@/lib/billPdf";
+import { downloadPaymentMadePdf } from "@/lib/paymentMadePdf";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import {
@@ -1661,6 +1662,22 @@ export default function VendorOrderDetailPage() {
           : null;
         if (linkedBill) {
           void generateBillPdf(linkedBill)
+            .then(() => recordDocumentActivity("downloaded", doc))
+            .catch(console.warn);
+          return;
+        }
+      } catch {
+        // Fall through to dataUrl download
+      }
+    }
+    if (doc?.paymentMadeId || doc?.type === "Payment Made") {
+      try {
+        const storedPayments = JSON.parse(localStorage.getItem("nido_purchase_payments_made_v1") || "[]");
+        const linkedPayment = Array.isArray(storedPayments)
+          ? storedPayments.find((p: any) => (doc?.paymentMadeId && p.id === doc.paymentMadeId) || `Payment-${p.paymentNumber}.pdf` === doc?.name)
+          : null;
+        if (linkedPayment) {
+          void downloadPaymentMadePdf(linkedPayment)
             .then(() => recordDocumentActivity("downloaded", doc))
             .catch(console.warn);
           return;

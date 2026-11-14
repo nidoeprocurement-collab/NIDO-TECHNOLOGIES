@@ -96,7 +96,7 @@ async function loadImage(url: string): Promise<{ data: string; format: 'PNG' | '
 }
 
 // ── Main generator ─────────────────────────────────────────────────────────────
-export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promise<void> {
+async function buildPaymentMadePdfDoc(payment: PaymentMadeForPdf): Promise<jsPDF> {
   const org = loadConfig().organization;
   const brandHeader = getBrandHeader(org.displayName, org.industry);
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
@@ -329,5 +329,20 @@ export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promis
     { size: 8, color: BLUE, bold: true, align: 'center' },
   );
 
+  return doc;
+}
+
+export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promise<void> {
+  const doc = await buildPaymentMadePdfDoc(payment);
   doc.save(`${payment.paymentNumber}.pdf`);
+}
+
+export async function generatePaymentMadePdfBase64(
+  payment: PaymentMadeForPdf,
+): Promise<{ dataUrl: string; sizeBytes: number }> {
+  const doc = await buildPaymentMadePdfDoc(payment);
+  const dataUrl = doc.output('datauristring');
+  const base64 = dataUrl.split(',')[1] || '';
+  const sizeBytes = Math.round((base64.length * 3) / 4);
+  return { dataUrl, sizeBytes };
 }

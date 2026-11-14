@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
-import { downloadPaymentMadePdf } from "@/lib/paymentMadePdf";
+import { downloadPaymentMadePdf, generatePaymentMadePdfBase64 } from "@/lib/paymentMadePdf";
+import { getPOByNumber, updatePO } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
@@ -383,7 +384,74 @@ export default function PaymentsMadePage() {
   const setF = <K extends keyof typeof form>(key: K, val: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const savePayment = (status: "PAID" | "DRAFT") => {
+  const attachPaymentMadePdfToPOs = async (payment: PaymentEntry) => {
+    try {
+      const storedBills = safeReadJson<Array<Record<string, any>>>(BILLS_STORAGE_KEY, []);
+      const allocatedIds = new Set(payment.allocations.map((a) => a.billId));
+      if (payment.billId) allocatedIds.add(payment.billId);
+
+      const poNumbers = new Set<string>();
+      storedBills.forEach((b) => {
+        const matchesId = allocatedIds.has(b.id);
+        const matchesNum = payment.billNumber && payment.billNumber !== "—" && b.billNumber === payment.billNumber;
+        if (!matchesId && !matchesNum) return;
+        const poRef = String(b.sourcePurchaseOrderId || b.orderNumber || "").trim();
+        if (poRef) poNumbers.add(poRef);
+      });
+
+      if (poNumbers.size === 0) return;
+
+      const { dataUrl, sizeBytes } = await generatePaymentMadePdfBase64(payment);
+      const sizeStr =
+        sizeBytes >= 1024 * 1024
+          ? `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`
+          : `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
+      const uploadedOn = new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      const docName = `Payment-${payment.paymentNumber}.pdf`;
+      const docId = `doc-payment-${payment.id}`;
+      const baseDocEntry = {
+        id: docId,
+        paymentMadeId: payment.id,
+        name: docName,
+        ext: "pdf",
+        type: "Payment Made",
+        uploadedBy: "System",
+        uploadedOn,
+        size: sizeStr,
+      };
+
+      poNumbers.forEach((poNum) => {
+        const po = getPOByNumber(poNum);
+        if (!po) return;
+        const existingDocs = Array.isArray((po as any).documents) ? (po as any).documents : [];
+        const docEntry = { ...baseDocEntry, dataUrl };
+        const nextDocs = [
+          docEntry,
+          ...existingDocs.filter((d: any) => d.id !== docId && d.name !== docName),
+        ];
+
+        try {
+          updatePO(po.poNumber, { documents: nextDocs } as any);
+        } catch {
+          const fallbackEntry = { ...baseDocEntry };
+          const fallbackDocs = [
+            fallbackEntry,
+            ...existingDocs.filter((d: any) => d.id !== docId && d.name !== docName),
+          ];
+          updatePO(po.poNumber, { documents: fallbackDocs } as any);
+        }
+      });
+    } catch (error) {
+      console.warn("Could not attach Payment Made PDF to PO documents:", error);
+    }
+  };
+
+  const savePayment = async (status: "PAID" | "DRAFT") => {
     if (!form.vendorName.trim()) { toast({ title: "Vendor is required" }); return; }
     if (amountValue <= 0) { toast({ title: "Enter a payment amount" }); return; }
 
@@ -416,6 +484,7 @@ export default function PaymentsMadePage() {
       const next = [created, ...payments];
       persist(next);
       if (status === "PAID") updateBillsForPayment(created);
+      await attachPaymentMadePdfToPOs(created);
 
       toast({ title: status === "PAID" ? "Payment recorded" : "Draft saved" });
       navigate(`/transactions/purchase/payments-made/${created.id}`, { replace: true });
