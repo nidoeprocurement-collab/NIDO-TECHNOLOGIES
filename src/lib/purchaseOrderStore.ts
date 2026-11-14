@@ -77,6 +77,14 @@ export interface POLineItem {
   status?: string;
   cancelReason?: string;
   cancelSource?: "vendor-po" | "order-details";
+  provisioningDetails?: {
+    method: "activated" | "key_received_via_mail";
+    howActivated?: string;
+    activatedAt?: string;
+    notes?: string;
+    documentName?: string;
+    savedAt: string;
+  };
   tracking?: {
     number: string;
     carrier: string;

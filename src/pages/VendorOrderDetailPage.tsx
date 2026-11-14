@@ -458,7 +458,247 @@ function UploadDocumentModal({ onSave, onClose }: { onSave: (doc: any) => void; 
   );
 }
 
-// ── Status Dropdown ───────────────────────────────────────────────────────────
+// ── Provisioned Details Modal ────────────────────────────────────────────────
+function ProvisionedDetailsModal({
+  itemName,
+  uploadedBy,
+  onSave,
+  onClose,
+}: {
+  itemName: string;
+  uploadedBy: string;
+  onSave: (payload: {
+    provisioningDetails: {
+      method: "activated" | "key_received_via_mail";
+      howActivated?: string;
+      activatedAt?: string;
+      notes?: string;
+      documentName?: string;
+      savedAt: string;
+    };
+    document?: any;
+  }) => void;
+  onClose: () => void;
+}) {
+  const [method, setMethod] = useState<"activated" | "key_received_via_mail">("activated");
+  const [howActivated, setHowActivated] = useState("");
+  const [activatedAt, setActivatedAt] = useState(() => new Date().toISOString().split("T")[0]);
+  const [activationNotes, setActivationNotes] = useState("");
+  const [mailDetails, setMailDetails] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileDataUrl, setFileDataUrl] = useState<string>("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const canSave = method === "activated"
+    ? Boolean(howActivated.trim() && activatedAt.trim())
+    : Boolean(mailDetails.trim() && file && fileDataUrl);
+
+  const handleFileChange = (selected: File | null) => {
+    setFile(selected);
+    setFileDataUrl("");
+    if (!selected) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setFileDataUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(selected);
+  };
+
+  const handleSubmit = () => {
+    if (!canSave) return;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " +
+      now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+    if (method === "activated") {
+      onSave({
+        provisioningDetails: {
+          method: "activated",
+          howActivated: howActivated.trim(),
+          activatedAt: activatedAt.trim(),
+          notes: activationNotes.trim() || undefined,
+          savedAt: dateStr,
+        },
+      });
+      return;
+    }
+
+    const fileName = file!.name;
+    const ext = fileName.split(".").pop()?.toLowerCase() || "file";
+    onSave({
+      provisioningDetails: {
+        method: "key_received_via_mail",
+        notes: mailDetails.trim(),
+        documentName: fileName,
+        savedAt: dateStr,
+      },
+      document: {
+        id: "d" + Date.now(),
+        name: fileName,
+        ext,
+        type: "License / Activation Key",
+        uploadedBy: uploadedBy.trim() || "Vendor",
+        uploadedOn: dateStr,
+        dataUrl: fileDataUrl,
+      },
+    });
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 550, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 520, maxWidth: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Provisioning Details</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{itemName}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+        </div>
+
+        <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* 2 Options */}
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Select Provisioning Method *</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setMethod("activated")}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: method === "activated" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                  background: method === "activated" ? "#eff6ff" : "#fff",
+                  color: method === "activated" ? "#1d4ed8" : "#374151",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                }}
+              >
+                <div>Activated</div>
+                <div style={{ fontSize: 11, fontWeight: 400, color: "#6b7280", marginTop: 2 }}>Enter activation method &amp; date</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod("key_received_via_mail")}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: method === "key_received_via_mail" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                  background: method === "key_received_via_mail" ? "#eff6ff" : "#fff",
+                  color: method === "key_received_via_mail" ? "#1d4ed8" : "#374151",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                }}
+              >
+                <div>Key received via mail</div>
+                <div style={{ fontSize: 11, fontWeight: 400, color: "#6b7280", marginTop: 2 }}>Enter details &amp; upload key file</div>
+              </button>
+            </div>
+          </div>
+
+          {method === "activated" ? (
+            <>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>How was it activated? *</label>
+                <input
+                  value={howActivated}
+                  onChange={e => setHowActivated(e.target.value)}
+                  placeholder="e.g. Vendor Admin Portal, Tenant Assignment, SSO..."
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>When was it done? *</label>
+                <input
+                  type="date"
+                  value={activatedAt}
+                  onChange={e => setActivatedAt(e.target.value)}
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Activation Details / Notes</label>
+                <textarea
+                  rows={3}
+                  value={activationNotes}
+                  onChange={e => setActivationNotes(e.target.value)}
+                  placeholder="Enter any additional activation details, tenant ID, or confirmation reference..."
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Key / Mail Details *</label>
+                <textarea
+                  rows={3}
+                  value={mailDetails}
+                  onChange={e => setMailDetails(e.target.value)}
+                  placeholder="Enter key details, sender email, license notes, or instructions..."
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Upload File *</label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  style={{ border: "2px dashed #d1d5db", borderRadius: 8, padding: "18px", textAlign: "center", cursor: "pointer", background: "#f9fafb" }}
+                >
+                  {file ? (
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#15803d" }}>📄 {file.name}</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>📁</div>
+                      <div style={{ fontSize: 13, color: "#6b7280" }}>Click to choose a file to attach to Documents</div>
+                    </>
+                  )}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    style={{ display: "none" }}
+                    onChange={e => handleFileChange(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px", borderTop: "1px solid #f3f4f6" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSave}
+            style={{
+              flex: 1,
+              padding: "9px 0",
+              border: "none",
+              borderRadius: 7,
+              background: canSave ? "#2563eb" : "#93c5fd",
+              color: "#fff",
+              cursor: canSave ? "pointer" : "not-allowed",
+              fontWeight: 600,
+              fontSize: 13,
+              fontFamily: "inherit",
+            }}
+          >
+            Save Details
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function StatusDropdown({ status, onChange, disabled, allowCancel = true, digital = false, quantity }: { status: string; onChange: (s: string) => void; disabled?: boolean; allowCancel?: boolean; digital?: boolean; quantity?: number | string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -954,6 +1194,7 @@ function storedPOToDetail(po: StoredPO) {
             expectedDelivery: po.requestedDelivery || "Within 30 days",
             tracking: li.tracking || null,
             cancelReason: li.cancelReason,
+            provisioningDetails: li.provisioningDetails,
           }))
         : [
             {
@@ -1025,6 +1266,7 @@ export default function VendorOrderDetailPage() {
   } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
   const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
+  const [pendingProvisionItem, setPendingProvisionItem] = useState<{ id: string; name: string } | null>(null);
 
   // A cancelled PO is a terminal state: no further status changes, item
   // edits, vendor/reference updates, or tracking changes are allowed. Derive
@@ -1161,6 +1403,12 @@ export default function VendorOrderDetailPage() {
       });
       return;
     }
+    if (status === "Provisioned") {
+      const it = currentItem;
+      if (!it) return;
+      setPendingProvisionItem({ id, name: it.name || "this item" });
+      return;
+    }
     let savedStatus = status;
     if (digital && status === "Partially Provisioned") {
       const totalQuantity = Number(currentItem?.qty);
@@ -1270,6 +1518,49 @@ export default function VendorOrderDetailPage() {
       appendPOActivity(poKey, activity);
     }
     setPendingItemCancel(null);
+  };
+  const confirmItemProvisioned = (payload: {
+    provisioningDetails: {
+      method: "activated" | "key_received_via_mail";
+      howActivated?: string;
+      activatedAt?: string;
+      notes?: string;
+      documentName?: string;
+      savedAt: string;
+    };
+    document?: any;
+  }) => {
+    if (!pendingProvisionItem || isCancelled || isAssignmentPending) return;
+    const { id, name } = pendingProvisionItem;
+    if (payload.document) {
+      handleUploadDocument(payload.document);
+    }
+    setItems(prev => prev.map(it => it.id === id
+      ? { ...it, status: "Provisioned", provisioningDetails: payload.provisioningDetails }
+      : it));
+    const po = getPOByNumber(poKey);
+    const itemIndex = items.findIndex(it => it.id === id);
+    if (po && itemIndex >= 0) {
+      const previousStatus = po.items[itemIndex]?.status || items[itemIndex]?.status || "Pending";
+      const updatedLines = po.items.map((line, index) => index === itemIndex
+        ? { ...line, status: "Provisioned", provisioningDetails: payload.provisioningDetails }
+        : line);
+      const derivedStatus = derivePOFulfillmentStatus({ ...po, items: updatedLines });
+      updatePO(poKey, {
+        items: updatedLines,
+        ...(po.status !== "Draft" && derivedStatus === "Delivered"
+          ? { status: "Delivered" as StoredPO["status"] }
+          : {}),
+      });
+      setOrderStatus(derivedStatus);
+      const detailText = payload.provisioningDetails.method === "activated"
+        ? `Method: Activated (${payload.provisioningDetails.howActivated || "—"} on ${payload.provisioningDetails.activatedAt || "—"})`
+        : `Method: Key received via mail${payload.provisioningDetails.documentName ? ` · Document: ${payload.provisioningDetails.documentName}` : ""}`;
+      const text = `${name} status changed from ${previousStatus} to Provisioned. ${detailText}`;
+      const activity = makePOActivity(text, "status-change", `activity_item_provisioned_${poKey}_${id}_${Date.now()}`);
+      appendPOActivity(poKey, activity);
+    }
+    setPendingProvisionItem(null);
   };
   const handleDeleteItem = (id: string) => {
     if (isCancelled) return;
@@ -1921,6 +2212,20 @@ export default function VendorOrderDetailPage() {
                     Reason: {(item as any).cancelReason}
                   </div>
                 )}
+                {(item as any).provisioningDetails && (
+                  <div style={{ fontSize: 11, color: "#047857", marginTop: 5, lineHeight: 1.4 }}>
+                    {(item as any).provisioningDetails.method === "activated" ? (
+                      <>
+                        <strong>Activated:</strong> {(item as any).provisioningDetails.howActivated}
+                        {(item as any).provisioningDetails.activatedAt && ` · ${(item as any).provisioningDetails.activatedAt}`}
+                      </>
+                    ) : (
+                      <>
+                        <strong>Key via Mail:</strong> {(item as any).provisioningDetails.documentName || "Details saved"}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
                 <div style={{ fontSize: 12.5, color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : item.expectedDelivery}</div>
               {!isDigitalOrder && (
@@ -2184,6 +2489,14 @@ export default function VendorOrderDetailPage() {
           itemName={pendingItemCancel.name}
           onConfirm={confirmItemCancel}
           onClose={() => setPendingItemCancel(null)}
+        />
+      )}
+      {pendingProvisionItem && (
+        <ProvisionedDetailsModal
+          itemName={pendingProvisionItem.name}
+          uploadedBy={vendor.name || "Vendor"}
+          onSave={confirmItemProvisioned}
+          onClose={() => setPendingProvisionItem(null)}
         />
       )}
       {showEditAssignment && (
