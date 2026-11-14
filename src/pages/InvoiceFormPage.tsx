@@ -1449,10 +1449,6 @@ export default function InvoiceFormPage() {
                     <td className="px-4 py-2.5 text-right text-gray-900">{fmt(grossSubtotal)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="px-4 py-2.5 font-semibold text-gray-900">Item Level Discounts (-)</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">− {fmt(totalDiscount)}</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
                     <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmt(totalTaxableValue)}</td>
                   </tr>

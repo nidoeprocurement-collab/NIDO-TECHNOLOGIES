@@ -136,7 +136,6 @@ function drawSummary(
   width: number,
 ): number {
   const grossSubtotal = invoice.grossSubtotal ?? invoice.subtotal;
-  const totalDiscount = invoice.totalDiscount ?? 0;
   const taxableSubtotal = invoice.subtotal;
   const shipping = invoice.shippingCharges ?? 0;
   const platformFee = invoice.platformFee ?? 0;
@@ -151,7 +150,6 @@ function drawSummary(
   const hasPhysicalItems = invoice.lineItems.some((item) => !isDigitalDocumentProduct(item));
   const rows: Array<[string, string, boolean?]> = [
     ['Gross Subtotal', money(grossSubtotal)],
-    ['Item Level Discounts (-)', `${adjustment < 0 ? '-' : ''}${money(totalDiscount)}`, true],
     ['Total Taxable Value', money(taxableSubtotal), true],
     [`Total GST${rates ? ` (${rates})` : ''}`, money(invoice.totalTax)],
     ...(hasPhysicalItems || shipping > 0 ? [['Shipping & Handling Charges', money(shipping)] as [string, string]] : []),
