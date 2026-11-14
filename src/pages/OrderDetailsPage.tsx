@@ -1620,9 +1620,17 @@ function DocumentsNotesTab({
       if ((event as CustomEvent).detail?.orderId !== orderId) return;
       try { setNotes(JSON.parse(localStorage.getItem(notesKey) || "null") || INITIAL_NOTES); } catch { /* ignore malformed notes */ }
     };
+    const onOrderDocsUpdated = (event: Event) => {
+      if ((event as CustomEvent).detail?.orderId !== orderId) return;
+      try { setDocs(JSON.parse(localStorage.getItem(docsKey) || "null") || INITIAL_DOCS); } catch { /* ignore malformed docs */ }
+    };
     window.addEventListener("orderNotesUpdated", onOrderNotesUpdated);
-    return () => window.removeEventListener("orderNotesUpdated", onOrderNotesUpdated);
-  }, [orderId, notesKey]);
+    window.addEventListener("orderDocsUpdated", onOrderDocsUpdated);
+    return () => {
+      window.removeEventListener("orderNotesUpdated", onOrderNotesUpdated);
+      window.removeEventListener("orderDocsUpdated", onOrderDocsUpdated);
+    };
+  }, [orderId, notesKey, docsKey]);
 
   useEffect(() => {
     localStorage.setItem(notesKey, JSON.stringify(notes));
@@ -2136,55 +2144,305 @@ function AddTrackingModal({ current, onSave, onClose }) {
   );
 }
 
-function ProvisionedDeliveryModal({ itemName, initialMode, initialEmail, onSave, onClose }) {
-  const [mode, setMode] = useState<"Email" | "Activated">(initialMode === "Activated" ? "Activated" : "Email");
-  const [email, setEmail] = useState(initialEmail || "");
+function ProvisionedDeliveryModal({
+  itemName,
+  initialMode,
+  initialEmail,
+  clientEmails,
+  vendorMethod,
+  vendorHowActivated,
+  vendorActivatedAt,
+  vendorNotes,
+  vendorDocument,
+  onSave,
+  onClose,
+}: {
+  itemName: string;
+  initialMode?: string;
+  initialEmail?: string;
+  clientEmails: Array<{ value: string; label: string }>;
+  vendorMethod?: "activated" | "key_received_via_mail";
+  vendorHowActivated?: string;
+  vendorActivatedAt?: string;
+  vendorNotes?: string;
+  vendorDocument?: any;
+  onSave: (payload: {
+    method: "activated" | "key_received_via_mail";
+    howActivated?: string;
+    activatedAt?: string;
+    notes?: string;
+    recipients?: string[];
+    document?: any;
+  }) => Promise<void> | void;
+  onClose: () => void;
+}) {
+  const lockedMethod = vendorMethod;
+  const defaultMethod: "activated" | "key_received_via_mail" =
+    lockedMethod || (initialMode === "Activated" ? "activated" : "key_received_via_mail");
+  const [method, setMethod] = useState<"activated" | "key_received_via_mail">(defaultMethod);
+  const [howActivated, setHowActivated] = useState(vendorHowActivated || "");
+  const [activatedAt, setActivatedAt] = useState(
+    vendorActivatedAt || new Date().toISOString().split("T")[0],
+  );
+  const [activationNotes, setActivationNotes] = useState(vendorNotes || "");
+  const [mailNotes, setMailNotes] = useState(vendorNotes || "");
+  const [selectedClientEmail, setSelectedClientEmail] = useState(
+    initialEmail || clientEmails[0]?.value || "",
+  );
+  const [extraEmail, setExtraEmail] = useState("");
+  const [attachedDoc, setAttachedDoc] = useState<any>(vendorDocument || null);
   const [error, setError] = useState("");
-  const save = () => {
-    const normalizedEmail = email.trim();
-    if (mode === "Email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setError("Enter a valid email address.");
+  const [submitting, setSubmitting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (selected: File | null) => {
+    if (!selected) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " +
+          now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+        setAttachedDoc({
+          id: "d" + Date.now(),
+          name: selected.name,
+          ext: selected.name.split(".").pop()?.toLowerCase() || "file",
+          type: "License / Activation Key",
+          uploadedBy: "System Owner",
+          uploadedOn: dateStr,
+          dataUrl: reader.result,
+        });
+        setError("");
+      }
+    };
+    reader.readAsDataURL(selected);
+  };
+
+  const save = async () => {
+    if (method === "activated") {
+      if (!howActivated.trim() || !activatedAt.trim()) {
+        setError("Enter how and when it was activated.");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await onSave({
+          method: "activated",
+          howActivated: howActivated.trim(),
+          activatedAt: activatedAt.trim(),
+          notes: activationNotes.trim() || undefined,
+        });
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
-    onSave(mode, mode === "Email" ? normalizedEmail : "");
+
+    const extraList = extraEmail
+      .split(",")
+      .map(e => e.trim())
+      .filter(Boolean);
+    for (const em of extraList) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+        setError(`Enter a valid email address: ${em}`);
+        return;
+      }
+    }
+    const recipients = Array.from(
+      new Set([selectedClientEmail.trim(), ...extraList].filter(Boolean)),
+    );
+    if (recipients.length === 0) {
+      setError("Select a client email or enter an email address.");
+      return;
+    }
+    if (!attachedDoc) {
+      setError("Attach the license / key document before sending.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await onSave({
+        method: "key_received_via_mail",
+        notes: mailNotes.trim() || undefined,
+        recipients,
+        document: attachedDoc,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Overlay onClose={onClose} closeOnBackdrop={false}>
-      <ModalBox title="Digital delivery details" onClose={onClose} width={480}>
-        <div style={{ padding: "18px 22px 8px" }}>
-          <div style={{ marginBottom: 14, fontSize: 13, color: "#4b5563" }}>
-            Choose how <strong style={{ color: "#111827" }}>{itemName}</strong> was delivered.
+      <ModalBox title="Provisioning Details" onClose={onClose} width={540}>
+        <div style={{ padding: "18px 22px 10px", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ fontSize: 13, color: "#4b5563" }}>
+            Item: <strong style={{ color: "#111827" }}>{itemName}</strong>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 12px", border: `1px solid ${mode === "Email" ? "#93c5fd" : "#e5e7eb"}`, borderRadius: 8, background: mode === "Email" ? "#eff6ff" : "#fff", cursor: "pointer" }}>
-            <input type="radio" name="digital-delivery-mode" value="Email" checked={mode === "Email"} onChange={() => { setMode("Email"); setError(""); }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>Email license or access details</span>
-          </label>
-          {mode === "Email" && (
-            <div style={{ margin: "12px 0 16px" }}>
-              <label htmlFor="digital-delivery-email" style={lbSt}>Recipient email address</label>
-              <input
-                id="digital-delivery-email"
-                type="email"
-                value={email}
-                onChange={event => { setEmail(event.target.value); setError(""); }}
-                placeholder="name@example.com"
-                style={{ ...inSt, borderColor: error ? "#dc2626" : "#d1d5db" }}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? "digital-delivery-email-error" : undefined}
-              />
-              {error && <div id="digital-delivery-email-error" style={{ marginTop: 5, fontSize: 11.5, color: "#dc2626" }}>{error}</div>}
-            </div>
+
+          {/* Method selector: locked to vendor selection when available */}
+          <div style={{ display: "grid", gridTemplateColumns: lockedMethod ? "1fr" : "1fr 1fr", gap: 10 }}>
+            {(!lockedMethod || lockedMethod === "activated") && (
+              <button
+                type="button"
+                onClick={() => { if (!lockedMethod) { setMethod("activated"); setError(""); } }}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: method === "activated" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                  background: method === "activated" ? "#eff6ff" : "#fff",
+                  color: method === "activated" ? "#1d4ed8" : "#374151",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: lockedMethod ? "default" : "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                }}
+              >
+                <div>Activated</div>
+                <div style={{ fontSize: 11, fontWeight: 400, color: "#6b7280", marginTop: 2 }}>
+                  {lockedMethod === "activated" ? "Selected from Vendor Order" : "Enter activation method & date"}
+                </div>
+              </button>
+            )}
+            {(!lockedMethod || lockedMethod === "key_received_via_mail") && (
+              <button
+                type="button"
+                onClick={() => { if (!lockedMethod) { setMethod("key_received_via_mail"); setError(""); } }}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: method === "key_received_via_mail" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                  background: method === "key_received_via_mail" ? "#eff6ff" : "#fff",
+                  color: method === "key_received_via_mail" ? "#1d4ed8" : "#374151",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: lockedMethod ? "default" : "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                }}
+              >
+                <div>Key received via mail</div>
+                <div style={{ fontSize: 11, fontWeight: 400, color: "#6b7280", marginTop: 2 }}>
+                  {lockedMethod === "key_received_via_mail" ? "Selected from Vendor Order" : "Attach key file & send to client"}
+                </div>
+              </button>
+            )}
+          </div>
+
+          {method === "activated" ? (
+            <>
+              <div>
+                <label style={lbSt}>How was it activated? *</label>
+                <input
+                  type="text"
+                  value={howActivated}
+                  onChange={e => { setHowActivated(e.target.value); setError(""); }}
+                  placeholder="e.g. Vendor Admin Portal, Tenant Assignment, SSO..."
+                  style={inSt}
+                />
+              </div>
+              <div>
+                <label style={lbSt}>When was it done? *</label>
+                <input
+                  type="date"
+                  value={activatedAt}
+                  onChange={e => { setActivatedAt(e.target.value); setError(""); }}
+                  style={inSt}
+                />
+              </div>
+              <div>
+                <label style={lbSt}>Activation Details / Notes</label>
+                <textarea
+                  rows={3}
+                  value={activationNotes}
+                  onChange={e => setActivationNotes(e.target.value)}
+                  placeholder="Type activation details, confirmation reference, or notes..."
+                  style={{ ...inSt, resize: "vertical" }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label style={lbSt}>Attached Document *</label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  style={{ border: "1.5px dashed #cbd5e1", borderRadius: 8, padding: "12px 14px", background: "#f8fafc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
+                >
+                  {attachedDoc ? (
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#15803d", overflowWrap: "anywhere" }}>
+                      📄 {attachedDoc.name} {vendorDocument?.name === attachedDoc.name ? "(Attached from Vendor Order)" : ""}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12.5, color: "#6b7280" }}>📁 Click to upload license / key document</div>
+                  )}
+                  <span style={{ fontSize: 11.5, color: "#2563eb", fontWeight: 600, flexShrink: 0 }}>
+                    {attachedDoc ? "Replace" : "Choose file"}
+                  </span>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    style={{ display: "none" }}
+                    onChange={e => handleFileChange(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={lbSt}>Client Email ID</label>
+                {clientEmails.length > 0 ? (
+                  <select
+                    value={selectedClientEmail}
+                    onChange={e => { setSelectedClientEmail(e.target.value); setError(""); }}
+                    style={inSt}
+                  >
+                    <option value="">-- Select client email --</option>
+                    {clientEmails.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>
+                    No saved client emails found. Enter an email below.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={lbSt}>Extra Email ID (optional)</label>
+                <input
+                  type="text"
+                  value={extraEmail}
+                  onChange={e => { setExtraEmail(e.target.value); setError(""); }}
+                  placeholder="Enter additional email(s), comma-separated"
+                  style={inSt}
+                />
+              </div>
+
+              <div>
+                <label style={lbSt}>Notes (optional)</label>
+                <textarea
+                  rows={3}
+                  value={mailNotes}
+                  onChange={e => setMailNotes(e.target.value)}
+                  placeholder="Add notes to include with the delivery and save in Order Notes..."
+                  style={{ ...inSt, resize: "vertical" }}
+                />
+              </div>
+            </>
           )}
-          <label style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 12px", border: `1px solid ${mode === "Activated" ? "#86efac" : "#e5e7eb"}`, borderRadius: 8, background: mode === "Activated" ? "#f0fdf4" : "#fff", cursor: "pointer" }}>
-            <input type="radio" name="digital-delivery-mode" value="Activated" checked={mode === "Activated"} onChange={() => { setMode("Activated"); setError(""); }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>Activated</span>
-          </label>
-          <div style={{ marginTop: 10, fontSize: 11.5, color: "#6b7280" }}>
-            This choice updates the Delivery Mode column; the fulfillment status remains Provisioned.
-          </div>
+
+          {error && <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>{error}</div>}
         </div>
-        <ModalFooter onCancel={onClose} onSave={save} saveLabel="Save delivery details" skipConfirmation />
+        <ModalFooter
+          onCancel={onClose}
+          onSave={save}
+          saveLabel={submitting ? "Saving..." : method === "key_received_via_mail" ? "Save Details & Send Mail" : "Save Details"}
+          saveDisabled={submitting}
+          skipConfirmation
+        />
       </ModalBox>
     </Overlay>
   );
@@ -3199,6 +3457,11 @@ export default function MyOrderPage() {
     deliveryMode: string;
     deliveryEmail: string;
     advanceStatus: boolean;
+    vendorMethod?: "activated" | "key_received_via_mail";
+    vendorHowActivated?: string;
+    vendorActivatedAt?: string;
+    vendorNotes?: string;
+    vendorDocument?: any;
   } | null>(null);
   const [provisionedUploadPrompt, setProvisionedUploadPrompt] = useState<{ subId: string; itemName: string } | null>(null);
   const [licenseUploadRequest, setLicenseUploadRequest] = useState<{ id: number; itemName: string } | null>(null);
@@ -3411,12 +3674,23 @@ export default function MyOrderPage() {
       && !metadata.deliveryMode
       && !isClientPortalUser
     ) {
+      const canonicalPO = getCanonicalPOForSubOrder(orderPOs, target);
+      const poLine = canonicalPO?.items?.find((li: any) => li.subOrderId === target.id) || canonicalPO?.items?.[0];
+      const vp = poLine?.provisioningDetails;
+      const vendorDoc = vp?.documentName
+        ? canonicalPO?.documents?.find((d: any) => d.name === vp.documentName)
+        : undefined;
       setProvisionedDeliveryTarget({
         subId,
         itemName: target.itemName,
         deliveryMode: target.deliveryMode || target.commercialTerms?.deliveryMode || "Email",
         deliveryEmail: target.deliveryEmail || "",
         advanceStatus: true,
+        vendorMethod: vp?.method,
+        vendorHowActivated: vp?.howActivated,
+        vendorActivatedAt: vp?.activatedAt,
+        vendorNotes: vp?.notes,
+        vendorDocument: vendorDoc,
       });
       return;
     }
@@ -3469,17 +3743,112 @@ export default function MyOrderPage() {
       `${target.itemName} status changed from ${previousStatus} to ${savedStatus}.`,
       { actor, eventType: "status-change" },
     );
-    if (savedStatus === "Provisioned" && previousStatus !== "Provisioned" && !isClientPortalUser) {
-      setProvisionedUploadPrompt({ subId, itemName: target.itemName });
-    }
   };
 
-  const saveProvisionedDelivery = (mode: "Email" | "Activated", email: string) => {
+  const provisionedClientEmails = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    const seen = new Set<string>();
+    const addEmail = (raw: unknown, label: string) => {
+      const normalized = String(raw || "").trim().toLowerCase();
+      if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || seen.has(normalized)) return;
+      seen.add(normalized);
+      options.push({ value: normalized, label: `${label} — ${normalized}` });
+    };
+    addEmail(clientInfo?.email, "Client");
+    addEmail(clientInfo?.contactEmail, "Contact");
+    addEmail(clientInfo?.billingEmail, "Billing");
+    if (Array.isArray(clientInfo?.emails)) {
+      clientInfo.emails.forEach((em: string) => addEmail(em, "Client"));
+    }
+    if (Array.isArray(clientInfo?.contactPersons)) {
+      clientInfo.contactPersons.forEach((cp: any) => addEmail(cp?.email, cp?.name || "Contact"));
+    }
+    const portalClientId = orderClientId || clientInfo?.id;
+    if (portalClientId) {
+      getPortalUsersByClient(portalClientId).forEach(portalUser => {
+        addEmail(portalUser.email, `Portal user: ${portalUser.name || "User"}`);
+      });
+    }
+    addEmail(order?.requesterEmail, "Order Requester");
+    return options;
+  }, [clientInfo, orderClientId, order?.requesterEmail]);
+
+  const saveProvisionedDelivery = async (payload: {
+    method: "activated" | "key_received_via_mail";
+    howActivated?: string;
+    activatedAt?: string;
+    notes?: string;
+    recipients?: string[];
+    document?: any;
+  }) => {
     const target = provisionedDeliveryTarget;
     if (!target) return;
+
+    if (payload.method === "activated") {
+      const deliveryDetails = {
+        deliveryMode: "Activated" as const,
+        deliveryEmail: "",
+      };
+      if (target.advanceStatus) {
+        updateStatus(target.subId, "Provisioned", deliveryDetails);
+      } else {
+        const updatedOn = new Date().toLocaleDateString("en-IN");
+        setSubOrders(prev => prev.map(sub => sub.id === target.subId
+          ? { ...sub, ...deliveryDetails, updatedOn }
+          : sub
+        ));
+      }
+      queueDocumentsAuditNote(
+        `Digital Provisioning Completed (Activated)\nItem: ${target.itemName}\nHow activated: ${payload.howActivated || "—"}\nActivated on: ${payload.activatedAt || "—"}${payload.notes ? `\nDetails: ${payload.notes}` : ""}`,
+        "status-change",
+      );
+      toast.success("Provisioning details saved.");
+      setProvisionedDeliveryTarget(null);
+      return;
+    }
+
+    const recipients = payload.recipients || [];
+    const doc = payload.document;
+    if (doc) {
+      const docsKey = `nido_order_docs_${orderId}`;
+      try {
+        const existingDocs = JSON.parse(localStorage.getItem(docsKey) || "null") || [];
+        const alreadyAttached = Array.isArray(existingDocs) && existingDocs.some(
+          (d: any) => d.id === doc.id || (d.name === doc.name && d.dataUrl === doc.dataUrl),
+        );
+        if (!alreadyAttached) {
+          const nextDocs = [...(Array.isArray(existingDocs) ? existingDocs : []), doc];
+          localStorage.setItem(docsKey, JSON.stringify(nextDocs));
+          window.dispatchEvent(new CustomEvent("orderDocsUpdated", { detail: { orderId } }));
+        }
+      } catch {
+        // Ignore localStorage quota failures during doc sync
+      }
+    }
+
+    const base64Content = typeof doc?.dataUrl === "string" && doc.dataUrl.includes(",")
+      ? doc.dataUrl.slice(doc.dataUrl.indexOf(",") + 1)
+      : "";
+    const emailResult = await sendEmail({
+      templateKey: "digital_license_delivery",
+      to: recipients.join(", "),
+      variables: {
+        client_name: order?.client || "Client",
+        order_number: orderId,
+        item_name: target.itemName,
+        document_name: doc?.name || "",
+        notes: payload.notes || "—",
+      },
+      attachments: base64Content && doc?.name
+        ? [{ filename: doc.name, content: base64Content }]
+        : [],
+      triggerModule: "order_details_digital_provisioned",
+      sentBy: user?.email || user?.name || "System Owner",
+    });
+
     const deliveryDetails = {
-      deliveryMode: mode,
-      deliveryEmail: mode === "Email" ? email.trim() : "",
+      deliveryMode: "Email" as const,
+      deliveryEmail: recipients.join(", "),
     };
     if (target.advanceStatus) {
       updateStatus(target.subId, "Provisioned", deliveryDetails);
@@ -3489,6 +3858,17 @@ export default function MyOrderPage() {
         ? { ...sub, ...deliveryDetails, updatedOn }
         : sub
       ));
+    }
+
+    queueDocumentsAuditNote(
+      `Digital Provisioning Completed (Key received via mail)\nItem: ${target.itemName}\nSent to: ${recipients.join(", ")}\nAttached Document: ${doc?.name || "None"}${payload.notes ? `\nNotes: ${payload.notes}` : ""}`,
+      "status-change",
+    );
+
+    if (emailResult.success) {
+      toast.success(`Details saved and key sent to ${recipients.join(", ")}.`);
+    } else {
+      toast.success(`Details saved and recorded for ${recipients.join(", ")}.`);
     }
     setProvisionedDeliveryTarget(null);
   };
@@ -5104,13 +5484,25 @@ export default function MyOrderPage() {
                             type="button"
                             title="Update digital delivery details"
                             aria-label={`Edit delivery details for ${sub.itemName}`}
-                            onClick={() => setProvisionedDeliveryTarget({
-                              subId: sub.id,
-                              itemName: sub.itemName,
-                              deliveryMode: sub.deliveryMode || sub.commercialTerms?.deliveryMode || "Email",
-                              deliveryEmail: sub.deliveryEmail || "",
-                              advanceStatus: false,
-                            })}
+                            onClick={() => {
+                              const poLine = canonicalPO?.items?.find((li: any) => li.subOrderId === sub.id) || canonicalPO?.items?.[0];
+                              const vp = poLine?.provisioningDetails;
+                              const vendorDoc = vp?.documentName
+                                ? canonicalPO?.documents?.find((d: any) => d.name === vp.documentName)
+                                : undefined;
+                              setProvisionedDeliveryTarget({
+                                subId: sub.id,
+                                itemName: sub.itemName,
+                                deliveryMode: sub.deliveryMode || sub.commercialTerms?.deliveryMode || "Email",
+                                deliveryEmail: sub.deliveryEmail || "",
+                                advanceStatus: false,
+                                vendorMethod: vp?.method,
+                                vendorHowActivated: vp?.howActivated,
+                                vendorActivatedAt: vp?.activatedAt,
+                                vendorNotes: vp?.notes,
+                                vendorDocument: vendorDoc,
+                              });
+                            }}
                             style={{ display: "inline-flex", padding: 0, border: 0, background: "transparent", cursor: "pointer" }}
                           >
                             <StatusPill status={sub.itemStatus} compact />
@@ -5561,6 +5953,12 @@ export default function MyOrderPage() {
           itemName={provisionedDeliveryTarget.itemName}
           initialMode={provisionedDeliveryTarget.deliveryMode}
           initialEmail={provisionedDeliveryTarget.deliveryEmail}
+          clientEmails={provisionedClientEmails}
+          vendorMethod={provisionedDeliveryTarget.vendorMethod}
+          vendorHowActivated={provisionedDeliveryTarget.vendorHowActivated}
+          vendorActivatedAt={provisionedDeliveryTarget.vendorActivatedAt}
+          vendorNotes={provisionedDeliveryTarget.vendorNotes}
+          vendorDocument={provisionedDeliveryTarget.vendorDocument}
           onSave={saveProvisionedDelivery}
           onClose={() => setProvisionedDeliveryTarget(null)}
         />
