@@ -1262,12 +1262,7 @@ export default function InvoiceFormPage() {
                     { label: 'HSN/SAC', align: 'text-left' },
                     ...(hasPhysicalInvoiceItems ? [{ label: 'QTY', align: 'text-center' }] : []),
                     ...(hasPhysicalInvoiceItems
-                      ? isProformaMode
-                        ? [{ label: `UNIT PRICE (${currencySymbol})`, align: 'text-center' }]
-                        : [
-                            { label: `RATE (${currencySymbol})`, align: 'text-center' },
-                            { label: `DISC (${currencySymbol})`, align: 'text-center' },
-                          ]
+                      ? [{ label: `UNIT PRICE (${currencySymbol})`, align: 'text-center' }]
                       : []),
                     ...(hasDigitalInvoiceItems ? [{ label: DIGITAL_PRODUCT_HEADERS.provisioning, align: 'text-center' }] : []),
                     { label: `TAXABLE (${currencySymbol})`, align: 'text-right' },
@@ -1343,55 +1338,29 @@ export default function InvoiceFormPage() {
                         </td>
                       )}
                       {hasPhysicalInvoiceItems && (
-                        isProformaMode ? (
-                          <td className="px-3 py-2 text-center">
-                            {itemIsDigital ? (
-                              <span className="text-sm text-gray-400">—</span>
-                            ) : (
-                              <div className="inline-flex flex-col items-center gap-1">
-                                <input
-                                  type="number" min={0} value={item.rate}
-                                  onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value) || 0)}
-                                  className={`w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center ${hasDiscount ? 'font-bold text-green-700' : ''}`}
-                                />
-                                {hasDiscount && (
-                                  <div className="flex flex-col items-center leading-tight">
-                                    <span className="text-[11px] font-semibold text-green-700 whitespace-nowrap">
-                                      ({Number(discountPct.toFixed(2))}% off)
-                                    </span>
-                                    <del className="text-[11px] text-gray-400 whitespace-nowrap">
-                                      {fmt(originalRate)}
-                                    </del>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        ) : itemIsDigital ? (
-                          <>
-                            <td className="px-3 py-2 text-center text-sm text-gray-400">—</td>
-                            <td className="px-3 py-2 text-center text-sm text-gray-400">—</td>
-                          </>
-                        ) : (
-                          <>
-                            {/* Rate (₹) */}
-                            <td className="px-3 py-2 text-center">
+                        <td className="px-3 py-2 text-center">
+                          {itemIsDigital ? (
+                            <span className="text-sm text-gray-400">—</span>
+                          ) : (
+                            <div className="inline-flex flex-col items-center gap-1">
                               <input
                                 type="number" min={0} value={item.rate}
                                 onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value) || 0)}
-                                className="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
+                                className={`w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center ${hasDiscount ? 'font-bold text-green-700' : ''}`}
                               />
-                            </td>
-                            {/* Disc (₹) */}
-                            <td className="px-3 py-2 text-center">
-                              <input
-                                type="number" min={0} value={item.discount ?? 0}
-                                onChange={(e) => updateItem(item.id, 'discount', Number(e.target.value) || 0)}
-                                className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
-                              />
-                            </td>
-                          </>
-                        )
+                              {hasDiscount && (
+                                <div className="flex flex-col items-center leading-tight">
+                                  <span className="text-[11px] font-semibold text-green-700 whitespace-nowrap">
+                                    ({Number(discountPct.toFixed(2))}% off)
+                                  </span>
+                                  <del className="text-[11px] text-gray-400 whitespace-nowrap">
+                                    {fmt(originalRate)}
+                                  </del>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
                       )}
                       {hasDigitalInvoiceItems && <td className="px-3 py-2 text-center text-sm text-gray-600">{itemIsDigital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : '—'}</td>}
                       {/* Taxable (₹) — computed */}

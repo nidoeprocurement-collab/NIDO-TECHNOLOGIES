@@ -113,9 +113,7 @@ export default function InvoiceDetails() {
             <tr className="bg-gray-50 border-b border-gray-200">
               {(digital
                 ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.provisioning, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
-                : isProforma
-                  ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `UNIT PRICE (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
-                  : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+                : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `UNIT PRICE (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
               ).map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
               ))}
@@ -149,7 +147,7 @@ export default function InvoiceDetails() {
                   <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
                   {digital ? (
                     <td className="px-3 py-3 text-center text-gray-600">{presentation.provisioningTime}</td>
-                  ) : isProforma ? (
+                  ) : (
                     <>
                       <td className="px-3 py-3 text-center">{item.quantity}</td>
                       <td className="px-3 py-3 text-right">
@@ -164,12 +162,6 @@ export default function InvoiceDetails() {
                           fmt(item.rate)
                         )}
                       </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-3 py-3 text-center">{item.quantity}</td>
-                      <td className="px-3 py-3 text-right">{fmt(item.rate)}</td>
-                      <td className="px-3 py-3 text-right text-gray-500">{fmt(disc)}</td>
                     </>
                   )}
                   <td className="px-3 py-3 text-right">{fmt(taxable)}</td>
@@ -285,7 +277,7 @@ export default function InvoiceDetails() {
           <div>
             <div className="flex items-center gap-3 mb-1.5">
               <h1 className="text-xl font-bold text-gray-900">{invoice.invoiceNumber}</h1>
-               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusStyles[invoice.status]}`}>{invoiceStatusLabel(invoice)}</span>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusStyles[invoice.status]}`}>{invoiceStatusLabel(invoice)}</span>
             </div>
             <p className="text-sm text-gray-600">Customer: <span className="font-medium text-gray-900">{invoice.clientName}</span></p>
             {invoice.poReference && <p className="text-sm text-gray-500">PO Reference: {invoice.poReference}</p>}
@@ -321,7 +313,7 @@ export default function InvoiceDetails() {
               >
                 <Download size={15} /> Download PDF
               </button>
-               <button
+              <button
                 type="button"
                 onClick={() => { closeActions(); markSentAndEmail(); }}
                 disabled={sending}
@@ -329,16 +321,16 @@ export default function InvoiceDetails() {
               >
                 <Send size={15} /> {sending ? 'Sending…' : invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
               </button>
-               {invoice.status === 'Sent' && (
-                 <button
-                   type="button"
-                   onClick={() => { closeActions(); sendReminder(); }}
-                   disabled={sending}
-                   className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-                 >
-                   <Send size={15} /> Send Reminder
-                 </button>
-               )}
+              {invoice.status === 'Sent' && (
+                <button
+                  type="button"
+                  onClick={() => { closeActions(); sendReminder(); }}
+                  disabled={sending}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Send size={15} /> Send Reminder
+                </button>
+              )}
               {invoice.status === 'Proforma Invoice' && (
                 <button
                   type="button"
@@ -488,7 +480,7 @@ export default function InvoiceDetails() {
                   {adjustment !== 0 && (
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-500">Round Off Adjustment</td>
-                    <td className="px-4 py-2.5 text-right">{adjustment < 0 ? '−' : ''}{fmt(Math.abs(adjustment))}</td>
+                      <td className="px-4 py-2.5 text-right">{adjustment < 0 ? '−' : ''}{fmt(Math.abs(adjustment))}</td>
                     </tr>
                   )}
                   <tr className="bg-blue-50">
@@ -502,26 +494,26 @@ export default function InvoiceDetails() {
         </div>
       )}
 
-       {/* Payments Tab: payment receipts for this invoice only */}
-       {activeTab === 'payments' && !isProformaInvoice(invoice) && (
+      {/* Payments Tab: payment receipts for this invoice only */}
+      {activeTab === 'payments' && !isProformaInvoice(invoice) && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Payment history</h2>
-               <p className="text-sm text-gray-500">Payment receipts recorded against this invoice.</p>
+              <p className="text-sm text-gray-500">Payment receipts recorded against this invoice.</p>
             </div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-             {invoice.payments.length === 0 && paymentReceipts.length === 0 ? (
+            {invoice.payments.length === 0 && paymentReceipts.length === 0 ? (
               <div className="py-14 text-center text-gray-500">
                 <Receipt size={28} className="mx-auto mb-2 text-gray-300" />
-                 No payment receipts recorded yet.
+                No payment receipts recorded yet.
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">RECEIPT</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">RECEIPT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">DATE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">METHOD</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">REFERENCE</th>
@@ -529,24 +521,24 @@ export default function InvoiceDetails() {
                   </tr>
                 </thead>
                 <tbody>
-                   {invoice.payments.map((p) => (
-                     <tr key={p.id} className="border-b border-gray-100">
-                       <td className="px-4 py-3 text-gray-500">Payment</td>
-                       <td className="px-4 py-3 text-gray-600">{p.date}</td>
-                       <td className="px-4 py-3 text-gray-900">{p.method}</td>
-                       <td className="px-4 py-3 text-gray-600">{p.reference}</td>
-                       <td className="px-4 py-3 text-right font-medium">{fmt(p.amount)}</td>
-                     </tr>
-                   ))}
-                   {paymentReceipts.map((receipt) => (
-                     <tr key={receipt.id} className="border-b border-gray-100">
-                       <td className="px-4 py-3 font-medium text-blue-700">{receipt.paymentNumber}</td>
-                       <td className="px-4 py-3 text-gray-600">{receipt.paymentDate}</td>
-                       <td className="px-4 py-3 text-gray-900">{receipt.paymentMode}</td>
-                       <td className="px-4 py-3 text-gray-600">{receipt.reference || '—'}</td>
-                       <td className="px-4 py-3 text-right font-medium">{fmt(receipt.amountReceived)}</td>
-                     </tr>
-                   ))}
+                  {invoice.payments.map((p) => (
+                    <tr key={p.id} className="border-b border-gray-100">
+                      <td className="px-4 py-3 text-gray-500">Payment</td>
+                      <td className="px-4 py-3 text-gray-600">{p.date}</td>
+                      <td className="px-4 py-3 text-gray-900">{p.method}</td>
+                      <td className="px-4 py-3 text-gray-600">{p.reference}</td>
+                      <td className="px-4 py-3 text-right font-medium">{fmt(p.amount)}</td>
+                    </tr>
+                  ))}
+                  {paymentReceipts.map((receipt) => (
+                    <tr key={receipt.id} className="border-b border-gray-100">
+                      <td className="px-4 py-3 font-medium text-blue-700">{receipt.paymentNumber}</td>
+                      <td className="px-4 py-3 text-gray-600">{receipt.paymentDate}</td>
+                      <td className="px-4 py-3 text-gray-900">{receipt.paymentMode}</td>
+                      <td className="px-4 py-3 text-gray-600">{receipt.reference || '—'}</td>
+                      <td className="px-4 py-3 text-right font-medium">{fmt(receipt.amountReceived)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
