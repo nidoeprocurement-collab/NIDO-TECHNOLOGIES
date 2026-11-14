@@ -10,7 +10,10 @@ import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore"
 import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
 import { sendEmail } from "@/lib/emailUnavailable";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { canCancelOrderByPurchaseOrders } from "@/lib/orderCancellationEligibility";
+import {
+  canCancelOrderByPurchaseOrders,
+  isWithinClientCancellationWindow,
+} from "@/lib/orderCancellationEligibility";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { attachPOPdfToPO, downloadPOPdf, getPODataUri } from "@/lib/generatePO";
@@ -3590,16 +3593,37 @@ export default function MyOrderPage() {
     sub => sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled",
   );
   const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
-  const canCancelOrder = !isAssignmentPending && canCancelOrderByPO && !hasCancellationCutoffItem;
-  const cancelOrderUnavailableReason = isAssignmentPending
-    ? "Complete and save Assignment for this order before performing any actions."
-    : !canCancelOrderByPO && hasCancellationCutoffItem
-    ? "Active purchase orders and shipment or digital provisioning progress both block cancellation."
-    : !canCancelOrderByPO
-      ? "Cancel all active purchase orders before cancelling this order."
+  const hasPhysicalItems = subOrders.some((sub) =>
+    !isDigitalDocumentProduct({
+      productType: sub.commercialTerms?.productType,
+      itemName: sub.itemName,
+    }),
+  );
+  const hasConfirmedOrderPO = orderPOs.some((po) => isConfirmedPO(po));
+  const isWithinClientCancelWindow = isWithinClientCancellationWindow(order);
+  const canCancelOrder = isClientPortalUser
+    ? hasPhysicalItems &&
+      isWithinClientCancelWindow &&
+      !hasConfirmedOrderPO &&
+      !hasCancellationCutoffItem
+    : !isAssignmentPending && canCancelOrderByPO && !hasCancellationCutoffItem;
+  const cancelOrderUnavailableReason = isClientPortalUser
+    ? !isWithinClientCancelWindow
+      ? "Order cancellation is only available within 24 hours of placing the order."
       : hasCancellationCutoffItem
         ? "This order cannot be cancelled after an item has shipped or a digital license has been provisioned."
-        : "";
+        : hasConfirmedOrderPO
+          ? "This order cannot be cancelled because a purchase order has already been confirmed."
+          : ""
+    : isAssignmentPending
+      ? "Complete and save Assignment for this order before performing any actions."
+      : !canCancelOrderByPO && hasCancellationCutoffItem
+      ? "Active purchase orders and shipment or digital provisioning progress both block cancellation."
+      : !canCancelOrderByPO
+        ? "Cancel all active purchase orders before cancelling this order."
+        : hasCancellationCutoffItem
+          ? "This order cannot be cancelled after an item has shipped or a digital license has been provisioned."
+          : "";
   const handleCancelOrder = async (reason: string) => {
     if (isOrderCancelled || !canCancelOrder) return;
     try {
@@ -5005,8 +5029,8 @@ export default function MyOrderPage() {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "flex-start", gap: 8, flexShrink: 0 }}>
-            {/* Cancel Order is available before PO creation and after all POs are cancelled. */}
-            {!isClientPortalUser && (
+            {/* Cancel Order is available before PO creation and after all POs are cancelled (and for clients on physical orders within 24 hours). */}
+            {(!isClientPortalUser || hasPhysicalItems || isOrderCancelled) && (
               isOrderCancelled ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
