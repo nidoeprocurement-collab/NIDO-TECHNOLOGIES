@@ -7,9 +7,9 @@ import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import {
   formatPartiallyProvisionedStatus,
-  deriveDigitalFulfillmentStatus,
-  getDigitalFulfillmentStatusIndex,
-  getDigitalFulfillmentStatusSequence,
+  deriveVendorDigitalFulfillmentStatus,
+  getVendorDigitalFulfillmentStatusIndex,
+  getVendorDigitalFulfillmentStatusSequence,
   hasDigitalLicenseBeenProvisioned,
 } from "@/lib/digitalFulfillmentStatuses";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
@@ -108,6 +108,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }
   Provisioning: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
   "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Provisioned: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Validated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Activated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Completed: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Cancelled:  { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
@@ -464,7 +465,7 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
   const baseStatus = String(status || "").replace(/\s+\([^)]*\)$/, "");
   const s = STATUS_STYLE[status] || STATUS_STYLE[baseStatus] || STATUS_STYLE["Pending"];
   const statusSequence = digital
-    ? getDigitalFulfillmentStatusSequence(quantity)
+    ? getVendorDigitalFulfillmentStatusSequence(quantity)
     : ITEM_STATUS_SEQUENCE;
   const canPartiallyProvision = Number.isInteger(Number(quantity)) && Number(quantity) > 1;
   const physicalNextStatus: Record<string, string> = {
@@ -477,7 +478,7 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
     "Partially Delivered": "Delivered",
   };
   const currentStatusIndex = digital
-    ? getDigitalFulfillmentStatusIndex(status, quantity)
+    ? getVendorDigitalFulfillmentStatusIndex(status, quantity)
     : ITEM_STATUS_SEQUENCE.indexOf(baseStatus);
   const nextStatus = digital
     ? currentStatusIndex >= 0
@@ -504,8 +505,11 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
 
   if (disabled) {
     return (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, opacity: 0.7 }}>
-        {status}
+      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-start", gap: 1, padding: "4px 10px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, opacity: 0.7 }}>
+        <span>{status}</span>
+        {digital && status === "Validated" && (
+          <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.9 }}>(Ready to move for clients)</span>
+        )}
       </span>
     );
   }
@@ -514,19 +518,33 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true, digita
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button
         onClick={() => setOpen(v => !v)}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, cursor: "pointer", fontFamily: "inherit" }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
       >
-        {status} ▾
+        <span style={{ display: "inline-flex", flexDirection: "column", lineHeight: 1.2 }}>
+          <span>{status}</span>
+          {digital && status === "Validated" && (
+            <span style={{ fontSize: 10, fontWeight: 400 }}>(Ready to move for clients)</span>
+          )}
+        </span>
+        <span>▾</span>
       </button>
       {open && (
-        <div style={{ position: "absolute", left: 0, top: 32, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 200, minWidth: 160, overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 200, minWidth: 190, overflow: "hidden" }}>
           {itemStatuses.map(opt => (
             <button
               key={opt}
               onClick={() => { onChange(opt); setOpen(false); }}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 14px", border: "none", background: opt === status ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: opt === status ? "#2563eb" : "#374151", fontWeight: opt === status ? 600 : 400 }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%", padding: "9px 14px", border: "none", background: opt === status ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13, fontFamily: "inherit", color: opt === status ? "#2563eb" : "#374151", fontWeight: opt === status ? 600 : 400 }}
             >
-              {opt} {opt === status && <span>✓</span>}
+              <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.25 }}>
+                <span>{opt}</span>
+                {digital && opt === "Validated" && (
+                  <span style={{ fontSize: 10.5, fontWeight: 400, color: opt === status ? "#2563eb" : "#6b7280" }}>
+                    (Ready to move for clients)
+                  </span>
+                )}
+              </span>
+              {opt === status && <span>✓</span>}
             </button>
           ))}
         </div>
@@ -1089,13 +1107,13 @@ export default function VendorOrderDetailPage() {
     : isDigitalOrder
       ? activeDigitalItems.length === 0
         ? "Cancelled"
-        : deriveDigitalFulfillmentStatus(activeDigitalItems.map(item => ({
+        : deriveVendorDigitalFulfillmentStatus(activeDigitalItems.map(item => ({
             status: item.status || "Pending",
             quantity: item.qty,
           })))
       : orderStatus;
   const digitalStageIndex = isDigitalOrder
-    ? getDigitalFulfillmentStatusIndex(vendorDisplayStatus)
+    ? getVendorDigitalFulfillmentStatusIndex(vendorDisplayStatus)
     : -1;
   const itemTableGridTemplate = isDigitalOrder
     ? "40px 1fr 160px 140px 160px 180px 100px"
@@ -1108,11 +1126,11 @@ export default function VendorOrderDetailPage() {
     if (digital && (status === "Shipped" || status === "Delivered")) return;
     const currentIndex = currentItem
       ? digital
-        ? getDigitalFulfillmentStatusIndex(currentItem.status, currentItem.qty)
+        ? getVendorDigitalFulfillmentStatusIndex(currentItem.status, currentItem.qty)
         : ITEM_STATUS_SEQUENCE.indexOf(currentItem.status)
       : -1;
     const nextIndex = digital
-      ? getDigitalFulfillmentStatusIndex(status, currentItem?.qty)
+      ? getVendorDigitalFulfillmentStatusIndex(status, currentItem?.qty)
       : ITEM_STATUS_SEQUENCE.indexOf(status);
     if (
       currentIndex >= 0 &&
@@ -1720,8 +1738,8 @@ export default function VendorOrderDetailPage() {
             {isDigitalOrder ? (
               <div>
                 <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Digital fulfillment stages</div>
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${getDigitalFulfillmentStatusSequence().length}, minmax(0, 1fr))`, gap: 5 }}>
-                  {getDigitalFulfillmentStatusSequence().map((stage, index) => {
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${getVendorDigitalFulfillmentStatusSequence().length}, minmax(0, 1fr))`, gap: 5 }}>
+                  {getVendorDigitalFulfillmentStatusSequence().map((stage, index) => {
                     const done = digitalStageIndex > index;
                     const current = digitalStageIndex === index;
                     return (
@@ -1730,6 +1748,11 @@ export default function VendorOrderDetailPage() {
                         <span style={{ display: "block", fontSize: 9.5, lineHeight: 1.25, color: current ? "#1d4ed8" : "#6b7280", fontWeight: current ? 700 : 500 }}>
                           {stage}
                         </span>
+                        {stage === "Validated" && (
+                          <span style={{ display: "block", fontSize: 8.5, lineHeight: 1.2, color: current ? "#1d4ed8" : "#9ca3af", fontWeight: 500 }}>
+                            (Ready to move for clients)
+                          </span>
+                        )}
                       </div>
                     );
                   })}

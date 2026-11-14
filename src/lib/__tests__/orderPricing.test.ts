@@ -165,7 +165,7 @@ describe("calculateRemainingOrderPricing", () => {
     expect(pricing.platformFee).toBeCloseTo(expectedPlatformFee, 12);
     expect(pricing.grandTotal).toBeCloseTo(
       pricing.subtotalBeforeDiscount + pricing.totalGst + pricing.shippingDeliveryFee
-        + pricing.platformFee - pricing.discountAmount,
+      + pricing.platformFee - pricing.discountAmount,
       12,
     );
   });

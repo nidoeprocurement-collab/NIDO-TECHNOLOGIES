@@ -33,7 +33,7 @@ interface Order {
 
 const LEGACY_PO_STATUSES: OrderStatus[] = [
   "Pending", "Processing", "Pending Shipping", "Provisioning", "Partially Provisioned", "Provisioned",
-  "Activated", "Completed", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Closed", "Cancelled",
+  "Validated", "Activated", "Completed", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Closed", "Cancelled",
 ];
 const PAGE_SIZE = 10;
 
@@ -49,6 +49,7 @@ const badgeStyles: Record<string, { bg: string; color: string; border: string }>
   Provisioning:          { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
   "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Provisioned:           { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Validated:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Activated:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Completed:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Draft:                 { bg: "#fafafa", color: "#777",    border: "#ddd" },
@@ -59,8 +60,11 @@ const badgeStyles: Record<string, { bg: string; color: string; border: string }>
 function Badge({ status }: { status: OrderStatus }) {
   const s = badgeStyles[status] || { bg: "#f3f4f6", color: "#4b5563", border: "#d1d5db" };
   return (
-    <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-      {status}
+    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", padding: "3px 11px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, lineHeight: 1.25 }}>
+      <span>{status}</span>
+      {status === "Validated" && (
+        <span style={{ fontSize: 10, fontWeight: 400 }}>(Ready to move for clients)</span>
+      )}
     </span>
   );
 }

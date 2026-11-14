@@ -8,9 +8,23 @@ const DIGITAL_FULFILLMENT_STAGES = [
   "Completed",
 ];
 
+const VENDOR_DIGITAL_FULFILLMENT_STAGES = [
+  "Pending",
+  "Processing",
+  "Provisioning",
+  "Partially Provisioned",
+  "Provisioned",
+  "Validated",
+];
+
 /** Digital fulfillment has its own stages; quantities are recorded from actual work, never estimated. */
 export function getDigitalFulfillmentStatusSequence(_quantity?: number | string): string[] {
   return [...DIGITAL_FULFILLMENT_STAGES];
+}
+
+/** Vendor-facing digital fulfillment stops at Validated (Ready to move for clients) instead of Activated/Completed. */
+export function getVendorDigitalFulfillmentStatusSequence(_quantity?: number | string): string[] {
+  return [...VENDOR_DIGITAL_FULFILLMENT_STAGES];
 }
 
 /** Format a partial milestone only when the operator supplies an actual completed count. */
@@ -88,7 +102,38 @@ export function getDigitalFulfillmentStatusIndex(
   }
 
   const stage = normalizedStatus.replace(/\s+\([^)]*\)$/, "");
+  if (stage === "Validated") {
+    return sequence.indexOf("Activated");
+  }
   return sequence.findIndex((option) => option === stage);
+}
+
+/** Finds a vendor-facing digital stage, mapping legacy Activated/Completed to Validated. */
+export function getVendorDigitalFulfillmentStatusIndex(
+  status: string,
+  quantity?: number | string,
+): number {
+  const sequence = getVendorDigitalFulfillmentStatusSequence(quantity);
+  const normalizedStatus = String(status || "").trim();
+  if (normalizedStatus.toLowerCase() === "confirmed") {
+    return sequence.indexOf("Processing");
+  }
+
+  const stage = normalizedStatus.replace(/\s+\([^)]*\)$/, "");
+  if (stage === "Activated" || stage === "Completed") {
+    return sequence.indexOf("Validated");
+  }
+  return sequence.findIndex((option) => option === stage);
+}
+
+export function deriveVendorDigitalFulfillmentStatus(
+  lines: Array<{ status: string; quantity: number | string }>,
+): string {
+  const derived = deriveDigitalFulfillmentStatus(lines);
+  if (derived === "Activated" || derived === "Completed") {
+    return "Validated";
+  }
+  return derived;
 }
 
 /** The digital equivalent of shipment progress begins when any license is provisioned. */
