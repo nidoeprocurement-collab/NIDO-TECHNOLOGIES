@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { StoredClient } from "@/lib/clientStore";
+import { getPortalUsersByClient, type PortalUser } from "@/lib/portalUserStore";
 import {
   type ActivityCategory,
   type ClientInventoryData,
@@ -179,6 +180,10 @@ function exportRowsAsCsv(filename: string, headers: string[], rows: (string | nu
 export default function ClientInventoryPage({ client }: Props) {
   const [data, setData] = useState<ClientInventoryData>(() => getClientInventory(client.id));
   const [subTab, setSubTab] = useState<InventorySubTab>("available");
+  const clientUsers = useMemo(
+    () => getPortalUsersByClient(client.id).filter((u) => u.status !== "inactive"),
+    [client.id],
+  );
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<"all" | InventoryAssetType>("all");
@@ -217,11 +222,72 @@ export default function ClientInventoryPage({ client }: Props) {
     condition: "New" as "New" | "Good" | "Active" | "Fair",
   });
   const [assignForm, setAssignForm] = useState({
+    userId: "",
     assignee: "",
     employeeId: "",
     department: "IT",
     location: "Bengaluru",
+    email: "",
+    role: "",
   });
+
+  const extractUserDetails = (user: PortalUser) => {
+    const details = (user.details || {}) as Record<string, unknown>;
+    const employeeId =
+      String(details.employeeId || "").trim() ||
+      `EMP-${user.id.replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase() || "0101"}`;
+    const department = String(details.department || "").trim() || "IT";
+    const clientCity =
+      client.billingCity ||
+      client.locationDetails?.city ||
+      "Bengaluru";
+    const rawLoc = String(
+      details.location ||
+      details.homeLocation ||
+      details.city ||
+      (details.locationAccess && details.locationAccess !== "All Locations" ? details.locationAccess : "") ||
+      "",
+    ).trim();
+    const location = rawLoc || clientCity;
+    return {
+      userId: user.id,
+      assignee: user.name,
+      employeeId,
+      department,
+      location,
+      email: user.email || "",
+      role: user.role || "",
+    };
+  };
+
+  const openAssignModal = (item: InventoryItemRecord, prefillName?: string) => {
+    const matchedUser = prefillName
+      ? clientUsers.find((u) => u.name.toLowerCase() === prefillName.toLowerCase())
+      : undefined;
+    if (matchedUser) {
+      setAssignForm(extractUserDetails(matchedUser));
+    } else {
+      setAssignForm({
+        userId: "",
+        assignee: prefillName || "",
+        employeeId: "",
+        department: item.department || "IT",
+        location: item.location || client.billingCity || "Bengaluru",
+        email: "",
+        role: "",
+      });
+    }
+    setAssignModalItem(item);
+  };
+
+  const handleRecipientUserChange = (userId: string) => {
+    const user = clientUsers.find((u) => u.id === userId);
+    if (!user) {
+      setAssignForm((prev) => ({ ...prev, userId: "", assignee: "", employeeId: "", email: "", role: "" }));
+      return;
+    }
+    setAssignForm(extractUserDetails(user));
+  };
   const [returnCondition, setReturnCondition] = useState<"Good" | "New" | "Fair">("Good");
   const [transferLocation, setTransferLocation] = useState("Hyderabad · Store B");
   const [repairForm, setRepairForm] = useState({
@@ -458,7 +524,7 @@ export default function ClientInventoryPage({ client }: Props) {
 
   const handleConfirmAssign = () => {
     if (!assignModalItem || !assignForm.assignee.trim()) {
-      toast.error("Please enter recipient name");
+      toast.error("Please select a recipient user");
       return;
     }
     const prevStatus = assignModalItem.status === "reserved" ? "Reserved" : "Available";
@@ -498,8 +564,8 @@ export default function ClientInventoryPage({ client }: Props) {
       summaryNote: `Assigned ${assignModalItem.name} (${assignModalItem.assetId}) to ${assignForm.assignee.trim()}`,
     });
     setAssignModalItem(null);
-    setAssignForm({ assignee: "", employeeId: "", department: "IT", location: "Bengaluru" });
-    toast.success(`${assignModalItem.name} assigned`);
+    setAssignForm({ userId: "", assignee: "", employeeId: "", department: "IT", location: "Bengaluru", email: "", role: "" });
+    toast.success(`${assignModalItem.name} assigned to ${assignForm.assignee.trim()}`);
   };
 
   const handleConfirmReturn = () => {
@@ -1304,10 +1370,7 @@ export default function ClientInventoryPage({ client }: Props) {
                               <div className="inline-flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setAssignForm({ assignee: "", employeeId: "", department: "IT", location: "Bengaluru" });
-                                    setAssignModalItem(item);
-                                  }}
+                                  onClick={() => openAssignModal(item)}
                                   className="rounded-lg border border-blue-200 bg-white px-3.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50"
                                 >
                                   {actionLabelForAvailable(item)}
@@ -1407,15 +1470,7 @@ export default function ClientInventoryPage({ client }: Props) {
                               <div className="inline-flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setAssignForm({
-                                      assignee: item.reservedFor || "",
-                                      employeeId: "",
-                                      department: item.department || "IT",
-                                      location: item.location,
-                                    });
-                                    setAssignModalItem(item);
-                                  }}
+                                  onClick={() => openAssignModal(item, item.reservedFor)}
                                   className="rounded-lg border border-blue-200 bg-white px-3.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50"
                                 >
                                   {actionLabelForAvailable(item)}
@@ -1780,15 +1835,7 @@ export default function ClientInventoryPage({ client }: Props) {
                 <>
                   <button
                     type="button"
-                    onClick={() => {
-                      setAssignForm({
-                        assignee: "",
-                        employeeId: "",
-                        department: selectedAsset.department || "IT",
-                        location: selectedAsset.location,
-                      });
-                      setAssignModalItem(selectedAsset);
-                    }}
+                    onClick={() => openAssignModal(selectedAsset)}
                     className="rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 font-semibold text-gray-700 hover:bg-gray-50"
                   >
                     Reassign
@@ -1814,15 +1861,7 @@ export default function ClientInventoryPage({ client }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setAssignForm({
-                        assignee: selectedAsset.reservedFor || "",
-                        employeeId: "",
-                        department: selectedAsset.department || "IT",
-                        location: selectedAsset.location,
-                      });
-                      setAssignModalItem(selectedAsset);
-                    }}
+                    onClick={() => openAssignModal(selectedAsset, selectedAsset.reservedFor)}
                     className="rounded-lg bg-blue-600 px-4 py-1.5 font-semibold text-white hover:bg-blue-700"
                   >
                     Assign Now
@@ -1988,22 +2027,35 @@ export default function ClientInventoryPage({ client }: Props) {
       {assignModalItem && (
         <ModalShell title={`${actionLabelForAvailable(assignModalItem)} — ${assignModalItem.name}`} onClose={() => setAssignModalItem(null)}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div>
+            <div className="sm:col-span-2">
               <label className="block font-semibold text-gray-600 mb-1">Recipient Name *</label>
-              <input
-                value={assignForm.assignee}
-                onChange={(e) => setAssignForm({ ...assignForm, assignee: e.target.value })}
-                placeholder="e.g. Priya Sharma"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
-              />
+              <select
+                value={assignForm.userId}
+                onChange={(e) => handleRecipientUserChange(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-blue-400 focus:outline-none"
+              >
+                <option value="">
+                  {clientUsers.length > 0 ? "Select client user…" : "No client users found"}
+                </option>
+                {clientUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}{u.role ? ` — ${u.role}` : ""}
+                  </option>
+                ))}
+              </select>
+              {assignForm.email && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {assignForm.role ? `${assignForm.role} · ` : ""}{assignForm.email}
+                </p>
+              )}
             </div>
             <div>
               <label className="block font-semibold text-gray-600 mb-1">Employee ID</label>
               <input
                 value={assignForm.employeeId}
                 onChange={(e) => setAssignForm({ ...assignForm, employeeId: e.target.value })}
-                placeholder="e.g. EMP-0102"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                placeholder="Auto-filled on user selection"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs bg-gray-50/50"
               />
             </div>
             <div>
@@ -2011,12 +2063,14 @@ export default function ClientInventoryPage({ client }: Props) {
               <select
                 value={assignForm.department}
                 onChange={(e) => setAssignForm({ ...assignForm, department: e.target.value })}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs"
               >
-                {["IT", "Finance", "Sales", "Operations", "Support"].map((d) => <option key={d} value={d}>{d}</option>)}
+                {Array.from(new Set(["IT", "Finance", "Sales", "Operations", "Support", assignForm.department].filter(Boolean))).map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
               </select>
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="block font-semibold text-gray-600 mb-1">Location</label>
               <input
                 value={assignForm.location}
