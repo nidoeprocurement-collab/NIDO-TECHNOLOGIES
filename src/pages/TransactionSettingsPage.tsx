@@ -46,7 +46,7 @@ export default function TransactionSettingsPage() {
     overrideBankAccountId?: string;
   }>({
     open: false,
-    documentType: 'Tax Invoice',
+    documentType: 'Invoices',
   });
 
   const updateStore = (
@@ -97,7 +97,7 @@ export default function TransactionSettingsPage() {
               onClick={() =>
                 setPdfPreviewState({
                   open: true,
-                  documentType: 'Tax Invoice',
+                  documentType: 'Invoices',
                 })
               }
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold border border-slate-300 rounded-lg bg-white text-slate-700 hover:bg-slate-50"
@@ -180,7 +180,7 @@ export default function TransactionSettingsPage() {
             onPreviewPdfWithBank={(bankId) =>
               setPdfPreviewState({
                 open: true,
-                documentType: 'Tax Invoice',
+                documentType: 'Invoices',
                 overrideBankAccountId: bankId,
               })
             }
