@@ -1798,6 +1798,18 @@ function DocumentsNotesTab({
         return true;
       }
     }
+    if (!doc?.dataUrl && (doc?.poNumber || doc?.type === "Purchase Order")) {
+      const poKey = doc.poNumber || String(doc.name || "").replace(/\.pdf$/i, "");
+      const linkedPO = poKey ? getPOByNumber(poKey) : undefined;
+      if (linkedPO) {
+        void downloadPOPdf(linkedPO).then(() => {
+          onDocumentActivity?.(`Document downloaded: ${doc.name || "document"} (${doc.type || "Document"}).`);
+        }).catch(() => {
+          setDocFeedback({ type: "error", message: "The purchase order PDF could not be generated. Please try again." });
+        });
+        return true;
+      }
+    }
     if (!doc?.dataUrl) {
       setDocFeedback({ type: "error", message: "This document is not available for download." });
       return false;

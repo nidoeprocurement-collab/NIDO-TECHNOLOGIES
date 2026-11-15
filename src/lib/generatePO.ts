@@ -489,11 +489,13 @@ export async function getPODataUri(po: StoredPO): Promise<string> {
   return generatePOPdfBase64(po);
 }
 
-/** Generate the PO PDF and attach/replace it in the PO's Documents list. */
+/** Generate the PO PDF and attach/replace it in both the PO's Documents list and the linked Order's Documents tab. */
 export async function attachPOPdfToPO(poNumber: string): Promise<PODocument[]> {
   const latest = getPOByNumber(poNumber);
   if (!latest) return [];
   const dataUrl = await getPODataUri(latest);
+  const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : '';
+  const size = `${Math.max(1, Math.round((base64.length * 0.75) / 1024))} KB`;
   const uploadedOn = new Date().toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -506,6 +508,7 @@ export async function attachPOPdfToPO(poNumber: string): Promise<PODocument[]> {
     type: 'Purchase Order',
     uploadedBy: 'System',
     uploadedOn,
+    size,
     dataUrl,
   };
   const existingDocs = Array.isArray(latest.documents) ? latest.documents : [];
@@ -513,7 +516,55 @@ export async function attachPOPdfToPO(poNumber: string): Promise<PODocument[]> {
     pdfDoc,
     ...existingDocs.filter((doc) => doc.id !== pdfDoc.id && doc.name !== pdfDoc.name),
   ];
-  updatePO(latest.poNumber, { documents: nextDocuments });
+  try {
+    updatePO(latest.poNumber, { documents: nextDocuments });
+  } catch {
+    const { dataUrl: _omitted, ...compactDoc } = pdfDoc;
+    updatePO(latest.poNumber, {
+      documents: [compactDoc, ...existingDocs.filter((doc) => doc.id !== pdfDoc.id && doc.name !== pdfDoc.name)],
+    });
+  }
+
+  // Also attach to the linked Master Order's Documents tab (`nido_docs_<orderId>`)
+  if (latest.orderId && typeof window !== 'undefined') {
+    const orderDocsKey = `nido_docs_${latest.orderId}`;
+    let existingOrderDocs: Array<Record<string, any>> = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem(orderDocsKey) || '[]');
+      existingOrderDocs = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      existingOrderDocs = [];
+    }
+    const orderDocEntry = {
+      ...pdfDoc,
+      poNumber: latest.poNumber,
+      description: `Confirmed Purchase Order ${latest.poNumber}${latest.vendorName ? ` for ${latest.vendorName}` : ''}.`,
+    };
+    const nextOrderDocs = [
+      orderDocEntry,
+      ...existingOrderDocs.filter((doc) => doc.id !== orderDocEntry.id && doc.name !== orderDocEntry.name),
+    ];
+    try {
+      localStorage.setItem(orderDocsKey, JSON.stringify(nextOrderDocs));
+    } catch {
+      const { dataUrl: _omitted, ...compactOrderDoc } = orderDocEntry;
+      try {
+        localStorage.setItem(
+          orderDocsKey,
+          JSON.stringify([
+            compactOrderDoc,
+            ...existingOrderDocs
+              .filter((doc) => doc.id !== orderDocEntry.id && doc.name !== orderDocEntry.name)
+              .map((doc) => (doc.poNumber && doc.dataUrl ? { ...doc, dataUrl: undefined } : doc)),
+          ]),
+        );
+      } catch {
+        // Ignore if storage is completely full
+      }
+    }
+    window.dispatchEvent(new CustomEvent('orderDocsUpdated', { detail: { orderId: latest.orderId } }));
+  }
+
   return nextDocuments;
 }
 
