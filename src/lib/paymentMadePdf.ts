@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
-import { formatCurrency } from './formatters';
+import { formatCurrency, getCurrencySymbol } from './formatters';
 
 // ── Colour palette (identical to invoicePdf) ──────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -36,7 +36,12 @@ function fmt2(value: number): string {
 }
 
 function money(value: number): string {
-  return formatCurrency(value, loadConfig());
+  const config = loadConfig();
+  const formatted = formatCurrency(value, config);
+  const symbol = getCurrencySymbol(config);
+  return formatted.startsWith(symbol)
+    ? formatted.slice(symbol.length).trimStart()
+    : formatted;
 }
 
 function fmtDate(value: string): string {

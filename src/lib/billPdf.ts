@@ -55,7 +55,12 @@ function fmt2(value: number): string {
 }
 
 function money(value: number): string {
-  return formatCurrency(value, loadConfig());
+  const config = loadConfig();
+  const formatted = formatCurrency(value, config);
+  const symbol = getCurrencySymbol(config);
+  return formatted.startsWith(symbol)
+    ? formatted.slice(symbol.length).trimStart()
+    : formatted;
 }
 
 function splitLines(value: string | undefined): string[] {
