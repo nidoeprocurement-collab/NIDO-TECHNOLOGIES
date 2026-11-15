@@ -328,6 +328,7 @@ const NidoUserDetailPage = lazy(() => import("@/pages/NidoUserDetailPage"));
 const NidoUserEditPage = lazy(() => import("@/pages/NidoUserEditPage"));
 const TaxSettingsPage = lazy(() => import("@/pages/TaxSettingsPage"));
 const SLASettingsPage = lazy(() => import("@/pages/SLASettingsPage"));
+const TransactionSettingsPage = lazy(() => import("@/pages/TransactionSettingsPage"));
 
 function RootRedirect() {
   const { isClientPortalUser } = useAuth();
@@ -682,6 +683,17 @@ function AppRoutes() {
               <Route
                 path="configuration/stock-management"
                 element={<StockManagementPage />}
+              />
+              <Route
+                path="configuration/transaction-settings"
+                element={
+                  <PageErrorBoundary
+                    title="Transaction Settings failed to load"
+                    resetKey={location.pathname}
+                  >
+                    <TransactionSettingsPage />
+                  </PageErrorBoundary>
+                }
               />
               <Route
                 path="configuration/master-catalogue"

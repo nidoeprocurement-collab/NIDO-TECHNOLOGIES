@@ -13,6 +13,7 @@ import {
   Gauge,
   Boxes,
   UserCheck,
+  Receipt,
 } from "lucide-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 
@@ -101,6 +102,12 @@ const menuItems = [
     description: "Centralized inventory — single source of truth for all vendor stock",
     icon: Boxes,
     href: "/configuration/stock-management",
+  },
+  {
+    title: "Transaction Settings",
+    description: "Manage transaction documents, terms and conditions, banking information, digital signatures, and email templates.",
+    icon: Receipt,
+    href: "/configuration/transaction-settings",
   },
 ];
 
