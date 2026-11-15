@@ -1155,10 +1155,20 @@ export default function ClientInventoryPage({ client }: Props) {
         {/* ── Table ─────────────────────────────────────────────────────────────── */}
         <div className="overflow-x-auto">
           {subTab !== "activity" ? (
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[980px] table-fixed text-xs">
+              <colgroup>
+                <col className="w-[44px]" />
+                <col className="w-[22%]" />
+                <col className="w-[15%]" />
+                <col className="w-[15%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/70 text-[11px] font-semibold text-gray-600">
-                  <th className="w-10 px-4 py-3 text-left">
+                  <th className="pl-5 pr-2 py-3 text-left">
                     <input
                       type="checkbox"
                       checked={pagedItems.length > 0 && pagedItems.every((i) => selectedIds.has(i.id))}
@@ -1168,46 +1178,46 @@ export default function ClientInventoryPage({ client }: Props) {
                   </th>
                   {subTab === "available" && (
                     <>
-                      <th className="px-3 py-3 text-left">Item / Asset ID</th>
-                      <th className="px-3 py-3 text-left">Type</th>
-                      <th className="px-3 py-3 text-left">Location</th>
-                      <th className="px-3 py-3 text-left">Available</th>
-                      <th className="px-3 py-3 text-left">Condition</th>
-                      <th className="px-3 py-3 text-left">Idle For</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-4 py-3 text-left">Item / Asset ID</th>
+                      <th className="px-4 py-3 text-left">Type</th>
+                      <th className="px-4 py-3 text-left">Location</th>
+                      <th className="px-4 py-3 text-left">Available</th>
+                      <th className="px-4 py-3 text-left">Condition</th>
+                      <th className="px-4 py-3 text-left">Idle For</th>
+                      <th className="pl-4 pr-8 py-3 text-left">Action</th>
                     </>
                   )}
                   {subTab === "assigned" && (
                     <>
-                      <th className="px-3 py-3 text-left">Item / Asset ID</th>
-                      <th className="px-3 py-3 text-left">Assigned To</th>
-                      <th className="px-3 py-3 text-left">Department</th>
-                      <th className="px-3 py-3 text-left">Location</th>
-                      <th className="px-3 py-3 text-left">Assigned On</th>
-                      <th className="px-3 py-3 text-left">Usage Status</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-4 py-3 text-left">Item / Asset ID</th>
+                      <th className="px-4 py-3 text-left">Assigned To</th>
+                      <th className="px-4 py-3 text-left">Department</th>
+                      <th className="px-4 py-3 text-left">Location</th>
+                      <th className="px-4 py-3 text-left">Assigned On</th>
+                      <th className="px-4 py-3 text-left">Usage Status</th>
+                      <th className="pl-4 pr-8 py-3 text-left">Action</th>
                     </>
                   )}
                   {subTab === "reserved" && (
                     <>
-                      <th className="px-3 py-3 text-left">Item / Reservation ID</th>
-                      <th className="px-3 py-3 text-left">Reserved For</th>
-                      <th className="px-3 py-3 text-left">Qty</th>
-                      <th className="px-3 py-3 text-left">Location</th>
-                      <th className="px-3 py-3 text-left">Reserved Until</th>
-                      <th className="px-3 py-3 text-left">Status</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-4 py-3 text-left">Item / Reservation ID</th>
+                      <th className="px-4 py-3 text-left">Reserved For</th>
+                      <th className="px-4 py-3 text-left">Qty</th>
+                      <th className="px-4 py-3 text-left">Location</th>
+                      <th className="px-4 py-3 text-left">Reserved Until</th>
+                      <th className="px-4 py-3 text-left">Status</th>
+                      <th className="pl-4 pr-8 py-3 text-left">Action</th>
                     </>
                   )}
                   {subTab === "repair" && (
                     <>
-                      <th className="px-3 py-3 text-left">Asset / Repair ID</th>
-                      <th className="px-3 py-3 text-left">Reported Issue</th>
-                      <th className="px-3 py-3 text-left">Repair Provider</th>
-                      <th className="px-3 py-3 text-left">Sent On</th>
-                      <th className="px-3 py-3 text-left">Expected Return</th>
-                      <th className="px-3 py-3 text-left">Repair Status</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-4 py-3 text-left">Asset / Repair ID</th>
+                      <th className="px-4 py-3 text-left">Reported Issue</th>
+                      <th className="px-4 py-3 text-left">Repair Provider</th>
+                      <th className="px-4 py-3 text-left">Sent On</th>
+                      <th className="px-4 py-3 text-left">Expected Return</th>
+                      <th className="px-4 py-3 text-left">Repair Status</th>
+                      <th className="pl-4 pr-8 py-3 text-left">Action</th>
                     </>
                   )}
                 </tr>
@@ -1230,7 +1240,7 @@ export default function ClientInventoryPage({ client }: Props) {
                           isSelected ? "bg-blue-50/50" : "hover:bg-gray-50/70"
                         }`}
                       >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="pl-5 pr-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedIds.has(item.id)}
@@ -1238,7 +1248,7 @@ export default function ClientInventoryPage({ client }: Props) {
                             className="rounded border-gray-300"
                           />
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100">
                               <AssetIcon item={item} size={14} />
@@ -1261,23 +1271,23 @@ export default function ClientInventoryPage({ client }: Props) {
                         {/* Available columns */}
                         {subTab === "available" && (
                           <>
-                            <td className="px-3 py-2.5"><TypeBadge type={item.type} /></td>
-                            <td className="px-3 py-2.5 text-gray-600">
+                            <td className="px-4 py-2.5"><TypeBadge type={item.type} /></td>
+                            <td className="px-4 py-2.5 text-gray-600">
                               <span className="inline-flex items-center gap-1">
                                 {item.location === "Company-wide" ? <Users size={12} className="text-gray-400" /> : <MapPin size={12} className="text-gray-400" />}
                                 {item.location}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 font-semibold text-gray-800">{item.quantity} {item.unitLabel}</td>
-                            <td className="px-3 py-2.5"><ConditionBadge condition={item.condition} /></td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-4 py-2.5 font-semibold text-gray-800">{item.quantity} {item.unitLabel}</td>
+                            <td className="px-4 py-2.5"><ConditionBadge condition={item.condition} /></td>
+                            <td className="px-4 py-2.5">
                               <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${
                                 item.idleDays > 30 ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-700"
                               }`}>
                                 {item.idleDays} days
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td className="pl-4 pr-8 py-2.5 text-left" onClick={(e) => e.stopPropagation()}>
                               <div className="inline-flex items-center gap-1.5">
                                 <button
                                   type="button"
@@ -1310,7 +1320,7 @@ export default function ClientInventoryPage({ client }: Props) {
                         {/* Assigned columns */}
                         {subTab === "assigned" && (
                           <>
-                            <td className="px-3 py-2.5">
+                            <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
                                 <User size={13} className="text-gray-400 shrink-0" />
                                 <div>
@@ -1319,21 +1329,21 @@ export default function ClientInventoryPage({ client }: Props) {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-3 py-2.5"><DeptBadge dept={item.department} /></td>
-                            <td className="px-3 py-2.5 text-gray-600">
+                            <td className="px-4 py-2.5"><DeptBadge dept={item.department} /></td>
+                            <td className="px-4 py-2.5 text-gray-600">
                               <span className="inline-flex items-center gap-1">
                                 <MapPin size={12} className="text-gray-400" /> {item.location}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 text-gray-700">{item.assignedOn}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-4 py-2.5 text-gray-700">{item.assignedOn}</td>
+                            <td className="px-4 py-2.5">
                               <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${
                                 item.usageStatus === "Issued" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"
                               }`}>
                                 {item.usageStatus || "In Use"}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td className="pl-4 pr-8 py-2.5 text-left" onClick={(e) => e.stopPropagation()}>
                               <div className="inline-flex items-center gap-1.5">
                                 <button
                                   type="button"
@@ -1357,21 +1367,21 @@ export default function ClientInventoryPage({ client }: Props) {
                         {/* Reserved columns */}
                         {subTab === "reserved" && (
                           <>
-                            <td className="px-3 py-2.5">
+                            <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
                                 <User size={13} className="text-gray-400 shrink-0" />
                                 <span className="font-semibold text-gray-800">{item.reservedFor}</span>
                                 <DeptBadge dept={item.department} />
                               </div>
                             </td>
-                            <td className="px-3 py-2.5 font-semibold text-gray-800">{item.quantity} {item.unitLabel}</td>
-                            <td className="px-3 py-2.5 text-gray-600">
+                            <td className="px-4 py-2.5 font-semibold text-gray-800">{item.quantity} {item.unitLabel}</td>
+                            <td className="px-4 py-2.5 text-gray-600">
                               <span className="inline-flex items-center gap-1">
                                 <MapPin size={12} className="text-gray-400" /> {item.location}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 text-gray-700">{item.reservedUntil}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-4 py-2.5 text-gray-700">{item.reservedUntil}</td>
+                            <td className="px-4 py-2.5">
                               <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${
                                 item.reservationStatus === "Expiring Soon"
                                   ? "bg-amber-50 text-amber-700"
@@ -1380,7 +1390,7 @@ export default function ClientInventoryPage({ client }: Props) {
                                 {item.reservationStatus || "Reserved"}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td className="pl-4 pr-8 py-2.5 text-left" onClick={(e) => e.stopPropagation()}>
                               <div className="inline-flex items-center gap-1.5">
                                 <button
                                   type="button"
@@ -1409,10 +1419,10 @@ export default function ClientInventoryPage({ client }: Props) {
                         {/* Under Repair columns */}
                         {subTab === "repair" && (
                           <>
-                            <td className="px-3 py-2.5 text-gray-700">{item.reportedIssue}</td>
-                            <td className="px-3 py-2.5 text-gray-700">{item.repairProvider}</td>
-                            <td className="px-3 py-2.5 text-gray-600">{item.sentOn}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-4 py-2.5 text-gray-700">{item.reportedIssue}</td>
+                            <td className="px-4 py-2.5 text-gray-700">{item.repairProvider}</td>
+                            <td className="px-4 py-2.5 text-gray-600">{item.sentOn}</td>
+                            <td className="px-4 py-2.5">
                               <span className="text-gray-700">{item.expectedReturn}</span>
                               {item.repairOverdue && (
                                 <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
@@ -1420,8 +1430,8 @@ export default function ClientInventoryPage({ client }: Props) {
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5"><RepairStatusBadge status={item.repairStatus} /></td>
-                            <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-4 py-2.5"><RepairStatusBadge status={item.repairStatus} /></td>
+                            <td className="pl-4 pr-8 py-2.5 text-left" onClick={(e) => e.stopPropagation()}>
                               <div className="inline-flex items-center gap-1.5">
                                 <button
                                   type="button"
@@ -1458,15 +1468,23 @@ export default function ClientInventoryPage({ client }: Props) {
             </table>
           ) : (
             /* Activity Table */
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[980px] table-fixed text-xs">
+              <colgroup>
+                <col className="w-[17%]" />
+                <col className="w-[21%]" />
+                <col className="w-[13%]" />
+                <col className="w-[23%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/70 text-[11px] font-semibold text-gray-600">
-                  <th className="px-4 py-3 text-left">Date &amp; Time</th>
-                  <th className="px-3 py-3 text-left">Item / Event ID</th>
-                  <th className="px-3 py-3 text-left">Event</th>
-                  <th className="px-3 py-3 text-left">Change / Details</th>
-                  <th className="px-3 py-3 text-left">Performed By</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="pl-5 pr-4 py-3 text-left">Date &amp; Time</th>
+                  <th className="px-4 py-3 text-left">Item / Event ID</th>
+                  <th className="px-4 py-3 text-left">Event</th>
+                  <th className="px-4 py-3 text-left">Change / Details</th>
+                  <th className="px-4 py-3 text-left">Performed By</th>
+                  <th className="pl-4 pr-8 py-3 text-left">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -1487,13 +1505,13 @@ export default function ClientInventoryPage({ client }: Props) {
                           isSelected ? "bg-blue-50/50" : "hover:bg-gray-50/70"
                         }`}
                       >
-                        <td className="px-4 py-2.5 text-gray-600">
+                        <td className="pl-5 pr-4 py-2.5 text-gray-600">
                           <span className="inline-flex items-center gap-2">
                             <Calendar size={13} className="text-gray-400" />
                             {act.dateTime.replace(" · ", " / ")}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100">
                               <AssetIcon item={{ name: act.itemName, type: act.assetType, category: "" }} size={14} />
@@ -1504,13 +1522,13 @@ export default function ClientInventoryPage({ client }: Props) {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5"><EventBadge event={act.event} /></td>
-                        <td className="px-3 py-2.5 text-gray-700">{act.details}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-4 py-2.5"><EventBadge event={act.event} /></td>
+                        <td className="px-4 py-2.5 text-gray-700">{act.details}</td>
+                        <td className="px-4 py-2.5">
                           <p className="font-semibold text-gray-800">{act.performedBy}</p>
                           <p className="text-[11px] text-gray-400">{act.performedByRole}</p>
                         </td>
-                        <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <td className="pl-4 pr-8 py-2.5 text-left" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => setDetailEvent(act)}
