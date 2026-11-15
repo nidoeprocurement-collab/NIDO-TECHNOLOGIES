@@ -703,7 +703,16 @@ export default function MyOrderPage() {
                     />
                   </th>
                   {["ORDER ID", "CLIENT", "ASSIGNED", "ORDER DATE ↓", "LAST UPDATED", "PRODUCT TYPE", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
-                    <th key={h} style={thSt}>{h}</th>
+                    <th
+                      key={h}
+                      style={
+                        h === "PRODUCT TYPE"
+                          ? { ...thSt, width: 76, textAlign: "center", whiteSpace: "normal", lineHeight: 1.2 }
+                          : thSt
+                      }
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -762,7 +771,7 @@ export default function MyOrderPage() {
                             : <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>;
                         })()}
                       </td>
-                      <td style={tdSt}>
+                      <td style={{ ...tdSt, width: 76, textAlign: "center" }}>
                         {(() => {
                           const types = Array.from(
                             new Set(
@@ -771,10 +780,50 @@ export default function MyOrderPage() {
                                 .filter(Boolean),
                             ),
                           );
-                          return types.length > 0 ? (
-                            <span style={{ color: "hsl(var(--foreground))", fontSize: 13 }}>{types.join(", ")}</span>
-                          ) : (
-                            <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>
+                          if (types.length === 0) {
+                            return <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>;
+                          }
+                          return (
+                            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                              {types.map((type) => {
+                                const lower = type.toLowerCase();
+                                const isDigital = lower.includes("digital") || lower.includes("subscription") || lower.includes("saas") || lower.includes("cloud") || lower.includes("service");
+                                const isHybrid = lower.includes("hybrid");
+                                const isPhysical = lower.includes("physical");
+                                const code = isHybrid ? "H" : isDigital ? "D" : isPhysical ? "P" : type.charAt(0).toUpperCase();
+                                const palette = isHybrid
+                                  ? { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" }
+                                  : isDigital
+                                    ? { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" }
+                                    : isPhysical
+                                      ? { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" }
+                                      : { bg: "#f3f4f6", color: "#374151", border: "#e5e7eb" };
+                                return (
+                                  <span
+                                    key={type}
+                                    title={type}
+                                    aria-label={type}
+                                    style={{
+                                      width: 24,
+                                      height: 24,
+                                      borderRadius: "50%",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      background: palette.bg,
+                                      color: palette.color,
+                                      border: `1px solid ${palette.border}`,
+                                      cursor: "default",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {code}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           );
                         })()}
                       </td>
