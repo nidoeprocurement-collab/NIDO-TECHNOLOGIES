@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight, Send, Receipt } from 'lucide-react';
+import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight, Send, Receipt, ArrowDownLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -395,6 +395,44 @@ export default function InvoicePage() {
     return { totalAmount, amountReceived, balanceAmount };
   };
 
+  const paymentSummary = useMemo(() => {
+    const now = new Date();
+    const todayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    let totalOutstanding = 0;
+    let dueToday = 0;
+    let dueWithin30Days = 0;
+    let overdueInvoice = 0;
+
+    for (const invoice of tabInvoices) {
+      if (invoice.status === 'Paid' || invoice.status === 'Cancelled') continue;
+      const { balanceAmount } = getInvoiceAmounts(invoice);
+      if (balanceAmount <= 0) continue;
+
+      totalOutstanding += balanceAmount;
+
+      const parsedDue = invoice.dueDate ? new Date(`${invoice.dueDate}T00:00:00`) : null;
+      const dueMs = parsedDue && !Number.isNaN(parsedDue.getTime()) ? parsedDue.getTime() : NaN;
+      const dayDiff = Number.isNaN(dueMs) ? null : Math.round((dueMs - todayMs) / dayMs);
+
+      if (dayDiff !== null) {
+        if (dayDiff === 0) dueToday += balanceAmount;
+        if (dayDiff >= 0 && dayDiff <= 30) dueWithin30Days += balanceAmount;
+        if (dayDiff < 0 || invoice.status === 'Overdue') overdueInvoice += balanceAmount;
+      } else if (invoice.status === 'Overdue') {
+        overdueInvoice += balanceAmount;
+      }
+    }
+
+    return {
+      totalOutstanding,
+      dueToday,
+      dueWithin30Days,
+      overdueInvoice,
+    };
+  }, [tabInvoices, receipts]);
+
   const exportCsv = () => {
     const rows = [
       ['Date', 'Invoice #', 'Customer', 'Status', 'Due Date', 'Total Amount', 'Amount Received', 'Balance Amount'],
@@ -619,6 +657,38 @@ export default function InvoicePage() {
             </>
           )}
         </select>
+      </div>
+
+      <div className="bg-slate-50/80 border border-gray-200 rounded-lg px-5 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-3">
+          PAYMENT SUMMARY
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+          <div className="flex items-center gap-3.5 pr-4 lg:border-r lg:border-gray-200">
+            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <ArrowDownLeft size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500">Total Outstanding Receivables</p>
+              <p className="text-base font-bold text-gray-900 mt-0.5">{fmt(paymentSummary.totalOutstanding)}</p>
+            </div>
+          </div>
+
+          <div className="lg:px-4 lg:border-r lg:border-gray-200">
+            <p className="text-xs font-medium text-gray-500">Due Today</p>
+            <p className="text-base font-semibold text-amber-600 mt-0.5">{fmt(paymentSummary.dueToday)}</p>
+          </div>
+
+          <div className="lg:px-4 lg:border-r lg:border-gray-200">
+            <p className="text-xs font-medium text-gray-500">Due Within 30 Days</p>
+            <p className="text-base font-semibold text-gray-900 mt-0.5">{fmt(paymentSummary.dueWithin30Days)}</p>
+          </div>
+
+          <div className="lg:pl-4">
+            <p className="text-xs font-medium text-gray-500">Overdue Invoice</p>
+            <p className="text-base font-semibold text-gray-900 mt-0.5">{fmt(paymentSummary.overdueInvoice)}</p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
