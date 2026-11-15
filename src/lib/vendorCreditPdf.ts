@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
 import { numberToWords } from './quotePdfGenerator';
+import { ensurePdfSpace } from './pdfLayout';
 
 // ── Colour palette (identical to invoicePdf.ts) ───────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -301,6 +302,7 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
   const rowHeight = 20;
   const totalHeight = 27;
   const summaryHeight = rows.length * rowHeight + totalHeight;
+  y = ensurePdfSpace(doc, y, summaryHeight + 115, margin);
 
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.setFillColor(255, 255, 255);

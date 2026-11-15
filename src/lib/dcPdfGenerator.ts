@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { ensurePdfSpace } from './pdfLayout';
 
 // ── Colour palette (same as invoicePdf) ──────────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -161,8 +162,8 @@ function drawDCSummary(
   // Unique GST rates label
   const rates = hasGST
     ? [...new Set(dc.lineItems.filter((it) => it.taxPercent != null).map((it) => `${it.taxPercent}%`))]
-        .sort()
-        .join(', ')
+      .sort()
+      .join(', ')
     : '';
 
   const rows: Array<[string, string, boolean?]> = [
@@ -353,7 +354,7 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
     },
   });
 
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 14;
+  y = ensurePdfSpace(doc, ((doc as any).lastAutoTable?.finalY ?? y) + 14, 150, margin);
 
   // ── Summary box (right) + Transportation note (left) ─────────────────────
   const summaryWidth = 255;
@@ -373,6 +374,7 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
   }
 
   y += Math.max(summaryHeight, 60) + 16;
+  y = ensurePdfSpace(doc, y, 160, margin);
 
   // ── Bottom two-column section ─────────────────────────────────────────────
   const colGap = 14;
@@ -432,7 +434,7 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
   const dateLineY = y + ackBoxH - 18;
   drawText(doc, 'Date: ____ / ____ / ____', rightColX + 10, dateLineY, { size: 7.5, color: MUTED });
 
-  const advancedY = Math.max(leftY, y + ackBoxH) + 20;
+  const advancedY = ensurePdfSpace(doc, Math.max(leftY, y + ackBoxH) + 20, 95, margin);
 
   // ── Authorized signatory ──────────────────────────────────────────────────
   drawText(doc, `For ${brand.name || org.companyName || 'Nido Tech'}`, pageWidth - margin, advancedY, { size: 8, color: DARK, bold: true, align: 'right' });

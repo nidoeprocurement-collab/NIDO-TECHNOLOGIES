@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { ensurePdfSpace } from './pdfLayout';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredQuote } from './quoteStore';
@@ -365,7 +366,7 @@ export async function generateReferenceQuotePdfBase64(
     },
   });
 
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
+  y = ensurePdfSpace(doc, ((doc as any).lastAutoTable?.finalY ?? y) + 15, 220, margin);
   const summaryWidth = 250;
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawSummary(doc, quote, summaryX, y, summaryWidth, options);
@@ -395,7 +396,7 @@ export async function generateReferenceQuotePdfBase64(
     });
   }
 
-  y = Math.max(leftY, y + summaryHeight) + 25;
+  y = ensurePdfSpace(doc, Math.max(leftY, y + summaryHeight) + 25, 95, margin);
   drawText(doc, 'Total In Words', margin, y, { size: 8, color: BLUE, bold: true });
   drawText(doc, numberToWords(quote.grandTotal), margin, y + 15, { size: 8.5, color: DARK, bold: true });
 

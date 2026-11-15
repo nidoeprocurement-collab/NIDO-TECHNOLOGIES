@@ -5,6 +5,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { ensurePdfSpace } from './pdfLayout';
 import { numberToWords } from './quotePdfGenerator';
 import { getPOByNumber, updatePO, type PODocument, type StoredPO } from './purchaseOrderStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
@@ -401,7 +402,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   }
 
   // ── Summary box (right) + Left text blocks ────────────────────────────────
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
+  y = ensurePdfSpace(doc, ((doc as any).lastAutoTable?.finalY ?? y) + 15, 220, margin);
   const summaryWidth = 255;
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawPOSummary(doc, po, summaryX, y, summaryWidth);
@@ -438,12 +439,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   if (leftY < y + summaryHeight) leftY = y + summaryHeight + 10;
 
   // ── Total in Words + Authorized Signature ────────────────────────────────
-  y = Math.max(leftY + 8, y + summaryHeight) + 20;
-
-  if (y > pageHeight - 80) {
-    doc.addPage();
-    y = margin + 20;
-  }
+  y = ensurePdfSpace(doc, Math.max(leftY + 8, y + summaryHeight) + 20, 110, margin);
 
   drawText(doc, 'TOTAL PO VALUE IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
   drawText(doc, numberToWords(po.grandTotal), margin, y + 15, { size: 8.5, color: DARK, bold: true });

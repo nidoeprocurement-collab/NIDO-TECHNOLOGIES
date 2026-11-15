@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { ensurePdfSpace } from './pdfLayout';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { PaymentReceipt } from './paymentReceiptStore';
@@ -419,7 +420,7 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
   }
 
   // ── Summary box (right) + Notes (left) ───────────────────────────────────
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
+  y = ensurePdfSpace(doc, ((doc as any).lastAutoTable?.finalY ?? y) + 15, 160, margin);
   const summaryWidth = 255;
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawSummary(doc, receipt, summaryX, y, summaryWidth);
@@ -437,7 +438,7 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
   }
 
   // ── Total in Words + Authorized Signature ─────────────────────────────────
-  y = Math.max(leftY + 8, y + summaryHeight) + 20;
+  y = ensurePdfSpace(doc, Math.max(leftY + 8, y + summaryHeight) + 20, 95, margin);
   drawText(doc, 'TOTAL IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
   const totalAmount = receipt.amountReceived + Number(receipt.bankCharges ?? 0);
   drawText(doc, numberToWords(totalAmount), margin, y + 15, { size: 8.5, color: DARK, bold: true });

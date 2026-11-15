@@ -6,6 +6,7 @@ import { numberToWords } from './quotePdfGenerator';
 import type { StoredInvoice } from './invoiceStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
 import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
+import { ensurePdfSpace } from './pdfLayout';
 
 // ── Colour palette (identical to referenceQuotePdfGenerator) ─────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -416,7 +417,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
   }
 
   // ── Summary box (right) + Left text blocks ────────────────────────────────
-  y = lastTableY + 15;
+  y = ensurePdfSpace(doc, lastTableY + 15, 220, margin);
   const summaryWidth = 255;
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawSummary(doc, invoice, summaryX, y, summaryWidth);
@@ -468,7 +469,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
   }
 
   // ── Total in Words + Authorized Signature ────────────────────────────────
-  y = Math.max(leftY + 8, y + summaryHeight) + 20;
+  y = ensurePdfSpace(doc, Math.max(leftY + 8, y + summaryHeight) + 20, 95, margin);
   drawText(doc, 'TOTAL IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
   drawText(doc, numberToWords(invoice.grandTotal), margin, y + 15, { size: 8.5, color: DARK, bold: true });
 

@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
 import { numberToWords } from './quotePdfGenerator';
+import { ensurePdfSpace } from './pdfLayout';
 
 // ── Colour palette — exactly identical to invoicePdf.ts ─────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -277,6 +278,7 @@ export async function generateCreditNotePdf(note: CreditNotePdfData): Promise<st
   const rowH = 20;
   const totalH = 27;
   const sumHeight = sumRows.length * rowH + totalH;
+  y = ensurePdfSpace(doc, y, sumHeight + 130, margin);
 
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.setFillColor(255, 255, 255);

@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { ensurePdfSpace } from './pdfLayout';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 
 // ── Colour palette (identical to invoicePdf) ──────────────────────────────────
@@ -274,7 +275,6 @@ async function buildPaymentMadePdfDoc(payment: PaymentMadeForPdf): Promise<jsPDF
   });
 
   // ── Final summary box (right-aligned) ─────────────────────────────────────
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
   const boxWidth = 220;
   const boxX = pageWidth - margin - boxWidth;
   const finalRows: [string, string, boolean?][] = [
@@ -284,6 +284,7 @@ async function buildPaymentMadePdfDoc(payment: PaymentMadeForPdf): Promise<jsPDF
   ];
   const rowH = 20;
   const totalH = finalRows.length * rowH + 4;
+  y = ensurePdfSpace(doc, ((doc as any).lastAutoTable?.finalY ?? y) + 15, totalH + 115, margin);
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(boxX, y, boxWidth, totalH, 5, 5, 'FD');

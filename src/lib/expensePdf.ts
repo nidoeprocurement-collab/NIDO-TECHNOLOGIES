@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { ensurePdfSpace } from './pdfLayout';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 
 // ── Colour palette (identical to invoicePdf.ts) ───────────────────────────────
@@ -246,7 +247,7 @@ export async function generateExpensePdf(expense: ExpenseForPdf): Promise<void> 
     },
   });
 
-  y = (doc as any).lastAutoTable.finalY + 14;
+  y = ensurePdfSpace(doc, (doc as any).lastAutoTable.finalY + 14, 110, margin);
 
   // ── Summary box (right-aligned) ──────────────────────────────────────────────
   const summaryWidth = 255;
@@ -474,7 +475,7 @@ export async function generateRecurringExpensePdf(profile: RecurringExpenseProfi
     headStyles: { fillColor: [248, 250, 252], textColor: DARK, fontStyle: 'bold', fontSize: 6.5, halign: 'center' },
     columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } },
   });
-  y = (doc as any).lastAutoTable.finalY + 14;
+  y = ensurePdfSpace(doc, (doc as any).lastAutoTable.finalY + 14, 110, margin);
 
   // Summary box
   const summaryWidth = 255;

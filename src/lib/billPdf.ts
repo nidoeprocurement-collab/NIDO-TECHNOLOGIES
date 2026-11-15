@@ -4,6 +4,7 @@ import { loadConfig } from './configService';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
+import { ensurePdfSpace } from './pdfLayout';
 
 // ── Colour palette (identical to invoicePdf) ──────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -357,6 +358,7 @@ async function buildBillPdfDoc(bill: BillForPdf): Promise<jsPDF> {
   ];
   const rowH = 19;
   const totalH = finalRows.length * rowH + 4;
+  y = ensurePdfSpace(doc, y, totalH + 115, margin);
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(boxX, y, boxWidth, totalH, 5, 5, 'FD');
