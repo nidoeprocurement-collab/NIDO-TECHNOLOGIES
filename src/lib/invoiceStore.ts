@@ -410,3 +410,59 @@ export function convertProformaToInvoice(proformaId: string): StoredInvoice | nu
   saveInvoice(invoice);
   return invoice;
 }
+
+export interface InvoiceReminderAvailability {
+  canSend: boolean;
+  availableAt: Date | null;
+  remainingDays: number;
+  reason: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * First reminder activates 3 days after the invoice was sent; subsequent
+ * reminders activate 2 days after the previous reminder was sent.
+ */
+export function getInvoiceReminderAvailability(
+  invoice: Pick<StoredInvoice, 'status' | 'sentAt' | 'lastReminderAt' | 'updatedAt' | 'invoiceDate'>,
+  nowMs: number = Date.now(),
+): InvoiceReminderAvailability {
+  if (invoice.status !== 'Sent') {
+    return {
+      canSend: false,
+      availableAt: null,
+      remainingDays: 0,
+      reason: 'Reminders can only be sent for sent invoices.',
+    };
+  }
+
+  const hasPriorReminder = Boolean(invoice.lastReminderAt);
+  const waitDays = hasPriorReminder ? 2 : 3;
+  const baseIso = hasPriorReminder
+    ? invoice.lastReminderAt
+    : (invoice.sentAt || invoice.updatedAt || invoice.invoiceDate);
+  const baseMs = baseIso ? Date.parse(baseIso) : NaN;
+
+  if (Number.isNaN(baseMs)) {
+    return { canSend: true, availableAt: null, remainingDays: 0, reason: '' };
+  }
+
+  const availableAtMs = baseMs + waitDays * DAY_MS;
+  if (nowMs >= availableAtMs) {
+    return { canSend: true, availableAt: new Date(availableAtMs), remainingDays: 0, reason: '' };
+  }
+
+  const remainingDays = Math.max(1, Math.ceil((availableAtMs - nowMs) / DAY_MS));
+  const availableAt = new Date(availableAtMs);
+  const windowLabel = hasPriorReminder
+    ? '2 days after the previous reminder'
+    : '3 days after the invoice was sent';
+
+  return {
+    canSend: false,
+    availableAt,
+    remainingDays,
+    reason: `Reminder activates ${windowLabel} (available in ${remainingDays} day${remainingDays === 1 ? '' : 's'} on ${availableAt.toLocaleDateString('en-IN')}).`,
+  };
+}

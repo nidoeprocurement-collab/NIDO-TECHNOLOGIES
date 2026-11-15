@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight, Send } from 'lucide-react';
+import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight, Send, Receipt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -9,12 +9,14 @@ import {
   archiveInvoice,
   convertProformaToInvoice,
   getArchivedInvoices,
+  getInvoiceReminderAvailability,
   getInvoices,
   isProformaInvoiceEligible,
   saveInvoice,
   type InvoiceStatus,
   type StoredInvoice,
 } from '@/lib/invoiceStore';
+import { getActiveReceipts } from '@/lib/paymentReceiptStore';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
 import { toast } from 'sonner';
@@ -407,7 +409,7 @@ export default function InvoicePage() {
     const menuHeight = invoice.status === 'Proforma Invoice'
       ? 292
       : invoice.status === 'Sent'
-        ? 252
+        ? 292
         : 212;
     const preferredTop = rect.bottom + 4;
     const top = preferredTop + menuHeight > window.innerHeight - 8
@@ -434,9 +436,12 @@ export default function InvoicePage() {
 
   const sendDocumentEmail = async (invoice: StoredInvoice, kind: 'invoice' | 'reminder') => {
     if (sendingInvoiceId) return;
-    if (kind === 'reminder' && invoice.status !== 'Sent') {
-      toast.error('Reminders can only be sent for sent invoices.');
-      return;
+    if (kind === 'reminder') {
+      const reminderAvailability = getInvoiceReminderAvailability(invoice);
+      if (!reminderAvailability.canSend) {
+        toast.error(reminderAvailability.reason);
+        return;
+      }
     }
     setSendingInvoiceId(`${invoice.id}:${kind}`);
     const result = await sendInvoiceEmail(invoice, kind);
@@ -488,6 +493,23 @@ export default function InvoicePage() {
     );
     setRowMenu(null);
     setSendingInvoiceId(null);
+  };
+
+  const openPaymentReceiptForm = (invoice: StoredInvoice) => {
+    const directPaid = (invoice.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const receiptPaid = getActiveReceipts()
+      .filter((r) => r.invoiceNumber === invoice.invoiceNumber)
+      .reduce((sum, r) => sum + (Number(r.amountReceived) || 0), 0);
+    const amountDue = Math.max(0, Number(((invoice.grandTotal ?? 0) - directPaid - receiptPaid).toFixed(2)));
+    setRowMenu(null);
+    navigate('/sales/payment-receipts/create', {
+      state: {
+        customerName: invoice.clientName,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: amountDue,
+        email: invoice.clientContacts?.[0] || invoice.clientContact || '',
+      },
+    });
   };
 
   return (
@@ -641,10 +663,12 @@ export default function InvoicePage() {
       </div>
 
       {/* Fixed-position row action menu */}
-      {rowMenu && (
+      {rowMenu && (() => {
+        const reminderAvailability = getInvoiceReminderAvailability(rowMenu.invoice);
+        return (
         <div
           ref={rowMenuRef}
-          className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-2 z-[9999]"
+          className="fixed w-56 bg-white border border-gray-200 rounded-lg shadow-xl py-2 z-[9999]"
           style={{ top: rowMenu.top, right: rowMenu.right }}
         >
           <button
@@ -675,13 +699,29 @@ export default function InvoicePage() {
                : rowMenu.invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
            </button>
            {rowMenu.invoice.status === 'Sent' && (
-             <button
-               onClick={() => sendDocumentEmail(rowMenu.invoice, 'reminder')}
-               disabled={sendingInvoiceId === `${rowMenu.invoice.id}:reminder`}
-               className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-             >
-               <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:reminder` ? 'Sending…' : 'Send Reminder'}
-             </button>
+             <>
+               <button
+                 onClick={() => openPaymentReceiptForm(rowMenu.invoice)}
+                 className="w-full px-3 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
+               >
+                 <Receipt size={15} /> Generate Payment Receipt
+               </button>
+               <button
+                 onClick={() => sendDocumentEmail(rowMenu.invoice, 'reminder')}
+                 disabled={sendingInvoiceId === `${rowMenu.invoice.id}:reminder` || !reminderAvailability.canSend}
+                 title={reminderAvailability.canSend ? 'Send payment reminder email to client' : reminderAvailability.reason}
+                 className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center justify-between gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+               >
+                 <span className="flex items-center gap-2">
+                   <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:reminder` ? 'Sending…' : 'Send Reminder'}
+                 </span>
+                 {!reminderAvailability.canSend && reminderAvailability.remainingDays > 0 && (
+                   <span className="text-[11px] font-medium text-amber-700/80">
+                     in {reminderAvailability.remainingDays}d
+                   </span>
+                 )}
+               </button>
+             </>
            )}
            {rowMenu.invoice.status === 'Proforma Invoice' &&
              !invoices.some((invoice) => invoice.sourceProformaId === rowMenu.invoice.id) && (
@@ -700,7 +740,8 @@ export default function InvoicePage() {
             <Archive size={15} /> Archive
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* Archive confirmation dialog */}
       {archiveTarget && (

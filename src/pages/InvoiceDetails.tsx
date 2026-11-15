@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   convertProformaToInvoice,
   getInvoiceById,
+  getInvoiceReminderAvailability,
   isProformaInvoiceEligible,
   saveInvoice,
   type StoredInvoice,
@@ -218,10 +219,10 @@ export default function InvoiceDetails() {
   };
 
   const sendReminder = async () => {
-    if (sending || invoice.status !== 'Sent') {
-      if (invoice.status !== 'Sent') {
-        toast.error('Reminders can only be sent for sent invoices.');
-      }
+    if (sending) return;
+    const reminderAvailability = getInvoiceReminderAvailability(invoice);
+    if (!reminderAvailability.canSend) {
+      toast.error(reminderAvailability.reason);
       return;
     }
     setSending(true);
@@ -321,16 +322,27 @@ export default function InvoiceDetails() {
               >
                 <Send size={15} /> {sending ? 'Sending…' : invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
               </button>
-              {invoice.status === 'Sent' && (
+              {invoice.status === 'Sent' && (() => {
+                const reminderAvailability = getInvoiceReminderAvailability(invoice);
+                return (
                 <button
                   type="button"
                   onClick={() => { closeActions(); sendReminder(); }}
-                  disabled={sending}
-                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={sending || !reminderAvailability.canSend}
+                  title={reminderAvailability.canSend ? 'Send payment reminder email to client' : reminderAvailability.reason}
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Send size={15} /> Send Reminder
+                  <span className="flex items-center gap-2">
+                    <Send size={15} /> Send Reminder
+                  </span>
+                  {!reminderAvailability.canSend && reminderAvailability.remainingDays > 0 && (
+                    <span className="text-[11px] font-medium text-amber-700/80">
+                      in {reminderAvailability.remainingDays}d
+                    </span>
+                  )}
                 </button>
-              )}
+                );
+              })()}
               {invoice.status === 'Proforma Invoice' && (
                 <button
                   type="button"
