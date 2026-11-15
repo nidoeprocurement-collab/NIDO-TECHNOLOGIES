@@ -2838,6 +2838,7 @@ function ThreeDotMenu({
   statusUpdatesEnabled,
   statusLockReason,
   shippedLockReason,
+  deliveredLockReason,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const [statusWarning, setStatusWarning] = useState<{ status: string; reason: string } | null>(null);
@@ -2900,6 +2901,7 @@ function ThreeDotMenu({
     if (statusLockReason) return statusLockReason;
     if (!statusUpdatesEnabled) return "Status updates are unavailable for a cancelled item or order.";
     if (status === "Shipped" && shippedLockReason) return shippedLockReason;
+    if (status === "Delivered" && deliveredLockReason) return deliveredLockReason;
      if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
      if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
     const currentIndex = isDigitalItem
@@ -3495,23 +3497,43 @@ export default function MyOrderPage() {
   useEffect(() => {
     const syncInvoices = () => setInvoiceRefreshKey((k) => k + 1);
     window.addEventListener("nidoInvoicesUpdated", syncInvoices);
+    window.addEventListener("orderDocsUpdated", syncInvoices);
     window.addEventListener("storage", syncInvoices);
     return () => {
       window.removeEventListener("nidoInvoicesUpdated", syncInvoices);
+      window.removeEventListener("orderDocsUpdated", syncInvoices);
       window.removeEventListener("storage", syncInvoices);
     };
   }, []);
-  const proformaSubOrderIds = useMemo(() => {
+  const { proformaSubOrderIds, attachedProformaSubOrderIds } = useMemo(() => {
     const ids = new Set<string>();
+    const attachedIds = new Set<string>();
     const invoices = invoiceRefreshKey >= 0 ? getInvoices() : [];
+    let orderDocs: Array<{ invoiceId?: string; type?: string }> = [];
+    try {
+      const rawDocs = localStorage.getItem(`nido_docs_${orderId}`);
+      const parsed = rawDocs ? JSON.parse(rawDocs) : [];
+      if (Array.isArray(parsed)) orderDocs = parsed;
+    } catch {
+      orderDocs = [];
+    }
+    const attachedInvoiceIds = new Set(
+      orderDocs
+        .filter((d) => d?.type === "Proforma Invoice" && d?.invoiceId)
+        .map((d) => String(d.invoiceId)),
+    );
     for (const inv of invoices) {
       if (inv.status !== "Proforma Invoice") continue;
       if (inv.originatingOrderId && inv.originatingOrderId !== orderId) continue;
+      const isAttached = attachedInvoiceIds.has(String(inv.id));
       for (const li of inv.lineItems || []) {
-        if (li.subOrderId) ids.add(li.subOrderId);
+        if (li.subOrderId) {
+          ids.add(li.subOrderId);
+          if (isAttached) attachedIds.add(li.subOrderId);
+        }
       }
     }
-    return ids;
+    return { proformaSubOrderIds: ids, attachedProformaSubOrderIds: attachedIds };
   }, [invoiceRefreshKey, orderId]);
   const hasDraftOrderPO = orderPOs.some(po => String(po.status || "").toLowerCase() === "draft");
   const canCancelOrderByPO = canCancelOrderByPurchaseOrders(orderPOs);
@@ -3812,6 +3834,10 @@ export default function MyOrderPage() {
       return;
     }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
+    if (status === "Delivered" && isPhysicalProduct(target) && !attachedProformaSubOrderIds.has(subId)) {
+      toast.error("Generate and attach the Proforma Invoice in the Documents tab before marking this item as Delivered.");
+      return;
+    }
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
     const currentReturnIndex = returnStatuses.indexOf(target.itemStatus);
     const nextReturnIndex = returnStatuses.indexOf(status);
@@ -5830,6 +5856,11 @@ export default function MyOrderPage() {
                             shippedLockReason={
                               hasOrderProcurementFlow && !isVendorOrderItemDelivered(orderPOs, sub)
                                 ? "Mark this item as Delivered in Vendor Order Details before updating it to Shipped."
+                                : undefined
+                            }
+                            deliveredLockReason={
+                              isPhysicalProduct(sub) && !attachedProformaSubOrderIds.has(sub.id)
+                                ? "Generate and attach the Proforma Invoice in the Documents tab before marking this item as Delivered."
                                 : undefined
                             }
                           />
