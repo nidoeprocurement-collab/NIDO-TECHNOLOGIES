@@ -81,6 +81,7 @@ interface CreditNoteEntry {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "nido_credit_notes_v3";
+const DEBIT_STORAGE_KEY = "nido_client_debit_notes_v1";
 
 const reasons: Reason[] = [
   "Sales Return",
@@ -701,13 +702,17 @@ function CreditNotePreviewDrawer({
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
-export default function CreditNotesPage() {
+export default function CreditNotesPage({ noteKind = "credit" }: { noteKind?: "credit" | "debit" }) {
+  const isDebit = noteKind === "debit";
+  const storageKey = isDebit ? DEBIT_STORAGE_KEY : STORAGE_KEY;
+  const basePath = isDebit ? "/sales/debit-notes" : "/sales/credit-notes";
   const navigate = useNavigate();
   const organization = loadConfig().organization;
 
   const [notes, setNotes] = useState<CreditNoteEntry[]>(() => {
-    const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, defaultNotes);
-    const list = Array.isArray(stored) && stored.length ? stored : defaultNotes;
+    const fallback = isDebit ? [] : defaultNotes;
+    const stored = safeReadJson<CreditNoteEntry[]>(storageKey, fallback);
+    const list = Array.isArray(stored) && stored.length ? stored : fallback;
     return list.map((e) => normalize(e));
   });
 
@@ -720,7 +725,7 @@ export default function CreditNotesPage() {
 
   const persist = (next: CreditNoteEntry[]) => {
     setNotes(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(storageKey, JSON.stringify(next));
   };
 
   const convertToOpen = (note: CreditNoteEntry) => {
@@ -730,13 +735,19 @@ export default function CreditNotesPage() {
     if (previewNote?.id === note.id) {
       setPreviewNote((prev) => prev ? { ...prev, status: "open" } : prev);
     }
-    toast.success("Credit note converted to open");
+    toast.success(isDebit ? "Client debit note converted to open" : "Client credit note converted to open");
   };
 
   const handleDownload = async (note: CreditNoteEntry) => {
     setDownloadingId(note.id);
     try {
-      await downloadCreditNotePdf(note, `${note.creditNoteNumber}.pdf`);
+      await downloadCreditNotePdf(
+        note,
+        `${note.creditNoteNumber}.pdf`,
+        isDebit
+          ? { title: "CLIENT DEBIT NOTE", dateLabel: "Debit Date" }
+          : { title: "CLIENT CREDIT NOTE", dateLabel: "Credit Date" },
+      );
       toast.success(`${note.creditNoteNumber}.pdf downloaded`);
     } catch {
       toast.error("Failed to generate PDF");
@@ -777,9 +788,17 @@ export default function CreditNotesPage() {
       <div className="border-b border-gray-200/70">
         <div className="px-6 py-4 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">Sales › Credit Notes</p>
-            <h1 className="text-xl font-bold text-gray-900">Credit Notes</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Create, manage and track customer credit notes.</p>
+            <p className="text-xs text-gray-400 mb-0.5">
+              Sales › {isDebit ? "Client Debit Note" : "Client Credit Notes"}
+            </p>
+            <h1 className="text-xl font-bold text-gray-900">
+              {isDebit ? "Client Debit Note" : "Client Credit Notes"}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {isDebit
+                ? "Create, manage and track client debit notes."
+                : "Create, manage and track client credit notes."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -790,9 +809,9 @@ export default function CreditNotesPage() {
             </button>
             <button
               className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-              onClick={() => navigate("/sales/credit-notes/create")}
+              onClick={() => navigate(`${basePath}/create`)}
             >
-              <Plus size={15} /> New Credit Note
+              <Plus size={15} /> {isDebit ? "New Client Debit Note" : "New Client Credit Note"}
             </button>
           </div>
         </div>
@@ -802,11 +821,11 @@ export default function CreditNotesPage() {
       <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
         <div className="grid grid-cols-5 gap-3">
           {[
-            { label: "Total Credits", value: `₹${fmt(totalCredits)}`, color: "text-blue-700" },
-            { label: "Total Credit Notes", value: String(notes.length), color: "text-gray-900" },
+            { label: isDebit ? "Total Debits" : "Total Credits", value: `₹${fmt(totalCredits)}`, color: "text-blue-700" },
+            { label: isDebit ? "Total Debit Notes" : "Total Credit Notes", value: String(notes.length), color: "text-gray-900" },
             { label: "Draft", value: String(draftCount), color: "text-yellow-600" },
             { label: "Open", value: String(openCount), color: "text-green-600" },
-            { label: "Credit Value", value: `₹${fmt(totalAmount)}`, color: "text-gray-900" },
+            { label: isDebit ? "Debit Value" : "Credit Value", value: `₹${fmt(totalAmount)}`, color: "text-gray-900" },
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-white rounded-xl border border-gray-200 px-4 py-4">
               <p className="text-xs text-gray-500">{label}</p>
@@ -824,7 +843,7 @@ export default function CreditNotesPage() {
           <div className="relative flex-1 max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
-              placeholder="Search credit notes…"
+              placeholder={isDebit ? "Search client debit notes…" : "Search client credit notes…"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
@@ -859,7 +878,7 @@ export default function CreditNotesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/70">
-                {["Date", "Credit Note #", "Reference #", "Customer", "Invoice #", "Status", "Amount", ""].map((h, i) => (
+                {["Date", isDebit ? "Debit Note #" : "Credit Note #", "Reference #", "Customer", "Invoice #", "Status", "Amount", ""].map((h, i) => (
                   <th
                     key={h + i}
                     className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-gray-500 ${
@@ -875,9 +894,9 @@ export default function CreditNotesPage() {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-14 text-center text-sm text-gray-400">
-                    No credit notes found.{" "}
+                    {isDebit ? "No client debit notes found." : "No client credit notes found."}{" "}
                     <button
-                      onClick={() => navigate("/sales/credit-notes/create")}
+                      onClick={() => navigate(`${basePath}/create`)}
                       className="text-blue-600 hover:underline font-medium"
                     >
                       + Create one
@@ -926,7 +945,7 @@ export default function CreditNotesPage() {
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem
                               className="gap-2 cursor-pointer"
-                              onSelect={() => navigate(`/sales/credit-notes/${note.id}/edit`)}
+                              onSelect={() => navigate(`${basePath}/${note.id}/edit`)}
                             >
                               Edit
                             </DropdownMenuItem>
@@ -977,7 +996,7 @@ export default function CreditNotesPage() {
           onClose={() => setPreviewNote(null)}
           onEdit={() => {
             setPreviewNote(null);
-            navigate(`/sales/credit-notes/${previewNote.id}/edit`);
+            navigate(`${basePath}/${previewNote.id}/edit`);
           }}
           onDownload={() => handleDownload(previewNote)}
           onConvertToOpen={() => convertToOpen(previewNote)}

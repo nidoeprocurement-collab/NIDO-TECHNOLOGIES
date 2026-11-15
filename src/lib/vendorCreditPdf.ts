@@ -109,8 +109,14 @@ function calcTotals(credit: VendorCreditForPdf) {
   return { grossSubtotal, totalDiscount, subtotal, totalTax, grandTotal };
 }
 
+export interface VendorCreditPdfOptions {
+  title?: string;
+  dateLabel?: string;
+  totalLabel?: string;
+}
+
 // ── Main generator ─────────────────────────────────────────────────────────────
-export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promise<void> {
+export async function generateVendorCreditPdf(credit: VendorCreditForPdf, options?: VendorCreditPdfOptions): Promise<void> {
   const org = loadConfig().organization;
   const brand = getBrandHeader(org.displayName, org.industry);
   const totals = calcTotals(credit);
@@ -143,8 +149,11 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
   drawText(doc, brand.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
   drawText(doc, brand.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
-  // ── VENDOR CREDIT label + number box (right) ──────────────────────────────
-  drawText(doc, 'VENDOR CREDIT', pageWidth - margin, 48, { size: 18, color: DARK, bold: true, align: 'right' });
+  // ── VENDOR CREDIT / DEBIT NOTE label + number box (right) ─────────────────
+  const docTitle = options?.title || 'VENDOR CREDIT NOTE';
+  const dateLabel = options?.dateLabel || 'Credit Date';
+  const totalLabel = options?.totalLabel || 'Total Credit';
+  drawText(doc, docTitle, pageWidth - margin, 48, { size: 17, color: DARK, bold: true, align: 'right' });
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.roundedRect(pageWidth - margin - 120, 61, 120, 28, 4, 4, 'S');
   drawText(doc, '#', pageWidth - margin - 109, 79, { size: 11, color: BLUE });
@@ -169,7 +178,7 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
 
   // ── Credit date + Reference (right) ──────────────────────────────────────
   let dateY = 112;
-  drawText(doc, `Credit Date: ${fmtDate(credit.creditDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+  drawText(doc, `${dateLabel}: ${fmtDate(credit.creditDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
   if (credit.referenceNumber) {
     dateY += 14;
     drawText(doc, `Reference: ${credit.referenceNumber}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
@@ -320,7 +329,7 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
   doc.rect(summaryX + 0.5, totalY, summaryWidth - 1, totalHeight - 0.5, 'F');
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(summaryX, totalY, summaryX + summaryWidth, totalY);
-  drawText(doc, 'Total Credit', summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
+  drawText(doc, totalLabel, summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
   drawText(doc, `INR ${fmt2(totals.grandTotal)}`, summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
 
   // ── Left: Notes ───────────────────────────────────────────────────────────

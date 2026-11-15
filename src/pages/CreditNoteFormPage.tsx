@@ -22,14 +22,7 @@ import { safeReadJson } from "@/lib/utils";
 import { getPrefix } from "@/lib/configService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Reason =
-  | "Sales Return"
-  | "Post Sale Discount"
-  | "Deficiency in service"
-  | "Correction in invoice"
-  | "Change in POS"
-  | "Finalization of Provisional assessment"
-  | "Others";
+type Reason = string;
 
 type CreditStatus = "draft" | "open";
 
@@ -73,6 +66,7 @@ interface CreditNoteEntry {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STORAGE_KEY = "nido_credit_notes_v3";
+const DEBIT_STORAGE_KEY = "nido_client_debit_notes_v1";
 
 const REASONS: Reason[] = [
   "Sales Return",
@@ -84,6 +78,16 @@ const REASONS: Reason[] = [
   "Others",
 ];
 
+const DEBIT_REASONS: Reason[] = [
+  "Additional Charges",
+  "Price Revision",
+  "Tax Difference",
+  "Interest / Late Fee",
+  "Short Billing",
+  "Correction in invoice",
+  "Others",
+];
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 const toNumber = (value: unknown, fallback = 0) => {
@@ -92,8 +96,8 @@ const toNumber = (value: unknown, fallback = 0) => {
 };
 
 const numberToWords = (value: number): string => {
-  const units = ["Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
-  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  const units = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
   const convert = (num: number): string => {
     if (num < 20) return units[num];
     if (num < 100) return `${tens[Math.floor(num / 10)]}${num % 10 ? ` ${units[num % 10]}` : ""}`;
@@ -137,7 +141,7 @@ function buildAddress(c: StoredClient): string {
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 const inp = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white placeholder-gray-400 transition-colors";
-const ta  = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white placeholder-gray-400 transition-colors resize-none";
+const ta = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white placeholder-gray-400 transition-colors resize-none";
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -181,9 +185,9 @@ function Section({
   );
 }
 
-function blankForm(creditNoteNumber: string): CreditNoteEntry {
+function blankForm(creditNoteNumber: string, defaultReason: Reason = "Sales Return"): CreditNoteEntry {
   return {
-    id: `cn-${Date.now()}`,
+    id: `${defaultReason === "Sales Return" ? "cn" : "cdn"}-${Date.now()}`,
     creditNoteNumber,
     referenceNumber: "",
     customerName: "",
@@ -194,7 +198,7 @@ function blankForm(creditNoteNumber: string): CreditNoteEntry {
     invoiceNumber: "",
     invoiceDate: "",
     issueDate: today(),
-    reason: "Sales Return",
+    reason: defaultReason,
     placeOfSupply: "",
     status: "draft",
     item: { itemName: "", account: "Sales", description: "", hsnSac: "", quantity: 1, rate: 0, discount: 0, taxRate: 0 },
@@ -211,19 +215,23 @@ function blankForm(creditNoteNumber: string): CreditNoteEntry {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function CreditNoteFormPage() {
+export default function CreditNoteFormPage({ noteKind = "credit" }: { noteKind?: "credit" | "debit" }) {
+  const isDebit = noteKind === "debit";
+  const storageKey = isDebit ? DEBIT_STORAGE_KEY : STORAGE_KEY;
+  const backPath = isDebit ? "/client-debit-notes" : "/credit-notes";
+  const reasonOptions = isDebit ? DEBIT_REASONS : REASONS;
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
   const isEdit = !!id;
 
-  const [clients, setClients]               = useState<StoredClient[]>([]);
+  const [clients, setClients] = useState<StoredClient[]>([]);
   const [selectedClient, setSelectedClient] = useState<StoredClient | null>(null);
-  const [allInvoices, setAllInvoices]       = useState<StoredInvoice[]>([]);
+  const [allInvoices, setAllInvoices] = useState<StoredInvoice[]>([]);
   const [clientInvoices, setClientInvoices] = useState<StoredInvoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<StoredInvoice | null>(null);
-  const [allNotes, setAllNotes]             = useState<CreditNoteEntry[]>([]);
-  const [form, setForm]                     = useState<CreditNoteEntry | null>(null);
-  const [saving, setSaving]                 = useState(false);
+  const [allNotes, setAllNotes] = useState<CreditNoteEntry[]>([]);
+  const [form, setForm] = useState<CreditNoteEntry | null>(null);
+  const [saving, setSaving] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -233,7 +241,7 @@ export default function CreditNoteFormPage() {
     const invoices = getInvoices();
     setAllInvoices(invoices);
 
-    const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, []);
+    const stored = safeReadJson<CreditNoteEntry[]>(storageKey, []);
     const list: CreditNoteEntry[] = Array.isArray(stored) ? stored : [];
     setAllNotes(list);
 
@@ -254,12 +262,13 @@ export default function CreditNoteFormPage() {
           }
         }
       } else {
-        toast.error("Credit note not found");
-        navigate("/sales/credit-notes", { replace: true });
+        toast.error(isDebit ? "Client debit note not found" : "Client credit note not found");
+        navigate(backPath, { replace: true });
       }
     } else {
-      const cn = nextCode(getPrefix("creditNote") || "CR-", list.map((n) => n.creditNoteNumber), 5);
-      setForm(blankForm(cn));
+      const prefix = isDebit ? "CDN-" : (getPrefix("creditNote") || "CR-");
+      const cn = nextCode(prefix, list.map((n) => n.creditNoteNumber), 5);
+      setForm(blankForm(cn, isDebit ? "Additional Charges" : "Sales Return"));
     }
   }, []);
 
@@ -277,14 +286,14 @@ export default function CreditNoteFormPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        customerName:    client.name,
+        customerName: client.name,
         customerAddress: buildAddress(client),
-        customerGstin:   client.gst || client.gstin || client.locationDetails?.gstin || "",
-        customerEmail:   client.email || "",
-        customerPhone:   client.phone || client.mobile || "",
-        placeOfSupply:   client.billingState || client.locationDetails?.state || prev.placeOfSupply,
-        invoiceNumber:   "",
-        invoiceDate:     "",
+        customerGstin: client.gst || client.gstin || client.locationDetails?.gstin || "",
+        customerEmail: client.email || "",
+        customerPhone: client.phone || client.mobile || "",
+        placeOfSupply: client.billingState || client.locationDetails?.state || prev.placeOfSupply,
+        invoiceNumber: "",
+        invoiceDate: "",
       };
     });
   };
@@ -304,20 +313,20 @@ export default function CreditNoteFormPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        invoiceNumber:  inv.invoiceNumber,
-        invoiceDate:    inv.invoiceDate,
-        placeOfSupply:  inv.placeOfSupply || prev.placeOfSupply,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceDate: inv.invoiceDate,
+        placeOfSupply: inv.placeOfSupply || prev.placeOfSupply,
         shippingCharges: inv.shippingCharges ?? prev.shippingCharges,
-        adjustment:     inv.adjustment ?? prev.adjustment,
+        adjustment: inv.adjustment ?? prev.adjustment,
         item: firstLine ? {
-          itemName:    firstLine.description,
-          account:     "Sales",
+          itemName: firstLine.description,
+          account: "Sales",
           description: firstLine.itemDetails || "",
-          hsnSac:      firstLine.hsnSac || "",
-          quantity:    firstLine.quantity,
-          rate:        firstLine.rate,
-          discount:    firstLine.discount ?? 0,
-          taxRate:     firstLine.taxPercent,
+          hsnSac: firstLine.hsnSac || "",
+          quantity: firstLine.quantity,
+          rate: firstLine.rate,
+          discount: firstLine.discount ?? 0,
+          taxRate: firstLine.taxPercent,
         } : prev.item,
       };
     });
@@ -363,9 +372,13 @@ export default function CreditNoteFormPage() {
     const updated = isEdit
       ? allNotes.map((n) => n.id === id ? payload : n)
       : [payload, ...allNotes];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    toast.success(isEdit ? "Credit note updated" : `Credit note ${payload.creditNoteNumber} created`);
-    navigate("/sales/credit-notes");
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    toast.success(
+      isEdit
+        ? (isDebit ? "Client debit note updated" : "Client credit note updated")
+        : `${isDebit ? "Client debit note" : "Client credit note"} ${payload.creditNoteNumber} created`,
+    );
+    navigate(backPath);
   };
 
   if (!form) {
@@ -377,7 +390,7 @@ export default function CreditNoteFormPage() {
   }
 
   const itemAmount = Math.max(0, form.item.quantity * form.item.rate - form.item.discount);
-  const taxAmt     = Math.round(itemAmount * (form.item.taxRate / 100) * 100) / 100;
+  const taxAmt = Math.round(itemAmount * (form.item.taxRate / 100) * 100) / 100;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -389,7 +402,7 @@ export default function CreditNoteFormPage() {
           {/* Left: back + title */}
           <div className="flex items-center gap-2 min-w-0">
             <button
-              onClick={() => navigate("/sales/credit-notes")}
+              onClick={() => navigate(backPath)}
               className="shrink-0 p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
             >
               <ArrowLeft size={16} className="sm:hidden" />
@@ -397,10 +410,10 @@ export default function CreditNoteFormPage() {
             </button>
             <div className="min-w-0">
               <p className="hidden sm:block text-[11px] text-gray-400 font-medium leading-none mb-0.5">
-                Sales › Credit Notes
+                Sales › {isDebit ? "Client Debit Note" : "Client Credit Notes"}
               </p>
               <h1 className="text-sm sm:text-base font-bold text-gray-900 truncate leading-tight">
-                {isEdit ? `Edit ${form.creditNoteNumber}` : "New Credit Note"}
+                {isEdit ? `Edit ${form.creditNoteNumber}` : (isDebit ? "New Client Debit Note" : "New Client Credit Note")}
               </h1>
             </div>
           </div>
@@ -408,7 +421,7 @@ export default function CreditNoteFormPage() {
           {/* Right: actions — desktop */}
           <div className="hidden sm:flex items-center gap-2 shrink-0">
             <button
-              onClick={() => navigate("/sales/credit-notes")}
+              onClick={() => navigate(backPath)}
               className="px-3 py-1.5 text-sm font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Cancel
@@ -460,7 +473,7 @@ export default function CreditNoteFormPage() {
               Save as Draft
             </button>
             <button
-              onClick={() => { navigate("/sales/credit-notes"); }}
+              onClick={() => { navigate(backPath); }}
               className="flex-1 py-2 text-xs font-semibold border border-gray-200 rounded-lg text-gray-500 hover:bg-white transition-colors"
             >
               Cancel
@@ -496,7 +509,7 @@ export default function CreditNoteFormPage() {
                 </div>
 
                 <div>
-                  <FieldLabel required>Credit Note #</FieldLabel>
+                  <FieldLabel required>{isDebit ? "Debit Note #" : "Credit Note #"}</FieldLabel>
                   <input
                     className={inp}
                     value={form.creditNoteNumber}
@@ -515,7 +528,7 @@ export default function CreditNoteFormPage() {
                 </div>
 
                 <div>
-                  <FieldLabel required>Credit Note Date</FieldLabel>
+                  <FieldLabel required>{isDebit ? "Debit Note Date" : "Credit Note Date"}</FieldLabel>
                   <input
                     type="date"
                     className={inp}
@@ -531,7 +544,7 @@ export default function CreditNoteFormPage() {
                     value={form.reason}
                     onChange={(e) => setField("reason", e.target.value as Reason)}
                   >
-                    {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {reasonOptions.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
 
@@ -703,7 +716,7 @@ export default function CreditNoteFormPage() {
                 <table className="w-full text-sm" style={{ minWidth: 680 }}>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {["Item Name","Account","HSN/SAC","Qty","Rate (₹)","Disc (₹)","Tax %","Amount (₹)"].map((h) => (
+                      {["Item Name", "Account", "HSN/SAC", "Qty", "Rate (₹)", "Disc (₹)", "Tax %", "Amount (₹)"].map((h) => (
                         <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 last:pr-0 last:text-right">{h}</th>
                       ))}
                     </tr>
@@ -910,11 +923,10 @@ export default function CreditNoteFormPage() {
                 {(["tds", "tcs"] as const).map((mode) => (
                   <label
                     key={mode}
-                    className={`flex-1 flex items-center justify-center gap-2 cursor-pointer py-2 rounded-lg border transition-colors text-sm font-semibold ${
-                      form.taxMode === mode
+                    className={`flex-1 flex items-center justify-center gap-2 cursor-pointer py-2 rounded-lg border transition-colors text-sm font-semibold ${form.taxMode === mode
                         ? "border-blue-400 bg-blue-50 text-blue-700"
                         : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     <input type="radio" className="accent-blue-600" checked={form.taxMode === mode} onChange={() => setField("taxMode", mode)} />
                     {mode.toUpperCase()}

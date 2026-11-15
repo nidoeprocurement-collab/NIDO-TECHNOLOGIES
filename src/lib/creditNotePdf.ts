@@ -101,8 +101,13 @@ async function loadImage(url: string): Promise<{ data: string; format: 'PNG' | '
   }
 }
 
+export interface CreditNotePdfOptions {
+  title?: string;
+  dateLabel?: string;
+}
+
 // ── Main generator ─────────────────────────────────────────────────────────────
-export async function generateCreditNotePdf(note: CreditNotePdfData): Promise<string> {
+export async function generateCreditNotePdf(note: CreditNotePdfData, options?: CreditNotePdfOptions): Promise<string> {
   const org = loadConfig().organization;
   const brand = getBrandHeader(org.displayName, org.industry);
 
@@ -134,8 +139,10 @@ export async function generateCreditNotePdf(note: CreditNotePdfData): Promise<st
   drawText(doc, brand.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
   drawText(doc, brand.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
-  // ── CREDIT NOTE label + number box (right) ────────────────────────────────
-  drawText(doc, 'CREDIT NOTE', pageWidth - margin, 48, { size: 20, color: DARK, bold: true, align: 'right' });
+  // ── CREDIT / DEBIT NOTE label + number box (right) ────────────────────────
+  const docTitle = options?.title || 'CREDIT NOTE';
+  const dateLabel = options?.dateLabel || 'Credit Date';
+  drawText(doc, docTitle, pageWidth - margin, 48, { size: 20, color: DARK, bold: true, align: 'right' });
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.roundedRect(pageWidth - margin - 130, 61, 130, 28, 4, 4, 'S');
   drawText(doc, '#', pageWidth - margin - 119, 79, { size: 11, color: BLUE });
@@ -161,7 +168,7 @@ export async function generateCreditNotePdf(note: CreditNotePdfData): Promise<st
 
   // ── Dates (right) ─────────────────────────────────────────────────────────
   let dateY = 112;
-  drawText(doc, `Credit Date: ${fmtDate(note.issueDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+  drawText(doc, `${dateLabel}: ${fmtDate(note.issueDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
   dateY += 14;
   drawText(doc, `Ref#: ${note.referenceNumber}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
   if (note.invoiceNumber) {
@@ -358,8 +365,8 @@ export async function generateCreditNotePdf(note: CreditNotePdfData): Promise<st
   return doc.output('datauristring');
 }
 
-export async function downloadCreditNotePdf(note: CreditNotePdfData, filename?: string): Promise<void> {
-  const dataUri = await generateCreditNotePdf(note);
+export async function downloadCreditNotePdf(note: CreditNotePdfData, filename?: string, options?: CreditNotePdfOptions): Promise<void> {
+  const dataUri = await generateCreditNotePdf(note, options);
   const link = document.createElement('a');
   link.href = dataUri;
   link.download = filename ?? `${note.creditNoteNumber}.pdf`;

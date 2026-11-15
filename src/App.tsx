@@ -919,19 +919,35 @@ function AppRoutes() {
               />
               <Route
                 path="transactions/purchase/vendor-credits"
-                element={<VendorCreditsPage />}
+                element={<VendorCreditsPage key="vendor-credit" noteKind="credit" />}
               />
               <Route
                 path="transactions/purchase/vendor-credits/create"
-                element={<VendorCreditsPage />}
+                element={<VendorCreditsPage key="vendor-credit" noteKind="credit" />}
               />
               <Route
                 path="transactions/purchase/vendor-credits/:id"
-                element={<VendorCreditsPage />}
+                element={<VendorCreditsPage key="vendor-credit" noteKind="credit" />}
               />
               <Route
                 path="transactions/purchase/vendor-credits/:id/edit"
-                element={<VendorCreditsPage />}
+                element={<VendorCreditsPage key="vendor-credit" noteKind="credit" />}
+              />
+              <Route
+                path="transactions/purchase/vendor-debit-notes"
+                element={<VendorCreditsPage key="vendor-debit" noteKind="debit" />}
+              />
+              <Route
+                path="transactions/purchase/vendor-debit-notes/create"
+                element={<VendorCreditsPage key="vendor-debit" noteKind="debit" />}
+              />
+              <Route
+                path="transactions/purchase/vendor-debit-notes/:id"
+                element={<VendorCreditsPage key="vendor-debit" noteKind="debit" />}
+              />
+              <Route
+                path="transactions/purchase/vendor-debit-notes/:id/edit"
+                element={<VendorCreditsPage key="vendor-debit" noteKind="debit" />}
               />
               <Route
                 path="sales"
@@ -1052,15 +1068,25 @@ function AppRoutes() {
                 path="sales/payment-receipts/:id"
                 element={<NewPaymentReceiptPage />}
               />
-              <Route path="sales/credit-notes" element={<CreditNotesPage />} />
+              <Route path="sales/credit-notes" element={<CreditNotesPage key="client-credit" noteKind="credit" />} />
               <Route
                 path="sales/credit-notes/create"
-                element={<CreditNoteFormPage />}
+                element={<CreditNoteFormPage key="client-credit-form" noteKind="credit" />}
               />
-              <Route path="sales/credit-notes/:id" element={<CreditNotesPage />} />
+              <Route path="sales/credit-notes/:id" element={<CreditNotesPage key="client-credit" noteKind="credit" />} />
               <Route
                 path="sales/credit-notes/:id/edit"
-                element={<CreditNoteFormPage />}
+                element={<CreditNoteFormPage key="client-credit-form" noteKind="credit" />}
+              />
+              <Route path="sales/debit-notes" element={<CreditNotesPage key="client-debit" noteKind="debit" />} />
+              <Route
+                path="sales/debit-notes/create"
+                element={<CreditNoteFormPage key="client-debit-form" noteKind="debit" />}
+              />
+              <Route path="sales/debit-notes/:id" element={<CreditNotesPage key="client-debit" noteKind="debit" />} />
+              <Route
+                path="sales/debit-notes/:id/edit"
+                element={<CreditNoteFormPage key="client-debit-form" noteKind="debit" />}
               />
               <Route path="sales/e-way-bills" element={<EWayBillsPage />} />
               <Route path="sales/e-way-bills/create" element={<EWayBillsPage />} />
@@ -1087,11 +1113,13 @@ function AppRoutes() {
               <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="bills" element={<BillsPage />} />
               <Route path="payments-made" element={<PaymentsMadePage />} />
-              <Route path="vendor-credits" element={<VendorCreditsPage />} />
+              <Route path="vendor-credits" element={<VendorCreditsPage key="vendor-credit" noteKind="credit" />} />
+              <Route path="vendor-debit-notes" element={<VendorCreditsPage key="vendor-debit" noteKind="debit" />} />
               <Route path="recurring-invoices" element={<RecurringInvoicesPage />} />
               <Route path="delivery-challans" element={<DeliveryChallansPage />} />
               <Route path="payment-receipts" element={<PaymentReceiptsPage />} />
-              <Route path="credit-notes" element={<CreditNotesPage />} />
+              <Route path="credit-notes" element={<CreditNotesPage key="client-credit" noteKind="credit" />} />
+              <Route path="client-debit-notes" element={<CreditNotesPage key="client-debit" noteKind="debit" />} />
               <Route path="eway-bills" element={<EWayBillsPage />} />
               <Route path="invoices" element={<InvoicePage />} />
               <Route path="reports" element={<ReportsPage />} />

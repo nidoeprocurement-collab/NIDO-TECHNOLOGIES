@@ -25,11 +25,13 @@ const routeLabels: Record<string, string> = {
   'payment-receipts': 'Payment Receipts',
   'payments-made': 'Payments Made',
   'purchase-orders': 'Purchase Orders',
-  'vendor-credits': 'Vendor Credits',
+  'vendor-credits': 'Vendor Credit Note',
+  'vendor-debit-notes': 'Vendor Debit Note',
   'recurring-invoices': 'Recurring Invoices',
   'recurring-expenses': 'Recurring Expenses',
   'delivery-challans': 'Delivery Challans',
-  'credit-notes': 'Credit Notes',
+  'credit-notes': 'Client Credit Notes',
+  'client-debit-notes': 'Client Debit Note',
   'eway-bills': 'e-Way Bills',
   'departments': 'Departments',
   'roles': 'Roles',
@@ -262,7 +264,7 @@ export default function TopBar() {
                     ))}
                   </div>
                 ) : (
-                    <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+                  <p className="px-3 py-4 text-center text-sm text-muted-foreground">
                     No matches found. Try a name, ID, SKU, email, status, or keyword.
                   </p>
                 )}
@@ -301,11 +303,10 @@ export default function TopBar() {
             ) : index === 0 ? (
               <button
                 onClick={() => navigate(crumb.path)}
-                className={`text-sm px-2 py-1 rounded transition-colors ${
-                  crumb.isActive
+                className={`text-sm px-2 py-1 rounded transition-colors ${crumb.isActive
                     ? 'text-primary font-medium bg-primary/10'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
+                  }`}
               >
                 {crumb.label}
               </button>
@@ -314,11 +315,10 @@ export default function TopBar() {
                 <ChevronRight size={16} className="text-muted-foreground" />
                 <button
                   onClick={() => navigate(crumb.path)}
-                  className={`text-sm px-2 py-1 rounded transition-colors ${
-                    crumb.isActive
+                  className={`text-sm px-2 py-1 rounded transition-colors ${crumb.isActive
                       ? 'text-primary font-medium bg-primary/10'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                    }`}
                 >
                   {crumb.label}
                 </button>

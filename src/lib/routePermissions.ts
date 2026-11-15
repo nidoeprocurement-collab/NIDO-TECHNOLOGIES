@@ -29,6 +29,7 @@ export const ROUTE_MODULE_MAP: Array<{ prefix: string; moduleKey: string }> = [
   { prefix: '/sales/delivery-challans', moduleKey: 'sales' },
   { prefix: '/sales/payment-receipts', moduleKey: 'sales' },
   { prefix: '/sales/credit-notes', moduleKey: 'sales' },
+  { prefix: '/sales/debit-notes', moduleKey: 'sales' },
   { prefix: '/sales/e-way-bills', moduleKey: 'sales' },
   { prefix: '/sales/invoices', moduleKey: 'invoices' },
   { prefix: '/sales/recurring-invoices', moduleKey: 'invoices' },
@@ -37,6 +38,7 @@ export const ROUTE_MODULE_MAP: Array<{ prefix: string; moduleKey: string }> = [
   { prefix: '/delivery-challans', moduleKey: 'sales' },
   { prefix: '/payment-receipts', moduleKey: 'sales' },
   { prefix: '/credit-notes', moduleKey: 'sales' },
+  { prefix: '/client-debit-notes', moduleKey: 'sales' },
   { prefix: '/eway-bills', moduleKey: 'sales' },
 
   { prefix: '/transactions/purchase/expenses', moduleKey: 'expenses' },
@@ -51,7 +53,9 @@ export const ROUTE_MODULE_MAP: Array<{ prefix: string; moduleKey: string }> = [
   { prefix: '/transactions/purchase/payments-made', moduleKey: 'purchases' },
   { prefix: '/payments-made', moduleKey: 'purchases' },
   { prefix: '/transactions/purchase/vendor-credits', moduleKey: 'purchases' },
+  { prefix: '/transactions/purchase/vendor-debit-notes', moduleKey: 'purchases' },
   { prefix: '/vendor-credits', moduleKey: 'purchases' },
+  { prefix: '/vendor-debit-notes', moduleKey: 'purchases' },
   { prefix: '/transactions/purchase', moduleKey: 'purchases' },
   { prefix: '/transactions', moduleKey: 'purchases' },
 

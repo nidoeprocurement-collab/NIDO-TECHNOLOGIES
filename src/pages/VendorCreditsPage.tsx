@@ -89,7 +89,9 @@ interface CreditNumberPref {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CREDITS_KEY = "nido_purchase_vendor_credits_v1";
+const DEBITS_KEY = "nido_purchase_vendor_debit_notes_v1";
 const PREF_KEY = "nido_vendor_credit_pref_v1";
+const DEBIT_PREF_KEY = "nido_vendor_debit_pref_v1";
 const BILLS_KEY = "nido_purchase_bills_v1";
 
 const STATUS_STYLE: Record<CreditStatus, string> = {
@@ -125,10 +127,11 @@ const toIsoDate = (v: string | undefined): string => {
 const buildCreditNumber = (prefix: string, next: number) =>
   `${prefix}${String(next).padStart(5, "0")}`;
 
-const readCreditNumberPref = (): CreditNumberPref => {
-  const saved = safeReadJson<CreditNumberPref>(PREF_KEY, {
+const readCreditNumberPref = (prefKey = PREF_KEY, isDebit = false): CreditNumberPref => {
+  const defaultPrefix = isDebit ? "VDN-" : (getPrefix("vendorCredit") || "VC-");
+  const saved = safeReadJson<CreditNumberPref>(prefKey, {
     mode: "auto",
-    prefix: getPrefix("vendorCredit") || "VC-",
+    prefix: defaultPrefix,
     nextNumber: 1,
   });
   return {
@@ -136,7 +139,7 @@ const readCreditNumberPref = (): CreditNumberPref => {
     // The General Settings prefix is the source of truth for new documents.
     // Keep the saved mode and sequence for backwards compatibility, but do not
     // let the old page-local prefix override the centralized configuration.
-    prefix: getPrefix("vendorCredit") || "VC-",
+    prefix: defaultPrefix,
   };
 };
 
@@ -203,8 +206,8 @@ const normalizeCredit = (raw: Record<string, unknown>): VendorCreditEntry => {
 
 interface BillEntry { id: string; billNumber: string; billDate: string; vendorName: string; }
 
-const readCredits = (): VendorCreditEntry[] => {
-  const parsed = safeReadJson<unknown>(CREDITS_KEY, []);
+const readCredits = (creditsKey = CREDITS_KEY): VendorCreditEntry[] => {
+  const parsed = safeReadJson<unknown>(creditsKey, []);
   if (!Array.isArray(parsed)) return [];
   return parsed
     .filter((e) => !!e && typeof e === "object")
@@ -262,7 +265,7 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 }
 
 // ── Inline PDF preview view ───────────────────────────────────────────────────
-function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
+function CreditPdfView({ credit, isDebit = false }: { credit: VendorCreditEntry; isDebit?: boolean }) {
   const totals = getCreditTotals(credit);
   return (
     <div className="mx-auto max-w-[900px] border border-gray-200 bg-white rounded-xl p-8 shadow-sm text-gray-900">
@@ -270,14 +273,14 @@ function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-xl bg-blue-600 flex items-center justify-center text-white text-2xl font-bold">N</div>
           <div>
-            <p className="text-xs uppercase text-gray-400 tracking-wider">Vendor Credit</p>
+            <p className="text-xs uppercase text-gray-400 tracking-wider">{isDebit ? "Vendor Debit Note" : "Vendor Credit Note"}</p>
             <p className="text-sm font-semibold text-blue-700">{credit.creditNoteNumber}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-serif tracking-widest text-gray-800">VENDOR CREDIT</p>
+          <p className="text-2xl font-serif tracking-widest text-gray-800">{isDebit ? "VENDOR DEBIT NOTE" : "VENDOR CREDIT NOTE"}</p>
           <div className="mt-2 bg-blue-50 rounded-lg px-4 py-2">
-            <p className="text-xs text-gray-500">Total Credit</p>
+            <p className="text-xs text-gray-500">{isDebit ? "Total Debit" : "Total Credit"}</p>
             <p className="text-lg font-bold text-gray-900">{money(totals.total)}</p>
           </div>
         </div>
@@ -291,8 +294,8 @@ function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
         </div>
         <div className="space-y-1">
           {([
-            ["Credit Note #", credit.creditNoteNumber],
-            ["Credit Date", credit.creditDate],
+            [isDebit ? "Debit Note #" : "Credit Note #", credit.creditNoteNumber],
+            [isDebit ? "Debit Date" : "Credit Date", credit.creditDate],
             ...(credit.referenceNumber ? [["Reference #", credit.referenceNumber]] : []),
             ...(credit.associatedBillNumber ? [["Against Bill", credit.associatedBillNumber]] : []),
             ["Status", credit.status],
@@ -363,7 +366,14 @@ function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function VendorCreditsPage() {
+export default function VendorCreditsPage({ noteKind = "credit" }: { noteKind?: "credit" | "debit" }) {
+  const isDebit = noteKind === "debit";
+  const creditsKey = isDebit ? DEBITS_KEY : CREDITS_KEY;
+  const prefKey = isDebit ? DEBIT_PREF_KEY : PREF_KEY;
+  const basePath = isDebit ? "/transactions/purchase/vendor-debit-notes" : "/transactions/purchase/vendor-credits";
+  const docLabel = isDebit ? "Vendor Debit Note" : "Vendor Credit Note";
+  const docLabelPlural = isDebit ? "Vendor Debit Notes" : "Vendor Credit Notes";
+
   const { setMeta } = usePageMeta();
   const navigate = useNavigate();
   const location = useLocation();
@@ -372,9 +382,9 @@ export default function VendorCreditsPage() {
   const vendors = useMemo(() => getVendors().filter((v) => !v.archived), []);
   const bills = useMemo(() => readBills(), []);
 
-  const [credits, setCredits] = useState<VendorCreditEntry[]>(readCredits);
-  const [pref, setPref] = useState<CreditNumberPref>(readCreditNumberPref);
-  const [form, setForm] = useState<CreditForm>(() => blankForm(readCreditNumberPref()));
+  const [credits, setCredits] = useState<VendorCreditEntry[]>(() => readCredits(creditsKey));
+  const [pref, setPref] = useState<CreditNumberPref>(() => readCreditNumberPref(prefKey, isDebit));
+  const [form, setForm] = useState<CreditForm>(() => blankForm(readCreditNumberPref(prefKey, isDebit)));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPdfView, setShowPdfView] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "items" | "journal">("overview");
@@ -394,9 +404,9 @@ export default function VendorCreditsPage() {
   );
 
   useEffect(() => {
-    setMeta({ title: selectedCredit?.creditNoteNumber || "Vendor Credits" });
+    setMeta({ title: selectedCredit?.creditNoteNumber || docLabel });
     return () => setMeta({});
-  }, [selectedCredit]);
+  }, [selectedCredit, docLabel]);
 
   useEffect(() => {
     if (createMode) {
@@ -422,15 +432,15 @@ export default function VendorCreditsPage() {
 
   const persist = (next: VendorCreditEntry[]) => {
     setCredits(next);
-    localStorage.setItem(CREDITS_KEY, JSON.stringify(next));
+    localStorage.setItem(creditsKey, JSON.stringify(next));
   };
 
   const persistPref = (next: CreditNumberPref) => {
     setPref(next);
-    localStorage.setItem(PREF_KEY, JSON.stringify(next));
+    localStorage.setItem(prefKey, JSON.stringify(next));
   };
 
-  const backToList = () => navigate("/transactions/purchase/vendor-credits", { replace: true });
+  const backToList = () => navigate(basePath, { replace: true });
 
   const setF = <K extends keyof CreditForm>(key: K, value: CreditForm[K]) =>
     setForm((c) => ({ ...c, [key]: value }));
@@ -486,10 +496,10 @@ export default function VendorCreditsPage() {
             : c,
         );
         persist(updated);
-        toast({ title: "Vendor credit updated" });
-        navigate(`/transactions/purchase/vendor-credits/${editingId}`, { replace: true });
+        toast({ title: `${docLabel} updated` });
+        navigate(`${basePath}/${editingId}`, { replace: true });
       } else {
-        const id = `vc-${Date.now()}`;
+        const id = `${isDebit ? "vdn" : "vc"}-${Date.now()}`;
         const created: VendorCreditEntry = {
           id,
           creditNoteNumber: form.creditNoteNumber,
@@ -508,8 +518,8 @@ export default function VendorCreditsPage() {
         if (pref.mode === "auto") {
           persistPref({ ...pref, nextNumber: pref.nextNumber + 1 });
         }
-        toast({ title: status === "DRAFT" ? "Vendor credit saved as draft" : "Vendor credit created as open" });
-        navigate(`/transactions/purchase/vendor-credits/${id}`, { replace: true });
+        toast({ title: status === "DRAFT" ? `${docLabel} saved as draft` : `${docLabel} created as open` });
+        navigate(`${basePath}/${id}`, { replace: true });
       }
     } finally {
       setSaving(false);
@@ -585,7 +595,9 @@ export default function VendorCreditsPage() {
         notes: selectedCredit.notes,
         items: selectedCredit.items,
         adjustment: selectedCredit.adjustment,
-      });
+      }, isDebit
+        ? { title: "VENDOR DEBIT NOTE", dateLabel: "Debit Date", totalLabel: "Total Debit" }
+        : { title: "VENDOR CREDIT NOTE", dateLabel: "Credit Date", totalLabel: "Total Credit" });
     } catch (err) {
       console.error(err);
       toast({ title: "PDF generation failed", description: String(err) });
@@ -670,7 +682,7 @@ export default function VendorCreditsPage() {
               </button>
               <span className="text-gray-300">|</span>
               <h1 className="text-sm font-bold text-gray-900 truncate">
-                {editingId ? `Edit Vendor Credit ${credits.find((c) => c.id === editingId)?.creditNoteNumber || ""}` : "New Vendor Credit"}
+                {editingId ? `Edit ${docLabel} ${credits.find((c) => c.id === editingId)?.creditNoteNumber || ""}` : `New ${docLabel}`}
               </h1>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -710,7 +722,7 @@ export default function VendorCreditsPage() {
                 </select>
               </div>
               <div>
-                <FieldLabel required>Credit Note #</FieldLabel>
+                <FieldLabel required>{isDebit ? "Debit Note #" : "Credit Note #"}</FieldLabel>
                 <input
                   type="text"
                   className={pref.mode === "auto" ? inp + " bg-gray-50 text-gray-500 cursor-not-allowed" : inp}
@@ -969,7 +981,7 @@ export default function VendorCreditsPage() {
               </div>
 
               {showPdfView ? (
-                <CreditPdfView credit={selectedCredit} />
+                <CreditPdfView credit={selectedCredit} isDebit={isDebit} />
               ) : (
                 <div className="grid gap-4 md:grid-cols-4">
                   {[
@@ -1138,13 +1150,13 @@ export default function VendorCreditsPage() {
         <Card className="border-gray-200 shadow-sm">
           <CardContent className="px-6 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">All Vendor Credits</h1>
+              <h1 className="text-2xl font-bold text-gray-900">All {docLabelPlural}</h1>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search credits…"
+                    placeholder={isDebit ? "Search debit notes…" : "Search credit notes…"}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white w-52"
@@ -1152,9 +1164,9 @@ export default function VendorCreditsPage() {
                 </div>
                 <Button
                   className="h-9 rounded-lg bg-blue-600 px-4 hover:bg-blue-700 text-white"
-                  onClick={() => navigate("/transactions/purchase/vendor-credits/create")}
+                  onClick={() => navigate(`${basePath}/create`)}
                 >
-                  <Plus className="mr-1.5 h-4 w-4" /> New
+                  <Plus className="mr-1.5 h-4 w-4" /> New {docLabel}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -1194,7 +1206,7 @@ export default function VendorCreditsPage() {
                     <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">DATE</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">CREDIT NOTE #</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">{isDebit ? "DEBIT NOTE #" : "CREDIT NOTE #"}</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">REFERENCE NUMBER</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">VENDOR NAME</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">STATUS</TableHead>
@@ -1208,12 +1220,12 @@ export default function VendorCreditsPage() {
                     <TableCell colSpan={8} className="text-center py-16 text-gray-400">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-10 w-10 text-gray-200" />
-                        <p className="text-sm font-medium">No vendor credits yet</p>
+                        <p className="text-sm font-medium">No {docLabelPlural.toLowerCase()} yet</p>
                         <button
-                          onClick={() => navigate("/transactions/purchase/vendor-credits/create")}
+                          onClick={() => navigate(`${basePath}/create`)}
                           className="mt-1 text-sm text-blue-600 hover:underline font-medium"
                         >
-                          + Create your first vendor credit
+                          + Create your first {docLabel.toLowerCase()}
                         </button>
                       </div>
                     </TableCell>
@@ -1225,7 +1237,7 @@ export default function VendorCreditsPage() {
                       <TableRow
                         key={credit.id}
                         className="cursor-pointer hover:bg-gray-50 transition-colors"
-                        onClick={() => navigate(`/transactions/purchase/vendor-credits/${credit.id}`)}
+                        onClick={() => navigate(`${basePath}/${credit.id}`)}
                       >
                         <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selectedRows.has(credit.id)} onCheckedChange={() => toggleRow(credit.id)} />
