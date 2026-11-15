@@ -25,7 +25,7 @@ const routeLabels: Record<string, string> = {
   'payment-receipts': 'Payment Receipts',
   'payments-made': 'Payments Made',
   'purchase-orders': 'Purchase Orders',
-  'vendor-credits': 'Vendor Credits',
+  'vendor-credits': 'Debit Note',
   'recurring-invoices': 'Recurring Invoices',
   'recurring-expenses': 'Recurring Expenses',
   'delivery-challans': 'Delivery Challans',

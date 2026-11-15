@@ -82,7 +82,7 @@ const adminNavigationItems: NavItem[] = [
           { label: 'Purchase Orders',    icon: <ClipboardList size={16}/>,path: '/purchase-orders',    moduleKey: 'purchase_orders' },
           { label: 'Bills',              icon: <FileText size={16} />,   path: '/bills',               moduleKey: 'bills' },
           { label: 'Payments Made',      icon: <CreditCard size={16} />, path: '/payments-made',       moduleKey: 'purchases' },
-          { label: 'Vendor Credits',     icon: <Banknote size={16} />,   path: '/vendor-credits',      moduleKey: 'purchases' },
+          { label: 'Debit Note',         icon: <Banknote size={16} />,   path: '/vendor-credits',      moduleKey: 'purchases' },
         ],
       },
     ],

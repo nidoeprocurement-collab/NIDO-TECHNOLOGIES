@@ -18,7 +18,7 @@ export type MyOrderStatus =
   | "Provisioned"
   | "Activated"
   | "Completed"
-  | "Pending Shipping"
+  | "Pending Shipping"/*  */
   | "Partially Shipped"
   | "Shipped"
   | "Partially Delivered"
@@ -291,9 +291,9 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       : undefined;
     const assignment = order.clientId
       ? assignOrderLocally({
-          clientTier: String(assignmentClient?.client_tier || assignmentClient?.tier || ""),
-          roster: getAssignmentRoster(),
-        })
+        clientTier: String(assignmentClient?.client_tier || assignmentClient?.tier || ""),
+        roster: getAssignmentRoster(),
+      })
       : null;
     const assignedUser = assignment?.assignedEmployeeId
       ? getUsers().find((entry) => entry.id === assignment.assignedEmployeeId)
@@ -431,17 +431,17 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return prev.map((o) => (
         idSet.has(o.id) &&
-        o.status !== status &&
-        o.status !== "Cancelled" &&
-        !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
+          o.status !== status &&
+          o.status !== "Cancelled" &&
+          !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
           ? {
-              ...o,
-              status,
-              ...extra,
-              updatedBy,
-              updatedAt,
-              updateCount: (Number(o.updateCount) || 0) + 1,
-            }
+            ...o,
+            status,
+            ...extra,
+            updatedBy,
+            updatedAt,
+            updateCount: (Number(o.updateCount) || 0) + 1,
+          }
           : o
       ));
     });

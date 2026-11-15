@@ -143,8 +143,8 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
   drawText(doc, brand.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
   drawText(doc, brand.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
-  // ── VENDOR CREDIT label + number box (right) ──────────────────────────────
-  drawText(doc, 'VENDOR CREDIT', pageWidth - margin, 48, { size: 18, color: DARK, bold: true, align: 'right' });
+  // ── DEBIT NOTE label + number box (right) ─────────────────────────────────
+  drawText(doc, 'DEBIT NOTE', pageWidth - margin, 48, { size: 18, color: DARK, bold: true, align: 'right' });
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.roundedRect(pageWidth - margin - 120, 61, 120, 28, 4, 4, 'S');
   drawText(doc, '#', pageWidth - margin - 109, 79, { size: 11, color: BLUE });
@@ -169,7 +169,7 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
 
   // ── Credit date + Reference (right) ──────────────────────────────────────
   let dateY = 112;
-  drawText(doc, `Credit Date: ${fmtDate(credit.creditDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+  drawText(doc, `Debit Note Date: ${fmtDate(credit.creditDate)}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
   if (credit.referenceNumber) {
     dateY += 14;
     drawText(doc, `Reference: ${credit.referenceNumber}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
@@ -207,10 +207,10 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
   doc.setDrawColor(...BORDER).setLineWidth(0.7);
   doc.setFillColor(239, 246, 255);
   doc.roundedRect(creditCardX, y, cardWidth, cardHeight, 5, 5, 'FD');
-  drawText(doc, 'CREDIT SUMMARY', creditCardX + 13, y + 19, { size: 8, color: BLUE, bold: true });
+  drawText(doc, 'DEBIT NOTE SUMMARY', creditCardX + 13, y + 19, { size: 8, color: BLUE, bold: true });
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(creditCardX + 13, y + 27, creditCardX + cardWidth - 13, y + 27);
-  drawText(doc, 'Total Credit Amount', creditCardX + 13, y + 48, { size: 8, color: MUTED });
+  drawText(doc, 'Total Debit Amount', creditCardX + 13, y + 48, { size: 8, color: MUTED });
   drawText(doc, `INR ${fmt2(totals.grandTotal)}`, creditCardX + 13, y + 62, { size: 13, color: DARK, bold: true });
   drawText(doc, 'Balance Remaining', creditCardX + 13, y + 78, { size: 8, color: MUTED });
   drawText(doc, `INR ${fmt2(totals.grandTotal)}`, creditCardX + 13, y + 90, { size: 9, color: [5, 150, 105], bold: true });
@@ -320,7 +320,7 @@ export async function generateVendorCreditPdf(credit: VendorCreditForPdf): Promi
   doc.rect(summaryX + 0.5, totalY, summaryWidth - 1, totalHeight - 0.5, 'F');
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(summaryX, totalY, summaryX + summaryWidth, totalY);
-  drawText(doc, 'Total Credit', summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
+  drawText(doc, 'Total Debit', summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
   drawText(doc, `INR ${fmt2(totals.grandTotal)}`, summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
 
   // ── Left: Notes ───────────────────────────────────────────────────────────
