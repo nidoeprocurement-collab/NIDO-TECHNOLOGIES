@@ -5,6 +5,7 @@ import { getClients, type StoredClient } from '@/lib/clientStore';
 import { getCatalogProducts, type CatalogProduct } from '@/lib/catalogStore';
 import { getProductCategoryTaxMap } from '@/lib/taxEngine';
 import { saveQuote, getQuoteById, generateQuoteNumber, type StoredQuote, type QuoteLineItem, type SupportingDoc } from '@/lib/quoteStore';
+import { validateRequiredDocumentFields } from '@/lib/documentValidation';
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function todayISO(): string { return new Date().toISOString().split('T')[0]; }
@@ -272,8 +273,19 @@ export default function SalesQuoteFormPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const validateQuoteFields = () =>
+    validateRequiredDocumentFields(
+      [
+        { label: 'Customer Name', valid: Boolean(clientSearch.trim()) },
+        { label: 'Quote #', valid: Boolean(quoteNumber.trim()) },
+        { label: 'Quote Date', valid: Boolean(quoteDate) },
+        { label: 'At least one Line Item', valid: lineItems.some((item) => Boolean(item.description?.trim())) },
+      ],
+      'sales quote',
+    );
+
   const handleSaveAsDraft = async () => {
-    if (!clientSearch.trim()) { showToast('Please select a client.', 'error'); return; }
+    if (!validateQuoteFields()) return;
     setSaving('draft');
     try {
       const q = buildQuote('Draft');
@@ -288,7 +300,7 @@ export default function SalesQuoteFormPage() {
   };
 
   const handleSaveDraftInLocalMode = async () => {
-    if (!clientSearch.trim()) { showToast('Please select a client.', 'error'); return; }
+    if (!validateQuoteFields()) return;
     setSaving('local');
     try {
       const q = buildQuote('Draft');

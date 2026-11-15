@@ -4,6 +4,7 @@ import {
   ArrowLeft, Eye, Save, Download, Plus, Trash2, CheckCircle2, FileText, X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import {
   generateDCPdfBase64,
@@ -327,12 +328,16 @@ export default function NewDeliveryChallanPage() {
   const grandTotal = totalTaxable + totalGST + shipping + adj;
 
   // ── Actions ─────────────────────────────────────────────────────────────────
-  const validate = () => {
-    if (!form.challanNo.trim()) { toast.error("Challan number is required"); return false; }
-    if (!form.consigneeName.trim()) { toast.error("Consignee name is required"); return false; }
-    if (validItems.length === 0) { toast.error("Add at least one line item"); return false; }
-    return true;
-  };
+  const validate = () =>
+    validateRequiredDocumentFields(
+      [
+        { label: "Challan Number", valid: Boolean(form.challanNo.trim()) },
+        { label: "Consignee Name", valid: Boolean(form.consigneeName.trim()) },
+        { label: "Challan Date", valid: Boolean(form.challanDate) },
+        { label: "At least one Line Item", valid: validItems.length > 0 },
+      ],
+      "delivery challan",
+    );
 
   const handlePreview = async () => {
     setBusy("preview");

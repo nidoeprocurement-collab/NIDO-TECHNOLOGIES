@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { validateRequiredDocumentFields } from '@/lib/documentValidation';
 import { ArrowLeft, ClipboardList, Plus, Save, Trash2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -731,7 +732,20 @@ export default function InvoiceFormPage() {
   };
 
   const handleSave = async () => {
-    if (!clientName.trim() || lineItems.every((item) => !item.description.trim())) return;
+    const docLabel = status === 'Proforma Invoice' ? 'proforma invoice' : 'invoice';
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: 'Customer Name', valid: Boolean(clientName.trim()) },
+          { label: status === 'Proforma Invoice' ? 'Proforma Invoice #' : 'Invoice #', valid: Boolean(invoiceNumber.trim()) },
+          { label: status === 'Proforma Invoice' ? 'Proforma Date' : 'Invoice Date', valid: Boolean(invoiceDate) },
+          { label: 'At least one Line Item', valid: lineItems.some((item) => item.description.trim()) },
+        ],
+        docLabel,
+      )
+    ) {
+      return;
+    }
     if (status === 'Proforma Invoice' && !canCreateProforma) {
       toast.error('Proforma invoices are available only for physical and hybrid products.');
       return;
@@ -1567,8 +1581,7 @@ export default function InvoiceFormPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={!clientName.trim() || lineItems.every((item) => !item.description.trim())}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700"
           >
             <Save size={16} /> {status === 'Proforma Invoice' ? 'Save Proforma Invoice' : 'Save Invoice'}
           </button>

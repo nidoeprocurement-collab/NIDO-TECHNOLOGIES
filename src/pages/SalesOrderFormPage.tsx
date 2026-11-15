@@ -11,6 +11,7 @@ import {
 } from '@/lib/salesOrderStore';
 import { getProductCommercialTerms, getAvailabilityLabel } from '@/lib/productCommercialTerms';
 import { resolveAutoAssignment } from '@/lib/autoAssignmentStore';
+import { validateRequiredDocumentFields } from '@/lib/documentValidation';
 
 function todayISO(): string { return new Date().toISOString().split('T')[0]; }
 function addDays(dateStr: string, days: number): string {
@@ -306,8 +307,19 @@ export default function SalesOrderFormPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const validateOrderFields = () =>
+    validateRequiredDocumentFields(
+      [
+        { label: 'Customer Name', valid: Boolean(clientSearch.trim()) },
+        { label: 'Sales Order #', valid: Boolean(orderNumber.trim()) },
+        { label: 'Order Date', valid: Boolean(orderDate) },
+        { label: 'At least one Line Item', valid: lineItems.some((item) => Boolean(item.description?.trim())) },
+      ],
+      'sales order',
+    );
+
   const handleSaveAsDraft = () => {
-    if (!clientSearch.trim()) { showToast('Please select a client.', 'error'); return; }
+    if (!validateOrderFields()) return;
     setSaving('draft');
     try {
       saveOrder(buildOrder('Draft'));
@@ -321,7 +333,7 @@ export default function SalesOrderFormPage() {
   };
 
   const handleConfirmOrder = () => {
-    if (!clientSearch.trim()) { showToast('Please select a client.', 'error'); return; }
+    if (!validateOrderFields()) return;
     setSaving('confirm');
     try {
       saveOrder(buildOrder('Confirmed'));

@@ -12,6 +12,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { safeReadJson } from "@/lib/utils";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
@@ -212,11 +213,17 @@ export default function NewExpensePage() {
   };
 
   const handleSave = (andNew = false) => {
-    if (!form.expenseAccount || !form.amount || !form.paidThrough) {
-      toast({
-        title: "Required fields missing",
-        description: "Expense Account, Amount and Paid Through are required.",
-      });
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Date", valid: Boolean(form.date) },
+          { label: "Expense Account", valid: Boolean(form.expenseAccount) },
+          { label: "Amount", valid: Boolean(form.amount && amountValue > 0) },
+          { label: "Paid Through", valid: Boolean(form.paidThrough) },
+        ],
+        "expense",
+      )
+    ) {
       return;
     }
 
@@ -333,11 +340,10 @@ export default function NewExpensePage() {
           <button
             type="button"
             onClick={() => setExpenseTab("expense")}
-            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-              expenseTab === "expense"
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${expenseTab === "expense"
                 ? "bg-blue-600 text-white shadow-sm"
                 : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-            }`}
+              }`}
           >
             Record Expense
           </button>
@@ -347,11 +353,10 @@ export default function NewExpensePage() {
               setExpenseTab("mileage");
               toast({ title: "Record Mileage coming soon" });
             }}
-            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-              expenseTab === "mileage"
+            className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${expenseTab === "mileage"
                 ? "bg-blue-600 text-white shadow-sm"
                 : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-            }`}
+              }`}
           >
             Record Mileage
           </button>

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { safeReadJson } from "@/lib/utils";
 import { getPaginationItems } from "@/lib/pagination";
 import { Badge } from "@/components/ui/badge";
@@ -440,12 +441,17 @@ export default function PurchaseOrdersPage() {
   };
 
   const saveOrder = async (send: boolean) => {
-    if (!form.vendorName || !form.date || !form.deliveryDate) {
-      toast({ title: "Vendor Name, Date and Delivery Date are required" });
-      return;
-    }
-    if (!form.items.some((i) => i.itemName.trim())) {
-      toast({ title: "Please add at least one line item" });
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Vendor Name", valid: Boolean(form.vendorName.trim()) },
+          { label: "Order Date", valid: Boolean(form.date) },
+          { label: "Delivery Date", valid: Boolean(form.deliveryDate) },
+          { label: "At least one Line Item", valid: form.items.some((i) => i.itemName.trim()) },
+        ],
+        "purchase order",
+      )
+    ) {
       return;
     }
     setSaving(true);

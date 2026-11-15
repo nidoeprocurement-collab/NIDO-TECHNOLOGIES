@@ -5,6 +5,7 @@ import { downloadPaymentMadePdf, generatePaymentMadePdfBase64 } from "@/lib/paym
 import { getPOByNumber, updatePO } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { safeReadJson } from "@/lib/utils";
 import { getPrefix } from "@/lib/configService";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -452,8 +453,19 @@ export default function PaymentsMadePage() {
   };
 
   const savePayment = async (status: "PAID" | "DRAFT") => {
-    if (!form.vendorName.trim()) { toast({ title: "Vendor is required" }); return; }
-    if (amountValue <= 0) { toast({ title: "Enter a payment amount" }); return; }
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Vendor Name", valid: Boolean(form.vendorName.trim()) },
+          { label: "Payment #", valid: Boolean(form.paymentNumber.trim()) },
+          { label: "Payment Date", valid: Boolean(form.paymentDate) },
+          { label: "Payment Amount", valid: amountValue > 0 },
+        ],
+        "payment made",
+      )
+    ) {
+      return;
+    }
 
     setSaving(true);
     try {

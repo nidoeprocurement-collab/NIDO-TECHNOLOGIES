@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 import { AlertCircle, ArrowLeft, ChevronDown, Plus, Save, Search, Tag, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -305,6 +306,11 @@ export default function RecurringInvoiceFormPage() {
     if (errors.length > 0) {
       setFieldErrors(fe);
       setValidationErrors(errors);
+      toast({
+        variant: "destructive",
+        title: `Missing Required ${errors.length === 1 ? "Field" : "Fields"}`,
+        description: errors.join(". "),
+      });
       return;
     }
 

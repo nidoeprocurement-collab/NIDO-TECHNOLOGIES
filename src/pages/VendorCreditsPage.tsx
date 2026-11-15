@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { safeReadJson } from "@/lib/utils";
 import { getPrefix } from "@/lib/configService";
 import { getVendors } from "@/lib/vendorDataStore";
@@ -449,8 +450,17 @@ export default function VendorCreditsPage() {
   };
 
   const saveCredit = (status: CreditStatus) => {
-    if (!form.vendorName || !form.creditNoteNumber.trim()) {
-      toast({ title: "Vendor and Credit Note number are required" });
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Vendor Name", valid: Boolean(form.vendorName.trim()) },
+          { label: "Credit Note #", valid: Boolean(form.creditNoteNumber.trim()) },
+          { label: "Credit Note Date", valid: Boolean(form.creditDate) },
+          { label: "At least one Line Item", valid: form.items.some((item) => Boolean(item.itemDetails?.trim())) },
+        ],
+        "vendor credit",
+      )
+    ) {
       return;
     }
     setSaving(true);

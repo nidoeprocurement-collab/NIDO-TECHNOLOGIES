@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { getClients } from "@/lib/clientStore";
 import type { StoredClient } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
@@ -335,8 +336,19 @@ export default function CreditNoteFormPage() {
 
   const handleSave = (status: CreditStatus) => {
     if (!form) return;
-    if (!form.customerName.trim()) { toast.error("Customer name is required"); return; }
-    if (!form.creditNoteNumber.trim()) { toast.error("Credit Note # is required"); return; }
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Customer Name", valid: Boolean(form.customerName.trim()) },
+          { label: "Credit Note #", valid: Boolean(form.creditNoteNumber.trim()) },
+          { label: "Credit Note Date", valid: Boolean(form.creditDate) },
+          { label: "At least one Line Item", valid: form.items.some((item) => Boolean(item.itemDetails?.trim())) },
+        ],
+        "credit note",
+      )
+    ) {
+      return;
+    }
     if (form.customerPhone && !isValidPhoneNumber(form.customerPhone)) {
       toast.error("Customer phone number must contain exactly 10 digits"); return;
     }

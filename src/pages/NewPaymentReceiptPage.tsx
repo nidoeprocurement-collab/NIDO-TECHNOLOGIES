@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X, Download } from "lucide-react";
 import { toast } from "sonner";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { getClients } from "@/lib/clientStore";
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import {
@@ -55,11 +56,10 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-        active
+      className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${active
           ? "bg-blue-600 text-white shadow-sm"
           : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-      }`}
+        }`}
     >
       {children}
     </button>
@@ -178,14 +178,14 @@ export default function NewPaymentReceiptPage() {
   // Unpaid invoices for the selected customer (excludes Paid, Cancelled, and Proforma Invoices)
   const customerInvoices = form.customerName.trim()
     ? invoices.filter((inv) => {
-        if (inv.status === "Paid" || inv.status === "Cancelled" || inv.status === "Proforma Invoice") {
-          return false;
-        }
-        const sameCustomer =
-          inv.clientName.trim().toLowerCase() === form.customerName.trim().toLowerCase();
-        if (!sameCustomer) return false;
-        return getInvoiceAmountDue(inv) > 0 || inv.invoiceNumber === form.invoiceNumber;
-      })
+      if (inv.status === "Paid" || inv.status === "Cancelled" || inv.status === "Proforma Invoice") {
+        return false;
+      }
+      const sameCustomer =
+        inv.clientName.trim().toLowerCase() === form.customerName.trim().toLowerCase();
+      if (!sameCustomer) return false;
+      return getInvoiceAmountDue(inv) > 0 || inv.invoiceNumber === form.invoiceNumber;
+    })
     : [];
 
   const getCustomerEmails = (customerName: string, inv?: StoredInvoice): string[] => {
@@ -310,45 +310,50 @@ export default function NewPaymentReceiptPage() {
     });
 
     return {
-    id: isEditMode && editingReceipt ? editingReceipt.id : `pr-${Date.now()}`,
-    paymentNumber: form.paymentNumber.trim() || `PR-${Date.now().toString().slice(-5)}`,
-    customerName: form.customerName.trim(),
-    invoiceNumber: form.invoiceNumber.trim(),
-    paymentDate: form.paymentDate,
-    paymentMode: form.paymentMode,
-    amountReceived: amountValue,
-    taxDeducted: form.taxDeducted,
-    status: "paid",
-    bankCharges: form.bankCharges,
-    depositTo: form.depositTo,
-    reference: form.reference,
-    note: form.note,
-    placeOfSupply: form.placeOfSupply,
-    descriptionOfSupply: form.descriptionOfSupply,
-    taxCode: form.taxCode,
-    productType: linkedItems.length === 0
-      ? undefined
-      : allDigital
-        ? presentation?.type
-        : digitalItems.length === 0
-          ? getDocumentProductType(linkedItems[0])
-          : "Mixed Products",
-    usersLicenses: presentation?.quantity as number | undefined,
-    tenureBilling: presentation?.tenureBilling,
-    provisioningTime: presentation?.provisioningTime,
-    productDetails: productDetails.length > 0 ? productDetails : undefined,
-    attachments,
-    archived: isEditMode && editingReceipt ? editingReceipt.archived : false,
+      id: isEditMode && editingReceipt ? editingReceipt.id : `pr-${Date.now()}`,
+      paymentNumber: form.paymentNumber.trim() || `PR-${Date.now().toString().slice(-5)}`,
+      customerName: form.customerName.trim(),
+      invoiceNumber: form.invoiceNumber.trim(),
+      paymentDate: form.paymentDate,
+      paymentMode: form.paymentMode,
+      amountReceived: amountValue,
+      taxDeducted: form.taxDeducted,
+      status: "paid",
+      bankCharges: form.bankCharges,
+      depositTo: form.depositTo,
+      reference: form.reference,
+      note: form.note,
+      placeOfSupply: form.placeOfSupply,
+      descriptionOfSupply: form.descriptionOfSupply,
+      taxCode: form.taxCode,
+      productType: linkedItems.length === 0
+        ? undefined
+        : allDigital
+          ? presentation?.type
+          : digitalItems.length === 0
+            ? getDocumentProductType(linkedItems[0])
+            : "Mixed Products",
+      usersLicenses: presentation?.quantity as number | undefined,
+      tenureBilling: presentation?.tenureBilling,
+      provisioningTime: presentation?.provisioningTime,
+      productDetails: productDetails.length > 0 ? productDetails : undefined,
+      attachments,
+      archived: isEditMode && editingReceipt ? editingReceipt.archived : false,
     };
   };
 
   const handleSave = () => {
-    if (!form.customerName.trim()) {
-      toast.error("Customer name is required");
-      return;
-    }
-    if (!form.amountReceived || amountValue <= 0) {
-      toast.error("Enter a valid amount");
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Customer Name", valid: Boolean(form.customerName.trim()) },
+          { label: "Payment #", valid: Boolean(form.paymentNumber.trim()) },
+          { label: "Payment Date", valid: Boolean(form.paymentDate) },
+          { label: "Amount Received", valid: Boolean(form.amountReceived && amountValue > 0) },
+        ],
+        "payment receipt",
+      )
+    ) {
       return;
     }
 
@@ -860,7 +865,7 @@ export default function NewPaymentReceiptPage() {
                       <Download size={15} />
                     </button>
                     <button
-                    type="button"
+                      type="button"
                       onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
                       className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
                       title={`Remove ${attachment.name}`}

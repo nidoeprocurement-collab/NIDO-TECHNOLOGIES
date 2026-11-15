@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
+import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
 import { getAllPOs, getPOByNumber, updatePO } from "@/lib/purchaseOrderStore";
@@ -638,12 +639,18 @@ export default function BillsPage() {
   };
 
   const saveBill = async (status: BillStatus) => {
-    if (!form.vendorName || !form.billDate || !form.dueDate) {
-      toast({ title: "Vendor Name, Bill Date and Due Date are required" });
-      return;
-    }
-    if (!form.items.some((item) => item.itemDetails.trim())) {
-      toast({ title: "Please add at least one line item" });
+    if (
+      !validateRequiredDocumentFields(
+        [
+          { label: "Vendor Name", valid: Boolean(form.vendorName.trim()) },
+          { label: "Bill #", valid: Boolean(form.billNumber.trim()) },
+          { label: "Bill Date", valid: Boolean(form.billDate) },
+          { label: "Due Date", valid: Boolean(form.dueDate) },
+          { label: "At least one Line Item", valid: form.items.some((item) => item.itemDetails.trim()) },
+        ],
+        "bill",
+      )
+    ) {
       return;
     }
     setSaving(true);
