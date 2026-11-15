@@ -30,11 +30,11 @@ interface TermsConditionsTabProps {
   ) => void;
 }
 
-const CATEGORY_TABS: Array<{ id: 'all' | DocumentCategoryKey; label: string }> = [
-  { id: 'all', label: 'All Documents (23)' },
-  { id: 'sales_client', label: 'Sales & Client (9)' },
-  { id: 'procurement_vendor', label: 'Procurement & Vendor (7)' },
-  { id: 'service_other', label: 'Service & Other (7)' },
+const CATEGORY_LABELS: Array<{ id: 'all' | DocumentCategoryKey; label: string }> = [
+  { id: 'all', label: 'All Documents' },
+  { id: 'sales_client', label: 'Sales & Client' },
+  { id: 'procurement_vendor', label: 'Procurement & Vendor' },
+  { id: 'service_other', label: 'Service & Other' },
 ];
 
 export function TermsConditionsTab({
@@ -167,12 +167,24 @@ export function TermsConditionsTab({
     toast.success(`Restored v${version.version} as new v${nextVersion} for ${selectedDoc.documentType}.`);
   };
 
+  const categoryTabs = useMemo(
+    () =>
+      CATEGORY_LABELS.map((tab) => {
+        const count =
+          tab.id === 'all'
+            ? documentTerms.length
+            : documentTerms.filter((d) => d.category === tab.id).length;
+        return { ...tab, label: `${tab.label} (${count})` };
+      }),
+    [documentTerms],
+  );
+
   return (
     <div className="space-y-5">
       {/* Top Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-4">
         <div className="flex flex-wrap gap-1.5">
-          {CATEGORY_TABS.map((tab) => (
+          {categoryTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"

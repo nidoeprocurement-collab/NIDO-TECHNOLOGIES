@@ -19,11 +19,27 @@ export function loadTransactionSettings(): TransactionSettingsStoreState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<TransactionSettingsStoreState>;
+    const savedTerms = Array.isArray(parsed.documentTerms) ? parsed.documentTerms : [];
+    const reconciledDocumentTerms = fallback.documentTerms.map((baseDoc) => {
+      const existing = savedTerms.find(
+        (d) => d.category === baseDoc.category && d.documentType === baseDoc.documentType,
+      );
+      if (!existing) return baseDoc;
+      return {
+        ...baseDoc,
+        termsHtml: existing.termsHtml ?? baseDoc.termsHtml,
+        isEnabled: typeof existing.isEnabled === 'boolean' ? existing.isEnabled : baseDoc.isEnabled,
+        useDefault: typeof existing.useDefault === 'boolean' ? existing.useDefault : baseDoc.useDefault,
+        currentVersion: existing.currentVersion ?? baseDoc.currentVersion,
+        versions: Array.isArray(existing.versions) && existing.versions.length > 0 ? existing.versions : baseDoc.versions,
+        updatedAt: existing.updatedAt ?? baseDoc.updatedAt,
+        updatedBy: existing.updatedBy ?? baseDoc.updatedBy,
+      };
+    });
+
     return {
       defaultTermsHtml: parsed.defaultTermsHtml ?? fallback.defaultTermsHtml,
-      documentTerms: Array.isArray(parsed.documentTerms) && parsed.documentTerms.length > 0
-        ? parsed.documentTerms
-        : fallback.documentTerms,
+      documentTerms: reconciledDocumentTerms,
       bankAccounts: Array.isArray(parsed.bankAccounts)
         ? parsed.bankAccounts
         : fallback.bankAccounts,

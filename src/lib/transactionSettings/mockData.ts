@@ -27,19 +27,20 @@ const DOCUMENT_CATALOGUE: Array<{
   categoryLabel: string;
   termsHtml?: string;
 }> = [
-  // A. Sales & Client Documents
+  // A. Sales & Client Documents (matching Sidebar -> Sales)
   {
-    documentType: 'Proforma Invoice',
+    documentType: 'Quotes',
     category: 'sales_client',
     categoryLabel: 'Sales & Client Documents',
     termsHtml: `<ol>
-  <li>This Proforma Invoice is valid for 15 days from the date of issue.</li>
-  <li>Order dispatch or provisioning begins upon advance payment confirmation.</li>
+  <li>This Quote is valid for 15 days from the date of issue.</li>
+  <li>Order dispatch or provisioning begins upon quote acceptance and advance payment confirmation.</li>
   <li>All bank charges or remittance fees shall be borne by the remitter.</li>
 </ol>`,
   },
+  { documentType: 'Sales Orders', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
   {
-    documentType: 'Tax Invoice',
+    documentType: 'Invoices',
     category: 'sales_client',
     categoryLabel: 'Sales & Client Documents',
     termsHtml: `<ol>
@@ -48,18 +49,18 @@ const DOCUMENT_CATALOGUE: Array<{
   <li>Goods once sold and accepted will not be taken back unless defective on arrival.</li>
 </ol>`,
   },
-  { documentType: 'Commercial Invoice', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
-  { documentType: 'Credit Note', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
-  { documentType: 'Debit Note', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
-  { documentType: 'Sales Quotation', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
-  { documentType: 'Sales Order', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
-  { documentType: 'Payment Receipt', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
-  { documentType: 'Refund Receipt', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
+  { documentType: 'Recurring Invoices', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
+  { documentType: 'Delivery Challans', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
+  { documentType: 'Payment Receipts', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
+  { documentType: 'Client Credit Notes', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
+  { documentType: 'Client Debit Note', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
+  { documentType: 'e-Way Bills', category: 'sales_client', categoryLabel: 'Sales & Client Documents' },
 
-  // B. Procurement & Vendor Documents
-  { documentType: 'Purchase Requisition', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
+  // B. Procurement & Vendor Documents (matching Sidebar -> Purchases)
+  { documentType: 'Expenses', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
+  { documentType: 'Recurring Expenses', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
   {
-    documentType: 'Purchase Order',
+    documentType: 'Purchase Orders',
     category: 'procurement_vendor',
     categoryLabel: 'Procurement & Vendor Documents',
     termsHtml: `<ol>
@@ -68,11 +69,10 @@ const DOCUMENT_CATALOGUE: Array<{
   <li>NIDO Technologies reserves the right to reject damaged or non-conforming goods.</li>
 </ol>`,
   },
-  { documentType: 'Vendor Bill', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
-  { documentType: 'Goods Receipt Note (GRN)', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
-  { documentType: 'Vendor Payment Advice', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
-  { documentType: 'Vendor Debit Note', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
+  { documentType: 'Bills', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
+  { documentType: 'Payments Made', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
   { documentType: 'Vendor Credit Note', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
+  { documentType: 'Vendor Debit Note', category: 'procurement_vendor', categoryLabel: 'Procurement & Vendor Documents' },
 
   // C. Service & Other Documents
   { documentType: 'Service Invoice', category: 'service_other', categoryLabel: 'Service & Other Documents' },
