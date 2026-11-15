@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import type { StoredClient } from "@/lib/clientStore";
 import { getPortalUsersByClient, type PortalUser } from "@/lib/portalUserStore";
+import { getClientCatalog } from "@/lib/clientCatalogStore";
+import { isDigitalOnlyType } from "@/lib/productTypeRules";
 import {
   type ActivityCategory,
   type ClientInventoryData,
@@ -184,6 +186,7 @@ export default function ClientInventoryPage({ client }: Props) {
     () => getPortalUsersByClient(client.id).filter((u) => u.status !== "inactive"),
     [client.id],
   );
+  const clientProducts = useMemo(() => getClientCatalog(client.id), [client.id]);
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<"all" | InventoryAssetType>("all");
@@ -213,6 +216,7 @@ export default function ClientInventoryPage({ client }: Props) {
 
   // Form states for modals
   const [addForm, setAddForm] = useState({
+    productKey: "",
     name: "",
     type: "Physical Asset" as InventoryAssetType,
     category: "Laptops",
@@ -220,7 +224,43 @@ export default function ClientInventoryPage({ client }: Props) {
     location: "Bengaluru · Store A",
     quantity: 1,
     condition: "New" as "New" | "Good" | "Active" | "Fair",
+    warranty: "In Warranty",
+    brand: "",
   });
+
+  const handleSelectCatalogProduct = (key: string) => {
+    const product = clientProducts.find(
+      (p) => (p.cpc || p.productCode || p.sku || p.name) === key,
+    );
+    if (!product) {
+      setAddForm((prev) => ({
+        ...prev,
+        productKey: "",
+        name: "",
+        brand: "",
+      }));
+      return;
+    }
+    const rawType = product.physicalType || product.productType || "";
+    const mappedType: InventoryAssetType = isDigitalOnlyType(rawType)
+      ? "Digital License"
+      : rawType.toLowerCase().includes("consumable")
+        ? "Consumable"
+        : "Physical Asset";
+    const defaultCity = client.billingCity || client.locationDetails?.city || "Bengaluru";
+    setAddForm({
+      productKey: key,
+      name: product.name,
+      type: mappedType,
+      category: product.category || "General",
+      serialNumber: product.sku || product.cpc || product.productCode || "",
+      location: mappedType === "Digital License" ? "Company-wide" : `${defaultCity} · Store A`,
+      quantity: Math.max(1, product.moq || 1),
+      condition: mappedType === "Digital License" ? "Active" : "New",
+      warranty: product.warranty || "In Warranty",
+      brand: product.brand || "",
+    });
+  };
   const [assignForm, setAssignForm] = useState({
     userId: "",
     assignee: "",
@@ -467,7 +507,7 @@ export default function ClientInventoryPage({ client }: Props) {
   // Actions
   const handleAddInventory = () => {
     if (!addForm.name.trim()) {
-      toast.error("Please enter an item name");
+      toast.error("Please select a product");
       return;
     }
     const prefix = addForm.type === "Digital License" ? "LIC" : addForm.type === "Consumable" ? "STK" : "AST";
@@ -493,7 +533,7 @@ export default function ClientInventoryPage({ client }: Props) {
       condition: addForm.condition,
       status: "available",
       idleDays: 0,
-      warranty: "In Warranty",
+      warranty: addForm.warranty || "In Warranty",
     };
     pushActivity([newItem, ...data.items], {
       itemName: newItem.name,
@@ -511,6 +551,7 @@ export default function ClientInventoryPage({ client }: Props) {
     });
     setShowAddModal(false);
     setAddForm({
+      productKey: "",
       name: "",
       type: "Physical Asset",
       category: "Laptops",
@@ -518,6 +559,8 @@ export default function ClientInventoryPage({ client }: Props) {
       location: "Bengaluru · Store A",
       quantity: 1,
       condition: "New",
+      warranty: "In Warranty",
+      brand: "",
     });
     toast.success(`${newItem.name} added to inventory`);
   };
@@ -1944,12 +1987,30 @@ export default function ClientInventoryPage({ client }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div className="sm:col-span-2">
               <label className="block font-semibold text-gray-600 mb-1">Item Name *</label>
-              <input
-                value={addForm.name}
-                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                placeholder="e.g. Dell Latitude 5450"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs"
-              />
+              <select
+                value={addForm.productKey}
+                onChange={(e) => handleSelectCatalogProduct(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 focus:border-blue-400 focus:outline-none"
+              >
+                <option value="">
+                  {clientProducts.length > 0
+                    ? "Select product from client catalog…"
+                    : "No products added to this client catalog"}
+                </option>
+                {clientProducts.map((p) => {
+                  const key = p.cpc || p.productCode || p.sku || p.name;
+                  return (
+                    <option key={key} value={key}>
+                      {p.name}{p.cpc || p.sku ? ` (${p.cpc || p.sku})` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              {addForm.productKey && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {[addForm.brand, addForm.category, addForm.warranty].filter(Boolean).join(" · ")}
+                </p>
+              )}
             </div>
             <div>
               <label className="block font-semibold text-gray-600 mb-1">Type</label>
