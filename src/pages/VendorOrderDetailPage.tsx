@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore";
 import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
@@ -99,21 +100,21 @@ const ITEM_STATUS_SEQUENCE = [
 ];
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
-  Pending:    { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
-  Confirmed:  { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Pending: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
+  Confirmed: { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Processing: { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
   "Pending Shipping": { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
   "Partially Shipped": { bg: "#eff6ff", color: "#1d4ed8", border: "#93c5fd" },
-  Shipped:    { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  Shipped: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   "Partially Delivered": { bg: "#f0fdfa", color: "#0f766e", border: "#99f6e4" },
-  Delivered:  { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Delivered: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Provisioning: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
   "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Provisioned: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
   Validated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Activated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Completed: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Cancelled:  { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
+  Cancelled: { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
 };
 
 const STEPPER_STEPS = ORDER_FULFILLMENT_STATUSES;
@@ -185,11 +186,11 @@ function Field({ label, value, accent }: { label: string; value: React.ReactNode
 
 function DocIcon({ ext }: { ext: string }) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
-    pdf:  { bg: "#fee2e2", color: "#dc2626", label: "PDF" },
+    pdf: { bg: "#fee2e2", color: "#dc2626", label: "PDF" },
     xlsx: { bg: "#d1fae5", color: "#059669", label: "XLS" },
     docx: { bg: "#dbeafe", color: "#2563eb", label: "DOC" },
-    png:  { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
-    jpg:  { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
+    png: { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
+    jpg: { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
   };
   const ic = map[ext?.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280", label: ext?.toUpperCase() || "FILE" };
   return (
@@ -969,12 +970,17 @@ function CancelItemStatusModal({ itemName, onConfirm, onClose }: { itemName: str
           </label>
           <textarea
             value={reason}
-            onChange={e => setReason(e.target.value)}
+            onChange={e => setReason(enforceMaxWords(e.target.value))}
             rows={3}
             placeholder="Enter reason for cancellation..."
             style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
           />
-          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            {!ok ? <div style={{ fontSize: 11.5, color: "#dc2626" }}>Reason is required before confirming cancellation.</div> : <span />}
+            <span style={{ fontSize: 11, color: countWords(reason) >= MAX_CANCELLATION_REASON_WORDS ? "#dc2626" : "#6b7280" }}>
+              {countWords(reason)} / {MAX_CANCELLATION_REASON_WORDS} words
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Item</button>
@@ -1005,12 +1011,17 @@ function CancelPOModal({ poNumber, onConfirm, onClose }: { poNumber: string; onC
           </label>
           <textarea
             value={reason}
-            onChange={e => setReason(e.target.value)}
+            onChange={e => setReason(enforceMaxWords(e.target.value))}
             rows={3}
             placeholder="Enter reason for cancellation..."
             style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
           />
-          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            {!ok ? <div style={{ fontSize: 11.5, color: "#dc2626" }}>Reason is required before confirming cancellation.</div> : <span />}
+            <span style={{ fontSize: 11, color: countWords(reason) >= MAX_CANCELLATION_REASON_WORDS ? "#dc2626" : "#6b7280" }}>
+              {countWords(reason)} / {MAX_CANCELLATION_REASON_WORDS} words
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep PO</button>
@@ -1172,51 +1183,51 @@ function storedPOToDetail(po: StoredPO) {
     items:
       po.items && po.items.length > 0
         ? po.items.map((li, i) => ({
-            id: `i${i + 1}`,
-            num: i + 1,
-            subOrderId: li.subOrderId,
-            name: li.item,
-            image: "📦",
-            referenceNumber: li.referenceNumber || "",
-            serialNumber: li.serialNumber || "",
-            specs: li.specs || [],
-             configuration: li.configuration || {},
-             configurationPriceAdjustment: li.configurationPriceAdjustment || 0,
-             commercialTerms: li.commercialTerms,
-            qty: li.qty,
-            unitPrice: fmtINR(li.unitPrice),
-            total: fmtINR(li.lineSubtotal),
-            status: po.status === "Cancelled"
-              ? "Cancelled"
-              : (po.status === "Draft"
-                ? "Pending"
-                : (po.status === "Confirmed" && (!li.status || li.status === "Pending" || li.status === "Confirmed")
-                  ? "Processing"
-                  : (li.status || getPODisplayStatus(po.status)))),
-            expectedDelivery: po.requestedDelivery || "Within 30 days",
-            tracking: li.tracking || null,
-            cancelReason: li.cancelReason,
-            provisioningDetails: li.provisioningDetails,
-          }))
+          id: `i${i + 1}`,
+          num: i + 1,
+          subOrderId: li.subOrderId,
+          name: li.item,
+          image: "📦",
+          referenceNumber: li.referenceNumber || "",
+          serialNumber: li.serialNumber || "",
+          specs: li.specs || [],
+          configuration: li.configuration || {},
+          configurationPriceAdjustment: li.configurationPriceAdjustment || 0,
+          commercialTerms: li.commercialTerms,
+          qty: li.qty,
+          unitPrice: fmtINR(li.unitPrice),
+          total: fmtINR(li.lineSubtotal),
+          status: po.status === "Cancelled"
+            ? "Cancelled"
+            : (po.status === "Draft"
+              ? "Pending"
+              : (po.status === "Confirmed" && (!li.status || li.status === "Pending" || li.status === "Confirmed")
+                ? "Processing"
+                : (li.status || getPODisplayStatus(po.status)))),
+          expectedDelivery: po.requestedDelivery || "Within 30 days",
+          tracking: li.tracking || null,
+          cancelReason: li.cancelReason,
+          provisioningDetails: li.provisioningDetails,
+        }))
         : [
-            {
-              id: "i1",
-              num: 1,
-              subOrderId: po.subOrderId,
-              name: po.item,
-              image: "📦",
-              referenceNumber: po.referenceNumber || "",
-              serialNumber: po.serialNumber || "",
-              specs: po.specs || [],
-              commercialTerms: undefined,
-              qty: po.qty,
-              unitPrice: fmtINR(po.unitPrice),
-              total: fmtINR(po.subtotal),
-              status: po.status === "Cancelled" ? "Cancelled" : getPODisplayStatus(po.status),
-              expectedDelivery: po.requestedDelivery || "Within 30 days",
-              tracking: null,
-            },
-          ],
+          {
+            id: "i1",
+            num: 1,
+            subOrderId: po.subOrderId,
+            name: po.item,
+            image: "📦",
+            referenceNumber: po.referenceNumber || "",
+            serialNumber: po.serialNumber || "",
+            specs: po.specs || [],
+            commercialTerms: undefined,
+            qty: po.qty,
+            unitPrice: fmtINR(po.unitPrice),
+            total: fmtINR(po.subtotal),
+            status: po.status === "Cancelled" ? "Cancelled" : getPODisplayStatus(po.status),
+            expectedDelivery: po.requestedDelivery || "Within 30 days",
+            tracking: null,
+          },
+        ],
     documents: po.documents || [],
     notes: po.notes || [],
     // keep subtotal rows for the footer
@@ -1359,9 +1370,9 @@ export default function VendorOrderDetailPage() {
       ? activeDigitalItems.length === 0
         ? "Cancelled"
         : deriveVendorDigitalFulfillmentStatus(activeDigitalItems.map(item => ({
-            status: item.status || "Pending",
-            quantity: item.qty,
-          })))
+          status: item.status || "Pending",
+          quantity: item.qty,
+        })))
       : orderStatus;
   const digitalStageIndex = isDigitalOrder
     ? getVendorDigitalFulfillmentStatusIndex(vendorDisplayStatus)
@@ -1507,18 +1518,18 @@ export default function VendorOrderDetailPage() {
         setOrders(prev => prev.map(order => order.id !== po.orderId
           ? order
           : {
-              ...order,
-              cartItems: order.cartItems?.map(cartItem => cartItem.subOrderId !== subOrderId
-                ? cartItem
-                : {
-                    ...cartItem,
-                    selectedVendorId: null,
-                    selectedVendorName: null,
-                    vendorAllocations: [],
-                    vendorPrice: undefined,
-                    landedCost: undefined,
-                  }),
-            }
+            ...order,
+            cartItems: order.cartItems?.map(cartItem => cartItem.subOrderId !== subOrderId
+              ? cartItem
+              : {
+                ...cartItem,
+                selectedVendorId: null,
+                selectedVendorName: null,
+                vendorAllocations: [],
+                vendorPrice: undefined,
+                landedCost: undefined,
+              }),
+          }
         ));
         reopenSubOrderForVendorSelection(po.orderId, subOrderId);
       }
@@ -2001,177 +2012,177 @@ export default function VendorOrderDetailPage() {
           aria-disabled={isAssignmentPending || undefined}
           style={isAssignmentPending ? { opacity: 0.55, pointerEvents: "none", userSelect: "none" } : undefined}
         >
-        {/* Info Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginTop: 20, marginBottom: 20 }}>
-          <InfoCard title="Vendor Information">
-            <Field label="Vendor Name" value={initialData.vendor.name} />
-            <Field label="Contact Person" value={initialData.vendor.contactPerson} />
-            <Field label="Email" value={initialData.vendor.email} />
-            <Field label="Phone" value={initialData.vendor.phone} />
-          </InfoCard>
-          <InfoCard title="Shipping Information">
-            <Field label="Shipping Address" value={initialData.shipping.address} />
-            <Field label="Delivery Method" value={initialData.shipping.deliveryMethod} />
-            <Field label="Requested Delivery" value={initialData.shipping.requestedDelivery} />
-          </InfoCard>
-          <InfoCard title="Billing Information">
-            <Field label="Billing Address" value={initialData.billing.address} />
-            <Field label="Payment Terms" value={initialData.billing.paymentTerms} />
-            <Field label="Payment Method" value={initialData.billing.paymentMethod} />
-          </InfoCard>
-          <InfoCard title="Vendor Order Summary">
-            {[
-              ["PO Number", initialData.poNumber],
-              ["Linked Master Order", initialData.linkedMasterOrder],
-              ["Order Status", isMasterOrderCancelled ? "Cancelled" : "Active"],
-              ["Total Items", initialData.totalItems],
-              ["Total Amount", initialData.totalAmount],
-              ["Order Date", initialData.orderDate],
-            ].map(([l, v]) => (
-              <div key={l as string} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 12.5, color: "#6b7280" }}>{l as string}</span>
-                <span style={{ fontSize: 13, fontWeight: l === "Linked Master Order" || l === "Order Status" ? 600 : 500, color: l === "Linked Master Order" ? "#2563eb" : l === "Order Status" && isMasterOrderCancelled ? "#991b1b" : "#111827", cursor: l === "Linked Master Order" ? "pointer" : "default" }}
-                  onClick={() => l === "Linked Master Order" && navigate(`/orders/${v}`)}
-                >{v as string}</span>
-              </div>
-            ))}
-          </InfoCard>
-        </div>
+          {/* Info Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginTop: 20, marginBottom: 20 }}>
+            <InfoCard title="Vendor Information">
+              <Field label="Vendor Name" value={initialData.vendor.name} />
+              <Field label="Contact Person" value={initialData.vendor.contactPerson} />
+              <Field label="Email" value={initialData.vendor.email} />
+              <Field label="Phone" value={initialData.vendor.phone} />
+            </InfoCard>
+            <InfoCard title="Shipping Information">
+              <Field label="Shipping Address" value={initialData.shipping.address} />
+              <Field label="Delivery Method" value={initialData.shipping.deliveryMethod} />
+              <Field label="Requested Delivery" value={initialData.shipping.requestedDelivery} />
+            </InfoCard>
+            <InfoCard title="Billing Information">
+              <Field label="Billing Address" value={initialData.billing.address} />
+              <Field label="Payment Terms" value={initialData.billing.paymentTerms} />
+              <Field label="Payment Method" value={initialData.billing.paymentMethod} />
+            </InfoCard>
+            <InfoCard title="Vendor Order Summary">
+              {[
+                ["PO Number", initialData.poNumber],
+                ["Linked Master Order", initialData.linkedMasterOrder],
+                ["Order Status", isMasterOrderCancelled ? "Cancelled" : "Active"],
+                ["Total Items", initialData.totalItems],
+                ["Total Amount", initialData.totalAmount],
+                ["Order Date", initialData.orderDate],
+              ].map(([l, v]) => (
+                <div key={l as string} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12.5, color: "#6b7280" }}>{l as string}</span>
+                  <span style={{ fontSize: 13, fontWeight: l === "Linked Master Order" || l === "Order Status" ? 600 : 500, color: l === "Linked Master Order" ? "#2563eb" : l === "Order Status" && isMasterOrderCancelled ? "#991b1b" : "#111827", cursor: l === "Linked Master Order" ? "pointer" : "default" }}
+                    onClick={() => l === "Linked Master Order" && navigate(`/orders/${v}`)}
+                  >{v as string}</span>
+                </div>
+              ))}
+            </InfoCard>
+          </div>
 
-        {/* Stepper + Assignment */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginBottom: 20 }}>
-          <div style={card}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🚚</div>
-              <div>
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 1 }}>Supplier Fulfillment Progress</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{vendorDisplayStatus}</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>Driven by the saved fulfillment status of the PO lines.</div>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 10, marginBottom: 16 }}>
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Internal PO lifecycle</div>
-                <div style={{ marginTop: 3, fontSize: 13, fontWeight: 700 }}>
-                  {isCancelled ? "Cancelled" : isDraft ? "Draft" : "Confirmed"}
+          {/* Stepper + Assignment */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginBottom: 20 }}>
+            <div style={card}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+                <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🚚</div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 1 }}>Supplier Fulfillment Progress</div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>{vendorDisplayStatus}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>Driven by the saved fulfillment status of the PO lines.</div>
                 </div>
               </div>
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Fulfillment scope</div>
-                <div style={{ marginTop: 3, fontSize: 13, fontWeight: 700 }}>
-                  {items.length} line{items.length === 1 ? "" : "s"} · {items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)} ordered units
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 10, marginBottom: 16 }}>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>Internal PO lifecycle</div>
+                  <div style={{ marginTop: 3, fontSize: 13, fontWeight: 700 }}>
+                    {isCancelled ? "Cancelled" : isDraft ? "Draft" : "Confirmed"}
+                  </div>
+                </div>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>Fulfillment scope</div>
+                  <div style={{ marginTop: 3, fontSize: 13, fontWeight: 700 }}>
+                    {items.length} line{items.length === 1 ? "" : "s"} · {items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)} ordered units
+                  </div>
+                </div>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>Next action</div>
+                  <div style={{ marginTop: 3, fontSize: 12, lineHeight: 1.45, fontWeight: 600 }}>
+                    {isCancelled
+                      ? "No further fulfillment updates."
+                      : isDraft
+                        ? "Review the vendor, quantities and terms before confirming."
+                        : isDigitalOrder
+                          ? "Record actual provider quantities; activation depends on the product terms."
+                          : orderStatus === "Pending Shipping"
+                            ? "Record dispatch tracking before marking items shipped."
+                            : orderStatus === "Shipped" || orderStatus === "Partially Shipped"
+                              ? "Capture proof of delivery and delivered quantities."
+                              : orderStatus === "Delivered" || orderStatus === "Partially Delivered"
+                                ? "Complete acceptance under the applicable client terms."
+                                : "Advance each line only after its required work is complete."}
+                  </div>
                 </div>
               </div>
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Next action</div>
-                <div style={{ marginTop: 3, fontSize: 12, lineHeight: 1.45, fontWeight: 600 }}>
-                  {isCancelled
-                    ? "No further fulfillment updates."
-                    : isDraft
-                      ? "Review the vendor, quantities and terms before confirming."
-                      : isDigitalOrder
-                        ? "Record actual provider quantities; activation depends on the product terms."
-                        : orderStatus === "Pending Shipping"
-                          ? "Record dispatch tracking before marking items shipped."
-                          : orderStatus === "Shipped" || orderStatus === "Partially Shipped"
-                            ? "Capture proof of delivery and delivered quantities."
-                            : orderStatus === "Delivered" || orderStatus === "Partially Delivered"
-                              ? "Complete acceptance under the applicable client terms."
-                              : "Advance each line only after its required work is complete."}
-                </div>
-              </div>
-            </div>
-            {isDigitalOrder ? (
-              <div>
-                <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Digital fulfillment stages</div>
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${getVendorDigitalFulfillmentStatusSequence().length}, minmax(0, 1fr))`, gap: 5 }}>
-                  {getVendorDigitalFulfillmentStatusSequence().map((stage, index) => {
-                    const done = digitalStageIndex > index;
-                    const current = digitalStageIndex === index;
-                    return (
-                      <div key={stage} style={{ minWidth: 0, textAlign: "center" }}>
-                        <div style={{ height: 4, borderRadius: 4, marginBottom: 6, background: done || current ? "#2563eb" : "#e5e7eb" }} />
-                        <span style={{ display: "block", fontSize: 9.5, lineHeight: 1.25, color: current ? "#1d4ed8" : "#6b7280", fontWeight: current ? 700 : 500 }}>
-                          {stage}
-                        </span>
-                        {stage === "Validated" && (
-                          <span style={{ display: "block", fontSize: 8.5, lineHeight: 1.2, color: current ? "#1d4ed8" : "#9ca3af", fontWeight: 500 }}>
-                            (Ready to move for clients)
+              {isDigitalOrder ? (
+                <div>
+                  <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "#6b7280" }}>Digital fulfillment stages</div>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${getVendorDigitalFulfillmentStatusSequence().length}, minmax(0, 1fr))`, gap: 5 }}>
+                    {getVendorDigitalFulfillmentStatusSequence().map((stage, index) => {
+                      const done = digitalStageIndex > index;
+                      const current = digitalStageIndex === index;
+                      return (
+                        <div key={stage} style={{ minWidth: 0, textAlign: "center" }}>
+                          <div style={{ height: 4, borderRadius: 4, marginBottom: 6, background: done || current ? "#2563eb" : "#e5e7eb" }} />
+                          <span style={{ display: "block", fontSize: 9.5, lineHeight: 1.25, color: current ? "#1d4ed8" : "#6b7280", fontWeight: current ? 700 : 500 }}>
+                            {stage}
                           </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {stage === "Validated" && (
+                            <span style={{ display: "block", fontSize: 8.5, lineHeight: 1.2, color: current ? "#1d4ed8" : "#9ca3af", fontWeight: 500 }}>
+                              (Ready to move for clients)
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <Stepper currentStatus={orderStatus} />
+              )}
+              <div style={{ marginTop: 12, fontSize: 11.5, color: "#6b7280" }}>
+                Invoice, payment, credit and refund states are tracked separately from fulfillment.
+                {isDigitalOrder ? " Digital provisioning counts are recorded per line; no fixed percentage is assumed." : ""}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
+                {isCancelled ? (
+                  <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
+                ) : isAssignmentPending ? (
+                  <span style={{ fontSize: 12.5, color: "#92400e", fontStyle: "italic" }}>Complete Assignment on the master order before confirming or updating this PO.</span>
+                ) : isDraft ? (
+                  <>
+                    <span style={{ fontSize: 12.5, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 7, padding: "6px 12px", fontWeight: 500 }}>
+                      Draft – Review items, then confirm to send to vendor
+                    </span>
+                    <button
+                      onClick={handleConfirmPO}
+                      style={{ padding: "8px 18px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+                    >
+                      ✓ Confirm Purchase Order
+                    </button>
+                  </>
+                ) : isDelivered ? (
+                  <span style={{ fontSize: 12.5, color: "#166534", fontStyle: "italic" }}>This PO is Delivered and can no longer be updated.</span>
+                ) : (
+                  <span style={{ fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
+                    Status updates automatically from item fulfillment progress.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div style={card}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <span style={{ fontWeight: 700, fontSize: 13.5 }}>Assignment</span>
+                {!isCancelled && (
+                  <button onClick={() => setShowEditAssignment(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>Edit</button>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Assigned To</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <Avatar initials={assignment.initials} color="#2563eb" size={36} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{assignment.assignedTo}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>{assignment.role}</div>
                 </div>
               </div>
-            ) : (
-              <Stepper currentStatus={orderStatus} />
-            )}
-            <div style={{ marginTop: 12, fontSize: 11.5, color: "#6b7280" }}>
-              Invoice, payment, credit and refund states are tracked separately from fulfillment.
-              {isDigitalOrder ? " Digital provisioning counts are recorded per line; no fixed percentage is assumed." : ""}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-              {isCancelled ? (
-                <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
-              ) : isAssignmentPending ? (
-                <span style={{ fontSize: 12.5, color: "#92400e", fontStyle: "italic" }}>Complete Assignment on the master order before confirming or updating this PO.</span>
-              ) : isDraft ? (
-                <>
-                  <span style={{ fontSize: 12.5, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 7, padding: "6px 12px", fontWeight: 500 }}>
-                    Draft – Review items, then confirm to send to vendor
-                  </span>
-                  <button
-                    onClick={handleConfirmPO}
-                    style={{ padding: "8px 18px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
-                  >
-                    ✓ Confirm Purchase Order
-                  </button>
-                </>
-              ) : isDelivered ? (
-                <span style={{ fontSize: 12.5, color: "#166534", fontStyle: "italic" }}>This PO is Delivered and can no longer be updated.</span>
-              ) : (
-                <span style={{ fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
-                  Status updates automatically from item fulfillment progress.
-                </span>
-              )}
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>Assigned On</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>{assignment.assignedOn}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Notes</div>
+              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.55 }}>{assignment.notes}</div>
             </div>
           </div>
 
-          <div style={card}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontWeight: 700, fontSize: 13.5 }}>Assignment</span>
-              {!isCancelled && (
-                <button onClick={() => setShowEditAssignment(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>Edit</button>
-              )}
-            </div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Assigned To</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <Avatar initials={assignment.initials} color="#2563eb" size={36} />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{assignment.assignedTo}</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>{assignment.role}</div>
+          {/* Items Section */}
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
+              <div style={{ padding: "14px 0", fontSize: 14, fontWeight: 700, color: "#111827" }}>
+                Items ({items.length})
+              </div>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 14 }}>🔍</span>
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>Assigned On</div>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>{assignment.assignedOn}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Notes</div>
-            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.55 }}>{assignment.notes}</div>
-          </div>
-        </div>
-
-        {/* Items Section */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
-            <div style={{ padding: "14px 0", fontSize: 14, fontWeight: 700, color: "#111827" }}>
-              Items ({items.length})
-            </div>
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 14 }}>🔍</span>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
-            </div>
-          </div>
-          <style>{`
+            <style>{`
             .vendor-po-items-grid > * {
               align-self: stretch;
               box-sizing: border-box;
@@ -2189,39 +2200,39 @@ export default function VendorOrderDetailPage() {
               padding-right: 0;
             }
           `}</style>
-          <div className="vendor-po-items-grid vendor-po-items-header" style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "0 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-            {(isDigitalOrder
-              ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "ACTIONS"]
-              : isMixedOrder
-                ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "DELIVERY / PROVISIONING", "TRACKING INFO", "ACTIONS"]
-                : ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", "ACTIONS"]
-            ).map(h => <div key={h}>{h}</div>)}
-          </div>
-          {filteredItems.length === 0 && (
-            <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
-          )}
-          {filteredItems.map((item, idx) => (
-            <div className="vendor-po-items-grid" key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "0 20px", alignItems: "stretch", borderBottom: idx < filteredItems.length - 1 ? "1px solid #e5e7eb" : "none", background: "#fff" }}>
-              <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
-                    <ProductConfigurationSummary
-                      configuration={item.configuration}
-                      priceAdjustment={item.configurationPriceAdjustment}
-                      className="rounded-md bg-violet-50 px-2 py-1"
-                    />
-                     {item.commercialTerms && (
-                       <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 14px", fontSize: 10.5, color: "#6b7280", lineHeight: 1.4 }}>
-                         <span>Pricing Model: <strong style={{ color: "#374151" }}>{item.commercialTerms.pricingModel}</strong></span>
-                           {!isDigitalDocumentProduct(item) && <span>MOQ / Min Qty: <strong style={{ color: "#374151" }}>{item.commercialTerms.moqLabel}</strong></span>}
+            <div className="vendor-po-items-grid vendor-po-items-header" style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "0 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+              {(isDigitalOrder
+                ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "ACTIONS"]
+                : isMixedOrder
+                  ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "DELIVERY / PROVISIONING", "TRACKING INFO", "ACTIONS"]
+                  : ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", "ACTIONS"]
+              ).map(h => <div key={h}>{h}</div>)}
+            </div>
+            {filteredItems.length === 0 && (
+              <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
+            )}
+            {filteredItems.map((item, idx) => (
+              <div className="vendor-po-items-grid" key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "0 20px", alignItems: "stretch", borderBottom: idx < filteredItems.length - 1 ? "1px solid #e5e7eb" : "none", background: "#fff" }}>
+                <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
+                      <ProductConfigurationSummary
+                        configuration={item.configuration}
+                        priceAdjustment={item.configurationPriceAdjustment}
+                        className="rounded-md bg-violet-50 px-2 py-1"
+                      />
+                      {item.commercialTerms && (
+                        <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 14px", fontSize: 10.5, color: "#6b7280", lineHeight: 1.4 }}>
+                          <span>Pricing Model: <strong style={{ color: "#374151" }}>{item.commercialTerms.pricingModel}</strong></span>
+                          {!isDigitalDocumentProduct(item) && <span>MOQ / Min Qty: <strong style={{ color: "#374151" }}>{item.commercialTerms.moqLabel}</strong></span>}
                           <span>{isDigitalDocumentProduct(item) ? `${DIGITAL_PRODUCT_HEADERS.provisioning}:` : "Lead Time / SLA:"} <strong style={{ color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : `${item.commercialTerms.leadTimePrimary}${item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}`}</strong></span>
-                         <span>Availability: <strong style={{ color: item.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
-                       </div>
-                     )}
-                     <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxWidth: 240 }}>
+                          <span>Availability: <strong style={{ color: item.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
+                        </div>
+                      )}
+                      <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxWidth: 240 }}>
                         <div style={{ fontSize: 10.5, color: "#6b7280" }}>
                           Reference No
                           <div style={{ marginTop: 2, fontSize: 11.5, color: "#374151", overflowWrap: "anywhere" }}>
@@ -2234,274 +2245,274 @@ export default function VendorOrderDetailPage() {
                             {String(item.serialNumber || "").trim() || "—"}
                           </div>
                         </div>
+                      </div>
+                      <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 4 }}>View more</button>
                     </div>
-                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 4 }}>View more</button>
                   </div>
                 </div>
-              </div>
-              <div>
-                {getProductSpecLines(item.specs, item.configuration).map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
-              </div>
-              {!isDigitalOrder && (
-                <>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>
-                    {isMixedOrder && isDigitalDocumentProduct(item) ? "—" : item.qty}
-                  </div>
-                  <div style={{ fontSize: 13 }}>
-                    {isMixedOrder && isDigitalDocumentProduct(item) ? "—" : item.unitPrice}
-                  </div>
-                </>
-              )}
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
-              <div>
-                <StatusDropdown
-                  status={item.status}
-                  onChange={s => handleItemStatusChange(item.id, s)}
-                  disabled={isCancelled || item.status === "Cancelled"}
-                  allowCancel={false}
-                  digital={isDigitalDocumentProduct(item)}
-                  quantity={item.qty}
-                />
-                {item.status === "Cancelled" && (item as any).cancelReason && (
-                  <div style={{ fontSize: 11, color: "#991b1b", marginTop: 5, lineHeight: 1.4, fontStyle: "italic" }}>
-                    Reason: {(item as any).cancelReason}
-                  </div>
+                <div>
+                  {getProductSpecLines(item.specs, item.configuration).map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
+                </div>
+                {!isDigitalOrder && (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      {isMixedOrder && isDigitalDocumentProduct(item) ? "—" : item.qty}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      {isMixedOrder && isDigitalDocumentProduct(item) ? "—" : item.unitPrice}
+                    </div>
+                  </>
                 )}
-                {(item as any).provisioningDetails && (
-                  <div style={{ fontSize: 11, color: "#047857", marginTop: 5, lineHeight: 1.4 }}>
-                    {(item as any).provisioningDetails.method === "activated" ? (
-                      <>
-                        <strong>Activated:</strong> {(item as any).provisioningDetails.howActivated}
-                        {(item as any).provisioningDetails.activatedAt && ` · ${(item as any).provisioningDetails.activatedAt}`}
-                      </>
-                    ) : (
-                      <>
-                        <strong>Key via Mail:</strong> {(item as any).provisioningDetails.documentName || "Details saved"}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : item.expectedDelivery}</div>
-              {!isDigitalOrder && (
-                <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
-                  {isDigitalDocumentProduct(item) ? (
-                    <span style={{ color: "#d1d5db" }}>—</span>
-                  ) : item.tracking ? (
-                    <>
-                      <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
-                      <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
-                      <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
-                      <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
-                    </>
-                  ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                  {!isDigitalDocumentProduct(item) && !isCancelled && item.status === "Shipped" && (
-                    <div style={{ marginTop: 7 }}>
-                      <button
-                        onClick={() => setUpdateTrackingItem({
-                          id: item.id,
-                          name: item.name,
-                          tracking: item.tracking,
-                          referenceNumber: item.referenceNumber || "",
-                          serialNumber: item.serialNumber || "",
-                        })}
-                        style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
-                      >
-                        Update
-                      </button>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
+                <div>
+                  <StatusDropdown
+                    status={item.status}
+                    onChange={s => handleItemStatusChange(item.id, s)}
+                    disabled={isCancelled || item.status === "Cancelled"}
+                    allowCancel={false}
+                    digital={isDigitalDocumentProduct(item)}
+                    quantity={item.qty}
+                  />
+                  {item.status === "Cancelled" && (item as any).cancelReason && (
+                    <div style={{ fontSize: 11, color: "#991b1b", marginTop: 5, lineHeight: 1.4, fontStyle: "italic" }}>
+                      Reason: {(item as any).cancelReason}
+                    </div>
+                  )}
+                  {(item as any).provisioningDetails && (
+                    <div style={{ fontSize: 11, color: "#047857", marginTop: 5, lineHeight: 1.4 }}>
+                      {(item as any).provisioningDetails.method === "activated" ? (
+                        <>
+                          <strong>Activated:</strong> {(item as any).provisioningDetails.howActivated}
+                          {(item as any).provisioningDetails.activatedAt && ` · ${(item as any).provisioningDetails.activatedAt}`}
+                        </>
+                      ) : (
+                        <>
+                          <strong>Key via Mail:</strong> {(item as any).provisioningDetails.documentName || "Details saved"}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-              <div style={{ minWidth: 0 }}>
-                {item.status === "Cancelled" ? (
-                  <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>Cancelled</span>
-                ) : item.status === "Shipped" || item.status === "Delivered" ||
-                  (isDigitalDocumentProduct(item) && hasDigitalLicenseBeenProvisioned(item.status, item.qty)) ? (
-                  <span
-                    style={{ fontSize: 12, color: "#9ca3af" }}
-                    title={isDigitalDocumentProduct(item)
-                      ? "Items cannot be cancelled after a license has been provisioned"
-                      : "Shipped and delivered items cannot be cancelled here"}
-                  >—</span>
-                ) : isCancelled ? (
-                  <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
-                ) : (
-                  <button
-                    onClick={() => setPendingItemCancel({ id: item.id, name: item.name })}
-                    style={{ padding: "5px 12px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
-                  >
-                    Cancel
-                  </button>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : item.expectedDelivery}</div>
+                {!isDigitalOrder && (
+                  <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
+                    {isDigitalDocumentProduct(item) ? (
+                      <span style={{ color: "#d1d5db" }}>—</span>
+                    ) : item.tracking ? (
+                      <>
+                        <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
+                        <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
+                        <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
+                        <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
+                      </>
+                    ) : <span style={{ color: "#d1d5db" }}>—</span>}
+                    {!isDigitalDocumentProduct(item) && !isCancelled && item.status === "Shipped" && (
+                      <div style={{ marginTop: 7 }}>
+                        <button
+                          onClick={() => setUpdateTrackingItem({
+                            id: item.id,
+                            name: item.name,
+                            tracking: item.tracking,
+                            referenceNumber: item.referenceNumber || "",
+                            serialNumber: item.serialNumber || "",
+                          })}
+                          style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                        >
+                          Update
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
+                <div style={{ minWidth: 0 }}>
+                  {item.status === "Cancelled" ? (
+                    <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>Cancelled</span>
+                  ) : item.status === "Shipped" || item.status === "Delivered" ||
+                    (isDigitalDocumentProduct(item) && hasDigitalLicenseBeenProvisioned(item.status, item.qty)) ? (
+                    <span
+                      style={{ fontSize: 12, color: "#9ca3af" }}
+                      title={isDigitalDocumentProduct(item)
+                        ? "Items cannot be cancelled after a license has been provisioned"
+                        : "Shipped and delivered items cannot be cancelled here"}
+                    >—</span>
+                  ) : isCancelled ? (
+                    <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                  ) : (
+                    <button
+                      onClick={() => setPendingItemCancel({ id: item.id, name: item.name })}
+                      style={{ padding: "5px 12px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          {/* Totals */}
-          <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
-            <div style={{ width: 280 }}>
-              {realPO ? (
-                <>
-                  {[
-                    ["Sub-total", "₹ " + realPO.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
-                    [`SGST (${realPO.sgstPct}%)`, "₹ " + realPO.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
-                    [`CGST (${realPO.cgstPct}%)`, "₹ " + realPO.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
-                  ].map(([l, v]) => (
+            ))}
+            {/* Totals */}
+            <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ width: 280 }}>
+                {realPO ? (
+                  <>
+                    {[
+                      ["Sub-total", "₹ " + realPO.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
+                      [`SGST (${realPO.sgstPct}%)`, "₹ " + realPO.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
+                      [`CGST (${realPO.cgstPct}%)`, "₹ " + realPO.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
+                    ].map(([l, v]) => (
+                      <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  [["Sub-total", "$1,790.00"], ["Tax (10%)", "$222.00"]].map(([l, v]) => (
                     <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                       <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
                       <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
                     </div>
-                  ))}
-                </>
-              ) : (
-                [["Sub-total", "$1,790.00"], ["Tax (10%)", "$222.00"]].map(([l, v]) => (
-                  <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
-                    <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
-                  </div>
-                ))
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
-                <span style={{ fontSize: 15, fontWeight: 800 }}>{initialData.totalAmount}</span>
+                  ))
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
+                  <span style={{ fontSize: 15, fontWeight: 800 }}>{initialData.totalAmount}</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>
-            Showing 1 to {filteredItems.length} of {items.length} items
-          </div>
-        </div>
-
-        {isCancelled ? (
-          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280", marginBottom: 16 }}>
-            <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#991b1b" }}>Purchase Order is Cancelled</div>
-            <div style={{ fontSize: 12.5, marginTop: 4 }}>This purchase order and its linked order are inactive and can no longer be edited or updated.</div>
-          </div>
-        ) : (
-          <>
-        {isDelivered && (
-          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 10, color: "#6b7280", marginBottom: 16 }}>
-            <div style={{ fontSize: 17, lineHeight: 1.2 }}>🔒</div>
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#374151" }}>Documents & Notes are read-only</div>
-              <div style={{ fontSize: 12.5, marginTop: 3 }}>This PO is Delivered. Previously uploaded documents and conversation history remain available for review and download.</div>
+            <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>
+              Showing 1 to {filteredItems.length} of {items.length} items
             </div>
           </div>
-        )}
-        {/* Documents Section */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
-            {!isDelivered && (
-              <button onClick={() => setShowUploadDocument(true)} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
-            )}
-          </div>
-          <div style={{ padding: "20px 24px" }}>
-            {documents.length === 0 ? (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No documents</div>
-              </div>
-            ) : (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                  {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
-                </div>
-                {documents.map((doc, idx) => (
-                  <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <DocIcon ext={doc.ext} />
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
-                    </div>
-                    <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
-                    <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
-                    <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
-                    <DocActionsMenu
-                      onDownload={() => handleDownloadDocument(doc)}
-                      onDelete={isDelivered ? undefined : () => handleDeleteDoc(doc.id)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Notes Section */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes</div>
-            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
-          </div>
-          <div style={{ padding: "20px 24px 28px" }}>
-            {/* Inline Add Note composer */}
-            {!isDelivered && (
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
-                <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
-                  <textarea
-                    value={noteText}
-                    onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }}
-                    placeholder="Write your note here..."
-                    rows={4}
-                    style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }}
-                  />
-                  <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
-                </div>
-                <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          {isCancelled ? (
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280", marginBottom: 16 }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#991b1b" }}>Purchase Order is Cancelled</div>
+              <div style={{ fontSize: 12.5, marginTop: 4 }}>This purchase order and its linked order are inactive and can no longer be edited or updated.</div>
+            </div>
+          ) : (
+            <>
+              {isDelivered && (
+                <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 10, color: "#6b7280", marginBottom: 16 }}>
+                  <div style={{ fontSize: 17, lineHeight: 1.2 }}>🔒</div>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
-                    {([["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]] as [string, string, string][]).map(([label, icon, sub]) => (
-                      <div key={label} onClick={() => setNoteVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
-                        <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${noteVisibility === label ? "#2563eb" : "#d1d5db"}`, background: noteVisibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
-                          {noteVisibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#374151" }}>Documents & Notes are read-only</div>
+                    <div style={{ fontSize: 12.5, marginTop: 3 }}>This PO is Delivered. Previously uploaded documents and conversation history remain available for review and download.</div>
+                  </div>
+                </div>
+              )}
+              {/* Documents Section */}
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
+                  {!isDelivered && (
+                    <button onClick={() => setShowUploadDocument(true)} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
+                  )}
+                </div>
+                <div style={{ padding: "20px 24px" }}>
+                  {documents.length === 0 ? (
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No documents</div>
+                    </div>
+                  ) : (
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                        {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
+                      </div>
+                      {documents.map((doc, idx) => (
+                        <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <DocIcon ext={doc.ext} />
+                            <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
+                          </div>
+                          <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
+                          <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
+                          <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
+                          <DocActionsMenu
+                            onDownload={() => handleDownloadDocument(doc)}
+                            onDelete={isDelivered ? undefined : () => handleDeleteDoc(doc.id)}
+                          />
                         </div>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
-                          <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes Section */}
+              <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes</div>
+                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
+                </div>
+                <div style={{ padding: "20px 24px 28px" }}>
+                  {/* Inline Add Note composer */}
+                  {!isDelivered && (
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
+                        <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
+                          <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
+                          <textarea
+                            value={noteText}
+                            onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }}
+                            placeholder="Write your note here..."
+                            rows={4}
+                            style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }}
+                          />
+                          <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
+                        </div>
+                        <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                            {([["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]] as [string, string, string][]).map(([label, icon, sub]) => (
+                              <div key={label} onClick={() => setNoteVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                                <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${noteVisibility === label ? "#2563eb" : "#d1d5db"}`, background: noteVisibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                                  {noteVisibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                                  <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <button
+                              onClick={handleAddNote}
+                              disabled={!noteText.trim()}
+                              style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+                            >
+                              Add
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <button
-                      onClick={handleAddNote}
-                      disabled={!noteText.trim()}
-                      style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
-                    >
-                      Add
-                    </button>
-                  </div>
+                    </div>
+                  )}
+                  {/* Note list */}
+                  {notes.map((note, i) => (
+                    <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
+                      <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                          <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
+                          <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
+                          <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                            {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                          {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
+                          {note.text}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
-            )}
-            {/* Note list */}
-            {notes.map((note, i) => (
-              <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
-                <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
-                    <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
-                      {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
-                    {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
-                    {note.text}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
 
-          </>
-        )}
+            </>
+          )}
         </div>
 
       </div>

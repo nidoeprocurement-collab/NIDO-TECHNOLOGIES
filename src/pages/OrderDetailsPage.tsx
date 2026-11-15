@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS } from "@/lib/utils";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { Building2, Mail, Phone, Truck, UserRound } from "lucide-react";
@@ -2677,12 +2678,17 @@ function CancelOrderStatusModal({ onConfirm, onClose }: { onConfirm: (reason: st
           </label>
           <textarea
             value={reason}
-            onChange={e => setReason(e.target.value)}
+            onChange={e => setReason(enforceMaxWords(e.target.value))}
             rows={3}
             placeholder="Enter reason for cancellation..."
             style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
           />
-          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            {!ok ? <div style={{ fontSize: 11.5, color: "#dc2626" }}>Reason is required before confirming cancellation.</div> : <span />}
+            <span style={{ fontSize: 11, color: countWords(reason) >= MAX_CANCELLATION_REASON_WORDS ? "#dc2626" : "#6b7280" }}>
+              {countWords(reason)} / {MAX_CANCELLATION_REASON_WORDS} words
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Order</button>
@@ -2707,12 +2713,17 @@ function CancelItemModal({ itemName, onConfirm, onClose }: { itemName: string; o
           </label>
           <textarea
             value={reason}
-            onChange={e => setReason(e.target.value)}
+            onChange={e => setReason(enforceMaxWords(e.target.value))}
             rows={3}
             placeholder="Enter reason for cancellation..."
             style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
           />
-          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            {!ok ? <div style={{ fontSize: 11.5, color: "#dc2626" }}>Reason is required before confirming cancellation.</div> : <span />}
+            <span style={{ fontSize: 11, color: countWords(reason) >= MAX_CANCELLATION_REASON_WORDS ? "#dc2626" : "#6b7280" }}>
+              {countWords(reason)} / {MAX_CANCELLATION_REASON_WORDS} words
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Item</button>

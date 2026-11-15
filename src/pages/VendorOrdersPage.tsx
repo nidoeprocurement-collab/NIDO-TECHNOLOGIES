@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
 import { getAllPOs, getPODisplayStatus, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
@@ -38,23 +39,23 @@ const LEGACY_PO_STATUSES: OrderStatus[] = [
 const PAGE_SIZE = 10;
 
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
-  Processing:            { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
-  "Pending Shipping":    { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
-  "Partially Shipped":   { bg: "#eff6ff", color: "#1d4ed8", border: "#93c5fd" },
-  Pending:               { bg: "#fafafa", color: "#777",    border: "#ddd" },
-  Confirmed:             { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
-  Shipped:               { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
+  Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
+  "Pending Shipping": { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+  "Partially Shipped": { bg: "#eff6ff", color: "#1d4ed8", border: "#93c5fd" },
+  Pending: { bg: "#fafafa", color: "#777", border: "#ddd" },
+  Confirmed: { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
+  Shipped: { bg: "#f3f4f6", color: "#555", border: "#d1d5db" },
   "Partially Delivered": { bg: "#f0fdfa", color: "#0f766e", border: "#99f6e4" },
-  Delivered:             { bg: "#e1f5ee", color: "#0f6e56", border: "#9fe1cb" },
-  Provisioning:          { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  Delivered: { bg: "#e1f5ee", color: "#0f6e56", border: "#9fe1cb" },
+  Provisioning: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
   "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
-  Provisioned:           { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
-  Validated:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Activated:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Completed:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Draft:                 { bg: "#fafafa", color: "#777",    border: "#ddd" },
-  Closed:                { bg: "#fbeaf0", color: "#993556", border: "#f4c0d1" },
-  Cancelled:             { bg: "#fff1f0", color: "#a32d2d", border: "#f7c1c1" },
+  Provisioned: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Validated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Activated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Completed: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Draft: { bg: "#fafafa", color: "#777", border: "#ddd" },
+  Closed: { bg: "#fbeaf0", color: "#993556", border: "#f4c0d1" },
+  Cancelled: { bg: "#fff1f0", color: "#a32d2d", border: "#f7c1c1" },
 };
 
 function Badge({ status }: { status: OrderStatus }) {
@@ -89,18 +90,18 @@ function storedPOToOrder(po: StoredPO): Order {
   const fmtINR = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return {
-    id:        po.poNumber,
-    orderId:   po.orderId,
-    vendor:    po.vendorName,
-    date:      hasValidDate ? createdDate.toISOString().split("T")[0] : "",
-    dateStr:   hasValidDate ? createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : po.createdOnDisplay || "—",
-    status:    derivePOFulfillmentStatus(po),
-    amount:    po.grandTotal,
+    id: po.poNumber,
+    orderId: po.orderId,
+    vendor: po.vendorName,
+    date: hasValidDate ? createdDate.toISOString().split("T")[0] : "",
+    dateStr: hasValidDate ? createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : po.createdOnDisplay || "—",
+    status: derivePOFulfillmentStatus(po),
+    amount: po.grandTotal,
     amountStr: fmtINR(po.grandTotal),
-    client:    "",
-    clientId:  "",
-    delivery:  po.requestedDelivery || "Within 30 days",
-    items:     (po.items?.length ? po.items.map(item => item.item).filter(Boolean) : [po.item]).filter(Boolean).join(", ") || "—",
+    client: "",
+    clientId: "",
+    delivery: po.requestedDelivery || "Within 30 days",
+    items: (po.items?.length ? po.items.map(item => item.item).filter(Boolean) : [po.item]).filter(Boolean).join(", ") || "—",
   };
 }
 
@@ -280,7 +281,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     [...new Set(displayedOrders.map(order => order.status))]
       .sort((a, b) => a.localeCompare(b))
       .map(status => ({ value: status, label: status })),
-  [displayedOrders]);
+    [displayedOrders]);
   const exportVendorOptions = useMemo<OrderExportOption[]>(() =>
     getVendors()
       .filter(vendor =>
@@ -291,7 +292,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       )
       .map(vendor => ({ value: vendor.name, label: vendor.name }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-  [scope.vendorId, scope.vendorName]);
+    [scope.vendorId, scope.vendorName]);
 
   const getFiltered = (): Order[] => {
     let rows = [...displayedOrders];
@@ -458,24 +459,24 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   };
 
   // ── Styles ─────────────────────────────────────────────────────────────────
-  const bg   = "hsl(var(--background))";
+  const bg = "hsl(var(--background))";
   const card = "hsl(var(--card))";
-  const fg   = "hsl(var(--foreground))";
-  const muted= "hsl(var(--muted-foreground))";
-  const bdr  = "hsl(var(--border))";
+  const fg = "hsl(var(--foreground))";
+  const muted = "hsl(var(--muted-foreground))";
+  const bdr = "hsl(var(--border))";
   const mutedBg = "hsl(var(--muted))";
 
   const s = {
-    page:      { padding: "28px 36px", background: bg, minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: fg } as React.CSSProperties,
-    card:      { background: card, border: `1px solid ${bdr}`, borderRadius: 12, overflow: "hidden" } as React.CSSProperties,
-    th:        { fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: ".05em", padding: "11px 14px", borderBottom: `1px solid ${bdr}`, textAlign: "left" as const, background: mutedBg, whiteSpace: "nowrap" as const },
-    td:        { padding: "13px 14px", borderBottom: `1px solid ${bdr}`, fontSize: 13, verticalAlign: "middle" as const, color: fg },
-    link:      { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" } as React.CSSProperties,
+    page: { padding: "28px 36px", background: bg, minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: fg } as React.CSSProperties,
+    card: { background: card, border: `1px solid ${bdr}`, borderRadius: 12, overflow: "hidden" } as React.CSSProperties,
+    th: { fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: ".05em", padding: "11px 14px", borderBottom: `1px solid ${bdr}`, textAlign: "left" as const, background: mutedBg, whiteSpace: "nowrap" as const },
+    td: { padding: "13px 14px", borderBottom: `1px solid ${bdr}`, fontSize: 13, verticalAlign: "middle" as const, color: fg },
+    link: { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" } as React.CSSProperties,
     orderLink: { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "monospace", fontSize: 13, background: "none", border: "none", padding: 0 } as React.CSSProperties,
-    btn:       { display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, cursor: "pointer", whiteSpace: "nowrap" as const },
-    ddItem:    { display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", fontSize: 13, color: fg, cursor: "pointer", textDecoration: "none", background: "none", border: "none", width: "100%", textAlign: "left" as const },
-    pgBtn:     (active: boolean): React.CSSProperties => ({ minWidth: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: `1px solid ${bdr}`, fontSize: 13, cursor: "pointer", background: active ? "#4a6cf7" : card, color: active ? "#fff" : fg }),
-    cb:        (checked: boolean, indeterminate?: boolean): React.CSSProperties => ({ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked || indeterminate ? "#4a6cf7" : bdr}`, background: checked || indeterminate ? "#4a6cf7" : card, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }),
+    btn: { display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, cursor: "pointer", whiteSpace: "nowrap" as const },
+    ddItem: { display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", fontSize: 13, color: fg, cursor: "pointer", textDecoration: "none", background: "none", border: "none", width: "100%", textAlign: "left" as const },
+    pgBtn: (active: boolean): React.CSSProperties => ({ minWidth: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: `1px solid ${bdr}`, fontSize: 13, cursor: "pointer", background: active ? "#4a6cf7" : card, color: active ? "#fff" : fg }),
+    cb: (checked: boolean, indeterminate?: boolean): React.CSSProperties => ({ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked || indeterminate ? "#4a6cf7" : bdr}`, background: checked || indeterminate ? "#4a6cf7" : card, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }),
   };
 
   const Dropdown = ({ id, children }: { id: string; children: React.ReactNode }) => (
@@ -572,13 +573,17 @@ export default function VendorOrderList(scope: VendorScope = {}) {
             </label>
             <textarea
               value={bulkCancelReason}
-              onChange={e => setBulkCancelReason(e.target.value)}
+              onChange={e => setBulkCancelReason(enforceMaxWords(e.target.value))}
               rows={3}
               placeholder="Enter reason for cancellation..."
               style={{ width: "100%", padding: "8px 10px", border: `1px solid ${bulkCancelReason.trim() ? bdr : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none", marginBottom: 4, background: card, color: fg }}
             />
-            {!bulkCancelReason.trim() && <div style={{ fontSize: 11.5, color: "#dc2626", marginBottom: 14 }}>Reason is required before confirming cancellation.</div>}
-            {bulkCancelReason.trim() && <div style={{ marginBottom: 14 }} />}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              {!bulkCancelReason.trim() ? <div style={{ fontSize: 11.5, color: "#dc2626" }}>Reason is required before confirming cancellation.</div> : <span />}
+              <span style={{ fontSize: 11, color: countWords(bulkCancelReason) >= MAX_CANCELLATION_REASON_WORDS ? "#dc2626" : "#6b7280" }}>
+                {countWords(bulkCancelReason)} / {MAX_CANCELLATION_REASON_WORDS} words
+              </span>
+            </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button onClick={() => { setConfirmBulkCancel(false); setBulkCancelReason(""); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${bdr}`, background: card, color: fg }}>Keep Orders</button>
               <button onClick={() => { if (!bulkCancelReason.trim()) return; performBulkStatusUpdate("Cancelled", bulkCancelReason.trim()); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: bulkCancelReason.trim() ? "pointer" : "not-allowed", border: "1px solid #dc2626", background: bulkCancelReason.trim() ? "#dc2626" : "#fca5a5", color: "#fff", transition: "background 0.15s" }}>Yes, Cancel</button>
@@ -663,7 +668,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
             <thead>
               <tr>
                 <th style={{ ...s.th, width: 48, paddingLeft: 16 }}></th>
-                {([["id","PO Number"],["vendor","Vendor"],["date","PO Date"],["items","Items"],["orderId","Order ID"],["status","Status"],["amount","Total Amount"],["delivery","Requested Delivery"]] as [keyof Order, string][]).map(([col, label]) => (
+                {([["id", "PO Number"], ["vendor", "Vendor"], ["date", "PO Date"], ["items", "Items"], ["orderId", "Order ID"], ["status", "Status"], ["amount", "Total Amount"], ["delivery", "Requested Delivery"]] as [keyof Order, string][]).map(([col, label]) => (
                   <th key={col} style={s.th}>
                     <span onClick={() => handleSort(col)} style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", userSelect: "none" }}>
                       {label} <SortIcon col={col} />
@@ -699,15 +704,15 @@ export default function VendorOrderList(scope: VendorScope = {}) {
                     {(() => {
                       const stages = getProcurementSLA();
                       const stageMap: Record<string, string> = {
-                        "Draft":               "Purchase Order Creation",
-                        "Pending":             "Purchase Order Approval",
-                        "Processing":          "Vendor Confirmation",
-                        "Confirmed":           "Vendor Confirmation",
-                        "Partially Shipped":   "Goods Dispatch",
-                        "Shipped":             "Goods Dispatch",
+                        "Draft": "Purchase Order Creation",
+                        "Pending": "Purchase Order Approval",
+                        "Processing": "Vendor Confirmation",
+                        "Confirmed": "Vendor Confirmation",
+                        "Partially Shipped": "Goods Dispatch",
+                        "Shipped": "Goods Dispatch",
                         "Partially Delivered": "Goods Receipt",
-                        "Delivered":           "Payment Processing",
-                        "Closed":              "Payment Processing",
+                        "Delivered": "Payment Processing",
+                        "Closed": "Payment Processing",
                       };
                       const stageName = stageMap[row.status] ?? "Purchase Order Creation";
                       const stage = stages.find(s => s.stage === stageName);
