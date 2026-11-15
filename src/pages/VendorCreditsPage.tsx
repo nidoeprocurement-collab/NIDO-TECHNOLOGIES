@@ -270,14 +270,14 @@ function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-xl bg-blue-600 flex items-center justify-center text-white text-2xl font-bold">N</div>
           <div>
-            <p className="text-xs uppercase text-gray-400 tracking-wider">Debit Note</p>
+            <p className="text-xs uppercase text-gray-400 tracking-wider">Vendor Credit</p>
             <p className="text-sm font-semibold text-blue-700">{credit.creditNoteNumber}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-serif tracking-widest text-gray-800">DEBIT NOTE</p>
+          <p className="text-3xl font-serif tracking-widest text-gray-800">VENDOR CREDIT</p>
           <div className="mt-2 bg-blue-50 rounded-lg px-4 py-2">
-            <p className="text-xs text-gray-500">Total Debit</p>
+            <p className="text-xs text-gray-500">Total Credit</p>
             <p className="text-lg font-bold text-gray-900">{money(totals.total)}</p>
           </div>
         </div>
@@ -291,8 +291,8 @@ function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
         </div>
         <div className="space-y-1">
           {([
-            ["Debit Note #", credit.creditNoteNumber],
-            ["Debit Note Date", credit.creditDate],
+            ["Credit Note #", credit.creditNoteNumber],
+            ["Credit Date", credit.creditDate],
             ...(credit.referenceNumber ? [["Reference #", credit.referenceNumber]] : []),
             ...(credit.associatedBillNumber ? [["Against Bill", credit.associatedBillNumber]] : []),
             ["Status", credit.status],
@@ -344,7 +344,7 @@ function CreditPdfView({ credit }: { credit: VendorCreditEntry }) {
           <div className="flex justify-between text-gray-600"><span>SGST</span><span>{money(totals.sgst)}</span></div>
           <div className="flex justify-between text-gray-600"><span>CGST</span><span>{money(totals.cgst)}</span></div>
           {credit.adjustment !== 0 && <div className="flex justify-between text-gray-600"><span>Adjustment</span><span>{credit.adjustment.toFixed(2)}</span></div>}
-          <div className="flex justify-between pt-2 border-t border-gray-200 font-bold text-gray-900 text-base"><span>Total Debit</span><span>{money(totals.total)}</span></div>
+          <div className="flex justify-between pt-2 border-t border-gray-200 font-bold text-gray-900 text-base"><span>Total Credit</span><span>{money(totals.total)}</span></div>
         </div>
       </div>
 
@@ -394,7 +394,7 @@ export default function VendorCreditsPage() {
   );
 
   useEffect(() => {
-    setMeta({ title: selectedCredit?.creditNoteNumber || "Debit Notes" });
+    setMeta({ title: selectedCredit?.creditNoteNumber || "Vendor Credits" });
     return () => setMeta({});
   }, [selectedCredit]);
 
@@ -454,11 +454,11 @@ export default function VendorCreditsPage() {
       !validateRequiredDocumentFields(
         [
           { label: "Vendor Name", valid: Boolean(form.vendorName.trim()) },
-          { label: "Debit Note #", valid: Boolean(form.creditNoteNumber.trim()) },
-          { label: "Debit Note Date", valid: Boolean(form.creditDate) },
+          { label: "Credit Note #", valid: Boolean(form.creditNoteNumber.trim()) },
+          { label: "Credit Note Date", valid: Boolean(form.creditDate) },
           { label: "At least one Line Item", valid: form.items.some((item) => Boolean(item.itemDetails?.trim())) },
         ],
-        "debit note",
+        "vendor credit",
       )
     ) {
       return;
@@ -486,7 +486,7 @@ export default function VendorCreditsPage() {
             : c,
         );
         persist(updated);
-        toast({ title: "Debit note updated" });
+        toast({ title: "Vendor credit updated" });
         navigate(`/transactions/purchase/vendor-credits/${editingId}`, { replace: true });
       } else {
         const id = `vc-${Date.now()}`;
@@ -508,7 +508,7 @@ export default function VendorCreditsPage() {
         if (pref.mode === "auto") {
           persistPref({ ...pref, nextNumber: pref.nextNumber + 1 });
         }
-        toast({ title: status === "DRAFT" ? "Debit note saved as draft" : "Debit note created as open" });
+        toast({ title: status === "DRAFT" ? "Vendor credit saved as draft" : "Vendor credit created as open" });
         navigate(`/transactions/purchase/vendor-credits/${id}`, { replace: true });
       }
     } finally {
@@ -519,7 +519,7 @@ export default function VendorCreditsPage() {
   const convertToOpen = () => {
     if (!selectedCredit) return;
     persist(credits.map((c) => c.id === selectedCredit.id ? { ...c, status: "OPEN" } : c));
-    toast({ title: "Debit note converted to open" });
+    toast({ title: "Vendor credit converted to open" });
   };
 
   const applyToBill = () => {
@@ -560,14 +560,14 @@ export default function VendorCreditsPage() {
     localStorage.setItem(BILLS_KEY, JSON.stringify(updatedBills));
     // Mark the credit as APPLIED
     persist(credits.map((c) => c.id === selectedCredit.id ? { ...c, status: "APPLIED" as CreditStatus } : c));
-    toast({ title: "Debit note applied to bill", description: `₹${creditTotals.total.toFixed(2)} debited against Bill #${selectedCredit.associatedBillNumber}` });
+    toast({ title: "Vendor credit applied to bill", description: `₹${creditTotals.total.toFixed(2)} credited against Bill #${selectedCredit.associatedBillNumber}` });
   };
 
   const deleteCredit = () => {
     if (!selectedCredit) return;
     persist(credits.filter((c) => c.id !== selectedCredit.id));
     backToList();
-    toast({ title: "Debit note deleted" });
+    toast({ title: "Vendor credit deleted" });
   };
 
   const handleDownloadPdf = async () => {
@@ -670,7 +670,7 @@ export default function VendorCreditsPage() {
               </button>
               <span className="text-gray-300">|</span>
               <h1 className="text-sm font-bold text-gray-900 truncate">
-                {editingId ? `Edit Debit Note ${credits.find((c) => c.id === editingId)?.creditNoteNumber || ""}` : "New Debit Note"}
+                {editingId ? `Edit Vendor Credit ${credits.find((c) => c.id === editingId)?.creditNoteNumber || ""}` : "New Vendor Credit"}
               </h1>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -710,7 +710,7 @@ export default function VendorCreditsPage() {
                 </select>
               </div>
               <div>
-                <FieldLabel required>Debit Note #</FieldLabel>
+                <FieldLabel required>Credit Note #</FieldLabel>
                 <input
                   type="text"
                   className={pref.mode === "auto" ? inp + " bg-gray-50 text-gray-500 cursor-not-allowed" : inp}
@@ -726,7 +726,7 @@ export default function VendorCreditsPage() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <FieldLabel required>Debit Note Date</FieldLabel>
+                  <FieldLabel required>Credit Date</FieldLabel>
                   <input type="date" className={inp} value={form.creditDate} onChange={(e) => setF("creditDate", e.target.value)} />
                 </div>
                 <div>
@@ -863,7 +863,7 @@ export default function VendorCreditsPage() {
                       </td>
                     </tr>
                     <tr className="border-t-2 border-gray-300 bg-blue-50/40">
-                      <td className="px-4 py-3 font-bold text-gray-900">Total Debit</td>
+                      <td className="px-4 py-3 font-bold text-gray-900">Total Credit</td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900">₹{formTotals.total.toFixed(2)}</td>
                     </tr>
                   </tbody>
@@ -948,7 +948,7 @@ export default function VendorCreditsPage() {
                     <Badge className={`text-xs font-semibold ${STATUS_STYLE[selectedCredit.status]}`} variant="outline">{selectedCredit.status}</Badge>
                   </div>
                   <span className="text-gray-300">|</span>
-                  <span className="text-gray-500">Total Debit: <span className="font-semibold text-gray-900">{money(totals.total)}</span></span>
+                  <span className="text-gray-500">Total Credit: <span className="font-semibold text-gray-900">{money(totals.total)}</span></span>
                   {selectedCredit.associatedBillNumber && (
                     <>
                       <span className="text-gray-300">|</span>
@@ -976,7 +976,7 @@ export default function VendorCreditsPage() {
                     { label: "Subtotal", value: money(totals.subtotal) },
                     { label: "Tax", value: money(totals.totalTax) },
                     { label: "Adjustment", value: money(selectedCredit.adjustment) },
-                    { label: "Total Debit", value: money(totals.total), highlight: true },
+                    { label: "Total Credit", value: money(totals.total), highlight: true },
                   ].map((item) => (
                     <div key={item.label} className={`rounded-xl p-4 border ${item.highlight ? "bg-gradient-to-br from-blue-50 to-emerald-50/30 border-blue-200" : "bg-gradient-to-br from-gray-50 to-blue-50/30 border-gray-200"}`}>
                       <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{item.label}</p>
@@ -1009,11 +1009,11 @@ export default function VendorCreditsPage() {
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="bg-white rounded-lg border border-gray-200 p-5">
-                <p className="text-xs uppercase text-gray-400 tracking-wide font-semibold mb-3">DEBIT NOTE DETAILS</p>
+                <p className="text-xs uppercase text-gray-400 tracking-wide font-semibold mb-3">CREDIT DETAILS</p>
                 <div className="space-y-2">
                   {[
                     ["Vendor", selectedCredit.vendorName],
-                    ["Debit Note Date", selectedCredit.creditDate],
+                    ["Credit Date", selectedCredit.creditDate],
                     selectedCredit.referenceNumber ? ["Reference #", selectedCredit.referenceNumber] : null,
                     selectedCredit.associatedBillNumber ? ["Against Bill", selectedCredit.associatedBillNumber] : null,
                     ["Status", selectedCredit.status],
@@ -1093,7 +1093,7 @@ export default function VendorCreditsPage() {
                         </tr>
                       ))}
                       <tr className="bg-blue-50">
-                        <td className="py-2.5 px-2 font-bold text-gray-900">Total Debit</td>
+                        <td className="py-2.5 px-2 font-bold text-gray-900">Total Credit</td>
                         <td className="py-2.5 px-2 text-right font-bold text-blue-700">{money(totals.total)}</td>
                       </tr>
                     </tbody>
@@ -1138,13 +1138,13 @@ export default function VendorCreditsPage() {
         <Card className="border-gray-200 shadow-sm">
           <CardContent className="px-6 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">All Debit Notes</h1>
+              <h1 className="text-2xl font-bold text-gray-900">All Vendor Credits</h1>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search debit notes…"
+                    placeholder="Search credits…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white w-52"
@@ -1170,10 +1170,10 @@ export default function VendorCreditsPage() {
                       Configure number preferences
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => {
-                      if (selectedRows.size === 0) { toast({ title: "No debit notes selected" }); return; }
+                      if (selectedRows.size === 0) { toast({ title: "No credits selected" }); return; }
                       persist(credits.filter((c) => !selectedRows.has(c.id)));
                       setSelectedRows(new Set());
-                      toast({ title: `${selectedRows.size} debit note(s) deleted` });
+                      toast({ title: `${selectedRows.size} credit(s) deleted` });
                     }} className="text-red-600 focus:text-red-600">
                       Delete Selected
                     </DropdownMenuItem>
@@ -1194,7 +1194,7 @@ export default function VendorCreditsPage() {
                     <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">DATE</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">DEBIT NOTE #</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">CREDIT NOTE #</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">REFERENCE NUMBER</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">VENDOR NAME</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">STATUS</TableHead>
@@ -1208,12 +1208,12 @@ export default function VendorCreditsPage() {
                     <TableCell colSpan={8} className="text-center py-16 text-gray-400">
                       <div className="flex flex-col items-center gap-2">
                         <FileText className="h-10 w-10 text-gray-200" />
-                        <p className="text-sm font-medium">No debit notes yet</p>
+                        <p className="text-sm font-medium">No vendor credits yet</p>
                         <button
                           onClick={() => navigate("/transactions/purchase/vendor-credits/create")}
                           className="mt-1 text-sm text-blue-600 hover:underline font-medium"
                         >
-                          + Create your first debit note
+                          + Create your first vendor credit
                         </button>
                       </div>
                     </TableCell>
