@@ -49,6 +49,7 @@ import ActivityPage from "./ClientActivityPage";
 import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
+import ClientInventoryPage from "./ClientInventoryPage";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getPlatformModuleForPath } from "@/lib/platformModuleCatalog";
 import { StoredDocumentList } from "@/components/shared/LabeledDocumentUploader";
@@ -65,6 +66,7 @@ const ADMIN_TABS = [
   "Activity",
   "Configuration",
   "Documents",
+  "Inventory",
 ];
 
 const PERIODS = ["Year", "Month", "Week", "Day"] as const;
@@ -618,6 +620,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     // its default General tab.
     if (activeTab === "Configuration") return <ConfigurationPage clientId={clientId} />;
     if (activeTab === "Documents") return <DocumentsPage key={`${clientId}-${refreshKey}-documents`} clientId={clientId} />;
+    if (activeTab === "Inventory") return <ClientInventoryPage key={`${clientId}-${refreshKey}-inventory`} client={client} />;
     return null;
   };
 
@@ -719,264 +722,264 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </p>
 
           {visibleKpiCount > 0 && (
-          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleKpiCount, 5)}`}>
-            {canViewOverviewModule("Overview - Total Orders") && (
-              <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
-            )}
-            {canViewOverviewModule("Overview - Total Spent") && (
-              <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
-            )}
-            {canViewOverviewModule("Overview - Products") && (
-              <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
-            )}
-            {canViewOverviewModule("Overview - Invoices") && (
-              <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
-            )}
-            {canViewOverviewModule("Overview - Open Support Tickets") && (
-              <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate(portalMode ? "/portal/support" : "/support/tickets")} />
-            )}
-          </div>
+            <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleKpiCount, 5)}`}>
+              {canViewOverviewModule("Overview - Total Orders") && (
+                <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
+              )}
+              {canViewOverviewModule("Overview - Total Spent") && (
+                <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
+              )}
+              {canViewOverviewModule("Overview - Products") && (
+                <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
+              )}
+              {canViewOverviewModule("Overview - Invoices") && (
+                <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
+              )}
+              {canViewOverviewModule("Overview - Open Support Tickets") && (
+                <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate(portalMode ? "/portal/support" : "/support/tickets")} />
+              )}
+            </div>
           )}
 
           {visibleSummaryRowCount > 0 && (
-          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleSummaryRowCount, 3)}`}>
-            {canViewOverviewModule("Company Information") && (
-            <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold capitalize text-emerald-600">{client.status || "Active"}</span>}>
-              <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-gray-900">{client.company_name || client.name}</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.id}</p>
-                </div>
-              </div>
-              <div className="mt-2 divide-y divide-gray-50">
-                <DetailRow label="Category" value={client.category || "—"} />
-                <DetailRow label="Client Tier" value={client.client_tier || client.tier || "—"} />
-                <DetailRow label="Contact Person" value={client.contact_person || client.rep || "—"} />
-                <DetailRow
-                  label="Email"
-                  value={
-                    profileEmail ? (
-                      <a href={`mailto:${profileEmail}`} className="text-blue-600 hover:underline">
-                        {profileEmail}
-                      </a>
-                    ) : "—"
-                  }
-                />
-                <DetailRow
-                  label="Phone"
-                  value={
-                    profilePhone ? (
-                      <a href={`tel:${profilePhone}`} className="hover:text-blue-600">
-                        {profilePhone}
-                      </a>
-                    ) : "—"
-                  }
-                />
-                <DetailRow
-                  label="Mobile"
-                  value={
-                    profileMobile ? (
-                      <a href={`tel:${profileMobile}`} className="hover:text-blue-600">
-                        {profileMobile}
-                      </a>
-                    ) : "—"
-                  }
-                />
-                <DetailRow
-                  label="Website"
-                  value={
-                    client.website ? (
-                      <a
-                        href={client.website.startsWith("http") ? client.website : `https://${client.website}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {client.website}
-                      </a>
-                    ) : "—"
-                  }
-                />
-                <DetailRow label="Contract Start Date" value={formatDate(startDate)} />
-                <DetailRow label="Contract End Date" value={formatDate(endDate)} />
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : goTo("Contracts")} className="flex-1 rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
-                  View Contracts
-                </button>
-                {!portalMode && (
-                  <button type="button" onClick={() => navigate(`/clients/${client.id}/edit`)} className="flex-1 rounded border border-gray-200 bg-white py-1.5 text-[10px] font-semibold text-gray-700 hover:bg-gray-50">
-                    Edit Client
-                  </button>
-                )}
-              </div>
-            </Panel>
-            )}
+            <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleSummaryRowCount, 3)}`}>
+              {canViewOverviewModule("Company Information") && (
+                <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold capitalize text-emerald-600">{client.status || "Active"}</span>}>
+                  <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-900">{client.company_name || client.name}</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.id}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 divide-y divide-gray-50">
+                    <DetailRow label="Category" value={client.category || "—"} />
+                    <DetailRow label="Client Tier" value={client.client_tier || client.tier || "—"} />
+                    <DetailRow label="Contact Person" value={client.contact_person || client.rep || "—"} />
+                    <DetailRow
+                      label="Email"
+                      value={
+                        profileEmail ? (
+                          <a href={`mailto:${profileEmail}`} className="text-blue-600 hover:underline">
+                            {profileEmail}
+                          </a>
+                        ) : "—"
+                      }
+                    />
+                    <DetailRow
+                      label="Phone"
+                      value={
+                        profilePhone ? (
+                          <a href={`tel:${profilePhone}`} className="hover:text-blue-600">
+                            {profilePhone}
+                          </a>
+                        ) : "—"
+                      }
+                    />
+                    <DetailRow
+                      label="Mobile"
+                      value={
+                        profileMobile ? (
+                          <a href={`tel:${profileMobile}`} className="hover:text-blue-600">
+                            {profileMobile}
+                          </a>
+                        ) : "—"
+                      }
+                    />
+                    <DetailRow
+                      label="Website"
+                      value={
+                        client.website ? (
+                          <a
+                            href={client.website.startsWith("http") ? client.website : `https://${client.website}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {client.website}
+                          </a>
+                        ) : "—"
+                      }
+                    />
+                    <DetailRow label="Contract Start Date" value={formatDate(startDate)} />
+                    <DetailRow label="Contract End Date" value={formatDate(endDate)} />
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : goTo("Contracts")} className="flex-1 rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
+                      View Contracts
+                    </button>
+                    {!portalMode && (
+                      <button type="button" onClick={() => navigate(`/clients/${client.id}/edit`)} className="flex-1 rounded border border-gray-200 bg-white py-1.5 text-[10px] font-semibold text-gray-700 hover:bg-gray-50">
+                        Edit Client
+                      </button>
+                    )}
+                  </div>
+                </Panel>
+              )}
 
-            {canViewOverviewModule("Orders Overview") && (
-            <Panel title="Orders Overview" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
-              <div className="flex min-h-[138px] items-center gap-4">
-                <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#10b981 0 ${((statusCounts[0].count / totalStatusCount) * 100)}%, #2563eb ${((statusCounts[0].count / totalStatusCount) * 100)}% ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}%, #f59e0b ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}% ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}%, #7c3aed ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}% 100%)` }}>
-                  <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white"><span className="text-xl font-bold">{periodOrders.length}</span><span className="text-[9px] text-gray-500">Total Orders</span></div>
-                </div>
-                <div className="min-w-0 flex-1 space-y-2 text-[10px]">
-                  {statusCounts.map((item, index) => {
-                    const colors = ["bg-emerald-500", "bg-blue-600", "bg-orange-500", "bg-violet-600"];
-                    return <div key={item.status} className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-gray-600"><i className={`h-2 w-2 rounded-full ${colors[index]}`} />{item.status}</span><strong>{item.count} <span className="font-normal text-gray-400">({Math.round((item.count / totalStatusCount) * 100)}%)</span></strong></div>;
-                  })}
-                </div>
-              </div>
-            </Panel>
-            )}
+              {canViewOverviewModule("Orders Overview") && (
+                <Panel title="Orders Overview" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
+                  <div className="flex min-h-[138px] items-center gap-4">
+                    <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#10b981 0 ${((statusCounts[0].count / totalStatusCount) * 100)}%, #2563eb ${((statusCounts[0].count / totalStatusCount) * 100)}% ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}%, #f59e0b ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}% ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}%, #7c3aed ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}% 100%)` }}>
+                      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white"><span className="text-xl font-bold">{periodOrders.length}</span><span className="text-[9px] text-gray-500">Total Orders</span></div>
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2 text-[10px]">
+                      {statusCounts.map((item, index) => {
+                        const colors = ["bg-emerald-500", "bg-blue-600", "bg-orange-500", "bg-violet-600"];
+                        return <div key={item.status} className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-gray-600"><i className={`h-2 w-2 rounded-full ${colors[index]}`} />{item.status}</span><strong>{item.count} <span className="font-normal text-gray-400">({Math.round((item.count / totalStatusCount) * 100)}%)</span></strong></div>;
+                      })}
+                    </div>
+                  </div>
+                </Panel>
+              )}
 
-            {canViewOverviewModule("Account Summary") && (
-            <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
-              <div className="space-y-2.5 text-[10px]">
-                {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
-                <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
-                <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-blue-500" />Uploaded Documents</span><strong>{documents.length}</strong></button>
-                <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
-                <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
-              </div>
-            </Panel>
-            )}
-          </div>
+              {canViewOverviewModule("Account Summary") && (
+                <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
+                  <div className="space-y-2.5 text-[10px]">
+                    {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Contracts</span><strong>{contracts.length}</strong></button>}
+                    <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
+                    <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-blue-500" />Uploaded Documents</span><strong>{documents.length}</strong></button>
+                    <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
+                    <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
+                  </div>
+                </Panel>
+              )}
+            </div>
           )}
 
           {visibleDetailsRowCount > 0 && (
-          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleDetailsRowCount, 4)}`}>
-            {canViewOverviewModule("Business & Tax Details") && (
-            <Panel title="Business & Tax Details">
-              <div className="divide-y divide-gray-50">
-                <DetailRow label="GST Treatment" value={client.gst_treatment || "—"} />
-                <DetailRow label="GSTIN" value={client.gstin || "—"} />
-                <DetailRow label="PAN Number" value={client.pan_number || "—"} />
-                <DetailRow label="ID / Reference No." value={client.id_reference_number || "—"} />
-                <DetailRow label="Source of Supply" value={client.source_of_supply || "—"} />
-                <DetailRow label="Currency" value={client.currency || "INR"} />
-                <DetailRow label="Opening Balance" value={openingBalanceDisplay} />
-              </div>
-            </Panel>
-            )}
+            <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleDetailsRowCount, 4)}`}>
+              {canViewOverviewModule("Business & Tax Details") && (
+                <Panel title="Business & Tax Details">
+                  <div className="divide-y divide-gray-50">
+                    <DetailRow label="GST Treatment" value={client.gst_treatment || "—"} />
+                    <DetailRow label="GSTIN" value={client.gstin || "—"} />
+                    <DetailRow label="PAN Number" value={client.pan_number || "—"} />
+                    <DetailRow label="ID / Reference No." value={client.id_reference_number || "—"} />
+                    <DetailRow label="Source of Supply" value={client.source_of_supply || "—"} />
+                    <DetailRow label="Currency" value={client.currency || "INR"} />
+                    <DetailRow label="Opening Balance" value={openingBalanceDisplay} />
+                  </div>
+                </Panel>
+              )}
 
-            {canViewOverviewModule("Financial & Bank Details") && (
-            <Panel title="Financial & Bank Details">
-              <div className="divide-y divide-gray-50">
-                <DetailRow label="Payment Terms" value={client.payment_terms || client.paymentTerms || "—"} />
-                <DetailRow label="TDS Rate" value={tdsRateDisplay} />
-                <DetailRow label="Bank Name" value={client.bank_name || client.bankName || "—"} />
-                <DetailRow label="Account Number" value={client.account_number || client.accountNumber || "—"} />
-                <DetailRow label="IFSC Code" value={client.ifsc_code || client.ifscCode || "—"} />
-                <DetailRow label="Branch" value={client.branch || "—"} />
-              </div>
-            </Panel>
-            )}
+              {canViewOverviewModule("Financial & Bank Details") && (
+                <Panel title="Financial & Bank Details">
+                  <div className="divide-y divide-gray-50">
+                    <DetailRow label="Payment Terms" value={client.payment_terms || client.paymentTerms || "—"} />
+                    <DetailRow label="TDS Rate" value={tdsRateDisplay} />
+                    <DetailRow label="Bank Name" value={client.bank_name || client.bankName || "—"} />
+                    <DetailRow label="Account Number" value={client.account_number || client.accountNumber || "—"} />
+                    <DetailRow label="IFSC Code" value={client.ifsc_code || client.ifscCode || "—"} />
+                    <DetailRow label="Branch" value={client.branch || "—"} />
+                  </div>
+                </Panel>
+              )}
 
-            {canViewOverviewModule("Billing Address") && (
-            <Panel title="Billing Address">
-              <div className="divide-y divide-gray-50">
-                <DetailRow label="Attention" value={billingAttention || "—"} />
-                <DetailRow label="Address Line 1" value={billingLine1 || "—"} />
-                <DetailRow label="Address Line 2" value={billingLine2 || "—"} />
-                <DetailRow label="City" value={billingCity || "—"} />
-                <DetailRow label="State" value={billingState || "—"} />
-                <DetailRow label="Pin Code" value={billingPincode || "—"} />
-                <DetailRow label="Country / Region" value={billingCountry || "—"} />
-                <DetailRow label="Phone" value={billingPhoneDisplay || "—"} />
-                <DetailRow label="Fax Number" value={billingFax || "—"} />
-              </div>
-            </Panel>
-            )}
+              {canViewOverviewModule("Billing Address") && (
+                <Panel title="Billing Address">
+                  <div className="divide-y divide-gray-50">
+                    <DetailRow label="Attention" value={billingAttention || "—"} />
+                    <DetailRow label="Address Line 1" value={billingLine1 || "—"} />
+                    <DetailRow label="Address Line 2" value={billingLine2 || "—"} />
+                    <DetailRow label="City" value={billingCity || "—"} />
+                    <DetailRow label="State" value={billingState || "—"} />
+                    <DetailRow label="Pin Code" value={billingPincode || "—"} />
+                    <DetailRow label="Country / Region" value={billingCountry || "—"} />
+                    <DetailRow label="Phone" value={billingPhoneDisplay || "—"} />
+                    <DetailRow label="Fax Number" value={billingFax || "—"} />
+                  </div>
+                </Panel>
+              )}
 
-            {canViewOverviewModule("Shipping Address") && (
-            <Panel
-              title="Shipping Address"
-              action={
-                sameAddress ? (
-                  <span className="rounded bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-600">
-                    Same as Billing
-                  </span>
-                ) : undefined
-              }
-            >
-              <div className="divide-y divide-gray-50">
-                <DetailRow label="Attention" value={shippingAttention || "—"} />
-                <DetailRow label="Address Line 1" value={shippingLine1 || "—"} />
-                <DetailRow label="Address Line 2" value={shippingLine2 || "—"} />
-                <DetailRow label="City" value={shippingCity || "—"} />
-                <DetailRow label="State" value={shippingState || "—"} />
-                <DetailRow label="Pin Code" value={shippingPincode || "—"} />
-                <DetailRow label="Country / Region" value={shippingCountry || "—"} />
-                <DetailRow label="Phone" value={shippingPhoneDisplay || "—"} />
-                <DetailRow label="Fax Number" value={shippingFax || "—"} />
-              </div>
-            </Panel>
-            )}
-          </div>
+              {canViewOverviewModule("Shipping Address") && (
+                <Panel
+                  title="Shipping Address"
+                  action={
+                    sameAddress ? (
+                      <span className="rounded bg-blue-50 px-2 py-0.5 text-[9px] font-semibold text-blue-600">
+                        Same as Billing
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <div className="divide-y divide-gray-50">
+                    <DetailRow label="Attention" value={shippingAttention || "—"} />
+                    <DetailRow label="Address Line 1" value={shippingLine1 || "—"} />
+                    <DetailRow label="Address Line 2" value={shippingLine2 || "—"} />
+                    <DetailRow label="City" value={shippingCity || "—"} />
+                    <DetailRow label="State" value={shippingState || "—"} />
+                    <DetailRow label="Pin Code" value={shippingPincode || "—"} />
+                    <DetailRow label="Country / Region" value={shippingCountry || "—"} />
+                    <DetailRow label="Phone" value={shippingPhoneDisplay || "—"} />
+                    <DetailRow label="Fax Number" value={shippingFax || "—"} />
+                  </div>
+                </Panel>
+              )}
+            </div>
           )}
 
           {canViewOverviewModule("Documents") && (
-          <div className="mt-3">
-            <Panel
-              title={`Documents (${activeDocuments.length})`}
-              action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">Manage Documents</button>}
-            >
-              <StoredDocumentList
-                documents={activeDocuments.map((doc) => ({
-                  id: doc.id,
-                  label: doc.label || doc.name,
-                  name: doc.fileName || doc.name,
-                  size: doc.size,
-                  fileData: doc.fileData,
-                }))}
-                emptyMessage="No documents have been uploaded for this client."
-                onMissingFile={() => toast.error("The file for this document is not available to download.")}
-              />
-            </Panel>
-          </div>
+            <div className="mt-3">
+              <Panel
+                title={`Documents (${activeDocuments.length})`}
+                action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">Manage Documents</button>}
+              >
+                <StoredDocumentList
+                  documents={activeDocuments.map((doc) => ({
+                    id: doc.id,
+                    label: doc.label || doc.name,
+                    name: doc.fileName || doc.name,
+                    size: doc.size,
+                    fileData: doc.fileData,
+                  }))}
+                  emptyMessage="No documents have been uploaded for this client."
+                  onMissingFile={() => toast.error("The file for this document is not available to download.")}
+                />
+              </Panel>
+            </div>
           )}
 
           {visibleTablesRowCount > 0 && (
-          <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleTablesRowCount, 2)}`}>
-            {canViewOverviewModule("Top Products") && (
-            <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
-              {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[460px] text-left text-[10px]">
-                    <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">{portalMode ? "Qty Ordered" : "Stock"}</th></tr></thead>
-                    <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
-                  </table>
-                </div>
+            <div className={`mt-3 grid gap-3 ${adaptiveGridCols(visibleTablesRowCount, 2)}`}>
+              {canViewOverviewModule("Top Products") && (
+                <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
+                  {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[460px] text-left text-[10px]">
+                        <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">{portalMode ? "Qty Ordered" : "Stock"}</th></tr></thead>
+                        <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  )}
+                </Panel>
               )}
-            </Panel>
-            )}
 
-            {canViewOverviewModule("Recent Orders") && (
-            <Panel title="Recent Orders" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
-              {recentOrders.length === 0 ? <EmptyState message="No orders found for this client in the selected period." /> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[470px] text-left text-[10px]">
-                    <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Order ID</th><th className="pb-2 font-semibold">Date</th><th className="pb-2 font-semibold">Status</th><th className="pb-2 text-right font-semibold">Total</th><th /></tr></thead>
-                    <tbody>{recentOrders.map((order) => <tr key={order.id} onClick={() => goTo("Orders")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{order.id}</td><td className="py-2 text-gray-500">{formatDate(order.date)}</td><td className="py-2"><span className={`rounded px-1.5 py-1 text-[9px] font-semibold ${orderStatusGroup(order.status) === "Completed" ? "bg-emerald-50 text-emerald-600" : orderStatusGroup(order.status) === "Cancelled" ? "bg-red-50 text-red-500" : "bg-blue-50 text-blue-600"}`}>{order.status}</span></td><td className="py-2 text-right font-semibold">{order.amount || formatMoney(order.amountNum, currency)}</td><td className="py-2 text-right text-gray-400"><ChevronRight size={13} className="inline" /></td></tr>)}</tbody>
-                  </table>
-                </div>
+              {canViewOverviewModule("Recent Orders") && (
+                <Panel title="Recent Orders" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
+                  {recentOrders.length === 0 ? <EmptyState message="No orders found for this client in the selected period." /> : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[470px] text-left text-[10px]">
+                        <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Order ID</th><th className="pb-2 font-semibold">Date</th><th className="pb-2 font-semibold">Status</th><th className="pb-2 text-right font-semibold">Total</th><th /></tr></thead>
+                        <tbody>{recentOrders.map((order) => <tr key={order.id} onClick={() => goTo("Orders")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{order.id}</td><td className="py-2 text-gray-500">{formatDate(order.date)}</td><td className="py-2"><span className={`rounded px-1.5 py-1 text-[9px] font-semibold ${orderStatusGroup(order.status) === "Completed" ? "bg-emerald-50 text-emerald-600" : orderStatusGroup(order.status) === "Cancelled" ? "bg-red-50 text-red-500" : "bg-blue-50 text-blue-600"}`}>{order.status}</span></td><td className="py-2 text-right font-semibold">{order.amount || formatMoney(order.amountNum, currency)}</td><td className="py-2 text-right text-gray-400"><ChevronRight size={13} className="inline" /></td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  )}
+                </Panel>
               )}
-            </Panel>
-            )}
-          </div>
+            </div>
           )}
 
           {canViewOverviewModule("Quick Links") && (
-          <div className="mt-3">
-            <h2 className="mb-2 text-xs font-bold text-gray-900">Quick Links</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <button type="button" onClick={() => openOverviewLink("/portal/catalog", "Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-              <button type="button" onClick={() => openOverviewLink("/portal/services", "Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-              <button type="button" onClick={() => navigate(portalMode ? "/portal/support" : "/support/create")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-              <button type="button" onClick={() => openOverviewLink("/portal/reports", "Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+            <div className="mt-3">
+              <h2 className="mb-2 text-xs font-bold text-gray-900">Quick Links</h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <button type="button" onClick={() => openOverviewLink("/portal/catalog", "Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+                <button type="button" onClick={() => openOverviewLink("/portal/services", "Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+                <button type="button" onClick={() => navigate(portalMode ? "/portal/support" : "/support/create")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+                <button type="button" onClick={() => openOverviewLink("/portal/reports", "Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              </div>
             </div>
-          </div>
           )}
         </main>
       )}
