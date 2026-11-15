@@ -1279,6 +1279,8 @@ export default function VendorOrderDetailPage() {
     serialNumber: string;
   } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
+  const [docsDropdownOpen, setDocsDropdownOpen] = useState(false);
+  const [notesDropdownOpen, setNotesDropdownOpen] = useState(false);
   const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
   const [pendingProvisionItem, setPendingProvisionItem] = useState<{ id: string; name: string } | null>(null);
 
@@ -2417,12 +2419,22 @@ export default function VendorOrderDetailPage() {
               )}
               {/* Documents Section */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
+                <div
+                  onClick={() => setDocsDropdownOpen(prev => !prev)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDocsDropdownOpen(prev => !prev); } }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: docsDropdownOpen ? "1px solid #f3f4f6" : "none", padding: "14px 20px", cursor: "pointer", background: docsDropdownOpen ? "#f9fafb" : "#fff" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#6b7280", transition: "transform 0.15s", display: "inline-block", transform: docsDropdownOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
+                  </div>
                   {!isDelivered && (
-                    <button onClick={() => setShowUploadDocument(true)} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
+                    <button onClick={(e) => { e.stopPropagation(); setDocsDropdownOpen(true); setShowUploadDocument(true); }} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
                   )}
                 </div>
+                {docsDropdownOpen && (
                 <div style={{ padding: "20px 24px" }}>
                   {documents.length === 0 ? (
                     <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
@@ -2452,14 +2464,25 @@ export default function VendorOrderDetailPage() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* Notes Section */}
               <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes</div>
-                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
+                <div
+                  onClick={() => setNotesDropdownOpen(prev => !prev)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setNotesDropdownOpen(prev => !prev); } }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: notesDropdownOpen ? "1px solid #f3f4f6" : "none", padding: "14px 20px", cursor: "pointer", background: notesDropdownOpen ? "#f9fafb" : "#fff" }}
+                >
+                  <span style={{ fontSize: 12, color: "#6b7280", transition: "transform 0.15s", display: "inline-block", transform: notesDropdownOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes</div>
+                    <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
+                  </div>
                 </div>
+                {notesDropdownOpen && (
                 <div style={{ padding: "20px 24px 28px" }}>
                   {/* Inline Add Note composer */}
                   {!isDelivered && (
@@ -2524,6 +2547,7 @@ export default function VendorOrderDetailPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
             </>

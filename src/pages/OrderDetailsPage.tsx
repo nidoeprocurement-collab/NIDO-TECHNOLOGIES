@@ -1603,6 +1603,8 @@ function DocumentsNotesTab({
   const [docSearch, setDocSearch] = useState("");
   const [docFeedback, setDocFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [uploadPreset, setUploadPreset] = useState<{ type: string; description: string } | null>(null);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   useEffect(() => {
     if (!licenseUploadRequest || locked || isClientPortalUser) return;
@@ -1893,65 +1895,93 @@ function DocumentsNotesTab({
           </div>
         </div>
       )}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827" }}>Documents</div>
-            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>{allDocs.length} document{allDocs.length !== 1 ? "s" : ""}</div>
+      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16, background: "#fff" }}>
+        <div
+          onClick={() => setDocsOpen(prev => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDocsOpen(prev => !prev); } }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", background: docsOpen ? "#f9fafb" : "#fff", borderBottom: docsOpen ? "1px solid #e5e7eb" : "none" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: "#6b7280", transition: "transform 0.15s", display: "inline-block", transform: docsOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827" }}>Documents</div>
+              <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>{allDocs.length} document{allDocs.length !== 1 ? "s" : ""}</div>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }} onClick={e => e.stopPropagation()}>
             <div style={{ position: "relative" }}>
               <span style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 13 }}>🔍</span>
-              <input value={docSearch} onChange={e => setDocSearch(e.target.value)} placeholder="Search documents..."
+              <input value={docSearch} onChange={e => { setDocSearch(e.target.value); if (!docsOpen) setDocsOpen(true); }} placeholder="Search documents..."
                 style={{ padding: "7px 12px 7px 28px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
             {!isClientPortalUser && !locked && (
-              <button onClick={() => { setDocFeedback(null); setShowUpload(true); }}
+              <button onClick={() => { setDocFeedback(null); setDocsOpen(true); setShowUpload(true); }}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
                 ⬆ Upload Document
               </button>
             )}
           </div>
         </div>
-           <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflowX: "auto", overflowY: "hidden", marginTop: 14 }}>
-            <div style={{ display: "grid", gridTemplateColumns: DOCUMENT_GRID_COLUMNS, minWidth: 980, gap: 12, padding: "10px 22px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4, whiteSpace: "nowrap" }}>
-            {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "DESCRIPTION", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
-          </div>
-          {filteredDocs.length === 0 ? (
-            <div style={{ padding: "32px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13.5 }}>No documents found.</div>
-          ) : filteredDocs.map((doc, i) => (
-             <div key={doc.id} style={{ display: "grid", gridTemplateColumns: DOCUMENT_GRID_COLUMNS, minWidth: 980, gap: 12, padding: "12px 22px", boxSizing: "border-box", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
-                <DocTypeIcon ext={doc.ext} />
-                <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                  <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 13.5, fontWeight: 600, overflowWrap: "anywhere" }}>{doc.name}</a>
-                  <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{doc.size}</div>
-                </div>
+        {docsOpen && (
+          <div style={{ padding: "14px 18px 18px" }}>
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflowX: "auto", overflowY: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: DOCUMENT_GRID_COLUMNS, minWidth: 980, gap: 12, padding: "10px 22px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4, whiteSpace: "nowrap" }}>
+                {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "DESCRIPTION", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
               </div>
-              <div style={{ minWidth: 0 }}><DocTypeTag type={doc.type} /></div>
-              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}>
-                <Avatar initial="S" color="#2563eb" size={28} />
-                <span style={{ minWidth: 0, fontSize: 13, color: "#374151", overflowWrap: "anywhere" }}>{doc.uploadedBy}</span>
-              </div>
-              <div style={{ minWidth: 0, fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5, overflowWrap: "anywhere" }}>{doc.uploadedOn}</div>
-              <div style={{ minWidth: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.45, overflowWrap: "anywhere" }}>{doc.description}</div>
-              {isClientPortalUser ? (
-                <button onClick={() => handleDownloadDocument(doc)} style={{ justifySelf: "center", background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
-              ) : (
-                <div style={{ justifySelf: "center" }}>
-                  <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={locked ? undefined : () => handleRemoveDocument(doc.id)} />
+              {filteredDocs.length === 0 ? (
+                <div style={{ padding: "32px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13.5 }}>No documents found.</div>
+              ) : filteredDocs.map((doc, i) => (
+                <div key={doc.id} style={{ display: "grid", gridTemplateColumns: DOCUMENT_GRID_COLUMNS, minWidth: 980, gap: 12, padding: "12px 22px", boxSizing: "border-box", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
+                    <DocTypeIcon ext={doc.ext} />
+                    <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                      <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 13.5, fontWeight: 600, overflowWrap: "anywhere" }}>{doc.name}</a>
+                      <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{doc.size}</div>
+                    </div>
+                  </div>
+                  <div style={{ minWidth: 0 }}><DocTypeTag type={doc.type} /></div>
+                  <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                    <Avatar initial="S" color="#2563eb" size={28} />
+                    <span style={{ minWidth: 0, fontSize: 13, color: "#374151", overflowWrap: "anywhere" }}>{doc.uploadedBy}</span>
+                  </div>
+                  <div style={{ minWidth: 0, fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5, overflowWrap: "anywhere" }}>{doc.uploadedOn}</div>
+                  <div style={{ minWidth: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.45, overflowWrap: "anywhere" }}>{doc.description}</div>
+                  {isClientPortalUser ? (
+                    <button onClick={() => handleDownloadDocument(doc)} style={{ justifySelf: "center", background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
+                  ) : (
+                    <div style={{ justifySelf: "center" }}>
+                      <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={locked ? undefined : () => handleRemoveDocument(doc.id)} />
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827", marginBottom: 1 }}>Notes</div>
-        <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>
-          {visibleNotes.length} note{visibleNotes.length !== 1 ? "s" : ""}{isClientPortalUser ? " \u2014 messages between you and the NIDO team" : ""}
+      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+        <div
+          onClick={() => setNotesOpen(prev => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setNotesOpen(prev => !prev); } }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer", background: notesOpen ? "#f9fafb" : "#fff", borderBottom: notesOpen ? "1px solid #e5e7eb" : "none" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: "#6b7280", transition: "transform 0.15s", display: "inline-block", transform: notesOpen ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827" }}>Notes</div>
+              <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>
+                {visibleNotes.length} note{visibleNotes.length !== 1 ? "s" : ""}{isClientPortalUser ? " \u2014 messages between you and the NIDO team" : ""}
+              </div>
+            </div>
+          </div>
         </div>
+        {notesOpen && (
+          <div style={{ padding: "14px 18px 18px" }}>
         {locked ? (
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px", marginTop: 8, background: "#f9fafb", color: "#6b7280", fontSize: 13 }}>
             🔒 Notes are read-only while this order is delivered or pickup is complete. Existing conversation history is preserved.
@@ -2029,6 +2059,8 @@ function DocumentsNotesTab({
             </div>
           </div>
         ))}
+          </div>
+        )}
       </div>
        {!locked && showUpload && (
          <UploadDocModal
