@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS } from "@/lib/utils";
+import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS, resolveTrackingLink } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUsers, NIDO_USERS_EVENT, type NidoUser } from "@/lib/nidoUsersStore";
 import { sortByDropdownLabel } from "@/lib/alphabeticalDropdowns";
@@ -262,6 +262,7 @@ function UpdateTrackingModal({
             ["number", "Tracking Number", "e.g. 1Z999AA1234567890"],
             ["carrier", "Carrier", "e.g. UPS, FedEx, DHL"],
             ["note", "Note", "e.g. Shipped on Apr 17, 2026"],
+            ["link", "Link Label / URL", "e.g. https://... or Track Package"],
           ] as [string, string, string][]).map(([key, label, placeholder]) => (
             <div key={key}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
@@ -2303,7 +2304,21 @@ export default function VendorOrderDetailPage() {
                         <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
                         <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
                         <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
-                        <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
+                        {(() => {
+                          const { href, label } = resolveTrackingLink(item.tracking);
+                          return href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#2563eb", textDecoration: "underline", fontSize: 12, wordBreak: "break-all" }}
+                            >
+                              {label}
+                            </a>
+                          ) : (
+                            <span style={{ color: "#6b7280", fontSize: 12 }}>{label}</span>
+                          );
+                        })()}
                       </>
                     ) : <span style={{ color: "#d1d5db" }}>—</span>}
                     {!isDigitalDocumentProduct(item) && !isCancelled && item.status === "Shipped" && (

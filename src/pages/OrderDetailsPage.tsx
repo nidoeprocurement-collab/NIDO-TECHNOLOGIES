@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS } from "@/lib/utils";
+import { countWords, enforceMaxWords, MAX_CANCELLATION_REASON_WORDS, resolveTrackingLink } from "@/lib/utils";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { Building2, Mail, Phone, Truck, UserRound } from "lucide-react";
@@ -2188,7 +2188,7 @@ function AddTrackingModal({ current, onSave, onClose }) {
     <Overlay onClose={onClose} closeOnBackdrop={false}>
       <ModalBox title={current ? "Update Tracking Info" : "Add Tracking Info"} onClose={onClose}>
         <div style={{ padding: "20px 22px 8px" }}>
-          {[["trackingNumber", "Tracking Number", "e.g. 1Z999AA1234567890"], ["note", "Tracking Note", "e.g. Shipped on Apr 17, 2026"], ["linkLabel", "Link Label", "e.g. Track Package"]].map(([k, label, ph]) => (
+          {[["trackingNumber", "Tracking Number", "e.g. 1Z999AA1234567890"], ["note", "Tracking Note", "e.g. Shipped on Apr 17, 2026"], ["linkLabel", "Link Label / URL", "e.g. https://... or Track Package"]].map(([k, label, ph]) => (
             <div key={k} style={{ marginBottom: 14 }}>
               <label style={lbSt}>{label}</label>
               <input value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} placeholder={ph} style={inSt} />
@@ -5653,7 +5653,21 @@ export default function MyOrderPage() {
                               <div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber || sub.tracking.number}</div>
                               <div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div>
                               <div style={{ color: "#6b7280" }}>{sub.tracking.note}</div>
-                              <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel || sub.tracking.link || "Track Package"}</a>
+                              {(() => {
+                                const { href, label } = resolveTrackingLink(sub.tracking);
+                                return href ? (
+                                  <a
+                                    href={href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: "#2563eb", textDecoration: "underline", fontSize: 11.5, wordBreak: "break-all" }}
+                                  >
+                                    {label}
+                                  </a>
+                                ) : (
+                                  <span style={{ color: "#6b7280", fontSize: 11.5 }}>{label}</span>
+                                );
+                              })()}
                             </>
                           ) : <span style={{ color: "#d1d5db" }}>-</span>}
                         </div>

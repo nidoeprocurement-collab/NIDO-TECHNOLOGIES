@@ -24,3 +24,33 @@ export function enforceMaxWords(text: string, maxWords = MAX_CANCELLATION_REASON
   const cutoff = (lastAllowed.index ?? 0) + lastAllowed[0].length;
   return text.slice(0, cutoff);
 }
+
+/**
+ * Extracts a clickable URL (if present) and display label from a tracking info object.
+ */
+export function resolveTrackingLink(tracking: {
+  linkUrl?: string;
+  url?: string;
+  linkLabel?: string;
+  link?: string;
+} | null | undefined): { href: string | null; label: string } {
+  if (!tracking) return { href: null, label: "" };
+  const rawLabel = String(tracking.linkLabel || tracking.link || "").trim();
+  const explicitUrl = String(tracking.linkUrl || tracking.url || "").trim();
+  const candidate = explicitUrl || rawLabel;
+  const looksLikeUrl =
+    /^https?:\/\//i.test(candidate) ||
+    /^www\./i.test(candidate) ||
+    (/^[^\s]+\.[a-z]{2,}(\/.*)?$/i.test(candidate) && !candidate.includes("@"));
+
+  const href = looksLikeUrl
+    ? /^https?:\/\//i.test(candidate)
+      ? candidate
+      : `https://${candidate}`
+    : null;
+
+  return {
+    href,
+    label: rawLabel || explicitUrl || "Track Package",
+  };
+}
