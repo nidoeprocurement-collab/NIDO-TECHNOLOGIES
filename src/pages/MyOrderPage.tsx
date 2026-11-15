@@ -12,7 +12,7 @@ import OrderExportDialog, { type OrderExportOption } from "@/components/shared/O
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { normalizeOrdersForList } from "@/lib/orderListData";
-import { getDocumentProductType } from "@/lib/productDocumentRules";
+import { getDocumentProductType, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import { getPaginationItems } from "@/lib/pagination";
 
 const ORDERS_PER_PAGE = 10;
@@ -50,6 +50,76 @@ function Avatar({ initial, color, size = 28 }: { initial: string; color: string;
     }}>
       {initial}
     </div>
+  );
+}
+
+function ProductTypeAvatar({ kind, label }: { kind: "digital" | "physical"; label: string }) {
+  if (kind === "digital") {
+    return (
+      <span
+        title={label}
+        aria-label={label}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 34,
+          height: 34,
+          borderRadius: "50%",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="34" height="34" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="22.5" fill="#EFF6FF" stroke="#2563EB" strokeWidth="2.5" />
+          {/* Floating digital tiles */}
+          <rect x="10" y="9" width="8" height="10" rx="2" transform="rotate(-8 10 9)" fill="#3B82F6" />
+          <rect x="20" y="7" width="9" height="9" rx="2" fill="#7C3AED" />
+          <path d="M23.5 9.5L26.5 11.5L23.5 13.5V9.5Z" fill="#FFFFFF" />
+          <rect x="30" y="10" width="8" height="9" rx="2" transform="rotate(8 30 10)" fill="#14B8A6" />
+          {/* Laptop */}
+          <rect x="11" y="20" width="26" height="16" rx="2.5" fill="#1E293B" />
+          <rect x="13" y="22" width="22" height="12" rx="1.5" fill="#2563EB" />
+          {/* Download arrow */}
+          <path d="M24 24V30M24 30L21.5 27.5M24 30L26.5 27.5" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M19.5 31.5H28.5" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" />
+          {/* Laptop base */}
+          <path d="M8.5 37.5H39.5C39.5 38.8 38.4 39.5 37 39.5H11C9.6 39.5 8.5 38.8 8.5 37.5Z" fill="#94A3B8" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 34,
+        height: 34,
+        borderRadius: "50%",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="34" height="34" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="22.5" fill="#F0FDF4" stroke="#16A34A" strokeWidth="2.5" />
+        {/* Cardboard shipping box */}
+        <path d="M11 19L21 14L31 19V32L21 37L11 32V19Z" fill="#E59A54" />
+        <path d="M21 14L31 19L21 24L11 19L21 14Z" fill="#F3B778" />
+        <path d="M21 24L31 19V32L21 37V24Z" fill="#C97D38" />
+        {/* Box tape */}
+        <path d="M16 16.5L26 21.5L24 22.5L14 17.5L16 16.5Z" fill="#A15C22" />
+        {/* Green check badge */}
+        <circle cx="34.5" cy="16.5" r="6" fill="#16A34A" />
+        <path d="M32 16.5L33.8 18.3L37.2 14.8" stroke="#FFFFFF" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Shopping cart */}
+        <path d="M25 27H27.2L29 33.5H36.5L38 28.8H28" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="30" cy="36.2" r="1.4" fill="#1E293B" />
+        <circle cx="35.5" cy="36.2" r="1.4" fill="#1E293B" />
+      </svg>
+    </span>
   );
 }
 
@@ -773,55 +843,26 @@ export default function MyOrderPage() {
                       </td>
                       <td style={{ ...tdSt, width: 76, textAlign: "center" }}>
                         {(() => {
-                          const types = Array.from(
-                            new Set(
-                              (order.cartItems ?? [])
-                                .map((item) => getDocumentProductType(item))
-                                .filter(Boolean),
-                            ),
-                          );
-                          if (types.length === 0) {
+                          const items = order.cartItems ?? [];
+                          if (items.length === 0) {
                             return <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>;
                           }
+                          const groups = new Map<"physical" | "digital", Set<string>>();
+                          items.forEach((item) => {
+                            const kind: "physical" | "digital" = isDigitalDocumentProduct(item) ? "digital" : "physical";
+                            const rawType = getDocumentProductType(item);
+                            if (!groups.has(kind)) groups.set(kind, new Set());
+                            if (rawType) groups.get(kind)!.add(rawType);
+                          });
                           return (
                             <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                              {types.map((type) => {
-                                const lower = type.toLowerCase();
-                                const isDigital = lower.includes("digital") || lower.includes("subscription") || lower.includes("saas") || lower.includes("cloud") || lower.includes("service");
-                                const isHybrid = lower.includes("hybrid");
-                                const isPhysical = lower.includes("physical");
-                                const code = isHybrid ? "H" : isDigital ? "D" : isPhysical ? "P" : type.charAt(0).toUpperCase();
-                                const palette = isHybrid
-                                  ? { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" }
-                                  : isDigital
-                                    ? { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" }
-                                    : isPhysical
-                                      ? { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" }
-                                      : { bg: "#f3f4f6", color: "#374151", border: "#e5e7eb" };
-                                return (
-                                  <span
-                                    key={type}
-                                    title={type}
-                                    aria-label={type}
-                                    style={{
-                                      width: 24,
-                                      height: 24,
-                                      borderRadius: "50%",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: 11,
-                                      fontWeight: 700,
-                                      background: palette.bg,
-                                      color: palette.color,
-                                      border: `1px solid ${palette.border}`,
-                                      cursor: "default",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {code}
-                                  </span>
-                                );
+                              {Array.from(groups.entries()).map(([kind, rawTypes]) => {
+                                const detail = Array.from(rawTypes).join(", ");
+                                const baseLabel = kind === "digital" ? "Digital Products" : "Physical Products";
+                                const label = detail && detail.toLowerCase() !== baseLabel.toLowerCase()
+                                  ? `${baseLabel} (${detail})`
+                                  : baseLabel;
+                                return <ProductTypeAvatar key={kind} kind={kind} label={label} />;
                               })}
                             </div>
                           );
