@@ -16,7 +16,7 @@ import {
   type InvoiceStatus,
   type StoredInvoice,
 } from '@/lib/invoiceStore';
-import { getActiveReceipts } from '@/lib/paymentReceiptStore';
+import { getActiveReceipts, type PaymentReceipt } from '@/lib/paymentReceiptStore';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
 import { toast } from 'sonner';
@@ -297,6 +297,7 @@ export default function InvoicePage() {
   const { config } = useConfig();
   const prefix = config.prefixes.find((item) => item.key === 'invoice')?.value || 'INV-';
   const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
   const [search, setSearch] = useState('');
@@ -307,12 +308,19 @@ export default function InvoicePage() {
   const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
 
-  const refresh = () => setInvoices(getInvoices());
+  const refresh = () => {
+    setInvoices(getInvoices());
+    setReceipts(getActiveReceipts());
+  };
 
   useEffect(() => {
     refresh();
     window.addEventListener('nidoInvoicesUpdated', refresh);
-    return () => window.removeEventListener('nidoInvoicesUpdated', refresh);
+    window.addEventListener('nidoPaymentReceiptsUpdated', refresh);
+    return () => {
+      window.removeEventListener('nidoInvoicesUpdated', refresh);
+      window.removeEventListener('nidoPaymentReceiptsUpdated', refresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -376,17 +384,33 @@ export default function InvoicePage() {
     setStatusFilter('all');
   };
 
+  const getInvoiceAmounts = (invoice: StoredInvoice) => {
+    const directPaid = (invoice.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const receiptPaid = receipts
+      .filter((r) => r.invoiceNumber === invoice.invoiceNumber)
+      .reduce((sum, r) => sum + (Number(r.amountReceived) || 0), 0);
+    const totalAmount = Number(invoice.grandTotal ?? 0);
+    const amountReceived = Number((directPaid + receiptPaid).toFixed(2));
+    const balanceAmount = Math.max(0, Number((totalAmount - amountReceived).toFixed(2)));
+    return { totalAmount, amountReceived, balanceAmount };
+  };
+
   const exportCsv = () => {
     const rows = [
-      ['Date', 'Invoice #', 'Customer', 'Status', 'Due Date', 'Total'],
-      ...filteredInvoices.map((invoice) => [
-        invoice.invoiceDate,
-        displayNumber(invoice.invoiceNumber, prefix),
-        invoice.clientName,
-        invoice.status,
-        invoice.dueDate,
-        invoice.grandTotal.toFixed(2),
-      ]),
+      ['Date', 'Invoice #', 'Customer', 'Status', 'Due Date', 'Total Amount', 'Amount Received', 'Balance Amount'],
+      ...filteredInvoices.map((invoice) => {
+        const { totalAmount, amountReceived, balanceAmount } = getInvoiceAmounts(invoice);
+        return [
+          invoice.invoiceDate,
+          displayNumber(invoice.invoiceNumber, prefix),
+          invoice.clientName,
+          invoice.status,
+          invoice.dueDate,
+          totalAmount.toFixed(2),
+          amountReceived.toFixed(2),
+          balanceAmount.toFixed(2),
+        ];
+      }),
     ];
     const csv = rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
     const link = document.createElement('a');
@@ -496,17 +520,13 @@ export default function InvoicePage() {
   };
 
   const openPaymentReceiptForm = (invoice: StoredInvoice) => {
-    const directPaid = (invoice.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const receiptPaid = getActiveReceipts()
-      .filter((r) => r.invoiceNumber === invoice.invoiceNumber)
-      .reduce((sum, r) => sum + (Number(r.amountReceived) || 0), 0);
-    const amountDue = Math.max(0, Number(((invoice.grandTotal ?? 0) - directPaid - receiptPaid).toFixed(2)));
+    const { balanceAmount } = getInvoiceAmounts(invoice);
     setRowMenu(null);
     navigate('/sales/payment-receipts/create', {
       state: {
         customerName: invoice.clientName,
         invoiceNumber: invoice.invoiceNumber,
-        amount: amountDue,
+        amount: balanceAmount,
         email: invoice.clientContacts?.[0] || invoice.clientContact || '',
       },
     });
@@ -619,7 +639,7 @@ export default function InvoicePage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['DATE', 'INVOICE #', 'CUSTOMER', 'STATUS', 'DUE DATE', 'TOTAL', 'ACTIONS'].map((heading) => (
+                  {['DATE', 'INVOICE #', 'CUSTOMER', 'STATUS', 'DUE DATE', 'TOTAL AMOUNT', 'AMOUNT RECEIVED', 'BALANCE AMOUNT', 'ACTIONS'].map((heading) => (
                     <th
                       key={heading}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap"
@@ -630,7 +650,9 @@ export default function InvoicePage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredInvoices.map((invoice) => (
+                {filteredInvoices.map((invoice) => {
+                  const { totalAmount, amountReceived, balanceAmount } = getInvoiceAmounts(invoice);
+                  return (
                   <tr key={invoice.id} className="border-b border-gray-200 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{invoice.invoiceDate}</td>
                     <td className="px-4 py-3 text-sm">
@@ -648,14 +670,17 @@ export default function InvoicePage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{invoice.dueDate}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{fmt(invoice.grandTotal)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{fmt(totalAmount)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-emerald-700 whitespace-nowrap">{fmt(amountReceived)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">{fmt(balanceAmount)}</td>
                     <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                       <button onClick={(e) => openRowMenu(e, invoice)} className="p-1.5 hover:bg-gray-100 rounded">
                         <MoreVertical size={16} className="text-gray-600" />
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
