@@ -1156,16 +1156,29 @@ export default function ClientInventoryPage({ client }: Props) {
         <div className="overflow-x-auto">
           {subTab !== "activity" ? (
             <table className="w-full min-w-[980px] table-fixed text-xs">
-              <colgroup>
-                <col className="w-[44px]" />
-                <col className="w-[22%]" />
-                <col className="w-[15%]" />
-                <col className="w-[15%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-              </colgroup>
+              {subTab === "reserved" ? (
+                <colgroup>
+                  <col className="w-[44px]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
+              ) : (
+                <colgroup>
+                  <col className="w-[44px]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
+              )}
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/70 text-[11px] font-semibold text-gray-600">
                   <th className="pl-5 pr-2 py-3 text-left">
