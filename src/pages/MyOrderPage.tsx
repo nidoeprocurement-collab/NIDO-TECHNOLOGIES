@@ -12,24 +12,25 @@ import OrderExportDialog, { type OrderExportOption } from "@/components/shared/O
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
 import { normalizeOrdersForList } from "@/lib/orderListData";
+import { getDocumentProductType } from "@/lib/productDocumentRules";
 import { getPaginationItems } from "@/lib/pagination";
 
 const ORDERS_PER_PAGE = 10;
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
-  Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
-  Provisioning:          { bg: "#eef2ff", color: "#4338ca", border: "#c7d2fe" },
+  Processing: { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Provisioning: { bg: "#eef2ff", color: "#4338ca", border: "#c7d2fe" },
   "Partially Provisioned": { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
-  Provisioned:           { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
-  Activated:             { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
-  Completed:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  "Pending Shipping":    { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" },
-  "Partially Shipped":   { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
-  Shipped:               { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  Provisioned: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Activated: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Completed: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  "Pending Shipping": { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" },
+  "Partially Shipped": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  Shipped: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   "Partially Delivered": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Delivered:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Cancelled:             { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
-  Draft:                 { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
+  Delivered: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Cancelled: { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
+  Draft: { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
 };
 
 const ALL_STATUSES: OrderStatus[] = [
@@ -249,9 +250,9 @@ function ActionDropdown({ onExport, onCreateOrder, onBulkNotes, onClose }: {
   onClose: () => void;
 }) {
   const items = [
-    { icon: "⬆️", label: "Export",              action: () => { onExport();      onClose(); } },
-    { icon: "＋", label: "Create Order",         action: () => { onCreateOrder(); onClose(); } },
-    { icon: "✎",  label: "Bulk Update Notes",   action: () => { onBulkNotes();   onClose(); } },
+    { icon: "⬆️", label: "Export", action: () => { onExport(); onClose(); } },
+    { icon: "＋", label: "Create Order", action: () => { onCreateOrder(); onClose(); } },
+    { icon: "✎", label: "Bulk Update Notes", action: () => { onBulkNotes(); onClose(); } },
   ];
   const _c = "hsl(var(--card))"; const _b = "hsl(var(--border))"; const _f = "hsl(var(--foreground))"; const _mu = "hsl(var(--muted))";
   return (
@@ -403,7 +404,7 @@ export default function MyOrderPage() {
     [...new Set(visibleOrders.map(order => order.status))]
       .sort((a, b) => a.localeCompare(b))
       .map(status => ({ value: status, label: status })),
-  [visibleOrders]);
+    [visibleOrders]);
   const exportClientOptions = useMemo<OrderExportOption[]>(() => {
     const clients = new Map<string, string>();
     visibleOrders.forEach(order => {
@@ -436,8 +437,8 @@ export default function MyOrderPage() {
       "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled",
     ];
     return [
-       { key: "All Orders", label: "All Orders", count: visibleOrders.length },
-       ...statuses.map(s => ({ key: s, label: s, count: visibleOrders.filter(o => o.status === s).length })),
+      { key: "All Orders", label: "All Orders", count: visibleOrders.length },
+      ...statuses.map(s => ({ key: s, label: s, count: visibleOrders.filter(o => o.status === s).length })),
     ];
   }, [visibleOrders]);
 
@@ -701,7 +702,7 @@ export default function MyOrderPage() {
                       onChange={toggleAll} style={{ cursor: "pointer", width: 15, height: 15 }}
                     />
                   </th>
-                  {["ORDER ID", "CLIENT", "ASSIGNED", "ORDER DATE ↓", "LAST UPDATED", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
+                  {["ORDER ID", "CLIENT", "ASSIGNED", "ORDER DATE ↓", "LAST UPDATED", "PRODUCT TYPE", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
                     <th key={h} style={thSt}>{h}</th>
                   ))}
                 </tr>
@@ -761,6 +762,22 @@ export default function MyOrderPage() {
                             : <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>;
                         })()}
                       </td>
+                      <td style={tdSt}>
+                        {(() => {
+                          const types = Array.from(
+                            new Set(
+                              (order.cartItems ?? [])
+                                .map((item) => getDocumentProductType(item))
+                                .filter(Boolean),
+                            ),
+                          );
+                          return types.length > 0 ? (
+                            <span style={{ color: "hsl(var(--foreground))", fontSize: 13 }}>{types.join(", ")}</span>
+                          ) : (
+                            <span style={{ color: "hsl(var(--muted-foreground))" }}>—</span>
+                          );
+                        })()}
+                      </td>
                       <td style={tdSt}><StatusBadge status={order.status} /></td>
                       <td style={tdSt}>
                         {(() => {
@@ -781,7 +798,7 @@ export default function MyOrderPage() {
                 })}
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
+                    <td colSpan={10} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
                       No orders match the current filters.
                     </td>
                   </tr>
