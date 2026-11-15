@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X, Download } from "lucide-react";
+import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X, Download, Plus, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { validateRequiredDocumentFields } from "@/lib/documentValidation";
 import { getClients } from "@/lib/clientStore";
@@ -12,6 +12,7 @@ import {
   getNextReceiptNumber,
   downloadReceiptAttachment,
   formatAttachmentSize,
+  sendThankYouNoteEmail,
 } from "@/lib/paymentReceiptStore";
 import type { PaymentReceipt, PaymentReceiptAttachment } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
@@ -114,6 +115,7 @@ export default function NewPaymentReceiptPage() {
   const [attachments, setAttachments] = useState<PaymentReceiptAttachment[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [editingReceipt, setEditingReceipt] = useState<PaymentReceipt | null>(null);
+  const [extraEmailInput, setExtraEmailInput] = useState("");
 
   const [form, setForm] = useState<FormState>(() =>
     makeDefaultForm({
@@ -342,6 +344,58 @@ export default function NewPaymentReceiptPage() {
     };
   };
 
+  const parseValidEmails = (rawInput: string): { valid: string[]; invalid: string[] } => {
+    const parts = rawInput
+      .split(/[\s,;]+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    for (const part of parts) {
+      if (emailPattern.test(part)) valid.push(part);
+      else invalid.push(part);
+    }
+    return { valid, invalid };
+  };
+
+  const mergeUniqueEmails = (existing: string[], incoming: string[]): string[] => {
+    const seen = new Set(existing.map((e) => e.toLowerCase()));
+    const next = [...existing];
+    for (const email of incoming) {
+      const key = email.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        next.push(email);
+      }
+    }
+    return next;
+  };
+
+  const handleAddExtraEmails = () => {
+    const trimmed = extraEmailInput.trim();
+    if (!trimmed) return;
+    const { valid, invalid } = parseValidEmails(trimmed);
+    if (invalid.length > 0) {
+      toast.error(`Invalid email address: ${invalid.join(", ")}`);
+      return;
+    }
+    if (valid.length > 0) {
+      setForm((prev) => ({
+        ...prev,
+        recipients: mergeUniqueEmails(prev.recipients, valid),
+      }));
+      setExtraEmailInput("");
+    }
+  };
+
+  const handleRemoveRecipient = (emailToRemove: string) => {
+    setForm((prev) => ({
+      ...prev,
+      recipients: prev.recipients.filter((r) => r.toLowerCase() !== emailToRemove.toLowerCase()),
+    }));
+  };
+
   const handleSave = () => {
     if (
       !validateRequiredDocumentFields(
@@ -357,6 +411,16 @@ export default function NewPaymentReceiptPage() {
       return;
     }
 
+    let finalRecipients = form.recipients;
+    if (!isEditMode && form.sendThankYou && extraEmailInput.trim()) {
+      const { valid, invalid } = parseValidEmails(extraEmailInput);
+      if (invalid.length > 0) {
+        toast.error(`Invalid email address in Thank You Note: ${invalid.join(", ")}`);
+        return;
+      }
+      finalRecipients = mergeUniqueEmails(finalRecipients, valid);
+    }
+
     setSaving(true);
     try {
       const receipt = buildReceipt();
@@ -366,8 +430,15 @@ export default function NewPaymentReceiptPage() {
           ? `Receipt ${receipt.paymentNumber} updated`
           : `Receipt ${receipt.paymentNumber} saved`
       );
-      if (!isEditMode && form.sendThankYou && form.recipients.length > 0) {
-        toast.info(`Thank you note queued for ${form.recipients.join(", ")}`);
+      if (!isEditMode && form.sendThankYou) {
+        if (finalRecipients.length > 0) {
+          const emailResult = sendThankYouNoteEmail(receipt, finalRecipients);
+          if (emailResult.sentCount > 0) {
+            toast.success(`Thank you note email sent to ${emailResult.recipients.join(", ")}`);
+          }
+        } else {
+          toast.warning("Receipt saved, but no recipient email IDs were added for the Thank You Note.");
+        }
       }
       navigate("/sales/payment-receipts", { replace: true });
     } catch {
@@ -886,32 +957,75 @@ export default function NewPaymentReceiptPage() {
         {/* ── Thank You (create mode only) ── */}
         {!isEditMode && (
           <Section title="Thank You Note" icon={Heart}>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                className="mt-0.5 accent-blue-600 w-4 h-4"
-                checked={form.sendThankYou}
-                onChange={(e) => setF("sendThankYou", e.target.checked)}
-              />
-              <div>
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-blue-600 w-4 h-4"
+                  checked={form.sendThankYou}
+                  onChange={(e) => setF("sendThankYou", e.target.checked)}
+                />
                 <p className="text-sm font-medium text-gray-800">
                   Send a "Thank you" note for this payment
                 </p>
-                {form.sendThankYou && (
-                  <div className="mt-2 flex flex-wrap gap-2">
+              </label>
+
+              {form.sendThankYou && (
+                <div className="pl-7 space-y-3">
+                  <div className="flex flex-wrap gap-2">
                     {form.recipients.length === 0 ? (
-                      <p className="text-xs text-gray-400">No recipients — add customer email to send.</p>
+                      <p className="text-xs text-gray-400">
+                        No recipients yet — select a customer or add email IDs below.
+                      </p>
                     ) : (
                       form.recipients.map((r) => (
-                        <span key={r} className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
+                        <span
+                          key={r}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100"
+                        >
+                          <Mail size={12} />
                           {r}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRecipient(r)}
+                            className="text-blue-500 hover:text-blue-800 ml-0.5"
+                            aria-label={`Remove ${r}`}
+                          >
+                            <X size={12} />
+                          </button>
                         </span>
                       ))
                     )}
                   </div>
-                )}
-              </div>
-            </label>
+
+                  <div className="flex flex-col sm:flex-row gap-2 max-w-xl">
+                    <input
+                      type="text"
+                      value={extraEmailInput}
+                      onChange={(e) => setExtraEmailInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === ",") {
+                          e.preventDefault();
+                          handleAddExtraEmails();
+                        }
+                      }}
+                      placeholder="Add extra email ID(s), e.g. accounts@client.com, finance@client.com"
+                      className={inp}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddExtraEmails}
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg whitespace-nowrap transition-colors"
+                    >
+                      <Plus size={14} /> Add Email
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Press Enter or click Add Email to include multiple recipients. All listed email IDs will receive the Thank You mail when you save.
+                  </p>
+                </div>
+              )}
+            </div>
           </Section>
         )}
 

@@ -103,3 +103,47 @@ export function archiveReceipt(id: string): void {
 export function getReceiptById(id: string): PaymentReceipt | undefined {
   return getReceipts().find((r) => r.id === id);
 }
+
+const THANK_YOU_OUTBOX_KEY = "nido_payment_receipt_email_outbox";
+
+export interface PaymentReceiptEmailOutboxItem {
+  id: string;
+  receiptId: string;
+  paymentNumber: string;
+  recipients: string[];
+  subject: string;
+  amount: number;
+  createdAt: string;
+}
+
+export function sendThankYouNoteEmail(
+  receipt: PaymentReceipt,
+  recipients: string[],
+): { recipients: string[]; sentCount: number; success: boolean } {
+  const uniqueRecipients = Array.from(
+    new Set(recipients.map((email) => email.trim()).filter(Boolean)),
+  );
+  if (uniqueRecipients.length === 0) {
+    return { recipients: [], sentCount: 0, success: false };
+  }
+
+  let outbox: PaymentReceiptEmailOutboxItem[] = [];
+  try {
+    outbox = JSON.parse(localStorage.getItem(THANK_YOU_OUTBOX_KEY) || "[]") as PaymentReceiptEmailOutboxItem[];
+  } catch {
+    outbox = [];
+  }
+
+  const item: PaymentReceiptEmailOutboxItem = {
+    id: `${receipt.id}-thank-you-${Date.now()}`,
+    receiptId: receipt.id,
+    paymentNumber: receipt.paymentNumber,
+    recipients: uniqueRecipients,
+    subject: `Thank you for your payment — ${receipt.paymentNumber}`,
+    amount: receipt.amountReceived,
+    createdAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(THANK_YOU_OUTBOX_KEY, JSON.stringify([item, ...outbox].slice(0, 100)));
+  return { recipients: uniqueRecipients, sentCount: uniqueRecipients.length, success: true };
+}
