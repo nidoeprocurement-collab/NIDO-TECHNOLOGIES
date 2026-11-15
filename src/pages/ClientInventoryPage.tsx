@@ -1,7 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StoredClient } from "@/lib/clientStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { getPortalUsersByClient, type PortalUser } from "@/lib/portalUserStore";
 import { getClientCatalog } from "@/lib/clientCatalogStore";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 import { isDigitalOnlyType } from "@/lib/productTypeRules";
 import {
   type ActivityCategory,
@@ -14,6 +17,7 @@ import {
   formatTodayShort,
   getClientInventory,
   saveClientInventory,
+  syncClientInventoryFromLiveSources,
 } from "@/lib/clientInventoryStore";
 import {
   AlertCircle,
@@ -180,6 +184,11 @@ function exportRowsAsCsv(filename: string, headers: string[], rows: (string | nu
 }
 
 export default function ClientInventoryPage({ client }: Props) {
+  const { user: authUser } = useAuth();
+  const { orders } = useMyOrders();
+  const actorName = authUser?.name || "System Admin";
+  const actorRole = authUser?.role || "Admin";
+
   const [data, setData] = useState<ClientInventoryData>(() => getClientInventory(client.id));
   const [subTab, setSubTab] = useState<InventorySubTab>("available");
   const clientUsers = useMemo(
@@ -187,6 +196,28 @@ export default function ClientInventoryPage({ client }: Props) {
     [client.id],
   );
   const clientProducts = useMemo(() => getClientCatalog(client.id), [client.id]);
+
+  // Sync live platform sources (delivered/fulfilled orders, user assigned devices, repair service requests)
+  useEffect(() => {
+    const runSync = () => {
+      const synced = syncClientInventoryFromLiveSources(
+        client,
+        orders,
+        getPortalUsersByClient(client.id).filter((u) => u.status !== "inactive"),
+        getServiceRequests(),
+      );
+      setData(synced);
+    };
+    runSync();
+    window.addEventListener("serviceRequestsUpdated", runSync);
+    window.addEventListener("ordersUpdated", runSync);
+    window.addEventListener("storage", runSync);
+    return () => {
+      window.removeEventListener("serviceRequestsUpdated", runSync);
+      window.removeEventListener("ordersUpdated", runSync);
+      window.removeEventListener("storage", runSync);
+    };
+  }, [client, orders]);
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<"all" | InventoryAssetType>("all");
@@ -543,8 +574,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: "Added",
       category: "Assignments",
       details: `${newItem.quantity} ${newItem.unitLabel} added to ${newItem.location}`,
-      performedBy: "Arun Demo",
-      performedByRole: "Client Admin",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: "New",
       newStatus: "Available",
       summaryNote: `Added ${newItem.quantity} ${newItem.unitLabel} (${newItem.assetId}) to ${newItem.location}`,
@@ -580,16 +611,16 @@ export default function ClientInventoryPage({ client }: Props) {
     const updated = data.items.map((item) =>
       item.id === assignModalItem.id
         ? {
-            ...item,
-            status: "assigned" as const,
-            idleDays: 0,
-            assignedTo: assignForm.assignee.trim(),
-            employeeId: assignForm.employeeId.trim() || "EMP-0190",
-            department: assignForm.department,
-            location: assignForm.location,
-            assignedOn: formatTodayShort(),
-            usageStatus: nextStatusLabel as InventoryItemRecord["usageStatus"],
-          }
+          ...item,
+          status: "assigned" as const,
+          idleDays: 0,
+          assignedTo: assignForm.assignee.trim(),
+          employeeId: assignForm.employeeId.trim() || "EMP-0190",
+          department: assignForm.department,
+          location: assignForm.location,
+          assignedOn: formatTodayShort(),
+          usageStatus: nextStatusLabel as InventoryItemRecord["usageStatus"],
+        }
         : item,
     );
     pushActivity(updated, {
@@ -600,8 +631,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: assignModalItem.type === "Digital License" ? "Allocated" : assignModalItem.type === "Consumable" ? "Issued" : "Assigned",
       category: "Assignments",
       details: `${prevStatus} -> ${nextStatusLabel} / ${assignForm.assignee.trim()} · ${assignForm.department}`,
-      performedBy: "Arun Demo",
-      performedByRole: "Client Admin",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: prevStatus,
       newStatus: nextStatusLabel,
       summaryNote: `Assigned ${assignModalItem.name} (${assignModalItem.assetId}) to ${assignForm.assignee.trim()}`,
@@ -617,17 +648,17 @@ export default function ClientInventoryPage({ client }: Props) {
     const updated = data.items.map((item) =>
       item.id === returnModalItem.id
         ? {
-            ...item,
-            status: "available" as const,
-            condition: returnCondition,
-            idleDays: 0,
-            location: item.location.includes("Store") ? item.location : `${item.location} · Store A`,
-            assignedTo: undefined,
-            employeeId: undefined,
-            department: undefined,
-            assignedOn: undefined,
-            usageStatus: undefined,
-          }
+          ...item,
+          status: "available" as const,
+          condition: returnCondition,
+          idleDays: 0,
+          location: item.location.includes("Store") ? item.location : `${item.location} · Store A`,
+          assignedTo: undefined,
+          employeeId: undefined,
+          department: undefined,
+          assignedOn: undefined,
+          usageStatus: undefined,
+        }
         : item,
     );
     pushActivity(updated, {
@@ -638,8 +669,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: "Returned",
       category: "Returns",
       details: `In Use -> Available / ${prevOwner} · ${returnModalItem.location}`,
-      performedBy: "Arun Demo",
-      performedByRole: "Client Admin",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: "In Use",
       newStatus: "Available",
       summaryNote: `Return recorded from ${prevOwner} · Condition: ${returnCondition} · Location: ${returnModalItem.location}`,
@@ -652,17 +683,17 @@ export default function ClientInventoryPage({ client }: Props) {
     const updated = data.items.map((x) =>
       x.id === item.id
         ? {
-            ...x,
-            status: "available" as const,
-            idleDays: 0,
-            location: x.location.includes("Store") ? x.location : `${x.location} · Store A`,
-            reservationId: undefined,
-            reservedFor: undefined,
-            reservedBy: undefined,
-            reservedUntil: undefined,
-            reservationPurpose: undefined,
-            reservationStatus: undefined,
-          }
+          ...x,
+          status: "available" as const,
+          idleDays: 0,
+          location: x.location.includes("Store") ? x.location : `${x.location} · Store A`,
+          reservationId: undefined,
+          reservedFor: undefined,
+          reservedBy: undefined,
+          reservedUntil: undefined,
+          reservationPurpose: undefined,
+          reservationStatus: undefined,
+        }
         : x,
     );
     pushActivity(updated, {
@@ -673,8 +704,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: "Returned",
       category: "Reservations",
       details: `Reservation ${item.reservationId || ""} released -> Available`,
-      performedBy: "Arun Demo",
-      performedByRole: "Client Admin",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: "Reserved",
       newStatus: "Available",
       summaryNote: `Released reservation for ${item.reservedFor || "recipient"}`,
@@ -696,8 +727,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: "Transferred",
       category: "Transfers",
       details: `${prevLoc} -> ${transferLocation}`,
-      performedBy: "Neha Rao",
-      performedByRole: "Inventory Manager",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: prevLoc,
       newStatus: transferLocation,
       summaryNote: `Transferred ${transferModalItem.name} from ${prevLoc} to ${transferLocation}`,
@@ -712,15 +743,15 @@ export default function ClientInventoryPage({ client }: Props) {
     const updated = data.items.map((x) =>
       x.id === repairModalItem.id
         ? {
-            ...x,
-            status: "repair" as const,
-            repairId: x.repairId || `RPR-${String(37 + data.items.length).padStart(5, "0")}`,
-            reportedIssue: repairForm.reportedIssue || x.reportedIssue || "Hardware inspection",
-            repairProvider: repairForm.repairProvider,
-            sentOn: x.sentOn || formatTodayShort(),
-            expectedReturn: repairForm.expectedReturn,
-            repairStatus: repairForm.repairStatus,
-          }
+          ...x,
+          status: "repair" as const,
+          repairId: x.repairId || `RPR-${String(37 + data.items.length).padStart(5, "0")}`,
+          reportedIssue: repairForm.reportedIssue || x.reportedIssue || "Hardware inspection",
+          repairProvider: repairForm.repairProvider,
+          sentOn: x.sentOn || formatTodayShort(),
+          expectedReturn: repairForm.expectedReturn,
+          repairStatus: repairForm.repairStatus,
+        }
         : x,
     );
     pushActivity(updated, {
@@ -731,8 +762,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: "Repair Updated",
       category: "Repairs",
       details: `${isExistingRepair ? repairModalItem.repairStatus : "Available"} -> ${repairForm.repairStatus} / ${repairForm.repairProvider}`,
-      performedBy: "Neha Rao",
-      performedByRole: "Inventory Manager",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: isExistingRepair ? repairModalItem.repairStatus || "In Progress" : "Available",
       newStatus: repairForm.repairStatus,
       summaryNote: `Repair updated for ${repairModalItem.name} (${repairForm.repairProvider})`,
@@ -745,18 +776,18 @@ export default function ClientInventoryPage({ client }: Props) {
     const updated = data.items.map((x) =>
       x.id === item.id
         ? {
-            ...x,
-            status: "available" as const,
-            condition: "Good" as const,
-            idleDays: 0,
-            repairId: undefined,
-            reportedIssue: undefined,
-            repairProvider: undefined,
-            sentOn: undefined,
-            expectedReturn: undefined,
-            repairOverdue: undefined,
-            repairStatus: undefined,
-          }
+          ...x,
+          status: "available" as const,
+          condition: "Good" as const,
+          idleDays: 0,
+          repairId: undefined,
+          reportedIssue: undefined,
+          repairProvider: undefined,
+          sentOn: undefined,
+          expectedReturn: undefined,
+          repairOverdue: undefined,
+          repairStatus: undefined,
+        }
         : x,
     );
     pushActivity(updated, {
@@ -767,8 +798,8 @@ export default function ClientInventoryPage({ client }: Props) {
       event: "Repair Completed",
       category: "Repairs",
       details: `Under Repair -> Available / ${item.repairProvider || "Service Centre"}`,
-      performedBy: "Arun Demo",
-      performedByRole: "Client Admin",
+      performedBy: actorName,
+      performedByRole: actorRole,
       previousStatus: "Under Repair",
       newStatus: "Available",
       summaryNote: `Repair completed for ${item.name} (${item.repairId || item.assetId}) and returned to stock`,
@@ -797,11 +828,88 @@ export default function ClientInventoryPage({ client }: Props) {
     toast.success(`Exported ${source.length} inventory records`);
   };
 
-  const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    toast.success(`Imported inventory CSV "${file.name}"`);
-    e.target.value = "";
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const dataLines = lines.length > 1 && lines[0].toLowerCase().includes("name") ? lines.slice(1) : lines;
+      if (dataLines.length === 0) {
+        toast.error("CSV file is empty");
+        return;
+      }
+      const imported: InventoryItemRecord[] = [];
+      const newActs: InventoryActivityRecord[] = [];
+      let seq = data.items.length + 1;
+      let actSeq = data.activities.length + 1;
+      const defaultCity = client.billingCity || client.locationDetails?.city || "Head Office";
+
+      dataLines.forEach((line, idx) => {
+        const cols = line.split(",").map((c) => c.replace(/^"|"$/g, "").trim());
+        const itemName = cols[0];
+        if (!itemName) return;
+        const rawType = (cols[1] || "").toLowerCase();
+        const type: InventoryAssetType = rawType.includes("license")
+          ? "Digital License"
+          : rawType.includes("consum")
+            ? "Consumable"
+            : "Physical Asset";
+        const prefix = type === "Digital License" ? "LIC" : type === "Consumable" ? "STK" : "AST";
+        const assetId = `${prefix}-${String(seq++).padStart(5, "0")}`;
+        const qty = Math.max(1, parseInt(cols[5] || "1", 10) || 1);
+        const location = cols[4] || (type === "Digital License" ? "Company-wide" : `${defaultCity} · Store A`);
+        const unitLabel = type === "Digital License" ? (qty === 1 ? "seat" : "seats") : (qty === 1 ? "unit" : "units");
+
+        const item: InventoryItemRecord = {
+          id: `inv-csv-${Date.now()}-${idx}`,
+          assetId,
+          name: itemName,
+          type,
+          category: cols[2] || "General",
+          serialNumber: cols[3] || `${prefix}-${Date.now().toString().slice(-4)}-${idx}`,
+          location,
+          quantity: qty,
+          unitLabel,
+          condition: (["New", "Good", "Active", "Fair"].includes(cols[6]) ? cols[6] : "New") as InventoryItemRecord["condition"],
+          status: "available",
+          idleDays: 0,
+          warranty: "In Warranty",
+        };
+        imported.push(item);
+        newActs.push({
+          id: `act-csv-${Date.now()}-${idx}`,
+          eventId: `EVT-${String(actSeq++).padStart(5, "0")}`,
+          dateTime: formatNowDateTime(),
+          itemName: item.name,
+          assetId: item.assetId,
+          assetType: item.type,
+          location: item.location,
+          event: "Added",
+          category: "Assignments",
+          details: `CSV Import · ${qty} ${unitLabel} added to ${location}`,
+          performedBy: actorName,
+          performedByRole: actorRole,
+          previousStatus: "CSV Import",
+          newStatus: "Available",
+          summaryNote: `Imported ${item.name} (${item.assetId}) from ${file.name}`,
+        });
+      });
+
+      if (imported.length === 0) {
+        toast.error("No valid inventory rows found in CSV");
+      } else {
+        persist({
+          items: [...imported, ...data.items],
+          activities: [...newActs, ...data.activities],
+        });
+        toast.success(`Imported ${imported.length} inventory item(s) from "${file.name}"`);
+      }
+    } catch {
+      toast.error("Failed to read CSV file");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const clientCode = (client as unknown as { code?: string }).code || client.id.slice(0, 6).toUpperCase();
@@ -996,9 +1104,8 @@ export default function ClientInventoryPage({ client }: Props) {
                 key={t.id}
                 type="button"
                 onClick={() => resetFiltersForTab(t.id)}
-                className={`relative whitespace-nowrap py-3.5 text-xs font-semibold transition-colors ${
-                  active ? "text-blue-600" : "text-gray-600 hover:text-gray-900"
-                }`}
+                className={`relative whitespace-nowrap py-3.5 text-xs font-semibold transition-colors ${active ? "text-blue-600" : "text-gray-600 hover:text-gray-900"
+                  }`}
               >
                 {t.label}
                 {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
@@ -1024,11 +1131,10 @@ export default function ClientInventoryPage({ client }: Props) {
                     key={pill.key}
                     type="button"
                     onClick={() => { setTypeFilter(pill.key); setPage(1); }}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      active
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active
                         ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
                         : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {pill.icon}
                     {pill.label}
@@ -1049,11 +1155,10 @@ export default function ClientInventoryPage({ client }: Props) {
                     key={pill.key}
                     type="button"
                     onClick={() => { setRepairPill(pill.key); setPage(1); }}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      active
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active
                         ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
                         : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {pill.icon}
                     {pill.label}
@@ -1076,11 +1181,10 @@ export default function ClientInventoryPage({ client }: Props) {
                     key={pill.key}
                     type="button"
                     onClick={() => { setActivityPill(pill.key); setPage(1); }}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      active
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active
                         ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
                         : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {pill.icon}
                     {pill.label}
@@ -1358,9 +1462,8 @@ export default function ClientInventoryPage({ client }: Props) {
                       <tr
                         key={item.id}
                         onClick={() => setSelectedAssetId(item.id)}
-                        className={`border-b border-gray-100 cursor-pointer transition-colors ${
-                          isSelected ? "bg-blue-50/50" : "hover:bg-gray-50/70"
-                        }`}
+                        className={`border-b border-gray-100 cursor-pointer transition-colors ${isSelected ? "bg-blue-50/50" : "hover:bg-gray-50/70"
+                          }`}
                       >
                         <td className="pl-5 pr-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -1403,9 +1506,8 @@ export default function ClientInventoryPage({ client }: Props) {
                             <td className="px-4 py-2.5 font-semibold text-gray-800">{item.quantity} {item.unitLabel}</td>
                             <td className="px-4 py-2.5"><ConditionBadge condition={item.condition} /></td>
                             <td className="px-4 py-2.5">
-                              <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${
-                                item.idleDays > 30 ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-700"
-                              }`}>
+                              <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${item.idleDays > 30 ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-700"
+                                }`}>
                                 {item.idleDays} days
                               </span>
                             </td>
@@ -1456,9 +1558,8 @@ export default function ClientInventoryPage({ client }: Props) {
                             </td>
                             <td className="px-4 py-2.5 text-gray-700">{item.assignedOn}</td>
                             <td className="px-4 py-2.5">
-                              <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${
-                                item.usageStatus === "Issued" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"
-                              }`}>
+                              <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${item.usageStatus === "Issued" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"
+                                }`}>
                                 {item.usageStatus || "In Use"}
                               </span>
                             </td>
@@ -1501,11 +1602,10 @@ export default function ClientInventoryPage({ client }: Props) {
                             </td>
                             <td className="px-4 py-2.5 text-gray-700">{item.reservedUntil}</td>
                             <td className="px-4 py-2.5">
-                              <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${
-                                item.reservationStatus === "Expiring Soon"
+                              <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${item.reservationStatus === "Expiring Soon"
                                   ? "bg-amber-50 text-amber-700"
                                   : "bg-purple-50 text-purple-700"
-                              }`}>
+                                }`}>
                                 {item.reservationStatus || "Reserved"}
                               </span>
                             </td>
@@ -1612,9 +1712,8 @@ export default function ClientInventoryPage({ client }: Props) {
                       <tr
                         key={act.id}
                         onClick={() => setSelectedEventId(act.id)}
-                        className={`border-b border-gray-100 cursor-pointer transition-colors ${
-                          isSelected ? "bg-blue-50/50" : "hover:bg-gray-50/70"
-                        }`}
+                        className={`border-b border-gray-100 cursor-pointer transition-colors ${isSelected ? "bg-blue-50/50" : "hover:bg-gray-50/70"
+                          }`}
                       >
                         <td className="pl-5 pr-4 py-2.5 text-gray-600">
                           <span className="inline-flex items-center gap-2">
@@ -1840,7 +1939,7 @@ export default function ClientInventoryPage({ client }: Props) {
               <>
                 <DetailStat label="Reservation" value={selectedAsset.reservationId || "—"} />
                 <DetailStat label="Reserved For" value={`${selectedAsset.reservedFor || "—"} / ${selectedAsset.department || "—"}`} />
-                <DetailStat label="Reserved By" value={selectedAsset.reservedBy || "Arun Demo"} />
+                <DetailStat label="Reserved By" value={selectedAsset.reservedBy || actorName} />
                 <DetailStat label="Location" value={selectedAsset.location} />
                 <DetailStat label="Reserved Until" value={selectedAsset.reservedUntil || "—"} />
               </>
