@@ -3613,6 +3613,19 @@ export default function MyOrderPage() {
     vendorNotes?: string;
     vendorDocument?: any;
   } | null>(null);
+  const [viewingProvisionDetails, setViewingProvisionDetails] = useState<{
+    itemName: string;
+    details: {
+      method: "activated" | "key_received_via_mail";
+      howActivated?: string;
+      activatedAt?: string;
+      notes?: string;
+      recipients?: string[];
+      documentName?: string;
+      documentDataUrl?: string;
+      savedAt?: string;
+    };
+  } | null>(null);
   const [provisionedUploadPrompt, setProvisionedUploadPrompt] = useState<{ subId: string; itemName: string } | null>(null);
   const [licenseUploadRequest, setLicenseUploadRequest] = useState<{ id: number; itemName: string } | null>(null);
 
@@ -3963,6 +3976,13 @@ export default function MyOrderPage() {
       const deliveryDetails = {
         deliveryMode: "Activated" as const,
         deliveryEmail: "",
+        provisioningDetails: {
+          method: "activated" as const,
+          howActivated: payload.howActivated || "",
+          activatedAt: payload.activatedAt || "",
+          notes: payload.notes || "",
+          savedAt: new Date().toLocaleDateString("en-IN"),
+        },
       };
       if (target.advanceStatus) {
         updateStatus(target.subId, "Provisioned", deliveryDetails);
@@ -4024,6 +4044,13 @@ export default function MyOrderPage() {
     const deliveryDetails = {
       deliveryMode: "Email" as const,
       deliveryEmail: recipients.join(", "),
+      provisioningDetails: {
+        method: "key_received_via_mail" as const,
+        notes: payload.notes || "",
+        recipients,
+        documentName: doc?.name || "",
+        savedAt: new Date().toLocaleDateString("en-IN"),
+      },
     };
     if (target.advanceStatus) {
       updateStatus(target.subId, "Provisioned", deliveryDetails);
@@ -5685,6 +5712,43 @@ export default function MyOrderPage() {
                           </button>
                         ) : <StatusPill status={sub.itemStatus} compact />}
                         <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div>
+                        {subIsDigital && (sub.itemStatus === "Provisioned" || sub.itemStatus === "Activated" || sub.itemStatus === "Completed") && (() => {
+                          const poLine = canonicalPO?.items?.find((li: any) => li.subOrderId === sub.id) || canonicalPO?.items?.[0];
+                          const vp = (sub as any).provisioningDetails || poLine?.provisioningDetails;
+                          if (!vp) return null;
+                          const matchedVendorDoc = vp.documentName
+                            ? canonicalPO?.documents?.find((d: any) => d.name === vp.documentName)
+                            : undefined;
+                          return (
+                            <div style={{ marginTop: 5 }}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setViewingProvisionDetails({
+                                    itemName: sub.itemName,
+                                    details: {
+                                      ...vp,
+                                      documentDataUrl: matchedVendorDoc?.dataUrl,
+                                    },
+                                  })
+                                }
+                                style={{
+                                  padding: "2px 8px",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: "#2563eb",
+                                  background: "#eff6ff",
+                                  border: "1px solid #bfdbfe",
+                                  borderRadius: 5,
+                                  cursor: "pointer",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                More
+                              </button>
+                            </div>
+                          );
+                        })()}
                         {(sub as any).cancelReason && (
                           <div style={{ fontSize: 10.5, color: "#991b1b", marginTop: 3, fontStyle: "italic", lineHeight: 1.4 }}>Reason: {(sub as any).cancelReason}</div>
                         )}
@@ -6180,6 +6244,107 @@ export default function MyOrderPage() {
           onSave={saveProvisionedDelivery}
           onClose={() => setProvisionedDeliveryTarget(null)}
         />
+      )}
+      {viewingProvisionDetails && (
+        <Overlay onClose={() => setViewingProvisionDetails(null)}>
+          <ModalBox title="Provisioning Details" onClose={() => setViewingProvisionDetails(null)} width={480}>
+            <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, fontSize: 13 }}>
+              <div style={{ fontSize: 13, color: "#4b5563" }}>
+                Item: <strong style={{ color: "#111827" }}>{viewingProvisionDetails.itemName}</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: 10, borderBottom: "1px solid #f3f4f6" }}>
+                <span style={{ color: "#6b7280", fontWeight: 500 }}>Provisioning Method</span>
+                <span style={{ fontWeight: 600, color: "#1d4ed8" }}>
+                  {viewingProvisionDetails.details.method === "activated" ? "Activated" : "Key received via mail"}
+                </span>
+              </div>
+              {viewingProvisionDetails.details.method === "activated" ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>How was it activated</span>
+                    <span style={{ fontWeight: 600, color: "#111827", textAlign: "right" }}>
+                      {viewingProvisionDetails.details.howActivated || "—"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Activated On</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>
+                      {viewingProvisionDetails.details.activatedAt || "—"}
+                    </span>
+                  </div>
+                  {viewingProvisionDetails.details.notes && (
+                    <div>
+                      <div style={{ color: "#6b7280", fontWeight: 500, marginBottom: 4 }}>Additional Details</div>
+                      <div style={{ padding: "10px 12px", borderRadius: 8, background: "#f9fafb", border: "1px solid #e5e7eb", color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                        {viewingProvisionDetails.details.notes}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {viewingProvisionDetails.details.recipients && viewingProvisionDetails.details.recipients.length > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                      <span style={{ color: "#6b7280", fontWeight: 500 }}>Sent To</span>
+                      <span style={{ fontWeight: 600, color: "#111827", textAlign: "right" }}>
+                        {viewingProvisionDetails.details.recipients.join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ color: "#6b7280", fontWeight: 500, marginBottom: 4 }}>Key / Mail Details</div>
+                    <div style={{ padding: "10px 12px", borderRadius: 8, background: "#f9fafb", border: "1px solid #e5e7eb", color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      {viewingProvisionDetails.details.notes || "—"}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Key Document</span>
+                    {(() => {
+                      const docName = viewingProvisionDetails.details.documentName;
+                      let dataUrl = viewingProvisionDetails.details.documentDataUrl;
+                      if (!dataUrl && docName) {
+                        try {
+                          const orderDocs = JSON.parse(localStorage.getItem(`nido_order_docs_${orderId}`) || "[]");
+                          const found = Array.isArray(orderDocs) ? orderDocs.find((d: any) => d.name === docName) : undefined;
+                          dataUrl = found?.dataUrl;
+                        } catch {
+                          // ignore storage errors
+                        }
+                      }
+                      if (dataUrl && docName) {
+                        return (
+                          <a
+                            href={dataUrl}
+                            download={docName}
+                            style={{ color: "#2563eb", fontWeight: 600, textDecoration: "underline" }}
+                          >
+                            {docName}
+                          </a>
+                        );
+                      }
+                      return <span style={{ fontWeight: 600, color: "#111827" }}>{docName || "—"}</span>;
+                    })()}
+                  </div>
+                </>
+              )}
+              {viewingProvisionDetails.details.savedAt && (
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, borderTop: "1px solid #f3f4f6", fontSize: 12 }}>
+                  <span style={{ color: "#6b7280" }}>Saved On</span>
+                  <span style={{ color: "#374151", fontWeight: 500 }}>{viewingProvisionDetails.details.savedAt}</span>
+                </div>
+              )}
+            </div>
+            <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", background: "#f9fafb" }}>
+              <button
+                type="button"
+                onClick={() => setViewingProvisionDetails(null)}
+                style={{ padding: "7px 18px", borderRadius: 7, border: "1px solid #d1d5db", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Close
+              </button>
+            </div>
+          </ModalBox>
+        </Overlay>
       )}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
       {pendingItemDelivered && (

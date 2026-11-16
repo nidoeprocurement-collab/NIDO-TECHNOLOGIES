@@ -1271,6 +1271,18 @@ export default function VendorOrderDetailPage() {
   const [noteVisibility, setNoteVisibility] = useState("Internal Note");
   const [cancelled, setCancelled] = useState(false);
   const [poCancelReason, setPoCancelReason] = useState<string>(() => getPOByNumber(poKey)?.cancelReason || "");
+  const [viewingProvisionDetails, setViewingProvisionDetails] = useState<{
+    itemName: string;
+    status: string;
+    details: {
+      method: "activated" | "key_received_via_mail";
+      howActivated?: string;
+      activatedAt?: string;
+      notes?: string;
+      documentName?: string;
+      savedAt?: string;
+    };
+  } | null>(null);
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{
     id: string;
     name: string;
@@ -2281,18 +2293,31 @@ export default function VendorOrderDetailPage() {
                       Reason: {(item as any).cancelReason}
                     </div>
                   )}
-                  {(item as any).provisioningDetails && (
-                    <div style={{ fontSize: 11, color: "#047857", marginTop: 5, lineHeight: 1.4 }}>
-                      {(item as any).provisioningDetails.method === "activated" ? (
-                        <>
-                          <strong>Activated:</strong> {(item as any).provisioningDetails.howActivated}
-                          {(item as any).provisioningDetails.activatedAt && ` · ${(item as any).provisioningDetails.activatedAt}`}
-                        </>
-                      ) : (
-                        <>
-                          <strong>Key via Mail:</strong> {(item as any).provisioningDetails.documentName || "Details saved"}
-                        </>
-                      )}
+                  {isDigitalDocumentProduct(item) && item.status === "Provisioned" && (item as any).provisioningDetails && (
+                    <div style={{ marginTop: 5 }}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewingProvisionDetails({
+                            itemName: item.name,
+                            status: item.status,
+                            details: (item as any).provisioningDetails,
+                          })
+                        }
+                        style={{
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#2563eb",
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          borderRadius: 5,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        More
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2603,6 +2628,102 @@ export default function VendorOrderDetailPage() {
           onSave={confirmItemProvisioned}
           onClose={() => setPendingProvisionItem(null)}
         />
+      )}
+      {viewingProvisionDetails && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 550, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setViewingProvisionDetails(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 12, width: 480, maxWidth: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.2)", overflow: "hidden" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", borderBottom: "1px solid #f3f4f6" }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Provisioning Details</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{viewingProvisionDetails.itemName}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingProvisionDetails(null)}
+                style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, fontSize: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: 10, borderBottom: "1px solid #f3f4f6" }}>
+                <span style={{ color: "#6b7280", fontWeight: 500 }}>Provisioning Method</span>
+                <span style={{ fontWeight: 600, color: "#1d4ed8" }}>
+                  {viewingProvisionDetails.details.method === "activated" ? "Activated" : "Key received via mail"}
+                </span>
+              </div>
+
+              {viewingProvisionDetails.details.method === "activated" ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>How was it activated</span>
+                    <span style={{ fontWeight: 600, color: "#111827", textAlign: "right" }}>
+                      {viewingProvisionDetails.details.howActivated || "—"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Activated On</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>
+                      {viewingProvisionDetails.details.activatedAt || "—"}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ color: "#6b7280", fontWeight: 500, marginBottom: 4 }}>Key / Mail Details</div>
+                    <div style={{ padding: "10px 12px", borderRadius: 8, background: "#f9fafb", border: "1px solid #e5e7eb", color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      {viewingProvisionDetails.details.notes || "—"}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Key Document</span>
+                    {(() => {
+                      const docName = viewingProvisionDetails.details.documentName;
+                      const matchedDoc = docName ? documents.find(d => d.name === docName) : undefined;
+                      if (matchedDoc?.dataUrl) {
+                        return (
+                          <a
+                            href={matchedDoc.dataUrl}
+                            download={matchedDoc.name}
+                            style={{ color: "#2563eb", fontWeight: 600, textDecoration: "underline" }}
+                          >
+                            {docName}
+                          </a>
+                        );
+                      }
+                      return <span style={{ fontWeight: 600, color: "#111827" }}>{docName || "—"}</span>;
+                    })()}
+                  </div>
+                </>
+              )}
+
+              {viewingProvisionDetails.details.savedAt && (
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, borderTop: "1px solid #f3f4f6", fontSize: 12 }}>
+                  <span style={{ color: "#6b7280" }}>Saved On</span>
+                  <span style={{ color: "#374151", fontWeight: 500 }}>{viewingProvisionDetails.details.savedAt}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", background: "#f9fafb" }}>
+              <button
+                type="button"
+                onClick={() => setViewingProvisionDetails(null)}
+                style={{ padding: "7px 18px", borderRadius: 7, border: "1px solid #d1d5db", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {showEditAssignment && (
         <EditAssignmentModal
