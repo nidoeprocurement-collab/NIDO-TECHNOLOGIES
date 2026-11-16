@@ -2664,16 +2664,22 @@ export default function VendorOrderDetailPage() {
               {viewingProvisionDetails.details.method === "activated" ? (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span style={{ color: "#6b7280", fontWeight: 500 }}>How was it activated</span>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>How was it activated?</span>
                     <span style={{ fontWeight: 600, color: "#111827", textAlign: "right" }}>
                       {viewingProvisionDetails.details.howActivated || "—"}
                     </span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Activated On</span>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>When was it done?</span>
                     <span style={{ fontWeight: 600, color: "#111827" }}>
                       {viewingProvisionDetails.details.activatedAt || "—"}
                     </span>
+                  </div>
+                  <div>
+                    <div style={{ color: "#6b7280", fontWeight: 500, marginBottom: 4 }}>Activation Details / Notes</div>
+                    <div style={{ padding: "10px 12px", borderRadius: 8, background: "#f9fafb", border: "1px solid #e5e7eb", color: "#111827", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      {viewingProvisionDetails.details.notes || "—"}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -2685,22 +2691,48 @@ export default function VendorOrderDetailPage() {
                     </div>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Key Document</span>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Uploaded File</span>
                     {(() => {
                       const docName = viewingProvisionDetails.details.documentName;
                       const matchedDoc = docName ? documents.find(d => d.name === docName) : undefined;
-                      if (matchedDoc?.dataUrl) {
-                        return (
-                          <a
-                            href={matchedDoc.dataUrl}
-                            download={matchedDoc.name}
-                            style={{ color: "#2563eb", fontWeight: 600, textDecoration: "underline" }}
-                          >
-                            {docName}
-                          </a>
-                        );
-                      }
-                      return <span style={{ fontWeight: 600, color: "#111827" }}>{docName || "—"}</span>;
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontWeight: 600, color: "#111827" }}>{docName || "—"}</span>
+                          {matchedDoc?.dataUrl && docName && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const link = document.createElement("a");
+                                link.href = matchedDoc.dataUrl!;
+                                link.download = docName;
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+                                const activity = makePOActivity(
+                                  `Downloaded provisioning key file "${docName}" for ${viewingProvisionDetails.itemName}.`,
+                                  "activity",
+                                  `activity_doc_download_${poKey}_${Date.now()}`,
+                                );
+                                appendPOActivity(poKey, activity);
+                                setNotes(prev => [activity, ...prev]);
+                              }}
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                border: "1px solid #bfdbfe",
+                                background: "#eff6ff",
+                                color: "#2563eb",
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              Download
+                            </button>
+                          )}
+                        </div>
+                      );
                     })()}
                   </div>
                 </>
