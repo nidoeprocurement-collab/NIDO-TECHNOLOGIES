@@ -1267,22 +1267,9 @@ function ConfiguredServiceProductCard({
               <p className="mt-5 rounded-lg bg-gray-50 px-3 py-4 text-xs text-gray-500">This service has no additional configuration fields in the catalogue.</p>
             )}
 
-            <div className="mt-5 flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Price / Unit</p>
-                <p className="text-base font-bold text-gray-900">
-                  {selectedVendor && draftEstimatedPrice > 0 ? formatCurrency(draftEstimatedPrice) : selectedVendor ? "Custom Quote" : "Select a vendor"}
-                </p>
-                {selectedVendor && draftConfigurationPriceAdjustment !== 0 && (
-                  <p className={`text-[10px] ${draftConfigurationPriceAdjustment > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                    {draftConfigurationPriceAdjustment > 0 ? "+" : ""}{formatCurrency(draftConfigurationPriceAdjustment)} from configuration
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2">
+            <div className="mt-5 flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
               <button type="button" onClick={() => setConfigOpen(false)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
               <button type="button" onClick={() => { setConfiguration({ ...draftConfiguration }); setConfigOpen(false); }} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">Save Configuration</button>
-              </div>
             </div>
           </div>
         </div>

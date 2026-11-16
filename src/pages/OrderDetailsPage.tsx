@@ -33,7 +33,10 @@ import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { getCartTaxRate } from "@/lib/vendorCartPricing";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import {
+  computeClientSellingPriceExclGst,
   computeVendorComparisons,
+  getLandedCost,
+  getVendorCommonSettings,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
@@ -222,7 +225,7 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
   }
 }
 
-function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], onSelect, onClose }) {
+function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVendorIds = [], onSelect, onClose }) {
   const isDigital = isDigitalDocumentProduct(sub);
   const digitalProductType = getProductType(sub.commercialTerms?.productType || sub.productType);
   const clientConfigEntries = useMemo(
@@ -235,10 +238,47 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
 
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
-    return computeVendorComparisons(sub.productCode, undefined, true)
+    return computeVendorComparisons(sub.productCode, sub.category, true)
       .filter(vendor => !excludedVendorIds.includes(vendor.vendorId))
       .slice(0, 4);
-  }, [sub.productCode, excludedVendorIds]);
+  }, [sub.productCode, sub.category, excludedVendorIds]);
+
+  const getVendorConfigAdjustment = (c: VendorComparisonRow): number => {
+    if (!isDigital || clientConfigEntries.length === 0) return 0;
+    const vendorVars = Array.isArray(c.variations) ? c.variations : [];
+    if (vendorVars.length === 0) return Number(sub.configurationPriceAdjustment) || 0;
+    let totalAdj = 0;
+    for (const [cfgName, cfgVal] of clientConfigEntries) {
+      const matchedVar = vendorVars.find(
+        (v) => v.name.trim().toLowerCase() === cfgName.trim().toLowerCase(),
+      );
+      if (!matchedVar) continue;
+      const valLower = String(cfgVal).trim().toLowerCase();
+      const matchedOpt = (matchedVar.options || []).find((opt) => {
+        const optLower = opt.label.trim().toLowerCase();
+        return optLower === valLower || valLower.startsWith(optLower);
+      });
+      if (matchedOpt) totalAdj += Number(matchedOpt.priceAdjustment) || 0;
+    }
+    return totalAdj;
+  };
+
+  const getClientSellingUnitPrice = (c: VendorComparisonRow): number => {
+    const configAdj = getVendorConfigAdjustment(c);
+    const effectiveVendorPrice = Math.max(0, c.basePrice + configAdj);
+    const effectiveVendorLandedCost =
+      configAdj !== 0 || isDigital
+        ? getLandedCost(effectiveVendorPrice, getVendorCommonSettings(c.vendorId), sub.category || "")
+        : c.landedCostPerUnit;
+    return clientId
+      ? computeClientSellingPriceExclGst(
+          clientId,
+          sub.productCode || "",
+          sub.category || "",
+          effectiveVendorLandedCost,
+        )
+      : effectiveVendorLandedCost;
+  };
 
   const validateDigitalVendor = (c: VendorComparisonRow): { ok: boolean; missing: string[]; reason: string } => {
     if (!isDigital) return { ok: true, missing: [], reason: "" };
@@ -544,7 +584,8 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                 const moqOk = qty === 0 || qty >= moqVal;
                 const lt = splitLT(c.leadTime);
                 const digitalLt = formatLeadTimeByType(c.leadTime, digitalProductType);
-                const lineTotal = c.landedCostPerUnit * qty;
+                const clientUnitPrice = getClientSellingUnitPrice(c);
+                const lineTotal = clientUnitPrice * qty;
                 const isLowest = i === 0;
                 const vendorVars = Array.isArray(c.variations) ? c.variations : [];
 
@@ -577,7 +618,7 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
 
                     {/* Client Selling Price */}
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(clientUnitPrice)}</div>
                     </div>
 
                     {isDigital ? (
@@ -747,13 +788,14 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                 </div>
                 {selectedComps.map((c, i) => {
                   const q = rowQtys[c.vendorId] || 0;
+                  const unitClientPrice = getClientSellingUnitPrice(c);
                   return (
                     <div key={c.vendorId} style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 1fr 130px", padding: "10px 16px", alignItems: "center", borderBottom: i < selectedComps.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ fontSize: 12.5, color: "#6b7280" }}>{i + 1}</div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.vendorName}</div>
                       <div style={{ fontSize: 13, color: "#374151" }}>{q} Nos</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(c.landedCostPerUnit * q)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{fmt(unitClientPrice)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(unitClientPrice * q)}</div>
                     </div>
                   );
                 })}
@@ -764,7 +806,7 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{totalAllocated} Nos</div>
                   <div />
                   <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
-                    {fmt(selectedComps.reduce((s, c) => s + c.landedCostPerUnit * (rowQtys[c.vendorId] || 0), 0))}
+                    {fmt(selectedComps.reduce((s, c) => s + getClientSellingUnitPrice(c) * (rowQtys[c.vendorId] || 0), 0))}
                   </div>
                 </div>
               </div>
@@ -6404,8 +6446,9 @@ export default function MyOrderPage() {
       {vendorTarget && (
         <VendorSelectionModal
           sub={vendorTarget}
+          clientId={orderClientId || clientInfo?.id || ""}
           selectedVendorId={vendorTarget.selectedVendorId}
-           excludedVendorIds={vendorTarget.previousVendorId ? [vendorTarget.previousVendorId] : []}
+          excludedVendorIds={vendorTarget.previousVendorId ? [vendorTarget.previousVendorId] : []}
           onSelect={handleVendorSelection}
           onClose={() => setVendorTarget(null)}
         />
