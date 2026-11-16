@@ -409,6 +409,7 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
       vendorId,
       vendorName: c?.vendorName || vendorId,
       unitPrice: c?.landedCostPerUnit || 0,
+      clientSellingPriceExclGst: c ? getClientSellingUnitPrice(c) : 0,
       location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : "",
       gstin: v?.taxId || (v as any)?.pan || "",
       contact: v?.primaryContact || "",
@@ -4572,6 +4573,29 @@ export default function MyOrderPage() {
     const previousSubOrder = subOrders.find(sub => sub.id === subId);
     const wasCancelled = previousSubOrder?.itemStatus === "Cancelled";
     const needsReplacementPO = Boolean(cancelledPO) && !wasCancelled;
+
+    const newClientSellingPriceExclGst =
+      typeof meta.clientSellingPriceExclGst === "number" &&
+      Number.isFinite(meta.clientSellingPriceExclGst) &&
+      meta.clientSellingPriceExclGst > 0
+        ? meta.clientSellingPriceExclGst
+        : undefined;
+    const existingDiscountPct = Math.max(
+      0,
+      Math.min(99.99, Number(currentSubOrder?.cartDiscountPct) || 0),
+    );
+    const newDiscountedClientExclGst =
+      newClientSellingPriceExclGst !== undefined
+        ? newClientSellingPriceExclGst * (1 - existingDiscountPct / 100)
+        : undefined;
+    const existingTaxRate =
+      Number(currentSubOrder?.taxRate) ||
+      getEffectiveTaxPctForCategory(currentSubOrder?.category || "");
+    const newDiscountedClientInclusive =
+      newDiscountedClientExclGst !== undefined
+        ? newDiscountedClientExclGst * (1 + existingTaxRate / 100)
+        : undefined;
+
     setSubOrders(prev => prev.map(sub => sub.id === subId
       ? {
           ...sub,
@@ -4581,6 +4605,13 @@ export default function MyOrderPage() {
           vendorInitial: vendorName[0]?.toUpperCase() || "V",
           vendorSelectionMeta: meta,
           stockAllocations: allocations,
+          ...(newClientSellingPriceExclGst !== undefined
+            ? {
+                originalUnitPriceExclGst: newClientSellingPriceExclGst,
+                unitPriceExclGst: newDiscountedClientExclGst,
+                unitPriceInclusive: newDiscountedClientInclusive,
+              }
+            : {}),
           itemStatus: wasCancelled ? "Pending" : sub.itemStatus,
           cancelReason: wasCancelled ? undefined : sub.cancelReason,
           tracking: wasCancelled ? null : sub.tracking,
@@ -4608,6 +4639,13 @@ export default function MyOrderPage() {
                 selectedVendorName: vendorName,
                 vendorPrice: meta.unitPrice,
                 landedCost: meta.unitPrice,
+                ...(newClientSellingPriceExclGst !== undefined
+                  ? {
+                      clientSellingPriceExclGst: newClientSellingPriceExclGst,
+                      checkoutUnitPriceExclGst: newDiscountedClientExclGst,
+                      checkoutUnitPriceInclusive: newDiscountedClientInclusive,
+                    }
+                  : {}),
                 vendorAllocations: allocations,
               }
           ),
