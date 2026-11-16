@@ -47,7 +47,7 @@ import {
   getAvailabilityLabel,
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
-import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
+import { formatLeadTimeByType, getProductType, isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
 import { getOrderProductTypeMetadata } from "@/lib/orderProductType";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import {
@@ -223,6 +223,16 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
 }
 
 function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], onSelect, onClose }) {
+  const isDigital = isDigitalDocumentProduct(sub);
+  const digitalProductType = getProductType(sub.commercialTerms?.productType || sub.productType);
+  const clientConfigEntries = useMemo(
+    () =>
+      Object.entries((sub.configuration || {}) as Record<string, string>).filter(
+        ([k, v]) => Boolean(k && v),
+      ),
+    [sub.configuration],
+  );
+
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
     return computeVendorComparisons(sub.productCode, undefined, true)
@@ -230,8 +240,50 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
       .slice(0, 4);
   }, [sub.productCode, excludedVendorIds]);
 
+  const validateDigitalVendor = (c: VendorComparisonRow): { ok: boolean; missing: string[]; reason: string } => {
+    if (!isDigital) return { ok: true, missing: [], reason: "" };
+    if (c.digitalAvailability === "not_available") {
+      return {
+        ok: false,
+        missing: [],
+        reason: "Product is marked Not Available (No Stock) for this vendor.",
+      };
+    }
+    if (clientConfigEntries.length === 0) {
+      return { ok: true, missing: [], reason: "" };
+    }
+    const vendorVars = Array.isArray(c.variations) ? c.variations : [];
+    const missing: string[] = [];
+    for (const [cfgName, cfgVal] of clientConfigEntries) {
+      const matchedVar = vendorVars.find(
+        (v) => v.name.trim().toLowerCase() === cfgName.trim().toLowerCase(),
+      );
+      if (!matchedVar) {
+        missing.push(`${cfgName}: ${cfgVal}`);
+        continue;
+      }
+      const valLower = String(cfgVal).trim().toLowerCase();
+      const matchedOpt = (matchedVar.options || []).find((opt) => {
+        const optLower = opt.label.trim().toLowerCase();
+        return optLower === valLower || valLower.startsWith(optLower);
+      });
+      if (!matchedOpt) {
+        missing.push(`${cfgName}: ${cfgVal}`);
+      }
+    }
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        missing,
+        reason: `Selected configuration (${missing.join(", ")}) is not available with this vendor.`,
+      };
+    }
+    return { ok: true, missing: [], reason: "" };
+  };
+
   // Use the stock value exactly as entered in vendor product assignment.
-  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
+  const getVendorStock = (c: VendorComparisonRow): number =>
+    isDigital ? (c.digitalAvailability === "not_available" ? 0 : Math.max(sub.qty, 999999)) : c.stock;
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -266,6 +318,15 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
   );
 
   const handleToggleCheck = (vendorId: string) => {
+    const comp = comparisons.find(x => x.vendorId === vendorId);
+    if (comp && !checkedSet.has(vendorId)) {
+      const check = validateDigitalVendor(comp);
+      if (!check.ok) {
+        toast.error(`${comp.vendorName} cannot be selected: ${check.reason}`);
+        setDetailVendorId(vendorId);
+        return;
+      }
+    }
     // An order item has exactly one vendor. The vendor selected in Shop is
     // carried into this view; this picker is only for replacing that vendor
     // while its PO is still Draft. Never split one item across vendors here.
@@ -279,6 +340,14 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
   };
 
   const handleQtyChange = (vendorId: string, val: number) => {
+    const comp = comparisons.find(x => x.vendorId === vendorId);
+    if (comp && val > 0) {
+      const check = validateDigitalVendor(comp);
+      if (!check.ok) {
+        toast.error(`${comp.vendorName} cannot be selected: ${check.reason}`);
+        return;
+      }
+    }
     const n = Math.max(0, val);
     setRowQtys({ [vendorId]: n });
     setCheckedSet(n > 0 ? new Set([vendorId]) : new Set());
@@ -332,11 +401,11 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
   const detailVendorInfo = detailVendorId ? getVendorById(detailVendorId) : undefined;
   const canConfirm = selectedComps.length > 0 && totalAllocated === sub.qty;
 
-  // 15-column grid: cb | # | Vendor | Price | Current | Reserved | Available | LeadTime | Rating | OnTime | PayTerms | MOQ | Score | AllocQty | Total.
-  // Every table row uses this exact template so grouped headers, subheaders, and cells
-  // remain vertically aligned even when the full table needs horizontal scrolling.
-  const TABLE_MIN_WIDTH = 1180;
-  const GRID = "36px 32px minmax(150px, 1fr) 100px 72px 72px 72px 110px 62px 72px 106px 56px 60px 106px 90px";
+  // 15-column grid for physical; 13-column grid for digital (Availability + Provisioning Time + Variations, no Score).
+  const TABLE_MIN_WIDTH = isDigital ? 1160 : 1180;
+  const GRID = isDigital
+    ? "36px 32px minmax(150px, 1fr) 100px 104px 116px minmax(190px, 1.3fr) 62px 72px 106px 64px 106px 90px"
+    : "36px 32px minmax(150px, 1fr) 100px 72px 72px 72px 110px 62px 72px 106px 56px 60px 106px 90px";
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.48)", zIndex: 600, display: "flex", alignItems: "stretch", justifyContent: "stretch" }} onClick={onClose}>
@@ -373,8 +442,25 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
           ))}
         </div>
 
-        {/* ── Split-required / stock warning banner ── */}
-            {comparisons.length > 0 && totalAvailable < sub.qty && (
+        {/* ── Client-selected configuration banner (Digital) OR Split-required / stock warning banner (Physical) ── */}
+        {isDigital && clientConfigEntries.length > 0 && (
+          <div style={{ padding: "10px 24px", background: "#eff6ff", borderBottom: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1e40af" }}>
+              Client Selected Configuration (Shop):
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {clientConfigEntries.map(([label, val]) => (
+                <span
+                  key={label}
+                  style={{ fontSize: 11.5, background: "#fff", border: "1px solid #93c5fd", color: "#1e3a8a", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}
+                >
+                  {label}: {val}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {!isDigital && comparisons.length > 0 && totalAvailable < sub.qty && (
           <div style={{ padding: "10px 24px", background: totalAvailable < sub.qty ? "#fef2f2" : "#fffbeb", borderBottom: "1px solid " + (totalAvailable < sub.qty ? "#fecaca" : "#fde68a"), display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 16 }}>{totalAvailable < sub.qty ? "⚠️" : "ℹ️"}</span>
             <div>
@@ -401,10 +487,19 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                 <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }}>#</div>
                 <div style={{ padding: "9px 12px", textAlign: "left", borderRight: "1px solid #e5e7eb" }}>Vendor</div>
                 <div style={{ padding: "9px 6px", background: "#fffbeb", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Price (₹)</div>
-                <div style={{ padding: "9px 6px", gridColumn: "span 4", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Stock Breakdown &amp; Delivery</div>
+                {isDigital ? (
+                  <>
+                    <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Availability &amp; Delivery</div>
+                    <div style={{ padding: "9px 6px", background: "#eef2ff", color: "#4338ca", borderRight: "1px solid #e5e7eb" }}>Variations</div>
+                  </>
+                ) : (
+                  <div style={{ padding: "9px 6px", gridColumn: "span 4", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Stock Breakdown &amp; Delivery</div>
+                )}
                 <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#f0fdf4", color: "#15803d", borderRight: "1px solid #e5e7eb" }}>Vendor Performance</div>
                 <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#faf5ff", color: "#7e22ce", borderRight: "1px solid #e5e7eb" }}>Commercial Terms</div>
-                <div style={{ padding: "9px 6px", background: "#fef3c7", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Score</div>
+                {!isDigital && (
+                  <div style={{ padding: "9px 6px", background: "#fef3c7", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Score</div>
+                )}
                 <div style={{ padding: "9px 6px", borderRight: "1px solid #e5e7eb" }}>Allocate Qty</div>
                 <div style={{ padding: "9px 6px" }}>Total (₹)</div>
               </div>
@@ -415,15 +510,25 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                 <div style={{ padding: "6px 0" }} />
                 <div style={{ padding: "6px 12px", textAlign: "left" }} />
                 <div style={{ padding: "6px 4px", background: "#fffef5" }}>Client Price<br />(Per Unit)</div>
-                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Current<br />Stock</div>
-                <div style={{ padding: "6px 4px", background: "#fff7ed", color: "#c2410c" }}>Already<br />Reserved</div>
-                <div style={{ padding: "6px 4px", background: "#f0fdf4", color: "#166534" }}>Available<br />Stock</div>
-                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Lead Time<br />(Dispatch + Transit)</div>
+                {isDigital ? (
+                  <>
+                    <div style={{ padding: "6px 4px", background: "#f0fdf4", color: "#166534" }}>Availability</div>
+                    <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Provisioning<br />Time</div>
+                    <div style={{ padding: "6px 4px", background: "#eef2ff", color: "#4338ca" }}>Vendor Configured<br />Variations</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Current<br />Stock</div>
+                    <div style={{ padding: "6px 4px", background: "#fff7ed", color: "#c2410c" }}>Already<br />Reserved</div>
+                    <div style={{ padding: "6px 4px", background: "#f0fdf4", color: "#166534" }}>Available<br />Stock</div>
+                    <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Lead Time<br />(Dispatch + Transit)</div>
+                  </>
+                )}
                 <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>Rating</div>
                 <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>On-Time<br />Delivery</div>
                 <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>Payment Terms</div>
                 <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>MOQ</div>
-                <div style={{ padding: "6px 4px", background: "#fef9c3" }} />
+                {!isDigital && <div style={{ padding: "6px 4px", background: "#fef9c3" }} />}
                 <div style={{ padding: "6px 4px" }} />
                 <div style={{ padding: "6px 4px" }} />
               </div>
@@ -432,23 +537,26 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
               {comparisons.map((c, i) => {
                 const isChecked = checkedSet.has(c.vendorId);
                 const stock = getVendorStock(c);
-                const stockOk = stock >= sub.qty;
+                const digitalCheck = validateDigitalVendor(c);
+                const stockOk = isDigital ? digitalCheck.ok : stock >= sub.qty;
                 const qty = rowQtys[c.vendorId] || 0;
                 const moqVal = c.moq || 0;
                 const moqOk = qty === 0 || qty >= moqVal;
                 const lt = splitLT(c.leadTime);
+                const digitalLt = formatLeadTimeByType(c.leadTime, digitalProductType);
                 const lineTotal = c.landedCostPerUnit * qty;
                 const isLowest = i === 0;
+                const vendorVars = Array.isArray(c.variations) ? c.variations : [];
 
                 return (
                   <div
                     key={c.vendorId}
                     onClick={() => setDetailVendorId(c.vendorId)}
-                    style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", borderBottom: "1px solid #f0f0f0", background: isChecked ? "#eff6ff" : "#fff", cursor: "pointer" }}
+                    style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", borderBottom: "1px solid #f0f0f0", background: isChecked ? "#eff6ff" : !digitalCheck.ok ? "#fafafa" : "#fff", cursor: "pointer" }}
                   >
                     {/* Checkbox */}
                     <div style={{ display: "flex", justifyContent: "center", padding: "14px 0" }} onClick={e => { e.stopPropagation(); handleToggleCheck(c.vendorId); }}>
-                      <div style={{ width: 18, height: 18, border: `2px solid ${isChecked ? "#2563eb" : "#d1d5db"}`, borderRadius: 4, background: isChecked ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                      <div style={{ width: 18, height: 18, border: `2px solid ${isChecked ? "#2563eb" : !digitalCheck.ok ? "#fca5a5" : "#d1d5db"}`, borderRadius: 4, background: isChecked ? "#2563eb" : !digitalCheck.ok ? "#fef2f2" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: !digitalCheck.ok ? "not-allowed" : "pointer", flexShrink: 0 }}>
                         {isChecked && <span style={{ color: "#fff", fontSize: 11, fontWeight: 800, lineHeight: 1 }}>✓</span>}
                       </div>
                     </div>
@@ -472,30 +580,86 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
                     </div>
 
-                    {/* Current Stock */}
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{c.currentStock}</div>
-                      <div style={{ fontSize: 10, color: "#9ca3af" }}>Physical</div>
-                    </div>
+                    {isDigital ? (
+                      <>
+                        {/* Availability: Available / Not Available */}
+                        <div style={{ textAlign: "center", padding: "8px 4px" }}>
+                          {c.digitalAvailability === "not_available" ? (
+                            <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+                              Not Available
+                            </span>
+                          ) : (
+                            <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }}>
+                              Available
+                            </span>
+                          )}
+                        </div>
 
-                    {/* Already Reserved */}
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: c.reservedStock > 0 ? "#c2410c" : "#6b7280" }}>{c.reservedStock}</div>
-                      <div style={{ fontSize: 10, color: "#9ca3af" }}>Reserved</div>
-                    </div>
+                        {/* Provisioning Time (replicated from Vendor Products Digital tab) */}
+                        <div style={{ textAlign: "center", padding: "8px 4px" }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#0369a1" }}>{digitalLt.primary}</div>
+                          {digitalLt.secondary && (
+                            <div style={{ fontSize: 10.5, color: "#16a34a", fontWeight: 500 }}>{digitalLt.secondary}</div>
+                          )}
+                        </div>
 
-                    {/* Available Stock */}
-                    <div style={{ textAlign: "center" }}>
-                      <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
-                        {stock}
-                      </span>
-                    </div>
+                        {/* Variations fetched automatically from vendor */}
+                        <div style={{ padding: "8px 10px", fontSize: 11, lineHeight: 1.45 }}>
+                          {vendorVars.length === 0 ? (
+                            <span style={{ color: "#9ca3af" }}>No variations configured</span>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                              {vendorVars.map((v) => (
+                                <div key={v.id || v.name} style={{ color: "#374151" }}>
+                                  <strong style={{ color: "#111827" }}>{v.name}:</strong>{" "}
+                                  {(v.options || []).map(o => o.label).join(", ") || "—"}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {clientConfigEntries.length > 0 && (
+                            <div style={{ marginTop: 4 }}>
+                              {digitalCheck.missing.length === 0 ? (
+                                <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "1px 6px" }}>
+                                  ✓ Config Match
+                                </span>
+                              ) : (
+                                <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "1px 6px" }}>
+                                  ✕ Missing: {digitalCheck.missing.join(", ")}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Current Stock */}
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{c.currentStock}</div>
+                          <div style={{ fontSize: 10, color: "#9ca3af" }}>Physical</div>
+                        </div>
 
-                    {/* Lead Time */}
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t}d</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>({lt.total} Days)</div>
-                    </div>
+                        {/* Already Reserved */}
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: c.reservedStock > 0 ? "#c2410c" : "#6b7280" }}>{c.reservedStock}</div>
+                          <div style={{ fontSize: 10, color: "#9ca3af" }}>Reserved</div>
+                        </div>
+
+                        {/* Available Stock */}
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
+                            {stock}
+                          </span>
+                        </div>
+
+                        {/* Lead Time */}
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t}d</div>
+                          <div style={{ fontSize: 11, color: "#6b7280" }}>({lt.total} Days)</div>
+                        </div>
+                      </>
+                    )}
 
                     {/* Rating */}
                     <div style={{ textAlign: "center" }}>
@@ -518,30 +682,46 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
                       <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal}` : "—"}</div>
                     </div>
 
-                    {/* Score */}
-                    <div style={{ textAlign: "center" }}>
-                      <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#fef9c3", color: "#92400e" }}>
-                        {Math.round(c.score)}
-                      </span>
-                    </div>
+                    {/* Score (physical only) */}
+                    {!isDigital && (
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#fef9c3", color: "#92400e" }}>
+                          {Math.round(c.score)}
+                        </span>
+                      </div>
+                    )}
 
-                    {/* Allocate Qty — stepper input capped to vendor available stock */}
+                    {/* Allocate Qty — stepper input capped to vendor available stock for physical, or unlimited for available digital */}
                     <div style={{ padding: "10px 6px" }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${qty > stock ? "#f87171" : "#d1d5db"}`, borderRadius: 6, overflow: "hidden", background: "#fff" }}>
+                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${!isDigital && qty > stock ? "#f87171" : "#d1d5db"}`, borderRadius: 6, overflow: "hidden", background: isDigital && !digitalCheck.ok ? "#f3f4f6" : "#fff" }}>
                         <input
                           type="number"
                           min={0}
-                          max={stock}
+                          max={isDigital ? undefined : stock}
+                          disabled={isDigital && !digitalCheck.ok}
                           value={qty}
-                          onChange={e => handleQtyChange(c.vendorId, Math.min(parseInt(e.target.value) || 0, stock))}
-                          style={{ flex: 1, width: 0, border: "none", outline: "none", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 4px", fontFamily: "inherit" }}
+                          onChange={e => {
+                            const parsed = parseInt(e.target.value) || 0;
+                            handleQtyChange(c.vendorId, isDigital ? Math.max(0, parsed) : Math.min(parsed, stock));
+                          }}
+                          style={{ flex: 1, width: 0, border: "none", outline: "none", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 4px", fontFamily: "inherit", background: "transparent" }}
                         />
                         <div style={{ display: "flex", flexDirection: "column", borderLeft: "1px solid #e5e7eb" }}>
-                          <button onClick={() => handleQtyChange(c.vendorId, Math.min(qty + 1, stock))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>▲</button>
-                          <button onClick={() => handleQtyChange(c.vendorId, Math.max(0, qty - 1))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151" }}>▼</button>
+                          <button
+                            disabled={isDigital && !digitalCheck.ok}
+                            onClick={() => handleQtyChange(c.vendorId, isDigital ? qty + 1 : Math.min(qty + 1, stock))}
+                            style={{ border: "none", background: "#f9fafb", cursor: isDigital && !digitalCheck.ok ? "not-allowed" : "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151", borderBottom: "1px solid #e5e7eb" }}
+                          >▲</button>
+                          <button
+                            disabled={isDigital && !digitalCheck.ok}
+                            onClick={() => handleQtyChange(c.vendorId, Math.max(0, qty - 1))}
+                            style={{ border: "none", background: "#f9fafb", cursor: isDigital && !digitalCheck.ok ? "not-allowed" : "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151" }}
+                          >▼</button>
                         </div>
                       </div>
-                      <div style={{ fontSize: 10, marginTop: 3, color: "#9ca3af" }}>Max: {stock}</div>
+                      <div style={{ fontSize: 10, marginTop: 3, color: isDigital && !digitalCheck.ok ? "#dc2626" : "#9ca3af" }}>
+                        {isDigital ? (digitalCheck.ok ? "Unlimited" : "Unavailable") : `Max: ${stock}`}
+                      </div>
                       {isChecked && moqVal > 0 && !moqOk && (
                         <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 600 }}>▲ Below MOQ</div>
                       )}
