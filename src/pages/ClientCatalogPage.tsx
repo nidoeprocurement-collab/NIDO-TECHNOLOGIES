@@ -184,10 +184,12 @@ function RoleDropdown({
   values,
   roles,
   onToggle,
+  showTags = true,
 }: {
   values: string[];
   roles: string[];
   onToggle: (r: string) => void;
+  showTags?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -240,7 +242,7 @@ function RoleDropdown({
       </button>
 
       {/* Selected role tags shown below trigger */}
-      {values.length > 1 && (
+      {showTags && values.length > 1 && (
         <div className="flex flex-wrap gap-1 mt-1">
           {values.map((r) => (
             <span key={r} className="inline-flex items-center gap-0.5 text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full">
@@ -728,6 +730,7 @@ function EditProductScreen({
                   values={roles}
                   roles={availableRoles}
                   onToggle={toggleRole}
+                  showTags={false}
                 />
                 {roles.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
