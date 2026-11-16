@@ -141,7 +141,6 @@ function drawPOSummary(
 
   const rows: Array<[string, string, boolean?]> = [
     ['Gross Subtotal', fmt2(po.subtotal)],
-    ['Item Level Discounts (-)', `- ${fmt2(0)}`, true],
     ['Total Taxable Value', fmt2(po.subtotal), true],
     [`Total GST${rates ? ` (${rates})` : ''}`, fmt2(totalTax)],
     ['Shipping & Handling Charges', fmt2(0)],
@@ -367,10 +366,10 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       },
       columnStyles: digital
         ? {
-          0: { cellWidth: 18, halign: 'center' }, 1: { cellWidth: 74 }, 2: { cellWidth: 38 },
-          3: { cellWidth: 54 }, 4: { cellWidth: 34, halign: 'center' }, 5: { cellWidth: 48 },
-          6: { cellWidth: 52 }, 7: { cellWidth: 34, halign: 'center' }, 8: { cellWidth: 47, halign: 'right' },
-          9: { cellWidth: 38, halign: 'center' }, 10: { cellWidth: 42, halign: 'right' }, 11: { cellWidth: 52, halign: 'right' },
+          0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 107 }, 2: { cellWidth: 42, halign: 'center' },
+          3: { cellWidth: 64 }, 4: { cellWidth: 58, halign: 'center' }, 5: { cellWidth: 42, halign: 'center' },
+          6: { cellWidth: 48, halign: 'right' }, 7: { cellWidth: 36, halign: 'center' }, 8: { cellWidth: 42, halign: 'right' },
+          9: { cellWidth: 52, halign: 'right' },
         }
         : {
           0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 104 }, 2: { cellWidth: 42, halign: 'center' },
@@ -383,7 +382,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.textColor = DARK;
         }
-        if (data.section === 'body' && data.column.index === (digital ? 11 : 9)) {
+        if (data.section === 'body' && data.column.index === 9) {
           data.cell.styles.fontStyle = 'bold';
         }
       },
