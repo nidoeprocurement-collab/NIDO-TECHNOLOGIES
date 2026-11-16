@@ -554,7 +554,7 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
                   <>
                     <div style={{ padding: "6px 4px", background: "#f0fdf4", color: "#166534" }}>Availability</div>
                     <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Provisioning<br />Time</div>
-                    <div style={{ padding: "6px 4px", background: "#eef2ff", color: "#4338ca" }}>Vendor Configured<br />Variations</div>
+                    <div style={{ padding: "6px 4px", background: "#eef2ff", color: "#4338ca" }}>Client Selected<br />Variations</div>
                   </>
                 ) : (
                   <>
@@ -644,31 +644,42 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
                           )}
                         </div>
 
-                        {/* Variations fetched automatically from vendor */}
+                        {/* Client-selected variations validated against this vendor */}
                         <div style={{ padding: "8px 10px", fontSize: 11, lineHeight: 1.45 }}>
-                          {vendorVars.length === 0 ? (
-                            <span style={{ color: "#9ca3af" }}>No variations configured</span>
+                          {clientConfigEntries.length === 0 ? (
+                            <span style={{ color: "#9ca3af" }}>No variations selected</span>
                           ) : (
                             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                              {vendorVars.map((v) => (
-                                <div key={v.id || v.name} style={{ color: "#374151" }}>
-                                  <strong style={{ color: "#111827" }}>{v.name}:</strong>{" "}
-                                  {(v.options || []).map(o => o.label).join(", ") || "—"}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {clientConfigEntries.length > 0 && (
-                            <div style={{ marginTop: 4 }}>
-                              {digitalCheck.missing.length === 0 ? (
-                                <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "1px 6px" }}>
-                                  ✓ Config Match
-                                </span>
-                              ) : (
-                                <span style={{ display: "inline-block", fontSize: 10, fontWeight: 600, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "1px 6px" }}>
-                                  ✕ Missing: {digitalCheck.missing.join(", ")}
-                                </span>
-                              )}
+                              {clientConfigEntries.map(([cfgName, cfgVal]) => {
+                                const matchedVar = vendorVars.find(
+                                  (v) => v.name.trim().toLowerCase() === cfgName.trim().toLowerCase(),
+                                );
+                                const valLower = String(cfgVal).trim().toLowerCase();
+                                const hasMatch = Boolean(
+                                  matchedVar &&
+                                  (matchedVar.options || []).some((opt) => {
+                                    const optLower = opt.label.trim().toLowerCase();
+                                    return optLower === valLower || valLower.startsWith(optLower);
+                                  }),
+                                );
+                                return (
+                                  <div
+                                    key={cfgName}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      color: hasMatch ? "#166534" : "#b91c1c",
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 700 }}>{hasMatch ? "✓" : "✕"}</span>
+                                    <span>
+                                      <strong style={{ color: hasMatch ? "#111827" : "#b91c1c" }}>{cfgName}:</strong>{" "}
+                                      {cfgVal}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
