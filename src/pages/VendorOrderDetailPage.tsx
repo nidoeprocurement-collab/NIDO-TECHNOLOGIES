@@ -1399,6 +1399,7 @@ export default function VendorOrderDetailPage() {
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled || isAssignmentPending) return; // PO is cancelled or master order assignment pending
     const currentItem = items.find(item => item.id === id);
+    if (currentItem?.status === "Validated") return;
     const digital = Boolean(currentItem && isDigitalDocumentProduct(currentItem));
     if (digital && (status === "Shipped" || status === "Delivered")) return;
     const currentIndex = currentItem
@@ -2283,7 +2284,7 @@ export default function VendorOrderDetailPage() {
                   <StatusDropdown
                     status={item.status}
                     onChange={s => handleItemStatusChange(item.id, s)}
-                    disabled={isCancelled || item.status === "Cancelled"}
+                    disabled={isCancelled || item.status === "Cancelled" || item.status === "Validated"}
                     allowCancel={false}
                     digital={isDigitalDocumentProduct(item)}
                     quantity={item.qty}
