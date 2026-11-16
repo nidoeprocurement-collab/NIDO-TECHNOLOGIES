@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle, Check } from "lucide-react";
+import { toast } from "sonner";
 import { getCatalogProducts, CatalogProduct, CatalogVariation, CatalogVariationOption } from "@/lib/catalogStore";
 import { getPrefix } from "@/lib/configService";
 import {
@@ -689,87 +690,183 @@ export default function AddVendorProductsPage() {
   };
 
   // ── Validation modal ─────────────────────────────────────────────────────
-  type MissingField = { productName: string; missing: string[] };
+  type ValidationIssueItem = { field: string; reason: string; action: string };
+  type MissingField = { productName: string; issues: ValidationIssueItem[] };
   const [validationErrors, setValidationErrors] = useState<MissingField[]>([]);
+  const [saveError, setSaveError] = useState<string>("");
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   // ── Submit ───────────────────────────────────────────────────────────────
   const commitProducts = () => {
+    setSaveError("");
     const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-    if (isEditMode && editProductId) {
-      // In edit mode the product already has a VPC — keep it as-is.
-      const row = selectedRows[0];
-      updateVendorProduct(vendorId, editProductId, {
-        price: isDigitalCatalogProduct(row.catalogProduct) ? "0" : row.price,
-        moq: isDigitalCatalogProduct(row.catalogProduct) ? row.moq || "1" : row.moq,
-        leadTime: row.leadTime,
-        stock: isDigitalCatalogProduct(row.catalogProduct) ? row.stock || "0" : row.stock,
-        vendorProductCode: row.vendorProductCode,
-        variations: isDigitalCatalogProduct(row.catalogProduct) ? row.variations : [],
-        digitalAvailability: isDigitalCatalogProduct(row.catalogProduct) ? row.digitalAvailability : undefined,
+    try {
+      if (isEditMode && editProductId) {
+        // In edit mode the product already has a VPC — keep it as-is.
+        const row = selectedRows[0];
+        if (!row) {
+          const msg = "Product details could not be loaded for saving. Please go back and open Edit Product again.";
+          setSaveError(msg);
+          toast.error(msg);
+          return;
+        }
+        updateVendorProduct(vendorId, editProductId, {
+          price: isDigitalCatalogProduct(row.catalogProduct) ? "0" : row.price,
+          moq: isDigitalCatalogProduct(row.catalogProduct) ? row.moq || "1" : row.moq,
+          leadTime: row.leadTime,
+          stock: isDigitalCatalogProduct(row.catalogProduct) ? row.stock || "0" : row.stock,
+          vendorProductCode: row.vendorProductCode,
+          variations: isDigitalCatalogProduct(row.catalogProduct) ? row.variations : [],
+          digitalAvailability: isDigitalCatalogProduct(row.catalogProduct) ? row.digitalAvailability : undefined,
+        });
+        toast.success("Product changes saved successfully.");
+      } else {
+        // Reserve sequential VPC codes only after the user confirms the review.
+        const vpcs = reserveVendorProductCodes(selectedRows.length);
+        const products: VendorProduct[] = selectedRows.map((r, i) => ({
+          id: r.catalogProduct.id,
+          vendorId,
+          masterProductCode: r.catalogProduct.masterProductCode,
+          skuCode: r.catalogProduct.skuCode,
+          productName: r.catalogProduct.productName,
+          category: r.catalogProduct.category,
+          brand: r.catalogProduct.brand,
+          physicalType: r.catalogProduct.physicalType || r.catalogProduct.productType,
+          images: r.catalogProduct.images,
+          price: isDigitalCatalogProduct(r.catalogProduct) ? "0" : r.price,
+          moq: isDigitalCatalogProduct(r.catalogProduct) ? r.moq || "1" : r.moq,
+          leadTime: r.leadTime,
+          stock: isDigitalCatalogProduct(r.catalogProduct) ? r.stock || "0" : r.stock,
+          variations: isDigitalCatalogProduct(r.catalogProduct) ? r.variations : [],
+          digitalAvailability: isDigitalCatalogProduct(r.catalogProduct) ? r.digitalAvailability : undefined,
+          reservedStock: "0",
+          incomingStock: "0",
+          lastStockUpdate: new Date().toISOString(),
+          vendorProductCode: vpcs[i],
+          addedAt: now,
+          status: "Active",
+        }));
+        addVendorProducts(vendorId, products);
+        toast.success(`${products.length} product${products.length === 1 ? "" : "s"} added to vendor.`);
+      }
+      setShowConfirmation(false);
+      navigate(`/vendors/${vendorId}`, {
+        state: {
+          tab: "products",
+          productTab: productTypeParam === "digital" || selectedProductTab === "digital" ? "digital" : "physical",
+        },
       });
-    } else {
-      // Reserve sequential VPC codes only after the user confirms the review.
-      const vpcs = reserveVendorProductCodes(selectedRows.length);
-      const products: VendorProduct[] = selectedRows.map((r, i) => ({
-        id: r.catalogProduct.id,
-        vendorId,
-        masterProductCode: r.catalogProduct.masterProductCode,
-        skuCode: r.catalogProduct.skuCode,
-        productName: r.catalogProduct.productName,
-        category: r.catalogProduct.category,
-        brand: r.catalogProduct.brand,
-        physicalType: r.catalogProduct.physicalType || r.catalogProduct.productType,
-        images: r.catalogProduct.images,
-        price: isDigitalCatalogProduct(r.catalogProduct) ? "0" : r.price,
-        moq: isDigitalCatalogProduct(r.catalogProduct) ? r.moq || "1" : r.moq,
-        leadTime: r.leadTime,
-        stock: isDigitalCatalogProduct(r.catalogProduct) ? r.stock || "0" : r.stock,
-        variations: isDigitalCatalogProduct(r.catalogProduct) ? r.variations : [],
-        digitalAvailability: isDigitalCatalogProduct(r.catalogProduct) ? r.digitalAvailability : undefined,
-        reservedStock: "0",
-        incomingStock: "0",
-        lastStockUpdate: new Date().toISOString(),
-        vendorProductCode: vpcs[i],
-        addedAt: now,
-        status: "Active",
-      }));
-      addVendorProducts(vendorId, products);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Unable to write product data to browser storage.";
+      const msg = `Changes were not saved (${reason}). Free up browser storage or refresh the page and try again.`;
+      setSaveError(msg);
+      setShowConfirmation(false);
+      toast.error(msg);
     }
-    setShowConfirmation(false);
-    navigate(`/vendors/${vendorId}`, {
-      state: {
-        tab: "products",
-        productTab: productTypeParam === "digital" || selectedProductTab === "digital" ? "digital" : "physical",
-      },
-    });
   };
 
   const handleSubmit = () => {
-    if (selectedRows.length === 0) return;
+    setSaveError("");
+    if (selectedRows.length === 0) {
+      const msg = isEditMode
+        ? "No product loaded to save. Please go back and click Edit again."
+        : "No products selected. Check at least one product in the list above, then fill its details.";
+      setSaveError(msg);
+      toast.error(msg);
+      return;
+    }
 
     // Validate required vendor-specific fields before saving
     const errors: MissingField[] = [];
     for (const row of selectedRows) {
-      const missing: string[] = [];
-      if (!isDigitalCatalogProduct(row.catalogProduct)) {
+      const digital = isDigitalCatalogProduct(row.catalogProduct);
+      const issues: ValidationIssueItem[] = [];
+
+      if (!row.vendorProductCode || row.vendorProductCode.trim() === "") {
+        issues.push({
+          field: "Vendor Product Code",
+          reason: "Vendor Product Code is blank.",
+          action: "Enter a unique Vendor Product Code before saving.",
+        });
+      }
+
+      if (!digital) {
         const basePrice = Number(row.price);
-        if (!row.price || row.price.trim() === "" || !Number.isFinite(basePrice) || basePrice < 0) {
-          missing.push("Price / Unit");
+        if (!row.price || row.price.trim() === "") {
+          issues.push({
+            field: "Price / Unit",
+            reason: "Price / Unit is empty.",
+            action: "Enter a valid price (0 or greater).",
+          });
+        } else if (!Number.isFinite(basePrice) || basePrice < 0) {
+          issues.push({
+            field: "Price / Unit",
+            reason: "Price / Unit cannot be negative or invalid.",
+            action: "Enter a valid number of 0 or greater.",
+          });
         }
       }
-      if (!row.moq || row.moq.trim() === "" || Number(row.moq) <= 0) {
-        missing.push(isDigitalCatalogProduct(row.catalogProduct) ? "MOQ / Min Qty" : "MOQ");
+
+      const moqField = digital ? "MOQ / Min Qty" : "MOQ";
+      const moqNum = Number(row.moq);
+      if (!row.moq || row.moq.trim() === "") {
+        issues.push({
+          field: moqField,
+          reason: `${moqField} is empty.`,
+          action: "Enter a whole number of 1 or more.",
+        });
+      } else if (!Number.isFinite(moqNum) || moqNum <= 0 || !Number.isInteger(moqNum)) {
+        issues.push({
+          field: moqField,
+          reason: `${moqField} must be a whole number of at least 1.`,
+          action: "Change it to a whole number >= 1 (e.g. 1, 5, 10).",
+        });
       }
-      if (!row.leadTime || row.leadTime.trim() === "") missing.push("Lead Time");
-      if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.stock || row.stock.trim() === "")) {
-        missing.push("Stock");
+
+      const ltField = digital ? "Provisioning Time" : "Lead Time";
+      const ltNum = Number(row.leadTime);
+      if (!row.leadTime || row.leadTime.trim() === "") {
+        issues.push({
+          field: ltField,
+          reason: `${ltField} is empty.`,
+          action: digital
+            ? "Enter 0 for instant provisioning, or enter the provisioning hours/days."
+            : "Enter 0 for same-day dispatch, or enter the lead time in days.",
+        });
+      } else if (!Number.isFinite(ltNum) || ltNum < 0) {
+        issues.push({
+          field: ltField,
+          reason: `${ltField} cannot be negative.`,
+          action: "Enter 0 or a positive number.",
+        });
       }
-      if (missing.length > 0) errors.push({ productName: row.catalogProduct.productName, missing });
+
+      if (!digital) {
+        const stockNum = Number(row.stock);
+        if (!row.stock || row.stock.trim() === "") {
+          issues.push({
+            field: "Stock",
+            reason: "Stock quantity is empty.",
+            action: "Enter 0 (if out of stock) or the available stock count.",
+          });
+        } else if (!Number.isFinite(stockNum) || stockNum < 0 || !Number.isInteger(stockNum)) {
+          issues.push({
+            field: "Stock",
+            reason: "Stock must be a non-negative whole number.",
+            action: "Enter 0 or a positive whole number without decimals.",
+          });
+        }
+      }
+
+      if (issues.length > 0) {
+        errors.push({ productName: row.catalogProduct.productName, issues });
+      }
     }
     if (errors.length > 0) {
       setValidationErrors(errors);
+      const first = errors[0].issues[0];
+      toast.error(`Not saved: ${first.reason} ${first.action}`);
       return;
     }
 
@@ -1187,40 +1284,64 @@ export default function AddVendorProductsPage() {
       {/* ── Validation warning modal ── */}
       {validationErrors.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-2 flex flex-col gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 flex flex-col gap-4">
             {/* Header */}
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-gray-900">Missing Required Details</h3>
+                <h3 className="text-base font-semibold text-gray-900">
+                  {isEditMode ? "Changes Were Not Saved" : "Products Could Not Be Added"}
+                </h3>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Please fill in all required fields before adding products.
+                  Please review why saving was blocked and follow the steps below to fix it.
                 </p>
               </div>
             </div>
 
             {/* Error list */}
-            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto pr-1">
               {validationErrors.map((err, i) => (
-                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-2 py-2.5">
-                  <p className="text-sm font-medium text-gray-800 leading-tight truncate">{err.productName}</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Missing: {err.missing.join(", ")}
-                  </p>
+                <div key={i} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-2">
+                  <p className="text-sm font-semibold text-gray-900 leading-tight">{err.productName}</p>
+                  <div className="space-y-1.5">
+                    {err.issues.map((issue, idx) => (
+                      <div key={idx} className="text-xs bg-white/80 border border-amber-100 rounded-md px-2.5 py-2">
+                        <p className="font-semibold text-red-700">{issue.field}: {issue.reason}</p>
+                        <p className="text-gray-700 mt-0.5">
+                          <span className="font-semibold">What to do:</span> {issue.action}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
 
             {/* Action */}
             <button
+              type="button"
               onClick={() => setValidationErrors([])}
               className="w-full py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Go Back &amp; Fill Details
+              Go Back &amp; Fix Details
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Inline save error banner ── */}
+      {saveError && (
+        <div className="mx-4 sm:mx-6 mb-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2.5 text-xs text-red-800">
+          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Unable to save changes</p>
+            <p className="mt-0.5">{saveError}</p>
+          </div>
+          <button type="button" onClick={() => setSaveError("")} className="text-red-500 hover:text-red-700">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -1236,8 +1357,7 @@ export default function AddVendorProductsPage() {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={selectedRows.length === 0}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
         >
           {isEditMode ? (
             <><Save className="w-4 h-4" /> Save Changes</>
