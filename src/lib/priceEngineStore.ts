@@ -357,6 +357,8 @@ export interface VendorComparisonRow {
   vendorProductCode: string;
   /** Variations configured by this vendor for digital products. */
   variations?: CatalogVariation[];
+  /** Digital product availability ('available' | 'not_available'). */
+  digitalAvailability?: 'available' | 'not_available';
   basePrice: number;
   moq: number;
   leadTime: number;
@@ -407,17 +409,17 @@ export function getVendorComparisonBadge(
 
   const fastest = eligible.reduce((best, row) =>
     row.leadTime > 0 && (best === null || row.leadTime < best.leadTime) ? row : best,
-  null as VendorComparisonRow | null);
+    null as VendorComparisonRow | null);
   if (fastest && comparison.vendorId === fastest.vendorId) return "Fastest";
 
   const bestPrice = eligible.reduce((best, row) =>
     best === null || row.landedCostPerUnit < best.landedCostPerUnit ? row : best,
-  null as VendorComparisonRow | null);
+    null as VendorComparisonRow | null);
   if (bestPrice && comparison.vendorId === bestPrice.vendorId) return "Best Price";
 
   const topRated = eligible.reduce((best, row) =>
     best === null || row.rating > best.rating ? row : best,
-  null as VendorComparisonRow | null);
+    null as VendorComparisonRow | null);
   if (topRated && topRated.rating > 0 && comparison.vendorId === topRated.vendorId) return "Top Rated";
   return null;
 }
@@ -461,6 +463,7 @@ export function computeVendorComparisons(
       primaryContact: info?.primaryContact || info?.name || vendorId,
       vendorProductCode: match.vendorProductCode || '—',
       variations: Array.isArray(match.variations) ? match.variations : [],
+      digitalAvailability: match.digitalAvailability,
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
@@ -704,11 +707,11 @@ export function getAllClientPricing(): ClientPricingRow[] {
       if (!pp) return;
       const calc = pp.winningVendor
         ? computeClientFinalPrice(
-            pp.landedCostPerUnit,
-            settings,
-            resolveClientProfitPct(c.id, pp.masterProductCode, pp.category),
-            pp.category,
-          )
+          pp.landedCostPerUnit,
+          settings,
+          resolveClientProfitPct(c.id, pp.masterProductCode, pp.category),
+          pp.category,
+        )
         : null;
       rows.push({
         clientId: c.id,

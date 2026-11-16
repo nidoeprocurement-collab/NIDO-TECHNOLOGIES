@@ -18,6 +18,8 @@ export interface VendorProduct {
   images: string[];
   /** Vendor-specific digital product variations and option price adjustments. */
   variations?: CatalogVariation[];
+  /** Digital product availability status ('available' -> Unlimited, 'not_available' -> No Stock). */
+  digitalAvailability?: 'available' | 'not_available';
   price: string;
   moq: string;
   leadTime: string;

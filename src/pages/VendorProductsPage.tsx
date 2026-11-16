@@ -1197,7 +1197,7 @@ export default function VendorProductsPage({ vendorId: propVendorId }: { vendorI
                     const current = parseInt(product.stock || "0") || 0;
                     const reserved = parseInt(product.reservedStock || "0") || 0;
                     const available = Math.max(0, current - reserved);
-                    const availability = getAvailabilityByType(available, type);
+                    const availability = getAvailabilityByType(available, type, product.digitalAvailability);
                     const leadTime = formatVendorLeadTime(product.leadTime, type);
                     const isCloudService = type.toLowerCase().includes("cloud");
                     const quantityValue = product.moq

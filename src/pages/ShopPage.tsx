@@ -1030,8 +1030,11 @@ function ConfiguredServiceProductCard({
       )
     : 0;
   const canUseVendor = (vendor: VendorComparisonRow) =>
-    isDigitalProduct(product) || canVendorFulfillMoq(vendor);
-  const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor) && !isInCart;
+    isDigitalProduct(product)
+      ? vendor.digitalAvailability !== "not_available"
+      : canVendorFulfillMoq(vendor);
+  const isDigitalNoStock = isDigitalProduct(product) && vendorComps.length > 0 && vendorComps.every(v => !canUseVendor(v));
+  const canAdd = !isImpersonating && product.inStock && !isDigitalNoStock && !!selectedVendor && canUseVendor(selectedVendor) && !isInCart;
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!canAdd || !selectedVendor) return;
@@ -1074,8 +1077,14 @@ function ConfiguredServiceProductCard({
 
   return (
     <div
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "min-h-[520px]" : "h-full"}`}
-      onClick={() => onPreview(product)}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow ${
+        isDigitalNoStock
+          ? "border-red-200 opacity-75 cursor-not-allowed"
+          : "border-blue-100 hover:shadow-md cursor-pointer"
+      } ${isGrid ? "min-h-[520px]" : "h-full"}`}
+      onClick={() => {
+        if (!isDigitalNoStock) onPreview(product);
+      }}
     >
       <div className="flex items-start justify-between gap-3 px-3 pt-3">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -1086,10 +1095,17 @@ function ConfiguredServiceProductCard({
             <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-gray-900">{product.name}</h3>
           </div>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
-          <ServiceIcon size={12} />
-          {serviceLabel}
-        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+            <ServiceIcon size={12} />
+            {serviceLabel}
+          </span>
+          {isDigitalNoStock && (
+            <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold text-red-600">
+              No Stock
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mx-3 mt-3 flex h-[86px] items-center justify-center overflow-hidden rounded-xl border border-blue-50 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -1118,7 +1134,7 @@ function ConfiguredServiceProductCard({
           <option value="">Select a vendor</option>
           {vendorComps.map(vendor => (
             <option key={vendor.vendorId} value={vendor.vendorId} disabled={!canUseVendor(vendor)}>
-              {vendor.vendorName}{!canUseVendor(vendor) ? " — unavailable" : ""}
+              {vendor.vendorName}{!canUseVendor(vendor) ? " — No Stock" : ""}
             </option>
           ))}
         </select>
@@ -1304,7 +1320,11 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   const productPricingModel = getPricingModel(productType);
   const productQuantityLabel = getQuantityLabel(productType);
   const tenureBilling = getTenureBilling(productType);
-  const canUseVendor = (vendor: VendorComparisonRow) => isDigital || canVendorFulfillMoq(vendor);
+  const canUseVendor = (vendor: VendorComparisonRow) =>
+    isDigital
+      ? vendor.digitalAvailability !== "not_available"
+      : canVendorFulfillMoq(vendor);
+  const isDigitalNoStock = isDigital && vendorComps.length > 0 && vendorComps.every(v => !canUseVendor(v));
   const isInCart = !!selectedVendor && items.some(item =>
     item.productCode === product.productCode &&
     item.clientId === clientId &&
@@ -1355,7 +1375,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
     : undefined;
 
   const recommendedVendor = isDigital
-    ? (vendorComps[0] || null)
+    ? (vendorComps.find(canUseVendor) || null)
     : getRecommendedVendor(vendorComps);
   const termsVendor = selectedVendor ?? recommendedVendor;
   const commercialTerms = getProductCommercialTerms(productType, {
@@ -1384,7 +1404,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isImpersonating) return;
-    if (!product.inStock || isInCart || !selectedVendor || !canUseVendor(selectedVendor)) return;
+    if (!product.inStock || isDigitalNoStock || isInCart || !selectedVendor || !canUseVendor(selectedVendor)) return;
     addItem(
       {
         id: Math.random() * 10000,
@@ -1565,7 +1585,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
                 const isSelected = selectedVendor?.vendorId === comp.vendorId;
                 const isOOS = !canUseVendor(comp);
                 const badge = getVendorComparisonBadge(comp, vendorComps, canUseVendor);
-                const availability = getAvailabilityByType(comp.stock, productType);
+                const availability = getAvailabilityByType(comp.stock, productType, comp.digitalAvailability);
                 const leadTime = formatLeadTimeByType(comp.leadTime, productType);
                 const price = !isOOS && clientId
                   ? computeClientSellingPriceExclGst(
@@ -1623,10 +1643,17 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
                     </span>
                       {/* Stock / provisioning */}
                       {isDigital ? (
-                        <span className="text-[10px] leading-tight font-semibold text-emerald-600">
-                          {leadTime.primary}
-                          {leadTime.secondary && <span className="block text-[9px] font-medium text-gray-400">{leadTime.secondary}</span>}
-                        </span>
+                        isOOS ? (
+                          <span className="text-[10px] leading-tight font-semibold text-red-500">
+                            No Stock
+                            <span className="block text-[9px] font-medium text-red-400">Not Available</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] leading-tight font-semibold text-emerald-600">
+                            {leadTime.primary}
+                            {leadTime.secondary && <span className="block text-[9px] font-medium text-gray-400">{leadTime.secondary}</span>}
+                          </span>
+                        )
                       ) : (
                         <span className={`text-[10px] leading-tight font-semibold ${
                           availability.status === 'Out of Stock' ? 'text-red-500' :

@@ -53,6 +53,7 @@ interface SelectedRow {
   stock: string;
   vendorProductCode: string;
   variations: CatalogVariation[];
+  digitalAvailability: "available" | "not_available";
 }
 
 type SelectedProductTab = "physical" | "digital";
@@ -340,7 +341,7 @@ function SelectedProductsTable({
           {rows.map((row) => {
             const type = selectedProductType(row.catalogProduct);
             const digital = isDigitalOnlyType(type);
-            const availability = getAvailabilityByType(parseInt(row.stock || "0", 10) || 0, type);
+            const availability = getAvailabilityByType(parseInt(row.stock || "0", 10) || 0, type, row.digitalAvailability);
             const formattedLeadTime = formatLeadTimeByType(row.leadTime, type);
 
             return (
@@ -411,9 +412,30 @@ function SelectedProductsTable({
                 </td>
                 <td className="px-3 py-3">
                   {digital ? (
-                    <div className="space-y-0.5">
-                      <div className="font-semibold text-xs text-gray-800">{availability.primary}</div>
-                      <div className="text-[10px] font-medium text-emerald-600">Instant</div>
+                    <div className="space-y-1">
+                      <select
+                        value={row.digitalAvailability}
+                        onChange={(e) =>
+                          updateRow(
+                            row.catalogProduct.id,
+                            "digitalAvailability",
+                            e.target.value as "available" | "not_available",
+                          )
+                        }
+                        aria-label={`${row.catalogProduct.productName} Availability`}
+                        className="w-full min-w-[116px] px-2 py-1.5 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="available">Available</option>
+                        <option value="not_available">Not Available</option>
+                      </select>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className={`font-semibold ${availability.isUnlimited ? "text-gray-800" : "text-red-600"}`}>
+                          {availability.primary}
+                        </span>
+                        {availability.isUnlimited && (
+                          <span className="font-medium text-emerald-600">· Instant</span>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <input
@@ -610,6 +632,7 @@ export default function AddVendorProductsPage() {
       stock: existing.stock,
       vendorProductCode: existing.vendorProductCode,
       variations: Array.isArray(existing.variations) ? existing.variations : [],
+      digitalAvailability: existing.digitalAvailability === "not_available" ? "not_available" : "available",
     }]);
   }, [editProductId, isEditMode, vendorId]);
 
@@ -639,6 +662,7 @@ export default function AddVendorProductsPage() {
             stock: "",
             vendorProductCode: preview,
             variations: [],
+            digitalAvailability: "available",
           }];
         });
       }
@@ -683,6 +707,7 @@ export default function AddVendorProductsPage() {
         stock: isDigitalCatalogProduct(row.catalogProduct) ? row.stock || "0" : row.stock,
         vendorProductCode: row.vendorProductCode,
         variations: isDigitalCatalogProduct(row.catalogProduct) ? row.variations : [],
+        digitalAvailability: isDigitalCatalogProduct(row.catalogProduct) ? row.digitalAvailability : undefined,
       });
     } else {
       // Reserve sequential VPC codes only after the user confirms the review.
@@ -702,6 +727,7 @@ export default function AddVendorProductsPage() {
         leadTime: r.leadTime,
         stock: isDigitalCatalogProduct(r.catalogProduct) ? r.stock || "0" : r.stock,
         variations: isDigitalCatalogProduct(r.catalogProduct) ? r.variations : [],
+        digitalAvailability: isDigitalCatalogProduct(r.catalogProduct) ? r.digitalAvailability : undefined,
         reservedStock: "0",
         incomingStock: "0",
         lastStockUpdate: new Date().toISOString(),
@@ -1114,7 +1140,11 @@ export default function AddVendorProductsPage() {
                         {isDigitalCatalogProduct(row.catalogProduct) ? "Availability" : "Stock"}
                       </p>
                       <p className="text-sm font-semibold text-gray-900 mt-0.5">
-                        {isDigitalCatalogProduct(row.catalogProduct) ? "Unlimited · Instant" : row.stock}
+                        {isDigitalCatalogProduct(row.catalogProduct)
+                          ? row.digitalAvailability === "not_available"
+                            ? "No Stock"
+                            : "Unlimited · Instant"
+                          : row.stock}
                       </p>
                     </div>
                     <div>

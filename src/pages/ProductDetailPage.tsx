@@ -283,7 +283,9 @@ export default function ProductDetailPage() {
   const productPricingModel = getPricingModel(productType);
   const productQuantityLabel = getQuantityLabel(productType);
   const canUseVendor = (vendor: VendorComparisonRow) =>
-    isDigitalOnlyType(productType) || canVendorFulfillMoq(vendor);
+    isDigitalOnlyType(productType)
+      ? vendor.digitalAvailability !== "not_available"
+      : canVendorFulfillMoq(vendor);
   const vendorMoq = selectedVendor?.moq ?? product.moq;
   const vendorMaxQty = selectedVendor && !isDigitalOnlyType(productType) && selectedVendor.stock > 0
     ? selectedVendor.stock

@@ -183,12 +183,16 @@ export function formatLeadTimeByType(
 export function getAvailabilityByType(
   stock: number,
   type: string,
+  digitalAvailability?: "available" | "not_available",
 ): {
   primary: string;
   status: StockStatus | "Instant";
   isUnlimited: boolean;
 } {
   if (isDigitalOnlyType(type)) {
+    if (digitalAvailability === "not_available") {
+      return { primary: "No Stock", status: "Out of Stock", isUnlimited: false };
+    }
     return { primary: "Unlimited", status: "Instant", isUnlimited: true };
   }
 
