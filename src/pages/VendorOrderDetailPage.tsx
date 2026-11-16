@@ -2293,7 +2293,7 @@ export default function VendorOrderDetailPage() {
                       Reason: {(item as any).cancelReason}
                     </div>
                   )}
-                  {isDigitalDocumentProduct(item) && item.status === "Provisioned" && (item as any).provisioningDetails && (
+                  {isDigitalDocumentProduct(item) && (item as any).provisioningDetails && (
                     <div style={{ marginTop: 5 }}>
                       <button
                         type="button"
@@ -2316,7 +2316,7 @@ export default function VendorOrderDetailPage() {
                           fontFamily: "inherit",
                         }}
                       >
-                        More
+                        Provisioned Details
                       </button>
                     </div>
                   )}
