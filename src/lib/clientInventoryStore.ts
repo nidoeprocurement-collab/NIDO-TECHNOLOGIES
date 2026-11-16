@@ -96,13 +96,8 @@ export interface ClientInventoryData {
 
 const STORAGE_PREFIX = "nido_client_inventory_v2_";
 
-const FULFILLED_ORDER_STATUSES = new Set([
-  "Delivered",
-  "Partially Delivered",
-  "Activated",
-  "Provisioned",
-  "Completed",
-]);
+const DELIVERED_PHYSICAL_STATUSES = new Set(["Delivered"]);
+const DELIVERED_DIGITAL_STATUSES = new Set(["Delivered", "Activated", "Provisioned", "Completed"]);
 
 function mapAssetType(rawType?: string): InventoryAssetType {
   if (!rawType) return "Physical Asset";
@@ -170,21 +165,45 @@ export function syncClientInventoryFromLiveSources(
   const clientDefaultCity =
     client.billingCity || client.locationDetails?.city || "Head Office";
 
-  // 1. Fulfilled / Delivered Client Orders -> Available stock
+  // 1. Delivered Client Orders -> Available stock (only products ordered by & delivered to this client)
+  const validDeliveredOrderKeys = new Set<string>();
+
   const clientOrders = orders.filter((order) => {
-    const matchesClient =
-      order.clientId === client.id ||
-      (order.clientName || "").trim().toLowerCase() === client.name.trim().toLowerCase() ||
-      (order.cartItems || []).some((c) => c.clientId === client.id);
-    return matchesClient && FULFILLED_ORDER_STATUSES.has(order.status);
+    if (order.status === "Cancelled" || order.status === "Draft") return false;
+    return order.clientId
+      ? order.clientId === client.id
+      : (order.client || "").trim().toLowerCase() === client.name.trim().toLowerCase();
   });
 
   clientOrders.forEach((order) => {
+    const subItemsState = safeReadJson<Record<string, { itemStatus?: string }>>(
+      `nido_subitems_${order.id}`,
+      {},
+    );
+
     (order.cartItems || []).forEach((cartItem, idx) => {
-      const sourceKey = `order:${order.id}:${cartItem.id ?? idx}`;
-      if (existingKeys.has(sourceKey)) return;
+      if (cartItem.clientId && cartItem.clientId !== client.id) return;
 
       const assetType = mapAssetType(cartItem.physicalType || cartItem.productType);
+      const deliveredStatuses =
+        assetType === "Digital License"
+          ? DELIVERED_DIGITAL_STATUSES
+          : DELIVERED_PHYSICAL_STATUSES;
+
+      const subId =
+        cartItem.subOrderId || `SO-${order.id}-${String(idx + 1).padStart(3, "0")}`;
+      const subItemStatus = subItemsState[subId]?.itemStatus;
+
+      const isItemDelivered = subItemStatus
+        ? deliveredStatuses.has(subItemStatus)
+        : deliveredStatuses.has(order.status);
+
+      if (!isItemDelivered) return;
+
+      const sourceKey = `order:${order.id}:${cartItem.id ?? idx}`;
+      validDeliveredOrderKeys.add(sourceKey);
+      if (existingKeys.has(sourceKey)) return;
+
       const prefix = assetType === "Digital License" ? "LIC" : assetType === "Consumable" ? "STK" : "AST";
       const assetId = `${prefix}-${String(seq++).padStart(5, "0")}`;
       const qty = Math.max(1, Number(cartItem.quantity) || 1);
@@ -214,6 +233,7 @@ export function syncClientInventoryFromLiveSources(
 
       const actKey = `act-${sourceKey}`;
       if (!existingActKeys.has(actKey)) {
+        const effectiveStatus = subItemStatus || order.status;
         addedActivities.push({
           id: `act-${Date.now()}-${actSeq}`,
           sourceKey: actKey,
@@ -225,12 +245,12 @@ export function syncClientInventoryFromLiveSources(
           location: item.location,
           event: "Added",
           category: "Assignments",
-          details: `Order ${order.id} (${order.status}) · ${qty} ${item.unitLabel} added`,
-          performedBy: order.requesterName || client.name,
+          details: `Order ${order.id} (${effectiveStatus}) · ${qty} ${item.unitLabel} delivered`,
+          performedBy: order.requester || client.name,
           performedByRole: order.requesterRole || "Client User",
-          previousStatus: order.status,
+          previousStatus: effectiveStatus,
           newStatus: "Available",
-          summaryNote: `Received from order ${order.id} · Location: ${location}`,
+          summaryNote: `Delivered from order ${order.id} · Location: ${location}`,
         });
       }
     });
@@ -372,12 +392,21 @@ export function syncClientInventoryFromLiveSources(
     }
   });
 
-  if (addedItems.length === 0 && addedActivities.length === 0) {
+  const reconciledCurrentItems = current.items.filter((item) => {
+    if (item.status === "available" && item.sourceKey?.startsWith("order:")) {
+      return validDeliveredOrderKeys.has(item.sourceKey);
+    }
+    return true;
+  });
+
+  const prunedAny = reconciledCurrentItems.length !== current.items.length;
+
+  if (addedItems.length === 0 && addedActivities.length === 0 && !prunedAny) {
     return current;
   }
 
   const next: ClientInventoryData = {
-    items: [...addedItems, ...current.items],
+    items: [...addedItems, ...reconciledCurrentItems],
     activities: [...addedActivities, ...current.activities],
   };
   saveClientInventory(client.id, next);
