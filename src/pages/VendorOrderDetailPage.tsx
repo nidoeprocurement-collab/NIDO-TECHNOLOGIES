@@ -1541,7 +1541,7 @@ export default function VendorOrderDetailPage() {
         const itemLabel = currentItem?.name || "Product";
         const vendorLabel = po.vendorName || initialData.vendor?.name || initialData.vendorName || "Vendor";
         const orderNoteText =
-          `RECEIVED AT NIDO PLATFORM: ${itemLabel}${subId ? ` (${subId})` : ""} from PO ${po.poNumber} has been marked ${savedStatus} by ${vendorLabel}. Please move/update this item to the client in My Order Details.`;
+          `${itemLabel}${subId ? ` (${subId})` : ""} against PO ${po.poNumber} is ${savedStatus} at NIDO platform, please update and move it to the client in My Order Details.`;
         appendOrderActivity(po.orderId, orderNoteText, {
           actor: getActivityActor(vendorLabel),
           eventType: "status-change",
