@@ -500,6 +500,13 @@ function ProvisionedDetailsModal({
     setFile(selected);
     setFileDataUrl("");
     if (!selected) return;
+    if (selected.size > 4 * 1024 * 1024) {
+      const msg = "Selected file exceeds 4 MB. Please upload a smaller file (under 4 MB) so it can be saved.";
+      setValidationError(msg);
+      toast.error(msg);
+      setFile(null);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
@@ -606,7 +613,7 @@ function ProvisionedDetailsModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <button
                 type="button"
-                onClick={() => setMethod("activated")}
+                onClick={() => { setMethod("activated"); setValidationError(""); }}
                 style={{
                   padding: "10px 12px",
                   borderRadius: 8,
@@ -625,7 +632,7 @@ function ProvisionedDetailsModal({
               </button>
               <button
                 type="button"
-                onClick={() => setMethod("key_received_via_mail")}
+                onClick={() => { setMethod("key_received_via_mail"); setValidationError(""); }}
                 style={{
                   padding: "10px 12px",
                   borderRadius: 8,
@@ -651,7 +658,7 @@ function ProvisionedDetailsModal({
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>How was it activated? *</label>
                 <input
                   value={howActivated}
-                  onChange={e => setHowActivated(e.target.value)}
+                  onChange={e => { setHowActivated(e.target.value); setValidationError(""); }}
                   placeholder="e.g. Vendor Admin Portal, Tenant Assignment, SSO..."
                   style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
                 />
@@ -661,7 +668,7 @@ function ProvisionedDetailsModal({
                 <input
                   type="date"
                   value={activatedAt}
-                  onChange={e => setActivatedAt(e.target.value)}
+                  onChange={e => { setActivatedAt(e.target.value); setValidationError(""); }}
                   style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
                 />
               </div>
@@ -683,7 +690,7 @@ function ProvisionedDetailsModal({
                 <textarea
                   rows={3}
                   value={mailDetails}
-                  onChange={e => setMailDetails(e.target.value)}
+                  onChange={e => { setMailDetails(e.target.value); setValidationError(""); }}
                   placeholder="Enter key details, sender email, license notes, or instructions..."
                   style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }}
                 />
@@ -1628,37 +1635,54 @@ export default function VendorOrderDetailPage() {
     };
     document?: any;
   }) => {
-    if (!pendingProvisionItem || isCancelled || isAssignmentPending) return;
+    if (!pendingProvisionItem) {
+      toast.error("No item selected for provisioning. Please re-open the Provisioning Details popup.");
+      return;
+    }
+    if (isCancelled) {
+      toast.error("This Purchase Order is cancelled, so provisioning details cannot be saved.");
+      return;
+    }
+    if (isAssignmentPending) {
+      toast.error("Order assignment is pending. Complete the order assignment before saving provisioning details.");
+      return;
+    }
     const { id, name } = pendingProvisionItem;
-    if (payload.document) {
-      handleUploadDocument(payload.document);
+    try {
+      if (payload.document) {
+        handleUploadDocument(payload.document);
+      }
+      setItems(prev => prev.map(it => it.id === id
+        ? { ...it, status: "Provisioned", provisioningDetails: payload.provisioningDetails }
+        : it));
+      const po = getPOByNumber(poKey);
+      const itemIndex = items.findIndex(it => it.id === id);
+      if (po && itemIndex >= 0) {
+        const previousStatus = po.items[itemIndex]?.status || items[itemIndex]?.status || "Pending";
+        const updatedLines = po.items.map((line, index) => index === itemIndex
+          ? { ...line, status: "Provisioned", provisioningDetails: payload.provisioningDetails }
+          : line);
+        const derivedStatus = derivePOFulfillmentStatus({ ...po, items: updatedLines });
+        updatePO(poKey, {
+          items: updatedLines,
+          ...(po.status !== "Draft" && derivedStatus === "Delivered"
+            ? { status: "Delivered" as StoredPO["status"] }
+            : {}),
+        });
+        setOrderStatus(derivedStatus);
+        const detailText = payload.provisioningDetails.method === "activated"
+          ? `Method: Activated (${payload.provisioningDetails.howActivated || "—"} on ${payload.provisioningDetails.activatedAt || "—"})`
+          : `Method: Key received via mail${payload.provisioningDetails.documentName ? ` · Document: ${payload.provisioningDetails.documentName}` : ""}`;
+        const text = `${name} status changed from ${previousStatus} to Provisioned. ${detailText}`;
+        const activity = makePOActivity(text, "status-change", `activity_item_provisioned_${poKey}_${id}_${Date.now()}`);
+        appendPOActivity(poKey, activity);
+      }
+      toast.success("Provisioning details saved and status updated to Provisioned.");
+      setPendingProvisionItem(null);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Could not save provisioning details to browser storage.";
+      toast.error(`Details were not saved (${reason}). Try uploading a smaller file or clearing old browser data.`);
     }
-    setItems(prev => prev.map(it => it.id === id
-      ? { ...it, status: "Provisioned", provisioningDetails: payload.provisioningDetails }
-      : it));
-    const po = getPOByNumber(poKey);
-    const itemIndex = items.findIndex(it => it.id === id);
-    if (po && itemIndex >= 0) {
-      const previousStatus = po.items[itemIndex]?.status || items[itemIndex]?.status || "Pending";
-      const updatedLines = po.items.map((line, index) => index === itemIndex
-        ? { ...line, status: "Provisioned", provisioningDetails: payload.provisioningDetails }
-        : line);
-      const derivedStatus = derivePOFulfillmentStatus({ ...po, items: updatedLines });
-      updatePO(poKey, {
-        items: updatedLines,
-        ...(po.status !== "Draft" && derivedStatus === "Delivered"
-          ? { status: "Delivered" as StoredPO["status"] }
-          : {}),
-      });
-      setOrderStatus(derivedStatus);
-      const detailText = payload.provisioningDetails.method === "activated"
-        ? `Method: Activated (${payload.provisioningDetails.howActivated || "—"} on ${payload.provisioningDetails.activatedAt || "—"})`
-        : `Method: Key received via mail${payload.provisioningDetails.documentName ? ` · Document: ${payload.provisioningDetails.documentName}` : ""}`;
-      const text = `${name} status changed from ${previousStatus} to Provisioned. ${detailText}`;
-      const activity = makePOActivity(text, "status-change", `activity_item_provisioned_${poKey}_${id}_${Date.now()}`);
-      appendPOActivity(poKey, activity);
-    }
-    setPendingProvisionItem(null);
   };
   const handleDeleteItem = (id: string) => {
     if (isCancelled) return;
