@@ -24,6 +24,7 @@ import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate, type SLAStatus } from "@/lib/slaUtils";
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import OrderDetailsSummaryCard from "@/pages/OrderDetailsSummaryCard";
+import { SecureProvisioningModal } from "@/components/provisioning/SecureProvisioningModal";
 import {
   calculateRemainingOrderPricing,
   getOrderLineUnitPriceInclusive,
@@ -2628,6 +2629,7 @@ function ProvisionedDeliveryModal({
   vendorActivatedAt,
   vendorNotes,
   vendorDocument,
+  onOpenSecureProvisioning,
   onSave,
   onClose,
 }: {
@@ -2640,6 +2642,7 @@ function ProvisionedDeliveryModal({
   vendorActivatedAt?: string;
   vendorNotes?: string;
   vendorDocument?: any;
+  onOpenSecureProvisioning?: () => void;
   onSave: (payload: {
     method: "activated" | "key_received_via_mail";
     howActivated?: string;
@@ -2909,6 +2912,22 @@ function ProvisionedDeliveryModal({
           )}
 
           {error && <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>{error}</div>}
+          {onOpenSecureProvisioning && (
+            <div style={{ padding: "10px 12px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontSize: 12, color: "#1e40af", lineHeight: 1.4 }}>
+                <strong>NIDO Secure Provisioning &amp; Licence Delivery</strong>
+                <div style={{ fontSize: 11, color: "#3b82f6" }}>Manage keys, simulated encryption, OTP verification, assignments &amp; history.</div>
+              </div>
+              <button
+                type="button"
+                data-confirmation-skip
+                onClick={onOpenSecureProvisioning}
+                style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}
+              >
+                Open Workspace
+              </button>
+            </div>
+          )}
         </div>
         <ModalFooter
           onCancel={onClose}
@@ -3992,6 +4011,8 @@ export default function MyOrderPage() {
     vendorDocument?: any;
   } | null>(null);
   const [viewingProvisionDetails, setViewingProvisionDetails] = useState<{
+    subId?: string;
+    qty?: number;
     itemName: string;
     details: {
       method: "activated" | "key_received_via_mail";
@@ -4003,6 +4024,13 @@ export default function MyOrderPage() {
       documentDataUrl?: string;
       savedAt?: string;
     };
+  } | null>(null);
+  const [secureProvisioningTarget, setSecureProvisioningTarget] = useState<{
+    subId: string;
+    itemName: string;
+    qty: number;
+    recipientEmail?: string;
+    recipientMobile?: string;
   } | null>(null);
   const [provisionedUploadPrompt, setProvisionedUploadPrompt] = useState<{ subId: string; itemName: string } | null>(null);
   const [licenseUploadRequest, setLicenseUploadRequest] = useState<{ id: number; itemName: string } | null>(null);
@@ -6139,6 +6167,8 @@ export default function MyOrderPage() {
                                 type="button"
                                 onClick={() =>
                                   setViewingProvisionDetails({
+                                    subId: sub.id,
+                                    qty: sub.qty || 1,
                                     itemName: sub.itemName,
                                     details: {
                                       ...vp,
@@ -6656,6 +6686,17 @@ export default function MyOrderPage() {
           vendorActivatedAt={provisionedDeliveryTarget.vendorActivatedAt}
           vendorNotes={provisionedDeliveryTarget.vendorNotes}
           vendorDocument={provisionedDeliveryTarget.vendorDocument}
+          onOpenSecureProvisioning={() => {
+            const matchedSub = subOrders.find(s => s.id === provisionedDeliveryTarget.subId);
+            setSecureProvisioningTarget({
+              subId: provisionedDeliveryTarget.subId,
+              itemName: provisionedDeliveryTarget.itemName,
+              qty: matchedSub?.qty || 1,
+              recipientEmail: provisionedDeliveryTarget.deliveryEmail || provisionedClientEmails[0]?.value,
+              recipientMobile: clientInfo?.phone || "+91 98765 43210",
+            });
+            setProvisionedDeliveryTarget(null);
+          }}
           onSave={saveProvisionedDelivery}
           onClose={() => setProvisionedDeliveryTarget(null)}
         />
@@ -6770,7 +6811,27 @@ export default function MyOrderPage() {
                 </div>
               )}
             </div>
-            <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", background: "#f9fafb" }}>
+            <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#f9fafb" }}>
+              <button
+                type="button"
+                data-confirmation-skip
+                onClick={() => {
+                  const matchedSub = subOrders.find(
+                    s => s.id === viewingProvisionDetails.subId || s.itemName === viewingProvisionDetails.itemName,
+                  );
+                  setSecureProvisioningTarget({
+                    subId: viewingProvisionDetails.subId || matchedSub?.id || `${orderId}-LIC`,
+                    itemName: viewingProvisionDetails.itemName,
+                    qty: viewingProvisionDetails.qty || matchedSub?.qty || 1,
+                    recipientEmail: viewingProvisionDetails.details.recipients?.[0] || provisionedClientEmails[0]?.value,
+                    recipientMobile: clientInfo?.phone || "+91 98765 43210",
+                  });
+                  setViewingProvisionDetails(null);
+                }}
+                style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Secure Provisioning &amp; Licence Delivery
+              </button>
               <button
                 type="button"
                 onClick={() => setViewingProvisionDetails(null)}
@@ -6781,6 +6842,19 @@ export default function MyOrderPage() {
             </div>
           </ModalBox>
         </Overlay>
+      )}
+      {secureProvisioningTarget && (
+        <SecureProvisioningModal
+          open={Boolean(secureProvisioningTarget)}
+          onClose={() => setSecureProvisioningTarget(null)}
+          orderId={String(orderId || "")}
+          subOrderId={secureProvisioningTarget.subId}
+          clientName={clientInfo?.name || order?.client || "Client"}
+          productName={secureProvisioningTarget.itemName}
+          purchasedQuantity={secureProvisioningTarget.qty}
+          defaultRecipientEmail={secureProvisioningTarget.recipientEmail}
+          defaultRecipientMobile={secureProvisioningTarget.recipientMobile}
+        />
       )}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
       {pendingItemDelivered && (

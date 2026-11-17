@@ -14,6 +14,7 @@ import {
   Boxes,
   UserCheck,
   Receipt,
+  ShieldCheck,
 } from "lucide-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 
@@ -108,6 +109,12 @@ const menuItems = [
     description: "Manage transaction documents, terms and conditions, banking information, digital signatures, and email templates.",
     icon: Receipt,
     href: "/configuration/transaction-settings",
+  },
+  {
+    title: "Security Settings",
+    description: "Provisioning Security — OTP delivery, validity & verification preferences",
+    icon: ShieldCheck,
+    href: "/configuration/security-settings",
   },
 ];
 

@@ -329,6 +329,7 @@ const NidoUserEditPage = lazy(() => import("@/pages/NidoUserEditPage"));
 const TaxSettingsPage = lazy(() => import("@/pages/TaxSettingsPage"));
 const SLASettingsPage = lazy(() => import("@/pages/SLASettingsPage"));
 const TransactionSettingsPage = lazy(() => import("@/pages/TransactionSettingsPage"));
+const SecuritySettingsPage = lazy(() => import("@/pages/SecuritySettingsPage"));
 
 function RootRedirect() {
   const { isClientPortalUser } = useAuth();
@@ -692,6 +693,17 @@ function AppRoutes() {
                     resetKey={location.pathname}
                   >
                     <TransactionSettingsPage />
+                  </PageErrorBoundary>
+                }
+              />
+              <Route
+                path="configuration/security-settings"
+                element={
+                  <PageErrorBoundary
+                    title="Security Settings failed to load"
+                    resetKey={location.pathname}
+                  >
+                    <SecuritySettingsPage />
                   </PageErrorBoundary>
                 }
               />
