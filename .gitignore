@@ -17,6 +17,10 @@ dist-ssr
 !.env.*.example
 *.local
 
+# Supabase CLI local/linked state (contains project refs and temp DB state)
+supabase/.temp/
+supabase/.branches/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
