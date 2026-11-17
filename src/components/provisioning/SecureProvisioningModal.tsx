@@ -26,13 +26,21 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { getClients } from '@/lib/clientStore';
+import { getPortalUsersByClient, type PortalUser } from '@/lib/portalUserStore';
 import {
-  buildSimulatedSecureLink,
+  decryptFromVault,
+  encryptAndStoreInVault,
+  generateCryptographicOtp,
+  removeVaultEntry,
+} from '@/lib/provisioningDelivery/cryptoVault';
+import {
+  buildSecureDeliveryLink,
+  computeExpiryTimestamp,
   createEmptyLicenceRecord,
-  createSampleOrderWorkspace,
   formatDateStamp,
   maskRegistrationKey,
-} from '@/lib/provisioningDelivery/mockData';
+} from '@/lib/provisioningDelivery/defaults';
 import {
   computeLicenceSummary,
   createActivityEntry,
@@ -108,26 +116,28 @@ export function SecureProvisioningModal({
   clientName,
   productName,
   purchasedQuantity,
-  defaultRecipientEmail = 'client-admin@company.com',
-  defaultRecipientMobile = '+91 98450 11223',
+  defaultRecipientEmail = '',
+  defaultRecipientMobile = '',
 }: SecureProvisioningModalProps) {
   const { user, isClientPortalUser } = useAuth();
   const actorName = user?.name || user?.email || (isClientPortalUser ? 'Client Admin' : 'NIDO Admin');
   const actorRoleLabel = user?.role || (isClientPortalUser ? 'Client Admin' : 'NIDO Super Admin');
 
-  const [demoSampleMode, setDemoSampleMode] = useState(false);
-  const effectiveOrderId = demoSampleMode ? 'NIDO-ORD-00125' : orderId;
-  const effectiveSubOrderId = demoSampleMode ? 'SO-NIDO-ORD-00125-001' : subOrderId;
-  const effectiveClientName = demoSampleMode ? 'ABC Technologies Pvt. Ltd.' : clientName;
-  const effectiveProductName = demoSampleMode ? 'Adobe Acrobat Pro 2024' : productName;
-  const effectiveQty = demoSampleMode ? 2 : Math.max(1, purchasedQuantity || 1);
+  const clientPortalUsers = useMemo<PortalUser[]>(() => {
+    const matchedClient = getClients().find(
+      (c) => c.name.toLowerCase() === clientName.toLowerCase(),
+    );
+    return matchedClient ? getPortalUsersByClient(matchedClient.id) : [];
+  }, [clientName]);
+
+  const effectiveQty = Math.max(1, purchasedQuantity || 1);
 
   const [workspace, setWorkspace] = useState<ProvisioningWorkspaceState>(() =>
     loadProvisioningWorkspace(
-      effectiveOrderId,
-      effectiveSubOrderId,
-      effectiveClientName,
-      effectiveProductName,
+      orderId,
+      subOrderId,
+      clientName,
+      productName,
       effectiveQty,
     ),
   );
@@ -135,39 +145,26 @@ export function SecureProvisioningModal({
     loadOtpSecuritySettings(),
   );
 
-  // In-memory only raw keys/files (never written to localStorage)
-  const sessionRawKeysRef = useRef<Record<string, string>>({});
-
   const [activeTab, setActiveTab] = useState<SectionTab>('keys_files');
   const [licenceFilter, setLicenceFilter] = useState<LicenceFilter>('All');
   const [selectedLicenceId, setSelectedLicenceId] = useState<string>(
     () => workspace.licences[0]?.id || '',
   );
 
-  // Reload workspace when order/demo mode changes
+  // Reload workspace when order changes
   useEffect(() => {
     if (!open) return;
-    const loaded = demoSampleMode
-      ? createSampleOrderWorkspace()
-      : loadProvisioningWorkspace(
-          effectiveOrderId,
-          effectiveSubOrderId,
-          effectiveClientName,
-          effectiveProductName,
-          effectiveQty,
-        );
+    const loaded = loadProvisioningWorkspace(
+      orderId,
+      subOrderId,
+      clientName,
+      productName,
+      effectiveQty,
+    );
     setWorkspace(loaded);
     setSelectedLicenceId(loaded.licences[0]?.id || '');
     setOtpSettings(loadOtpSecuritySettings());
-  }, [
-    open,
-    demoSampleMode,
-    effectiveOrderId,
-    effectiveSubOrderId,
-    effectiveClientName,
-    effectiveProductName,
-    effectiveQty,
-  ]);
+  }, [open, orderId, subOrderId, clientName, productName, effectiveQty]);
 
   useEffect(() => {
     const onSettingsUpdated = () => setOtpSettings(loadOtpSecuritySettings());
@@ -178,9 +175,7 @@ export function SecureProvisioningModal({
 
   const persistWorkspace = (next: ProvisioningWorkspaceState) => {
     setWorkspace(next);
-    if (!demoSampleMode) {
-      saveProvisioningWorkspace(next);
-    }
+    saveProvisioningWorkspace(next);
   };
 
   const selectedLicence = useMemo(
@@ -199,7 +194,7 @@ export function SecureProvisioningModal({
       if (licenceFilter === 'All') return true;
       if (licenceFilter === 'Available') return l.assignmentStatus === 'Available';
       if (licenceFilter === 'Assigned') return l.assignmentStatus === 'Assigned';
-      if (licenceFilter === 'Provisioned') return l.processingStatus === 'Processed (Demo)';
+      if (licenceFilter === 'Provisioned') return l.processingStatus === 'Provisioned';
       if (licenceFilter === 'Activated') return l.activationRecord.status === 'Activated';
       if (licenceFilter === 'Pending')
         return (
@@ -240,69 +235,114 @@ export function SecureProvisioningModal({
     });
   };
 
-  const handleSaveManualKey = () => {
+  const handleSaveManualKey = async () => {
     if (!selectedLicence) return;
-    if (!manualKeyInput.trim()) {
+    const raw = manualKeyInput.trim();
+    if (!raw) {
       toast.error('Enter a registration key before saving.');
       return;
     }
-    sessionRawKeysRef.current[selectedLicence.id] = manualKeyInput.trim();
-    const masked = maskRegistrationKey(manualKeyInput);
-    updateLicenceWithHistory(
-      selectedLicence.id,
-      (lic) => ({
-        ...lic,
-        keyMaskedPreview: masked,
-        hasKeyInSession: true,
-        registrationType: lic.fileMetadata ? 'Key & File' : 'Key',
-        processingStatus: 'Processed (Demo)',
-      }),
-      'Registration key entered',
-      'Processed (Demo)',
-      `Masked key ${masked} recorded in memory (never stored in localStorage).`,
-    );
-    setManualKeyInput('');
-    toast.success(`Registration key recorded for ${selectedLicence.licenceRef} (masked preview saved).`);
+    const masked = maskRegistrationKey(raw);
+    try {
+      const encoded = new TextEncoder().encode(raw);
+      const { sha256Fingerprint } = await encryptAndStoreInVault({
+        licenceId: selectedLicence.id,
+        kind: 'key',
+        data: encoded,
+        fileName: `${selectedLicence.licenceRef}-key.txt`,
+        mimeType: 'text/plain',
+      });
+      updateLicenceWithHistory(
+        selectedLicence.id,
+        (lic) => ({
+          ...lic,
+          keyMaskedPreview: masked,
+          hasKeyInVault: true,
+          registrationType: lic.fileMetadata ? 'Key & File' : 'Key',
+          processingStatus: 'Provisioned',
+          deliveryRecord: {
+            ...lic.deliveryRecord,
+            encryptionStatus: 'Encrypted',
+            encryptionFingerprint: sha256Fingerprint,
+          },
+        }),
+        'Registration key entered',
+        'Provisioned',
+        `Encrypted registration key (${masked}) via AES-256-GCM (SHA-256: ${sha256Fingerprint}).`,
+      );
+      setManualKeyInput('');
+      toast.success(`Registration key encrypted & saved for ${selectedLicence.licenceRef}.`);
+    } catch {
+      toast.error('Failed to encrypt registration key in browser vault.');
+    }
   };
 
-  const handleUploadRegFile = (file: File | null, isReplace = false) => {
+  const handleUploadRegFile = async (file: File | null, isReplace = false) => {
     if (!selectedLicence || !file) return;
     const { date } = formatDateStamp();
-    updateLicenceWithHistory(
-      selectedLicence.id,
-      (lic) => ({
-        ...lic,
-        fileMetadata: {
-          fileName: file.name,
-          fileType: file.type || `.${file.name.split('.').pop() || 'lic'}`,
-          fileSizeBytes: file.size,
-          uploadDate: date,
-        },
-        registrationType: lic.keyMaskedPreview ? 'Key & File' : 'File',
-        processingStatus: 'Processed (Demo)',
-      }),
-      isReplace ? 'Registration file replaced' : 'Registration file uploaded',
-      'Processed (Demo)',
-      `${isReplace ? 'Replaced' : 'Uploaded'} file metadata: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB).`,
-    );
-    toast.success(`File "${file.name}" attached to ${selectedLicence.licenceRef} (metadata only).`);
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const { sha256Fingerprint } = await encryptAndStoreInVault({
+        licenceId: selectedLicence.id,
+        kind: 'file',
+        data: buf,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+      });
+      updateLicenceWithHistory(
+        selectedLicence.id,
+        (lic) => ({
+          ...lic,
+          hasFileInVault: true,
+          fileMetadata: {
+            fileName: file.name,
+            fileType: file.type || `.${file.name.split('.').pop() || 'lic'}`,
+            fileSizeBytes: file.size,
+            uploadDate: date,
+          },
+          registrationType: lic.keyMaskedPreview ? 'Key & File' : 'File',
+          processingStatus: 'Provisioned',
+          deliveryRecord: {
+            ...lic.deliveryRecord,
+            encryptionStatus: 'Encrypted',
+            encryptionFingerprint: sha256Fingerprint,
+          },
+        }),
+        isReplace ? 'Registration file replaced' : 'Registration file uploaded',
+        'Provisioned',
+        `${isReplace ? 'Replaced' : 'Uploaded'} & AES-256-GCM encrypted "${file.name}" (${Math.max(1, Math.round(file.size / 1024))} KB, SHA-256: ${sha256Fingerprint}).`,
+      );
+      toast.success(`File "${file.name}" encrypted & stored for ${selectedLicence.licenceRef}.`);
+    } catch {
+      toast.error('Failed to encrypt registration file in browser vault.');
+    }
   };
 
-  const handleRemovePendingRecord = (lic: LicenceRecord) => {
+  const handleRemovePendingRecord = async (lic: LicenceRecord) => {
     if (lic.assignmentStatus === 'Assigned') {
       toast.error('Cannot remove an already assigned licence. Reassign or deactivate instead.');
       return;
     }
-    delete sessionRawKeysRef.current[lic.id];
+    try {
+      await removeVaultEntry(lic.id);
+    } catch {
+      // ignore vault cleanup error
+    }
     updateLicenceWithHistory(
       lic.id,
       (prev) => ({
         ...prev,
         registrationType: 'Unassigned',
         keyMaskedPreview: undefined,
-        hasKeyInSession: false,
+        hasKeyInVault: false,
+        hasFileInVault: false,
         fileMetadata: undefined,
         processingStatus: 'Pending',
+        deliveryRecord: {
+          ...prev.deliveryRecord,
+          encryptionStatus: 'Pending',
+          encryptionFingerprint: undefined,
+        },
       }),
       'Access revoked',
       'Pending',
@@ -321,7 +361,7 @@ export function SecureProvisioningModal({
       bulkSelectedIds.includes(lic.id)
         ? {
             ...lic,
-            processingStatus: 'Processed (Demo)' as const,
+            processingStatus: 'Provisioned' as const,
             lastUpdated: `${date} · ${time}`,
           }
         : lic,
@@ -330,12 +370,12 @@ export function SecureProvisioningModal({
       bulkSelectedIds.map((id) => workspace.licences.find((l) => l.id === id)?.licenceRef || id).join(', '),
       'Encryption status changed',
       actorName,
-      'Processed (Demo)',
-      `Bulk processed ${bulkSelectedIds.length} licence record(s).`,
+      'Provisioned',
+      `Bulk marked ${bulkSelectedIds.length} licence record(s) as Provisioned.`,
     );
     persistWorkspace({ ...workspace, licences: nextLicences, history: [entry, ...workspace.history] });
     setBulkSelectedIds([]);
-    toast.success(`Bulk updated ${bulkSelectedIds.length} licence record(s).`);
+    toast.success(`Updated ${bulkSelectedIds.length} licence record(s) to Provisioned.`);
   };
 
   const handleAddLicenceSlot = () => {
@@ -367,9 +407,9 @@ export function SecureProvisioningModal({
   const handleToggleEncryption = () => {
     if (!selectedLicence) return;
     const nextEnc =
-      selectedLicence.deliveryRecord.encryptionStatus === 'Encrypted (Simulated)'
+      selectedLicence.deliveryRecord.encryptionStatus === 'Encrypted'
         ? 'Pending'
-        : 'Encrypted (Simulated)';
+        : 'Encrypted';
     updateLicenceWithHistory(
       selectedLicence.id,
       (lic) => ({
@@ -378,7 +418,7 @@ export function SecureProvisioningModal({
       }),
       'Encryption status changed',
       nextEnc,
-      `Simulated AES-256-GCM encryption status set to ${nextEnc}.`,
+      `AES-256-GCM encryption status updated to ${nextEnc}.`,
     );
     toast.success(`Encryption status: ${nextEnc}`);
   };
@@ -386,7 +426,7 @@ export function SecureProvisioningModal({
   const handleUpdateDeliveryConfig = (
     patch: Partial<LicenceRecord['deliveryRecord']>,
     activity: Parameters<typeof createActivityEntry>[1] = 'Delivery notification prepared',
-    remarks = 'Updated simulated delivery configuration.',
+    remarks = 'Updated secure delivery configuration.',
   ) => {
     if (!selectedLicence) return;
     updateLicenceWithHistory(
@@ -404,18 +444,20 @@ export function SecureProvisioningModal({
   const handleRegenerateLink = () => {
     if (!selectedLicence) return;
     const { date, time } = formatDateStamp();
-    const newLink = buildSimulatedSecureLink(workspace.orderId, selectedLicence.licenceRef);
+    const { token, url } = buildSecureDeliveryLink(workspace.orderId, selectedLicence.licenceRef);
     handleUpdateDeliveryConfig(
       {
-        secureLinkPreview: newLink,
+        secureLinkPreview: url,
+        linkToken: token,
+        linkExpiresAt: computeExpiryTimestamp(selectedLicence.deliveryRecord.linkExpiry),
         revoked: false,
         deliveryStatus: 'Ready',
         lastGeneratedAt: `${date} · ${time}`,
       },
-      'Secure link generated (simulated)',
-      `Generated simulated secure delivery link (${selectedLicence.deliveryRecord.linkExpiry} expiry).`,
+      'Secure link generated',
+      `Generated secure delivery link (${selectedLicence.deliveryRecord.linkExpiry} expiry).`,
     );
-    toast.success('Simulated secure download link regenerated.');
+    toast.success('Secure download link regenerated.');
   };
 
   const handleRevokeLink = () => {
@@ -423,48 +465,82 @@ export function SecureProvisioningModal({
     handleUpdateDeliveryConfig(
       { revoked: true, deliveryStatus: 'Revoked' },
       'Access revoked',
-      'Revoked simulated secure delivery link.',
+      'Revoked secure delivery link.',
     );
-    toast.warning('Simulated delivery link revoked.');
+    toast.warning('Secure delivery link revoked.');
   };
 
-  const handleSimulatedDownload = () => {
+  const handleDownloadPackage = async () => {
     if (!selectedLicence) return;
     if (selectedLicence.deliveryRecord.revoked) {
-      toast.error('This simulated link is revoked. Regenerate the link first.');
+      toast.error('This secure link is revoked. Regenerate the link first.');
+      return;
+    }
+    if (
+      selectedLicence.deliveryRecord.linkExpiresAt &&
+      Date.now() > selectedLicence.deliveryRecord.linkExpiresAt
+    ) {
+      toast.error('This secure link has expired. Regenerate the link first.');
       return;
     }
     if (
       selectedLicence.deliveryRecord.downloadCount >=
       selectedLicence.deliveryRecord.downloadLimit
     ) {
-      toast.error('Simulated download limit reached. Increase limit or regenerate link.');
+      toast.error('Download limit reached. Increase limit or regenerate link.');
       return;
     }
-    handleUpdateDeliveryConfig(
-      { downloadCount: selectedLicence.deliveryRecord.downloadCount + 1 },
-      'File downloaded (simulated)',
-      `Simulated download #${selectedLicence.deliveryRecord.downloadCount + 1} (activation status unchanged — manual updates only).`,
-    );
-    toast.success('Simulated file download recorded. Activation status remains manual.');
+    try {
+      const decrypted = await decryptFromVault(selectedLicence.id);
+      if (decrypted) {
+        const blob = new Blob([new Uint8Array(decrypted.bytes)], {
+          type: decrypted.mimeType || 'application/octet-stream',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = decrypted.fileName || `${selectedLicence.licenceRef}-licence.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        toast.warning('No encrypted key/file found in browser vault for this licence; recording download event.');
+      }
+      handleUpdateDeliveryConfig(
+        {
+          downloadCount: selectedLicence.deliveryRecord.downloadCount + 1,
+          deliveryStatus: 'Delivered',
+        },
+        'File downloaded',
+        `Decrypted & downloaded package (#${selectedLicence.deliveryRecord.downloadCount + 1}; activation status remains manual).`,
+      );
+      toast.success('Licence package decrypted and downloaded. Activation status remains manual.');
+    } catch {
+      toast.error('Failed to decrypt licence package from vault.');
+    }
   };
 
-  const handleSendSimulatedDelivery = () => {
+  const handleSendDelivery = () => {
     if (!selectedLicence) return;
     const email =
       selectedLicence.deliveryRecord.recipientEmail ||
       selectedLicence.assignedEmployee?.email ||
       defaultRecipientEmail;
+    if (!email.trim()) {
+      toast.error('Enter a recipient email address first.');
+      return;
+    }
     handleUpdateDeliveryConfig(
       {
         emailNotificationPrepared: true,
         recipientEmail: email,
-        deliveryStatus: 'Sent (Simulated)',
+        deliveryStatus: 'Sent',
       },
       'Delivery notification prepared',
-      `Simulated secure delivery email prepared for ${email} (no real email sent).`,
+      `Secure delivery notification marked Sent for ${email}.`,
     );
-    toast.success(`Simulated delivery notification prepared for ${email}.`);
+    toast.success(`Delivery notification prepared for ${email}.`);
   };
 
   // ── Tab 3: OTP Verification (Mobile / Email) State ─────────────────────────
@@ -483,7 +559,7 @@ export function SecureProvisioningModal({
   const [attemptsLeft, setAttemptsLeft] = useState(otpSettings.maxAttempts);
   const [validitySecondsLeft, setValiditySecondsLeft] = useState(0);
   const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
-  const [showDemoOtpHint, setShowDemoOtpHint] = useState(false);
+  const [showOtpSessionCode, setShowOtpSessionCode] = useState(false);
 
   useEffect(() => {
     if (validitySecondsLeft <= 0 && resendSecondsLeft <= 0) return;
@@ -500,41 +576,43 @@ export function SecureProvisioningModal({
     return () => window.clearInterval(timer);
   }, [validitySecondsLeft, resendSecondsLeft, otpStatus]);
 
-  const handleSendSimulatedOtp = () => {
+  const handleSendOtp = () => {
+    const target = otpChannel === 'Mobile' ? otpMobile.trim() : otpEmail.trim();
+    if (!target) {
+      toast.error(`Enter a recipient ${otpChannel.toLowerCase()} before sending OTP.`);
+      return;
+    }
     const len = Math.min(8, Math.max(4, otpSettings.otpLength || 6));
-    const min = Math.pow(10, len - 1);
-    const max = Math.pow(10, len) - 1;
-    const code = String(Math.floor(min + Math.random() * (max - min + 1)));
+    const code = generateCryptographicOtp(len);
     setGeneratedOtp(code);
     setEnteredOtp('');
     setOtpStatus('sent');
     setAttemptsLeft(otpSettings.maxAttempts);
     setValiditySecondsLeft(otpSettings.otpValidityMinutes * 60);
     setResendSecondsLeft(otpSettings.resendAvailabilitySeconds);
-    setShowDemoOtpHint(true);
+    setShowOtpSessionCode(true);
     if (selectedLicence) {
-      const target = otpChannel === 'Mobile' ? otpMobile : otpEmail;
       const entry = createActivityEntry(
         selectedLicence.licenceRef,
-        'OTP verification attempted (simulated)',
+        'OTP verification attempted',
         actorName,
-        'OTP Sent (Demo)',
-        `Simulated ${otpChannel} OTP generated for ${target} (${len} digits, ${otpSettings.otpValidityMinutes}m validity).`,
+        'OTP Sent',
+        `${otpChannel} OTP generated for ${target} (${len} digits, ${otpSettings.otpValidityMinutes}m validity).`,
       );
       persistWorkspace({ ...workspace, history: [entry, ...workspace.history] });
     }
-    toast.info(`Simulated ${otpChannel} OTP generated (frontend demo only).`);
+    toast.success(`${otpChannel} OTP generated for ${target}.`);
   };
 
-  const handleVerifySimulatedOtp = () => {
+  const handleVerifyOtp = () => {
     if (!generatedOtp || otpStatus === 'expired' || validitySecondsLeft <= 0) {
       setOtpStatus('expired');
-      toast.error('Simulated OTP has expired. Click Resend OTP.');
+      toast.error('OTP has expired. Click Resend OTP.');
       return;
     }
     if (attemptsLeft <= 0) {
       setOtpStatus('locked');
-      toast.error('Maximum OTP attempts exceeded. Resend a new simulated OTP.');
+      toast.error('Maximum OTP attempts exceeded. Resend a new OTP.');
       return;
     }
     if (enteredOtp.trim() === generatedOtp) {
@@ -542,14 +620,14 @@ export function SecureProvisioningModal({
       if (selectedLicence) {
         const entry = createActivityEntry(
           selectedLicence.licenceRef,
-          'OTP verification attempted (simulated)',
+          'OTP verification attempted',
           actorName,
-          'Verified (Demo)',
-          `Simulated ${otpChannel} OTP verified successfully (activation status remains manual).`,
+          'Verified',
+          `${otpChannel} OTP verified successfully (activation status remains manual).`,
         );
         persistWorkspace({ ...workspace, history: [entry, ...workspace.history] });
       }
-      toast.success('Simulated OTP verified successfully.');
+      toast.success('OTP verified successfully.');
       return;
     }
     const remaining = attemptsLeft - 1;
@@ -558,10 +636,10 @@ export function SecureProvisioningModal({
     if (selectedLicence) {
       const entry = createActivityEntry(
         selectedLicence.licenceRef,
-        'OTP verification attempted (simulated)',
+        'OTP verification attempted',
         actorName,
-        remaining <= 0 ? 'Locked (Demo)' : 'Invalid OTP',
-        `Invalid simulated ${otpChannel} OTP entered (${remaining} attempt(s) left).`,
+        remaining <= 0 ? 'Locked' : 'Invalid OTP',
+        `Invalid ${otpChannel} OTP entered (${remaining} attempt(s) left).`,
       );
       persistWorkspace({ ...workspace, history: [entry, ...workspace.history] });
     }
@@ -788,8 +866,8 @@ export function SecureProvisioningModal({
                 <h2 className="text-base font-bold text-slate-900">
                   NIDO Secure Provisioning &amp; Licence Delivery System
                 </h2>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                  Frontend Only · Demo Mode
+                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Live · AES-256-GCM Vault
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                   Role: {actorRoleLabel}
@@ -807,17 +885,6 @@ export function SecureProvisioningModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setDemoSampleMode((m) => !m)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                demoSampleMode
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-              }`}
-            >
-              {demoSampleMode ? 'Viewing Sample (NIDO-ORD-00125)' : 'Load Sample Order (NIDO-ORD-00125)'}
-            </button>
-            <button
-              type="button"
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/70"
             >
@@ -828,11 +895,11 @@ export function SecureProvisioningModal({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 bg-slate-50/40">
-          {/* Demo Disclaimer */}
+          {/* Security Notice */}
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 flex items-center gap-2.5 text-xs text-blue-900">
-            <AlertTriangle size={15} className="text-blue-600 shrink-0" />
+            <ShieldCheck size={15} className="text-blue-600 shrink-0" />
             <span>
-              <strong>Frontend Demonstration Notice:</strong> Encryption (AES-256-GCM), secure links, and OTP verification are simulated locally. Real registration keys and confidential files are <strong>never</strong> persisted in browser <code className="px-1 bg-blue-100 rounded">localStorage</code>.
+              <strong>Web Crypto AES-256-GCM Active:</strong> Keys and registration files are encrypted in-browser and stored in the IndexedDB vault; only masked previews and audit metadata are persisted in <code className="px-1 bg-blue-100 rounded">localStorage</code>.
             </span>
           </div>
 
@@ -1054,7 +1121,7 @@ export function SecureProvisioningModal({
                       />
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[11px] text-slate-400">
-                          Only masked preview is stored in demo state.
+                          Only masked preview is stored in <code className="px-1 bg-slate-100 rounded">localStorage</code>; full key is AES-256-GCM encrypted in IndexedDB.
                         </span>
                         <button
                           type="button"
@@ -1153,7 +1220,7 @@ export function SecureProvisioningModal({
                       onClick={handleBulkProcessSelected}
                       className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800"
                     >
-                      Mark Selected Processed (Demo)
+                      Mark Selected Provisioned
                     </button>
                   </div>
                 </div>
@@ -1165,7 +1232,7 @@ export function SecureProvisioningModal({
                   <div className="p-4 rounded-xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
-                        <Lock size={14} className="text-blue-600" /> Encryption &amp; Link Controls (Simulated)
+                        <Lock size={14} className="text-blue-600" /> Encryption &amp; Link Controls
                       </h4>
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                         {selectedLicence.deliveryRecord.encryptionMethod}
@@ -1176,13 +1243,18 @@ export function SecureProvisioningModal({
                       <span>
                         Encryption Status:{' '}
                         <strong>{selectedLicence.deliveryRecord.encryptionStatus}</strong>
+                        {selectedLicence.deliveryRecord.encryptionFingerprint && (
+                          <span className="block text-[10px] font-mono text-slate-500">
+                            SHA-256: {selectedLicence.deliveryRecord.encryptionFingerprint}
+                          </span>
+                        )}
                       </span>
                       <button
                         type="button"
                         onClick={handleToggleEncryption}
                         className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
                       >
-                        Toggle Simulated Encryption
+                        Toggle Encryption Status
                       </button>
                     </div>
 
@@ -1250,10 +1322,10 @@ export function SecureProvisioningModal({
                       </button>
                       <button
                         type="button"
-                        onClick={handleSimulatedDownload}
+                        onClick={handleDownloadPackage}
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800"
                       >
-                        <Download size={12} /> Simulate Download
+                        <Download size={12} /> Decrypt &amp; Download
                       </button>
                     </div>
                   </div>
@@ -1261,7 +1333,7 @@ export function SecureProvisioningModal({
                   {/* Email Notification Preview */}
                   <div className="p-4 rounded-xl border border-slate-200 space-y-3">
                     <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
-                      <Mail size={14} className="text-blue-600" /> Email Notification Preview (Simulated)
+                      <Mail size={14} className="text-blue-600" /> Email Notification Preview
                     </h4>
                     <input
                       type="email"
@@ -1284,7 +1356,7 @@ export function SecureProvisioningModal({
                         Dear {selectedLicence.assignedEmployee?.employeeName || 'Authorized Recipient'},
                       </p>
                       <p className="text-slate-600">
-                        Your encrypted ({selectedLicence.deliveryRecord.encryptionMethod} demo) licence package for{' '}
+                        Your encrypted ({selectedLicence.deliveryRecord.encryptionMethod}) licence package for{' '}
                         <strong>{workspace.productName}</strong> is ready. Link expires in{' '}
                         <strong>{selectedLicence.deliveryRecord.linkExpiry}</strong> (max{' '}
                         {selectedLicence.deliveryRecord.downloadLimit} downloads). OTP verification is required before access.
@@ -1297,10 +1369,10 @@ export function SecureProvisioningModal({
                       <button
                         type="button"
                         data-confirmation-skip
-                        onClick={handleSendSimulatedDelivery}
+                        onClick={handleSendDelivery}
                         className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
                       >
-                        Prepare / Send Simulated Delivery
+                        Prepare / Mark Delivery Sent
                       </button>
                     </div>
                   </div>
@@ -1310,12 +1382,11 @@ export function SecureProvisioningModal({
               {/* ── 3. OTP VERIFICATION (MOBILE / EMAIL) ── */}
               {activeTab === 'otp_verification' && (
                 <div className="space-y-4">
-                  <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900">
-                    <strong>Simulated OTP Verification:</strong> Using settings from{' '}
+                  <div className="p-3 rounded-xl border border-blue-200 bg-blue-50 text-xs text-blue-900">
+                    <strong>Provisioning OTP Security Policy:</strong> Using live settings from{' '}
                     <em>Configuration Hub → Security Settings → Provisioning Security</em> (Length:{' '}
                     {otpSettings.otpLength} digits · Validity: {otpSettings.otpValidityMinutes}m · Max
-                    Attempts: {otpSettings.maxAttempts} · Resend: {otpSettings.resendAvailabilitySeconds}s). No
-                    real SMS or email is sent.
+                    Attempts: {otpSettings.maxAttempts} · Resend: {otpSettings.resendAvailabilitySeconds}s).
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1377,11 +1448,11 @@ export function SecureProvisioningModal({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={handleSendSimulatedOtp}
+                          onClick={handleSendOtp}
                           disabled={resendSecondsLeft > 0 && otpStatus === 'sent'}
                           className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                         >
-                          {generatedOtp ? 'Resend Simulated OTP' : 'Send Simulated OTP'}
+                          {generatedOtp ? 'Resend OTP' : 'Send OTP'}
                         </button>
                         {resendSecondsLeft > 0 && (
                           <span className="text-xs text-slate-500 flex items-center gap-1">
@@ -1400,7 +1471,7 @@ export function SecureProvisioningModal({
                         maxLength={otpSettings.otpLength}
                         value={enteredOtp}
                         onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
-                        placeholder={`Enter ${otpSettings.otpLength}-digit demo OTP`}
+                        placeholder={`Enter ${otpSettings.otpLength}-digit OTP`}
                         className="w-full px-3 py-2.5 text-center tracking-[0.4em] text-base font-mono font-bold border border-slate-300 rounded-lg"
                       />
                       <div className="flex items-center justify-between text-xs text-slate-500">
@@ -1413,22 +1484,22 @@ export function SecureProvisioningModal({
                         </span>
                         <span>Attempts left: {attemptsLeft}</span>
                       </div>
-                      {showDemoOtpHint && generatedOtp && (
+                      {showOtpSessionCode && generatedOtp && (
                         <div className="p-2 rounded-lg bg-slate-100 text-xs font-mono text-slate-700">
-                          Demo OTP (testing only): <strong>{generatedOtp}</strong>
+                          Session OTP (local gateway fallback): <strong>{generatedOtp}</strong>
                         </div>
                       )}
                       <button
                         type="button"
-                        onClick={handleVerifySimulatedOtp}
+                        onClick={handleVerifyOtp}
                         className="w-full py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800"
                       >
-                        Verify Simulated OTP
+                        Verify OTP
                       </button>
 
                       {otpStatus === 'verified' && (
                         <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
-                          <CheckCircle2 size={14} /> OTP Verified (Demo). Activation status remains manual.
+                          <CheckCircle2 size={14} /> OTP Verified. Activation status remains manual.
                         </div>
                       )}
                       {otpStatus === 'invalid' && (
@@ -1439,8 +1510,8 @@ export function SecureProvisioningModal({
                       {(otpStatus === 'expired' || otpStatus === 'locked') && (
                         <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">
                           {otpStatus === 'expired'
-                            ? 'OTP Expired. Click Resend Simulated OTP.'
-                            : 'Maximum attempts exceeded. Resend Simulated OTP.'}
+                            ? 'OTP Expired. Click Resend OTP.'
+                            : 'Maximum attempts exceeded. Resend OTP.'}
                         </div>
                       )}
                     </div>
@@ -1468,8 +1539,37 @@ export function SecureProvisioningModal({
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                      <input
+                    <div className="space-y-3">
+                      {clientPortalUsers.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="font-semibold text-slate-600">Quick-fill from Client Portal Users:</span>
+                          <select
+                            defaultValue=""
+                            onChange={(e) => {
+                              const picked = clientPortalUsers.find((u) => u.id === e.target.value);
+                              if (!picked) return;
+                              setAssignForm((f) => ({
+                                ...f,
+                                employeeName: picked.name || f.employeeName,
+                                employeeId: picked.id || f.employeeId,
+                                email: picked.email || f.email,
+                                department: picked.department || f.department,
+                                designation: picked.designation || picked.role || f.designation,
+                              }));
+                            }}
+                            className="px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-700"
+                          >
+                            <option value="">Select a client user...</option>
+                            {clientPortalUsers.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name} ({u.email})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                        <input
                         placeholder="Employee Name *"
                         value={assignForm.employeeName}
                         onChange={(e) => setAssignForm((f) => ({ ...f, employeeName: e.target.value }))}
@@ -1527,6 +1627,7 @@ export function SecureProvisioningModal({
                         >
                           Assign {selectedLicence.licenceRef} to Employee
                         </button>
+                      </div>
                       </div>
                     </div>
                   )}

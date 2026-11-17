@@ -6692,8 +6692,8 @@ export default function MyOrderPage() {
               subId: provisionedDeliveryTarget.subId,
               itemName: provisionedDeliveryTarget.itemName,
               qty: matchedSub?.qty || 1,
-              recipientEmail: provisionedDeliveryTarget.deliveryEmail || provisionedClientEmails[0]?.value,
-              recipientMobile: clientInfo?.phone || "+91 98765 43210",
+              recipientEmail: provisionedDeliveryTarget.deliveryEmail || provisionedClientEmails[0]?.value || "",
+              recipientMobile: clientInfo?.phone || "",
             });
             setProvisionedDeliveryTarget(null);
           }}
@@ -6823,8 +6823,8 @@ export default function MyOrderPage() {
                     subId: viewingProvisionDetails.subId || matchedSub?.id || `${orderId}-LIC`,
                     itemName: viewingProvisionDetails.itemName,
                     qty: viewingProvisionDetails.qty || matchedSub?.qty || 1,
-                    recipientEmail: viewingProvisionDetails.details.recipients?.[0] || provisionedClientEmails[0]?.value,
-                    recipientMobile: clientInfo?.phone || "+91 98765 43210",
+                    recipientEmail: viewingProvisionDetails.details.recipients?.[0] || provisionedClientEmails[0]?.value || "",
+                    recipientMobile: clientInfo?.phone || "",
                   });
                   setViewingProvisionDetails(null);
                 }}

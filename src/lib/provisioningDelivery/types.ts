@@ -14,8 +14,8 @@ export type ActivationStatus =
 export type DeliveryStatus =
   | 'Not Prepared'
   | 'Ready'
-  | 'Sent (Simulated)'
-  | 'Delivered (Simulated)'
+  | 'Sent'
+  | 'Delivered'
   | 'Revoked';
 
 export type LinkExpiryOption = '24 hours' | '48 hours' | '7 days';
@@ -54,10 +54,13 @@ export interface LicenceActivationRecord {
 }
 
 export interface LicenceDeliveryRecord {
-  encryptionStatus: 'Pending' | 'Encrypted (Simulated)';
+  encryptionStatus: 'Pending' | 'Encrypted';
   encryptionMethod: 'AES-256-GCM';
+  encryptionFingerprint?: string;
   secureLinkPreview: string;
+  linkToken: string;
   linkExpiry: LinkExpiryOption;
+  linkExpiresAt: number;
   downloadLimit: number;
   downloadCount: number;
   deliveryStatus: DeliveryStatus;
@@ -74,11 +77,12 @@ export interface LicenceRecord {
   licenceRef: string;
   productName: string;
   registrationType: RegistrationType;
-  /** Masked preview only — raw keys are kept in memory during the session and never persisted to localStorage. */
+  /** Masked preview for table display; raw key/file payloads are encrypted via Web Crypto AES-256-GCM in IndexedDB. */
   keyMaskedPreview?: string;
-  hasKeyInSession?: boolean;
+  hasKeyInVault?: boolean;
+  hasFileInVault?: boolean;
   fileMetadata?: RegistrationFileMetadata;
-  processingStatus: 'Pending' | 'Processed (Demo)';
+  processingStatus: 'Pending' | 'Provisioned';
   assignmentStatus: AssignmentStatus;
   assignedEmployee?: LicenceAssignmentRecord;
   previousAssignments: LicenceAssignmentRecord[];
@@ -92,9 +96,9 @@ export type ProvisioningActivityType =
   | 'Registration file uploaded'
   | 'Encryption status changed'
   | 'Delivery notification prepared'
-  | 'Secure link generated (simulated)'
-  | 'OTP verification attempted (simulated)'
-  | 'File downloaded (simulated)'
+  | 'Secure link generated'
+  | 'OTP verification attempted'
+  | 'File downloaded'
   | 'Licence assigned'
   | 'Activation details updated'
   | 'Licence reassigned'

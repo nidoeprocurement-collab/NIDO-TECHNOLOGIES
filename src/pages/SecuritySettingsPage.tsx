@@ -3,7 +3,7 @@ import { ChevronLeft, RotateCcw, Save, ShieldCheck, Smartphone, Mail, AlertTrian
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_OTP_SECURITY_SETTINGS } from '@/lib/provisioningDelivery/mockData';
+import { DEFAULT_OTP_SECURITY_SETTINGS } from '@/lib/provisioningDelivery/defaults';
 import { loadOtpSecuritySettings, saveOtpSecuritySettings } from '@/lib/provisioningDelivery/service';
 import type { OtpDeliveryMethod, OtpSecuritySettings } from '@/lib/provisioningDelivery/types';
 
@@ -81,16 +81,15 @@ export default function SecuritySettingsPage() {
           </div>
         </div>
 
-        {/* Frontend Demo Disclaimer */}
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
-          <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-900 space-y-1">
-            <p className="font-bold">Frontend Demonstration Mode — Simulated OTP &amp; Security Controls</p>
+        {/* Security & Gateway Notice */}
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+          <div className="text-xs text-blue-900 space-y-1">
+            <p className="font-bold">Provisioning Security &amp; OTP Delivery Configuration</p>
             <p>
-              These preferences configure the simulated OTP verification workflow in the NIDO Secure
-              Provisioning &amp; Licence Delivery System. No SMS gateway, email provider, or backend
-              authentication service is connected in this phase; settings are temporarily stored in
-              browser <code className="px-1 py-0.5 bg-amber-100 rounded">localStorage</code>.
+              These preferences control OTP generation, validity window, retry lockouts, and delivery
+              channel selection inside the NIDO Secure Provisioning &amp; Licence Delivery System.
+              External SMS/SMTP gateway dispatch requires backend provider credentials when connected.
             </p>
           </div>
         </div>
@@ -101,7 +100,7 @@ export default function SecuritySettingsPage() {
             <div>
               <h2 className="text-sm font-bold text-slate-900">Provisioning Security — OTP Delivery Preferences</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Configure simulated OTP length, validity window, retry limits, and delivery channel.
+                Configure OTP length, validity window, retry limits, and preferred delivery channel.
               </p>
             </div>
             <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">

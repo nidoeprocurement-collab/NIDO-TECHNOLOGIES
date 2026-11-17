@@ -1,8 +1,8 @@
 import {
-  createDefaultWorkspaceForOrder,
+  createWorkspaceForOrder,
   DEFAULT_OTP_SECURITY_SETTINGS,
   formatDateStamp,
-} from './mockData';
+} from './defaults';
 import type {
   LicenceRecord,
   OtpSecuritySettings,
@@ -11,11 +11,8 @@ import type {
   ProvisioningWorkspaceState,
 } from './types';
 
-// Temporary frontend demonstration storage keys.
-// Replace these methods with Supabase/API calls during backend integration.
-// NOTE: Real registration keys and confidential file contents are NEVER stored in localStorage.
-const SECURITY_SETTINGS_KEY = 'nido_provisioning_security_demo_v1';
-const WORKSPACE_PREFIX = 'nido_provisioning_demo_v1_';
+const SECURITY_SETTINGS_KEY = 'nido_provisioning_security_v1';
+const WORKSPACE_PREFIX = 'nido_provisioning_workspace_v1_';
 
 export interface ProvisioningSummaryCounts {
   totalPurchased: number;
@@ -54,7 +51,7 @@ export function saveOtpSecuritySettings(settings: OtpSecuritySettings): void {
     localStorage.setItem(SECURITY_SETTINGS_KEY, JSON.stringify(settings));
     window.dispatchEvent(new CustomEvent('provisioningSecuritySettingsUpdated'));
   } catch {
-    // Ignore storage quota issues in frontend demo mode
+    // Ignore storage quota errors
   }
 }
 
@@ -83,9 +80,9 @@ export function loadProvisioningWorkspace(
       }
     }
   } catch {
-    // Fall back to default mock/initial state
+    // Fall back to fresh workspace
   }
-  return createDefaultWorkspaceForOrder(
+  return createWorkspaceForOrder(
     orderId,
     subOrderId,
     clientName,
@@ -97,17 +94,9 @@ export function loadProvisioningWorkspace(
 export function saveProvisioningWorkspace(state: ProvisioningWorkspaceState): void {
   const key = `${WORKSPACE_PREFIX}${state.orderId}_${state.subOrderId}`;
   try {
-    // Strip any transient session-only flags; never persist raw keys or file blobs in localStorage.
-    const sanitized: ProvisioningWorkspaceState = {
-      ...state,
-      licences: state.licences.map((lic) => ({
-        ...lic,
-        hasKeyInSession: Boolean(lic.keyMaskedPreview),
-      })),
-    };
-    localStorage.setItem(key, JSON.stringify(sanitized));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch {
-    // Ignore storage quota issues in frontend demo mode
+    // Ignore storage quota errors
   }
 }
 
@@ -121,13 +110,13 @@ export function createActivityEntry(
   const now = new Date();
   const { date, time } = formatDateStamp(now);
   return {
-    id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `ACT-${now.getTime()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     licenceRef,
     date,
     time,
     timestamp: now.getTime(),
     activity,
-    userResponsible: userResponsible || 'System Admin',
+    userResponsible: userResponsible || 'NIDO Admin',
     status,
     remarks,
   };
@@ -137,18 +126,24 @@ export function computeLicenceSummary(
   licences: LicenceRecord[],
   purchasedQuantity?: number,
 ): ProvisioningSummaryCounts {
-  const totalPurchased = Math.max(purchasedQuantity ?? 0, licences.length);
-  const available = licences.filter((l) => l.assignmentStatus === 'Available').length;
-  const assigned = licences.filter((l) => l.assignmentStatus === 'Assigned').length;
-  const activated = licences.filter((l) => l.activationRecord.status === 'Activated').length;
-  const pendingActivations = licences.filter(
-    (l) =>
-      l.activationRecord.status === 'Not Activated' ||
-      l.activationRecord.status === 'Activation Pending',
-  ).length;
-  const expired = licences.filter((l) => l.activationRecord.status === 'Expired').length;
+  let available = 0;
+  let assigned = 0;
+  let activated = 0;
+  let pendingActivations = 0;
+  let expired = 0;
+
+  for (const lic of licences) {
+    if (lic.assignmentStatus === 'Available') available += 1;
+    else assigned += 1;
+
+    const act = lic.activationRecord.status;
+    if (act === 'Activated') activated += 1;
+    else if (act === 'Not Activated' || act === 'Activation Pending') pendingActivations += 1;
+    else if (act === 'Expired') expired += 1;
+  }
+
   return {
-    totalPurchased,
+    totalPurchased: Math.max(licences.length, purchasedQuantity || 0),
     available,
     assigned,
     activated,
@@ -156,4 +151,3 @@ export function computeLicenceSummary(
     expired,
   };
 }
-
