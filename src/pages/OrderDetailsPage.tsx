@@ -264,13 +264,18 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
     return totalAdj;
   };
 
-  const getClientSellingUnitPrice = (c: VendorComparisonRow): number => {
+  const getVendorLandedCost = (c: VendorComparisonRow): number => {
     const configAdj = getVendorConfigAdjustment(c);
     const effectiveVendorPrice = Math.max(0, c.basePrice + configAdj);
     const effectiveVendorLandedCost =
       configAdj !== 0 || isDigital
         ? getLandedCost(effectiveVendorPrice, getVendorCommonSettings(c.vendorId), sub.category || "")
         : c.landedCostPerUnit;
+    return effectiveVendorLandedCost > 0 ? effectiveVendorLandedCost : effectiveVendorPrice;
+  };
+
+  const getClientSellingUnitPrice = (c: VendorComparisonRow): number => {
+    const effectiveVendorLandedCost = getVendorLandedCost(c);
     return clientId
       ? computeClientSellingPriceExclGst(
           clientId,
@@ -409,7 +414,7 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
     return {
       vendorId,
       vendorName: c?.vendorName || vendorId,
-      unitPrice: c?.landedCostPerUnit || 0,
+      unitPrice: c ? getVendorLandedCost(c) : 0,
       clientSellingPriceExclGst: c ? getClientSellingUnitPrice(c) : 0,
       location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : "",
       gstin: v?.taxId || (v as any)?.pan || "",
@@ -4786,7 +4791,10 @@ export default function MyOrderPage() {
         setVendorTarget(null);
         return;
       }
-      const updatedUnitPrice = Number(meta.unitPrice ?? line.unitPrice ?? 0);
+      const resolvedMetaPrice = Number(meta.unitPrice) || 0;
+      const updatedUnitPrice = resolvedMetaPrice > 0
+        ? resolvedMetaPrice
+        : (Number(line.unitPrice) || Number(currentSubOrder?.vendorSelectionMeta?.unitPrice) || 0);
       const movedLine = {
         ...line,
         subOrderId: subId,
@@ -4934,12 +4942,19 @@ export default function MyOrderPage() {
         };
         savePO(replacementPO);
         refreshDraftPOPdf(replacementPO);
+        setPoRefreshKey(k => k + 1);
       }
     } else if ((wasCancelled || needsReplacementPO) && previousSubOrder) {
       // A cancelled sub-order or cancelled PO is retained for audit history.
       // Create a fresh Draft PO for the replacement vendor rather than
       // changing the cancelled procurement record.
-      const unitPrice = Number(meta.unitPrice || String(previousSubOrder.unitPrice || "").replace(/[^\d.-]/g, "") || 0);
+      const unitPrice = Number(
+        meta.unitPrice ||
+        previousSubOrder.vendorSelectionMeta?.unitPrice ||
+        String(previousSubOrder.unitPrice || "").replace(/[^\d.-]/g, "") ||
+        previousSubOrder.unitPriceExclGst ||
+        0,
+      );
       const qty = Number(previousSubOrder.qty || 0);
       const gstPct = getEffectiveTaxPctForCategory(previousSubOrder.category);
       const lineSubtotal = unitPrice * qty;
@@ -5005,6 +5020,8 @@ export default function MyOrderPage() {
         }],
       };
       savePO(replacementPO);
+      refreshDraftPOPdf(replacementPO);
+      setPoRefreshKey(k => k + 1);
     }
     setVendorTarget(null);
   };
