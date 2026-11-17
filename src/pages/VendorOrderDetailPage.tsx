@@ -23,6 +23,7 @@ import ProductConfigurationSummary from "@/components/shared/ProductConfiguratio
 import { getProductSpecLines } from "@/lib/productConfiguration";
 import { useMyOrders, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
 import { appendOrderActivity, createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
+import { toast } from "sonner";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -491,13 +492,11 @@ function ProvisionedDetailsModal({
   const [mailDetails, setMailDetails] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileDataUrl, setFileDataUrl] = useState<string>("");
+  const [validationError, setValidationError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const canSave = method === "activated"
-    ? Boolean(howActivated.trim() && activatedAt.trim())
-    : Boolean(mailDetails.trim() && file && fileDataUrl);
-
   const handleFileChange = (selected: File | null) => {
+    setValidationError("");
     setFile(selected);
     setFileDataUrl("");
     if (!selected) return;
@@ -507,11 +506,50 @@ function ProvisionedDetailsModal({
         setFileDataUrl(reader.result);
       }
     };
+    reader.onerror = () => {
+      const msg = "Could not read the selected file. Please choose another file.";
+      setValidationError(msg);
+      toast.error(msg);
+    };
     reader.readAsDataURL(selected);
   };
 
   const handleSubmit = () => {
-    if (!canSave) return;
+    if (method === "activated") {
+      if (!howActivated.trim()) {
+        const msg = "Please enter how the product was activated (How was it activated? *).";
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!activatedAt.trim()) {
+        const msg = "Please select the activation date (When was it done? *).";
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+    } else {
+      if (!mailDetails.trim()) {
+        const msg = "Please enter Key / Mail Details * before saving.";
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!file) {
+        const msg = "Please upload the license / key file (Upload File *) before saving.";
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+      if (!fileDataUrl) {
+        const msg = "File is still loading or could not be read. Please wait a moment or re-select the file.";
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+    }
+    setValidationError("");
+
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " +
       now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -674,23 +712,29 @@ function ProvisionedDetailsModal({
               </div>
             </>
           )}
+          {validationError && (
+            <div style={{ padding: "10px 12px", borderRadius: 7, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>
+              {validationError}
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px", borderTop: "1px solid #f3f4f6" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+          <button type="button" onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
             Cancel
           </button>
           <button
+            type="button"
+            data-confirmation-skip
             onClick={handleSubmit}
-            disabled={!canSave}
             style={{
               flex: 1,
               padding: "9px 0",
               border: "none",
               borderRadius: 7,
-              background: canSave ? "#2563eb" : "#93c5fd",
+              background: "#2563eb",
               color: "#fff",
-              cursor: canSave ? "pointer" : "not-allowed",
+              cursor: "pointer",
               fontWeight: 600,
               fontSize: 13,
               fontFamily: "inherit",
