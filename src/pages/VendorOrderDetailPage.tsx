@@ -22,7 +22,7 @@ import { derivePOFulfillmentStatus, promoteOrderSubItemsToProcessingForPO } from
 import ProductConfigurationSummary from "@/components/shared/ProductConfigurationSummary";
 import { getProductSpecLines } from "@/lib/productConfiguration";
 import { useMyOrders, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
-import { createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
+import { appendOrderActivity, createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -1481,6 +1481,24 @@ export default function VendorOrderDetailPage() {
       const text = `${currentItem?.name || "Item"} status changed from ${previousStatus} to ${savedStatus}.`;
       const activity = makePOActivity(text, "status-change", `activity_item_status_${poKey}_${id}_${savedStatus}_${Date.now()}`);
       appendPOActivity(poKey, activity);
+
+      if (
+        po.orderId &&
+        ((!digital && savedStatus === "Delivered") || (digital && savedStatus === "Validated"))
+      ) {
+        const subId = po.items[itemIndex]?.subOrderId || po.subOrderIds?.[itemIndex] || po.subOrderId || "";
+        const itemLabel = currentItem?.name || "Product";
+        const vendorLabel = po.vendorName || initialData.vendor?.name || initialData.vendorName || "Vendor";
+        const orderNoteText =
+          `RECEIVED AT NIDO PLATFORM: ${itemLabel}${subId ? ` (${subId})` : ""} from PO ${po.poNumber} has been marked ${savedStatus} by ${vendorLabel}. Please move/update this item to the client in My Order Details.`;
+        appendOrderActivity(po.orderId, orderNoteText, {
+          actor: getActivityActor(vendorLabel),
+          eventType: "status-change",
+          visibility: "Internal Note",
+          bold: true,
+          id: `vendor_received_${po.orderId}_${poKey}_${id}_${savedStatus}_${Date.now()}`,
+        });
+      }
     }
   };
   const confirmItemCancel = (reason: string) => {

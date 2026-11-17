@@ -2430,7 +2430,7 @@ function DocumentsNotesTab({
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+              <div style={{ fontSize: 13.5, color: (note as any).bold ? "#111827" : "#374151", fontWeight: (note as any).bold ? 700 : 400, lineHeight: 1.6, whiteSpace: "pre-line" }}>
                 {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
                 {note.text}
               </div>

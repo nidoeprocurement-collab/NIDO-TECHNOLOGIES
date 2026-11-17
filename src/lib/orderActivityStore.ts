@@ -9,6 +9,7 @@ export interface ActivityNote {
   text: string;
   visibility: string;
   kind?: ActivityEventType;
+  bold?: boolean;
 }
 
 const orderNotesKey = (orderId: string) => `nido_notes_${orderId}`;
@@ -41,6 +42,7 @@ export function createActivityNote(
     visibility?: string;
     id?: string;
     date?: string;
+    bold?: boolean;
   } = {},
 ): ActivityNote {
   const actor = options.actor?.trim() || getActivityActor();
@@ -60,6 +62,7 @@ export function createActivityNote(
     text,
     visibility: options.visibility || "Internal Note",
     kind: options.eventType || "activity",
+    ...(options.bold ? { bold: true } : {}),
   };
 }
 
