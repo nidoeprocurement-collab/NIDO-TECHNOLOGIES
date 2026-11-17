@@ -2663,37 +2663,8 @@ function ProvisionedDeliveryModal({
   );
   const [activationNotes, setActivationNotes] = useState(vendorNotes || "");
   const [mailNotes, setMailNotes] = useState(vendorNotes || "");
-  const [selectedClientEmail, setSelectedClientEmail] = useState(
-    initialEmail || clientEmails[0]?.value || "",
-  );
-  const [extraEmail, setExtraEmail] = useState("");
-  const [attachedDoc, setAttachedDoc] = useState<any>(vendorDocument || null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (selected: File | null) => {
-    if (!selected) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        const now = new Date();
-        const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " +
-          now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-        setAttachedDoc({
-          id: "d" + Date.now(),
-          name: selected.name,
-          ext: selected.name.split(".").pop()?.toLowerCase() || "file",
-          type: "License / Activation Key",
-          uploadedBy: "System Owner",
-          uploadedOn: dateStr,
-          dataUrl: reader.result,
-        });
-        setError("");
-      }
-    };
-    reader.readAsDataURL(selected);
-  };
 
   const save = async () => {
     if (method === "activated") {
@@ -2715,35 +2686,11 @@ function ProvisionedDeliveryModal({
       return;
     }
 
-    const extraList = extraEmail
-      .split(",")
-      .map(e => e.trim())
-      .filter(Boolean);
-    for (const em of extraList) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
-        setError(`Enter a valid email address: ${em}`);
-        return;
-      }
-    }
-    const recipients = Array.from(
-      new Set([selectedClientEmail.trim(), ...extraList].filter(Boolean)),
-    );
-    if (recipients.length === 0) {
-      setError("Select a client email or enter an email address.");
-      return;
-    }
-    if (!attachedDoc) {
-      setError("Attach the license / key document before sending.");
-      return;
-    }
-
     setSubmitting(true);
     try {
       await onSave({
         method: "key_received_via_mail",
         notes: mailNotes.trim() || undefined,
-        recipients,
-        document: attachedDoc,
       });
     } finally {
       setSubmitting(false);
@@ -2757,6 +2704,23 @@ function ProvisionedDeliveryModal({
           <div style={{ fontSize: 13, color: "#4b5563" }}>
             Item: <strong style={{ color: "#111827" }}>{itemName}</strong>
           </div>
+
+          {onOpenSecureProvisioning && (
+            <div style={{ padding: "10px 12px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontSize: 12, color: "#1e40af", lineHeight: 1.4 }}>
+                <strong>NIDO Secure Provisioning &amp; Licence Delivery</strong>
+                <div style={{ fontSize: 11, color: "#3b82f6" }}>Manage keys, AES-256-GCM encryption, OTP verification, assignments &amp; history.</div>
+              </div>
+              <button
+                type="button"
+                data-confirmation-skip
+                onClick={onOpenSecureProvisioning}
+                style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}
+              >
+                Open Workspace
+              </button>
+            </div>
+          )}
 
           {/* Method selector: locked to vendor selection when available */}
           <div style={{ display: "grid", gridTemplateColumns: lockedMethod ? "1fr" : "1fr 1fr", gap: 10 }}>
@@ -2841,98 +2805,24 @@ function ProvisionedDeliveryModal({
               </div>
             </>
           ) : (
-            <>
-              <div>
-                <label style={lbSt}>Attached Document *</label>
-                <div
-                  onClick={() => fileRef.current?.click()}
-                  style={{ border: "1.5px dashed #cbd5e1", borderRadius: 8, padding: "12px 14px", background: "#f8fafc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}
-                >
-                  {attachedDoc ? (
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#15803d", overflowWrap: "anywhere" }}>
-                      📄 {attachedDoc.name} {vendorDocument?.name === attachedDoc.name ? "(Attached from Vendor Order)" : ""}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 12.5, color: "#6b7280" }}>📁 Click to upload license / key document</div>
-                  )}
-                  <span style={{ fontSize: 11.5, color: "#2563eb", fontWeight: 600, flexShrink: 0 }}>
-                    {attachedDoc ? "Replace" : "Choose file"}
-                  </span>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    style={{ display: "none" }}
-                    onChange={e => handleFileChange(e.target.files?.[0] || null)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={lbSt}>Client Email ID</label>
-                {clientEmails.length > 0 ? (
-                  <select
-                    value={selectedClientEmail}
-                    onChange={e => { setSelectedClientEmail(e.target.value); setError(""); }}
-                    style={inSt}
-                  >
-                    <option value="">-- Select client email --</option>
-                    {clientEmails.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>
-                    No saved client emails found. Enter an email below.
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={lbSt}>Extra Email ID (optional)</label>
-                <input
-                  type="text"
-                  value={extraEmail}
-                  onChange={e => { setExtraEmail(e.target.value); setError(""); }}
-                  placeholder="Enter additional email(s), comma-separated"
-                  style={inSt}
-                />
-              </div>
-
-              <div>
-                <label style={lbSt}>Notes (optional)</label>
-                <textarea
-                  rows={3}
-                  value={mailNotes}
-                  onChange={e => setMailNotes(e.target.value)}
-                  placeholder="Add notes to include with the delivery and save in Order Notes..."
-                  style={{ ...inSt, resize: "vertical" }}
-                />
-              </div>
-            </>
+            <div>
+              <label style={lbSt}>Notes (optional)</label>
+              <textarea
+                rows={3}
+                value={mailNotes}
+                onChange={e => setMailNotes(e.target.value)}
+                placeholder="Add notes to save in Order Notes..."
+                style={{ ...inSt, resize: "vertical" }}
+              />
+            </div>
           )}
 
           {error && <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>{error}</div>}
-          {onOpenSecureProvisioning && (
-            <div style={{ padding: "10px 12px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontSize: 12, color: "#1e40af", lineHeight: 1.4 }}>
-                <strong>NIDO Secure Provisioning &amp; Licence Delivery</strong>
-                <div style={{ fontSize: 11, color: "#3b82f6" }}>Manage keys, simulated encryption, OTP verification, assignments &amp; history.</div>
-              </div>
-              <button
-                type="button"
-                data-confirmation-skip
-                onClick={onOpenSecureProvisioning}
-                style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}
-              >
-                Open Workspace
-              </button>
-            </div>
-          )}
         </div>
         <ModalFooter
           onCancel={onClose}
           onSave={save}
-          saveLabel={submitting ? "Saving..." : method === "key_received_via_mail" ? "Save Details & Send Mail" : "Save Details"}
+          saveLabel={submitting ? "Saving..." : "Save Details"}
           saveDisabled={submitting}
           skipConfirmation
         />
@@ -4430,22 +4320,24 @@ export default function MyOrderPage() {
     const base64Content = typeof doc?.dataUrl === "string" && doc.dataUrl.includes(",")
       ? doc.dataUrl.slice(doc.dataUrl.indexOf(",") + 1)
       : "";
-    const emailResult = await sendEmail({
-      templateKey: "digital_license_delivery",
-      to: recipients.join(", "),
-      variables: {
-        client_name: order?.client || "Client",
-        order_number: orderId,
-        item_name: target.itemName,
-        document_name: doc?.name || "",
-        notes: payload.notes || "—",
-      },
-      attachments: base64Content && doc?.name
-        ? [{ filename: doc.name, content: base64Content }]
-        : [],
-      triggerModule: "order_details_digital_provisioned",
-      sentBy: user?.email || user?.name || "System Owner",
-    });
+    const emailResult = recipients.length > 0
+      ? await sendEmail({
+          templateKey: "digital_license_delivery",
+          to: recipients.join(", "),
+          variables: {
+            client_name: order?.client || "Client",
+            order_number: orderId,
+            item_name: target.itemName,
+            document_name: doc?.name || "",
+            notes: payload.notes || "—",
+          },
+          attachments: base64Content && doc?.name
+            ? [{ filename: doc.name, content: base64Content }]
+            : [],
+          triggerModule: "order_details_digital_provisioned",
+          sentBy: user?.email || user?.name || "System Owner",
+        })
+      : { success: false as const };
 
     const deliveryDetails = {
       deliveryMode: "Email" as const,
@@ -4469,14 +4361,16 @@ export default function MyOrderPage() {
     }
 
     queueDocumentsAuditNote(
-      `Digital Provisioning Completed (Key received via mail)\nItem: ${target.itemName}\nSent to: ${recipients.join(", ")}\nAttached Document: ${doc?.name || "None"}${payload.notes ? `\nNotes: ${payload.notes}` : ""}`,
+      `Digital Provisioning Completed (Key received via mail)\nItem: ${target.itemName}${recipients.length > 0 ? `\nSent to: ${recipients.join(", ")}` : ""}${doc?.name ? `\nAttached Document: ${doc.name}` : ""}${payload.notes ? `\nNotes: ${payload.notes}` : ""}`,
       "status-change",
     );
 
-    if (emailResult.success) {
+    if (recipients.length > 0 && emailResult.success) {
       toast.success(`Details saved and key sent to ${recipients.join(", ")}.`);
-    } else {
+    } else if (recipients.length > 0) {
       toast.success(`Details saved and recorded for ${recipients.join(", ")}.`);
+    } else {
+      toast.success("Provisioning details saved.");
     }
     setProvisionedDeliveryTarget(null);
   };
@@ -6695,18 +6589,42 @@ export default function MyOrderPage() {
               recipientEmail: provisionedDeliveryTarget.deliveryEmail || provisionedClientEmails[0]?.value || "",
               recipientMobile: clientInfo?.phone || "",
             });
-            setProvisionedDeliveryTarget(null);
           }}
           onSave={saveProvisionedDelivery}
           onClose={() => setProvisionedDeliveryTarget(null)}
         />
       )}
       {viewingProvisionDetails && (
-        <Overlay onClose={() => setViewingProvisionDetails(null)}>
-          <ModalBox title="Provisioning Details" onClose={() => setViewingProvisionDetails(null)} width={480}>
+        <Overlay onClose={() => setViewingProvisionDetails(null)} closeOnBackdrop={false}>
+          <ModalBox title="Provisioning Details" onClose={() => setViewingProvisionDetails(null)} width={520}>
             <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 12, fontSize: 13 }}>
               <div style={{ fontSize: 13, color: "#4b5563" }}>
                 Item: <strong style={{ color: "#111827" }}>{viewingProvisionDetails.itemName}</strong>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ fontSize: 12, color: "#1e40af", lineHeight: 1.4 }}>
+                  <strong>NIDO Secure Provisioning &amp; Licence Delivery</strong>
+                  <div style={{ fontSize: 11, color: "#3b82f6" }}>Manage keys, AES-256-GCM encryption, OTP verification, assignments &amp; history.</div>
+                </div>
+                <button
+                  type="button"
+                  data-confirmation-skip
+                  onClick={() => {
+                    const matchedSub = subOrders.find(
+                      s => s.id === viewingProvisionDetails.subId || s.itemName === viewingProvisionDetails.itemName,
+                    );
+                    setSecureProvisioningTarget({
+                      subId: viewingProvisionDetails.subId || matchedSub?.id || `${orderId}-LIC`,
+                      itemName: viewingProvisionDetails.itemName,
+                      qty: viewingProvisionDetails.qty || matchedSub?.qty || 1,
+                      recipientEmail: viewingProvisionDetails.details.recipients?.[0] || provisionedClientEmails[0]?.value || "",
+                      recipientMobile: clientInfo?.phone || "",
+                    });
+                  }}
+                  style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}
+                >
+                  Open Workspace
+                </button>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: 10, borderBottom: "1px solid #f3f4f6" }}>
                 <span style={{ color: "#6b7280", fontWeight: 500 }}>Provisioning Method</span>
@@ -6811,27 +6729,7 @@ export default function MyOrderPage() {
                 </div>
               )}
             </div>
-            <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#f9fafb" }}>
-              <button
-                type="button"
-                data-confirmation-skip
-                onClick={() => {
-                  const matchedSub = subOrders.find(
-                    s => s.id === viewingProvisionDetails.subId || s.itemName === viewingProvisionDetails.itemName,
-                  );
-                  setSecureProvisioningTarget({
-                    subId: viewingProvisionDetails.subId || matchedSub?.id || `${orderId}-LIC`,
-                    itemName: viewingProvisionDetails.itemName,
-                    qty: viewingProvisionDetails.qty || matchedSub?.qty || 1,
-                    recipientEmail: viewingProvisionDetails.details.recipients?.[0] || provisionedClientEmails[0]?.value || "",
-                    recipientMobile: clientInfo?.phone || "",
-                  });
-                  setViewingProvisionDetails(null);
-                }}
-                style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-              >
-                Secure Provisioning &amp; Licence Delivery
-              </button>
+            <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, background: "#f9fafb" }}>
               <button
                 type="button"
                 onClick={() => setViewingProvisionDetails(null)}
