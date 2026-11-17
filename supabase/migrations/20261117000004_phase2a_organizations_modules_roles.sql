@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS public.nido_organizations (
 CREATE INDEX IF NOT EXISTS idx_nido_organizations_status
   ON public.nido_organizations (status);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_nido_organizations_single_default
+  ON public.nido_organizations (is_default)
+  WHERE is_default = true;
+
 DROP TRIGGER IF EXISTS trg_nido_organizations_updated_at ON public.nido_organizations;
 CREATE TRIGGER trg_nido_organizations_updated_at
   BEFORE UPDATE ON public.nido_organizations
@@ -35,8 +39,8 @@ CREATE TRIGGER trg_nido_organizations_updated_at
 
 CREATE TABLE IF NOT EXISTS public.client_organizations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_code text NOT NULL UNIQUE CHECK (client_code ~ '^[A-Za-z]+-[0-9]+$'),
-  nido_org_id uuid REFERENCES public.nido_organizations(id) ON DELETE SET NULL,
+  client_code text NOT NULL UNIQUE CHECK (client_code ~ '^CL-[0-9]{5}$'),
+  nido_org_id uuid REFERENCES public.nido_organizations(id) ON DELETE RESTRICT,
   name text NOT NULL,
   category text,
   tier text,
@@ -310,10 +314,13 @@ ON CONFLICT (module_key) DO UPDATE SET
   label = EXCLUDED.label,
   group_key = EXCLUDED.group_key,
   group_label = EXCLUDED.group_label,
+  parent_module_key = EXCLUDED.parent_module_key,
   route_path = EXCLUDED.route_path,
+  source_origin = EXCLUDED.source_origin,
   is_core_group = EXCLUDED.is_core_group,
   display_order = EXCLUDED.display_order,
-  description = EXCLUDED.description;
+  description = EXCLUDED.description
+WHERE public.nido_module_catalog.is_custom = false;
 
 -- 4B. Remaining 39 Workbook Modules (Groups 2-6 of the 63-module catalogue)
 INSERT INTO public.nido_module_catalog (
@@ -370,7 +377,12 @@ ON CONFLICT (module_key) DO UPDATE SET
   group_key = EXCLUDED.group_key,
   group_label = EXCLUDED.group_label,
   parent_module_key = EXCLUDED.parent_module_key,
-  display_order = EXCLUDED.display_order;
+  route_path = EXCLUDED.route_path,
+  source_origin = EXCLUDED.source_origin,
+  is_core_group = EXCLUDED.is_core_group,
+  display_order = EXCLUDED.display_order,
+  description = EXCLUDED.description
+WHERE public.nido_module_catalog.is_custom = false;
 
 -- 4C. 74 Navigable Route-Level Page Keys (platformModuleCatalog.ts)
 INSERT INTO public.nido_module_catalog (
@@ -454,9 +466,15 @@ VALUES
   ('platform_audit_logs',                     'User Management › Audit Trail',                     'platform_pages', 'Platform Pages', 'audit_logs',       '/audit-logs',                     'platform_page', false, false, 174)
 ON CONFLICT (module_key) DO UPDATE SET
   label = EXCLUDED.label,
+  group_key = EXCLUDED.group_key,
+  group_label = EXCLUDED.group_label,
   parent_module_key = EXCLUDED.parent_module_key,
   route_path = EXCLUDED.route_path,
-  display_order = EXCLUDED.display_order;
+  source_origin = EXCLUDED.source_origin,
+  is_core_group = EXCLUDED.is_core_group,
+  display_order = EXCLUDED.display_order,
+  description = EXCLUDED.description
+WHERE public.nido_module_catalog.is_custom = false;
 
 -- ============================================================================
 -- 5. SEED CLIENT PORTAL MODULE CATALOG (34 Modules with Parent-Child Links)
@@ -533,3 +551,4 @@ REVOKE ALL ON TABLE public.nido_role_permissions FROM PUBLIC, anon, authenticate
 REVOKE ALL ON TABLE public.client_module_catalog FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.client_roles FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.client_role_permissions FROM PUBLIC, anon, authenticated;
+
