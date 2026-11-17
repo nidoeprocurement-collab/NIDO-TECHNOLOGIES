@@ -429,12 +429,40 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
     };
   };
 
+  const [pendingConfirmAllocs, setPendingConfirmAllocs] = useState<Array<{
+    vendorId: string;
+    qty: number;
+    meta: ReturnType<typeof buildMeta>;
+  }> | null>(null);
+
   const handleConfirm = () => {
     const allocs = selectedComps
       .map(c => ({ vendorId: c.vendorId, qty: rowQtys[c.vendorId] || 0, meta: buildMeta(c.vendorId) }))
       .filter(a => a.qty > 0);
     if (allocs.length === 0) return;
+
+    const primaryComp = selectedComps[0];
+    const prevUnitPrice = Math.max(
+      0,
+      Number(sub.originalUnitPriceExclGst ?? sub.unitPriceExclGst) || 0,
+    );
+    const nextUnitPrice = primaryComp ? getClientSellingUnitPrice(primaryComp) : prevUnitPrice;
+    const vendorChanged = Boolean(selectedVendorId && allocs[0].vendorId !== selectedVendorId);
+    const priceChanged = Math.abs(nextUnitPrice - prevUnitPrice) > 0.005;
+
+    if (vendorChanged || priceChanged) {
+      setPendingConfirmAllocs(allocs);
+      return;
+    }
+
     onSelect(sub.id, allocs);
+    onClose();
+  };
+
+  const handleFinalizeConfirm = () => {
+    if (!pendingConfirmAllocs || pendingConfirmAllocs.length === 0) return;
+    onSelect(sub.id, pendingConfirmAllocs);
+    setPendingConfirmAllocs(null);
     onClose();
   };
 
@@ -904,6 +932,122 @@ function VendorSelectionModal({ sub, clientId = "", selectedVendorId, excludedVe
             Confirm Selection
           </button>
         </div>
+
+        {/* ── Price Change Confirmation Popup ── */}
+        {pendingConfirmAllocs && pendingConfirmAllocs.length > 0 && (() => {
+          const nextAlloc = pendingConfirmAllocs[0];
+          const prevVendorName =
+            sub.selectedVendorName ||
+            sub.vendorName ||
+            (selectedVendorId ? getVendorById(selectedVendorId)?.name : "") ||
+            "Previous Vendor";
+          const nextVendorName = nextAlloc.meta.vendorName || nextAlloc.vendorId;
+          const prevUnitPrice = Math.max(
+            0,
+            Number(sub.originalUnitPriceExclGst ?? sub.unitPriceExclGst) || 0,
+          );
+          const nextComp = comparisons.find(c => c.vendorId === nextAlloc.vendorId);
+          const nextUnitPrice = nextComp
+            ? getClientSellingUnitPrice(nextComp)
+            : Number(nextAlloc.meta.clientSellingPriceExclGst ?? nextAlloc.meta.unitPrice) || 0;
+          const diffPerUnit = nextUnitPrice - prevUnitPrice;
+          const prevTotal = prevUnitPrice * sub.qty;
+          const nextTotal = nextUnitPrice * sub.qty;
+          const diffTotal = nextTotal - prevTotal;
+          const isIncrease = diffPerUnit > 0.005;
+          const isDecrease = diffPerUnit < -0.005;
+
+          return (
+            <div
+              style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 650, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+              onClick={() => setPendingConfirmAllocs(null)}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{ background: "#fff", borderRadius: 12, width: 480, maxWidth: "100%", boxShadow: "0 12px 40px rgba(0,0,0,0.22)", overflow: "hidden" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", borderBottom: "1px solid #e5e7eb" }}>
+                  <div>
+                    <div style={{ fontSize: 15.5, fontWeight: 700, color: "#111827" }}>Confirm Vendor Selection</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{sub.itemName} · {sub.qty} Nos</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPendingConfirmAllocs(null)}
+                    style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14, fontSize: 13 }}>
+                  {/* Direction badge */}
+                  <div style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: `1px solid ${isIncrease ? "#fed7aa" : isDecrease ? "#bbf7d0" : "#e5e7eb"}`,
+                    background: isIncrease ? "#fff7ed" : isDecrease ? "#f0fdf4" : "#f9fafb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}>
+                    <span style={{ fontWeight: 700, color: isIncrease ? "#c2410c" : isDecrease ? "#15803d" : "#374151" }}>
+                      {isIncrease
+                        ? "Price Change: Low → High"
+                        : isDecrease
+                          ? "Price Change: High → Low"
+                          : "No Price Change"}
+                    </span>
+                    <span style={{ fontWeight: 700, fontSize: 12.5, color: isIncrease ? "#c2410c" : isDecrease ? "#15803d" : "#6b7280" }}>
+                      {diffPerUnit > 0 ? `+${fmt(diffPerUnit)}` : diffPerUnit < 0 ? `-${fmt(Math.abs(diffPerUnit))}` : fmt(0)} / unit
+                    </span>
+                  </div>
+
+                  {/* Vendor comparison */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 4 }}>Previous Vendor</div>
+                      <div style={{ fontWeight: 700, color: "#111827", marginBottom: 8 }}>{prevVendorName}</div>
+                      <div style={{ fontSize: 12, color: "#4b5563" }}>Unit Price: <strong style={{ color: "#111827" }}>{fmt(prevUnitPrice)}</strong></div>
+                      <div style={{ fontSize: 12, color: "#4b5563", marginTop: 2 }}>Total: <strong style={{ color: "#111827" }}>{fmt(prevTotal)}</strong></div>
+                    </div>
+                    <div style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid #bfdbfe", background: "#eff6ff" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "#1d4ed8", marginBottom: 4 }}>Selected Vendor</div>
+                      <div style={{ fontWeight: 700, color: "#111827", marginBottom: 8 }}>{nextVendorName}</div>
+                      <div style={{ fontSize: 12, color: "#1e3a8a" }}>Unit Price: <strong>{fmt(nextUnitPrice)}</strong></div>
+                      <div style={{ fontSize: 12, color: "#1e3a8a", marginTop: 2 }}>Total: <strong>{fmt(nextTotal)}</strong></div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTop: "1px solid #f3f4f6", fontSize: 12.5 }}>
+                    <span style={{ color: "#6b7280", fontWeight: 500 }}>Total Order Line Impact ({sub.qty} Nos)</span>
+                    <span style={{ fontWeight: 700, color: isIncrease ? "#c2410c" : isDecrease ? "#15803d" : "#374151" }}>
+                      {diffTotal > 0 ? `+${fmt(diffTotal)}` : diffTotal < 0 ? `-${fmt(Math.abs(diffTotal))}` : fmt(0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ padding: "12px 22px", borderTop: "1px solid #e5e7eb", background: "#f9fafb", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPendingConfirmAllocs(null)}
+                    style={{ padding: "8px 18px", borderRadius: 7, border: "1px solid #d1d5db", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFinalizeConfirm}
+                    style={{ padding: "8px 22px", borderRadius: 7, border: "none", background: "#2563eb", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
