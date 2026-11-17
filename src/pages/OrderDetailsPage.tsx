@@ -6128,8 +6128,7 @@ export default function MyOrderPage() {
                         ) : <StatusPill status={sub.itemStatus} compact />}
                         <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div>
                         {subIsDigital && (() => {
-                          const poLine = canonicalPO?.items?.find((li: any) => li.subOrderId === sub.id) || canonicalPO?.items?.[0];
-                          const vp = (sub as any).provisioningDetails || poLine?.provisioningDetails;
+                          const vp = (sub as any).provisioningDetails;
                           if (!vp) return null;
                           const matchedVendorDoc = vp.documentName
                             ? canonicalPO?.documents?.find((d: any) => d.name === vp.documentName)
