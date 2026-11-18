@@ -71,6 +71,45 @@ Deno.serve(async (req) => {
       const { data: role, error: roleError } = await admin.from('client_roles')
         .select('id,client_id,status').eq('id', clientRoleId).eq('client_id', clientId).maybeSingle();
       if (roleError || !role || role.status !== 'active') throw new Error('Selected client role is unavailable or inactive for this organization');
+
+      // Client Admins may assign only roles whose permissions are a subset of
+      // their own. The initial Client Admin receives the tenant-scoped full
+      // access role created atomically by provision_client_org_admin().
+      if (isClientAdmin) {
+        const { data: actorProfile, error: actorProfileError } = await admin.from('client_users')
+          .select('client_role_id')
+          .eq('auth_user_id', actorId)
+          .eq('client_id', clientId)
+          .eq('user_type', 'client_admin')
+          .eq('status', 'active')
+          .maybeSingle();
+        if (actorProfileError || !actorProfile?.client_role_id) {
+          throw new Error('Client Admin must have an active permission role before assigning roles');
+        }
+
+        const permissionColumns = 'module_key,can_view,can_create,can_edit,can_delete,can_approve,can_export,can_import,can_manage,can_configure';
+        const [{ data: ownPermissions, error: ownPermissionsError }, { data: targetPermissions, error: targetPermissionsError }] = await Promise.all([
+          admin.from('client_role_permissions').select(permissionColumns)
+            .eq('client_id', clientId).eq('client_role_id', actorProfile.client_role_id),
+          admin.from('client_role_permissions').select(permissionColumns)
+            .eq('client_id', clientId).eq('client_role_id', clientRoleId),
+        ]);
+        if (ownPermissionsError || targetPermissionsError) {
+          throw new Error('Unable to verify delegated role permissions');
+        }
+
+        const ownByModule = new Map((ownPermissions ?? []).map((row) => [row.module_key, row]));
+        const permissionKeys = ['can_view','can_create','can_edit','can_delete','can_approve','can_export','can_import','can_manage','can_configure'] as const;
+        for (const targetPermission of targetPermissions ?? []) {
+          const ownPermission = ownByModule.get(targetPermission.module_key);
+          for (const key of permissionKeys) {
+            if (targetPermission[key] === true && ownPermission?.[key] !== true) {
+              throw new Error('Client Admin cannot assign a role with permissions they do not hold');
+            }
+          }
+        }
+      }
+
       const { data: org, error: orgError } = await admin.from('client_organizations')
         .select('id,status').eq('id', clientId).maybeSingle();
       if (orgError || !org || org.status !== 'Active') throw new Error('Client organization is unavailable or inactive');

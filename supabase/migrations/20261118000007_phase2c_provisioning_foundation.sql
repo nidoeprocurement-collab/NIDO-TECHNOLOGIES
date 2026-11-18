@@ -191,6 +191,7 @@ DECLARE
   v_client_id uuid;
   v_client_code text;
   v_client_user_id uuid;
+  v_client_admin_role_id uuid;
   v_email text := lower(btrim(p_email));
 BEGIN
   IF NOT app.is_trusted_backend() THEN
@@ -227,12 +228,35 @@ BEGIN
     'Active', p_actor_auth_user_id, p_actor_auth_user_id
   ) RETURNING id INTO v_client_id;
 
+  -- Option A: create a tenant-scoped Client Admin role with every catalogued
+  -- portal module and all nine supported actions enabled. This is full access
+  -- only inside this client organization; it grants no NIDO-internal authority.
+  INSERT INTO public.client_roles (
+    client_id, name, description, status, created_by, updated_by
+  ) VALUES (
+    v_client_id, 'Client Admin',
+    'Default full-access role for the initial Client Admin; scoped to this client organization.',
+    'active', p_actor_auth_user_id, p_actor_auth_user_id
+  ) RETURNING id INTO v_client_admin_role_id;
+
+   INSERT INTO public.client_role_permissions (
+    client_id, client_role_id, module_key,
+    can_view, can_create, can_edit, can_delete, can_approve,
+    can_export, can_import, can_manage, can_configure,
+    created_by, updated_by
+  )
+  SELECT
+    v_client_id, v_client_admin_role_id, cmc.module_key,
+    true, true, true, true, true, true, true, true, true,
+    p_actor_auth_user_id, p_actor_auth_user_id
+  FROM public.client_module_catalog cmc;
+
   INSERT INTO public.client_users (
-    auth_user_id, user_scope, client_id, user_type, name, email, phone,
+    auth_user_id, user_scope, client_id, user_type, client_role_id, name, email, phone,
     status, provision_reason, provisioned_at, created_by, updated_by,
     metadata
   ) VALUES (
-    p_auth_user_id, 'client_portal', v_client_id, 'client_admin',
+    p_auth_user_id, 'client_portal', v_client_id, 'client_admin', v_client_admin_role_id,
     btrim(p_name), v_email, p_phone, 'active', 'phase2c_invitation', now(),
     p_actor_auth_user_id, p_actor_auth_user_id,
     jsonb_build_object('provisioning_source', 'phase2c', 'invitation_status', 'sent')
