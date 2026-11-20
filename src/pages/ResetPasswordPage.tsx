@@ -1,229 +1,445 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+} from 'lucide-react';
+import type { EmailOtpType, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
-import { completePasswordReset } from '@/lib/passwordResetService';
-import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, Loader2, Lock, X, Zap } from 'lucide-react';
 
 const DEFAULT_LOGIN_LOGO = '/attached_assets/image_1786602878335.png';
 
-function getBrandName(displayName: string, industry: string) {
-  const match = (displayName || 'Nido Tech').match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-  return {
-    name: match ? match[1].trim() : (displayName || 'Nido Tech'),
-    subtitle: match ? match[2].trim() : (industry || null),
-  };
+interface ResetPasswordPageProps {
+  mode: 'request' | 'reset';
 }
 
-export default function ResetPasswordPage() {
+function extractRecoveryError(): string | null {
+  if (typeof window === 'undefined') return null;
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashRaw = window.location.hash.startsWith('#')
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const hashParams = new URLSearchParams(hashRaw);
+
+  const errorCode = searchParams.get('error') || hashParams.get('error');
+  const errorDesc =
+    searchParams.get('error_description') || hashParams.get('error_description');
+
+  if (errorCode || errorDesc) {
+    return errorDesc || 'This password recovery link is invalid or has expired.';
+  }
+  return null;
+}
+
+export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
   const navigate = useNavigate();
+  const { logout, isPasswordRecovery } = useAuth();
   const org = useOrgConfig();
-  const brand = getBrandName(org.displayName, org.industry);
+
+  // Request mode state
+  const [email, setEmail] = useState('');
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [requestError, setRequestError] = useState('');
+
+  // Reset mode state
+  const [checkingSession, setCheckingSession] = useState(mode === 'reset');
+  const [recoverySession, setRecoverySession] = useState<Session | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState(false);
 
-  const requirements = useMemo(() => [
-    { label: 'At least 8 characters', valid: password.length >= 8 },
-    { label: 'One uppercase letter', valid: /[A-Z]/.test(password) },
-    { label: 'One lowercase letter', valid: /[a-z]/.test(password) },
-    { label: 'One number', valid: /\d/.test(password) },
-  ], [password]);
+  useEffect(() => {
+    if (mode !== 'reset') return;
+    let mounted = true;
 
-  const allRequirementsMet = requirements.every((requirement) => requirement.valid);
-  const passwordsMatch = password.length > 0 && password === confirmPassword;
-  const canSubmit = allRequirementsMet && passwordsMatch && !isLoading;
+    const verifyRecoverySession = async () => {
+      const urlErr = extractRecoveryError();
+      if (urlErr) {
+        if (mounted) {
+          setLinkError(urlErr);
+          setCheckingSession(false);
+        }
+        return;
+      }
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError('');
+      try {
+        if (isPasswordRecovery) {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            if (mounted) {
+              setRecoverySession(data.session);
+              setCheckingSession(false);
+            }
+            return;
+          }
+        }
 
-    if (!password) {
-      setError('Please enter a new password.');
+        const searchParams = new URLSearchParams(window.location.search);
+        const tokenHash = searchParams.get('token_hash');
+        const type = searchParams.get('type') as EmailOtpType | null;
+
+        if (tokenHash && type === 'recovery') {
+          const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          });
+          if (!mounted) return;
+          if (verifyError || !verifyData.session) {
+            setLinkError(
+              verifyError?.message ||
+              'This password recovery link is invalid or has expired.',
+            );
+          } else {
+            setRecoverySession(verifyData.session);
+          }
+          setCheckingSession(false);
+          return;
+        }
+
+        if (mounted) {
+          setLinkError(
+            'No active password recovery session found. Your recovery link may have expired.',
+          );
+          setCheckingSession(false);
+        }
+      } catch {
+        if (mounted) {
+          setLinkError('Unable to verify your password recovery link.');
+          setCheckingSession(false);
+        }
+      }
+    };
+
+    void verifyRecoverySession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) return;
+      if (event === 'PASSWORD_RECOVERY' && nextSession) {
+        setRecoverySession(nextSession);
+        setLinkError(null);
+        setCheckingSession(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [mode, isPasswordRecovery]);
+
+  const handleRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRequestError('');
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setRequestError('Please enter your email address.');
       return;
     }
-    if (!allRequirementsMet) {
-      setError('Please meet all password requirements.');
-      return;
+
+    setRequestSubmitting(true);
+    try {
+      await supabase.auth.resetPasswordForEmail(trimmed, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      // Never disclose whether an email belongs to a provisioned account.
+      setRequestSent(true);
+    } catch {
+      setRequestSent(true);
+    } finally {
+      setRequestSubmitting(false);
     }
-    if (!passwordsMatch) {
-      setError('Passwords do not match.');
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError('');
+
+    if (!recoverySession) {
+      setResetError('A valid recovery session is required to update your password.');
       return;
     }
 
-    setIsLoading(true);
-    await completePasswordReset(password);
-    setIsLoading(false);
-    setIsSuccess(true);
-    setPassword('');
-    setConfirmPassword('');
+    if (password.length < 8) {
+      setResetError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setResetError('Passwords do not match.');
+      return;
+    }
+
+    setResetSubmitting(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        setResetError(error.message || 'Unable to update password. Please try again.');
+        setResetSubmitting(false);
+        return;
+      }
+
+      await logout();
+      setResetSuccess(true);
+    } catch {
+      setResetError('An unexpected error occurred. Please try again.');
+    } finally {
+      setResetSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-7xl">
-        <div
-          className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12 items-center"
-          style={{
-            fontFamily: 'Roboto, Lato, system-ui, sans-serif',
-            fontWeight: '800',
-            borderRadius: '15px',
-          }}
-        >
-          <div className="hidden lg:block bg-black" style={{ marginLeft: '20px' }}>
-            <div className="mb-14 flex flex-col items-start">
-              <div
-                role="img"
-                aria-label={org.displayName || 'Nido Tech'}
-                className="h-14 w-14 overflow-hidden rounded-xl bg-white/5 bg-left bg-no-repeat ring-1 ring-white/10"
-                style={{
-                  backgroundImage: `url("${org.logoUrl || DEFAULT_LOGIN_LOGO}")`,
-                  backgroundSize: 'auto 100%',
-                }}
-              />
-              <div className="mt-3">
-                <div className="text-2xl font-extrabold leading-tight tracking-tight text-white">{brand.name}</div>
-                {brand.subtitle && (
-                  <div className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/60">{brand.subtitle}</div>
-                )}
-              </div>
-            </div>
-            <h1 className="text-4xl font-bold text-white mb-6">Protect your account</h1>
-            <div className="space-y-4">
-              {['Use a unique password', 'Include letters and numbers', 'Keep your credentials private'].map((item) => (
-                <div key={item} className="flex items-start gap-3">
-                  <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-white">{item}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-white mt-12">© {new Date().getFullYear()} {org.companyName}</p>
-          </div>
-
-          <div className="w-full max-w-sm lg:ml-[50px] lg:mr-[-50px]">
-            <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 md:p-10">
-              <div className="mb-8 flex items-center gap-3">
-                <div className={`${org.logoUrl ? 'h-10 w-10 rounded-lg border border-gray-200' : 'h-14 w-[180px]'} overflow-hidden bg-white flex items-center justify-start shrink-0`}>
-                  <img src={org.logoUrl || DEFAULT_LOGIN_LOGO} alt={org.displayName || 'Nido Tech'} className="h-full w-full object-contain object-left" />
-                </div>
-                {org.logoUrl && (
-                  <div className="min-w-0">
-                    <h2 className="text-xl font-bold leading-tight text-gray-900">{brand.name}</h2>
-                    {brand.subtitle && <p className="mt-0.5 text-xs font-medium text-gray-500">{brand.subtitle}</p>}
-                  </div>
-                )}
-              </div>
-
-              {isSuccess ? (
-                <div className="text-center">
-                  <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
-                    <CheckCircle2 className="h-8 w-8 text-green-600" />
-                  </div>
-                  <h1 className="text-2xl font-bold text-gray-900 mb-2">Password reset successful</h1>
-                  <p className="text-sm leading-relaxed text-gray-600">
-                    Your password has been updated successfully. You can now sign in with your new password.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/login')}
-                    className="mt-6 w-full rounded-lg bg-blue-600 py-2.5 font-semibold text-white transition-colors hover:bg-blue-700"
-                  >
-                    Back to Login
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Create a new password</h1>
-                    <p className="text-gray-600 text-sm">Enter and confirm your new password below.</p>
-                  </div>
-
-                  {error && (
-                    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-                      <p className="text-sm text-red-700">{error}</p>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    <div>
-                      <label htmlFor="new-password" className="mb-2 block text-sm font-medium text-gray-900">New Password</label>
-                      <div className="relative">
-                        <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                          id="new-password"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(event) => { setPassword(event.target.value); setError(''); }}
-                          className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-10 text-gray-900 transition-all focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter a strong password"
-                          autoComplete="new-password"
-                          disabled={isLoading}
-                          required
-                        />
-                        <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Password requirements</p>
-                      <div className="space-y-1.5">
-                        {requirements.map((requirement) => (
-                          <div key={requirement.label} className={`flex items-center gap-2 text-xs ${requirement.valid ? 'text-green-600' : 'text-gray-500'}`}>
-                            {requirement.valid ? <Check size={14} /> : <X size={14} />}
-                            {requirement.label}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="confirm-password" className="mb-2 block text-sm font-medium text-gray-900">Confirm New Password</label>
-                      <div className="relative">
-                        <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                          id="confirm-password"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={(event) => { setConfirmPassword(event.target.value); setError(''); }}
-                          className={`w-full rounded-lg border bg-gray-50 py-2.5 pl-9 pr-10 text-gray-900 transition-all focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 ${confirmPassword && !passwordsMatch ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500'}`}
-                          placeholder="Re-enter your password"
-                          autoComplete="new-password"
-                          disabled={isLoading}
-                          required
-                        />
-                        <button type="button" onClick={() => setShowConfirmPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}>
-                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                      {confirmPassword && !passwordsMatch && <p className="mt-1 text-xs text-red-600">Passwords do not match.</p>}
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={!canSubmit}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isLoading ? <><Loader2 size={18} className="animate-spin" /> Resetting…</> : 'Reset Password'}
-                    </button>
-                  </form>
-
-                  <button
-                    type="button"
-                    onClick={() => navigate('/login')}
-                    className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    <ArrowLeft size={15} /> Back to Login
-                  </button>
-                </>
-              )}
-            </div>
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-12 w-[160px] overflow-hidden bg-white flex items-center justify-start">
+            <img
+              src={org.logoUrl || DEFAULT_LOGIN_LOGO}
+              alt={org.displayName || 'Nido Tech'}
+              className="h-full w-full object-contain object-left"
+            />
           </div>
         </div>
+
+        {mode === 'request' ? (
+          <>
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">Reset your password</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Enter your email address and we will send you a password recovery link if an account exists.
+              </p>
+            </div>
+
+            {requestError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{requestError}</p>
+              </div>
+            )}
+
+            {requestSent ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-green-800">
+                    If an account exists for <span className="font-medium">{email.trim()}</span>, a password recovery link has been sent. Please check your inbox.
+                  </p>
+                </div>
+                <Link
+                  to="/login"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 text-sm transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  Back to Sign In
+                </Link>
+              </div>
+            ) : (
+              <form onSubmit={handleRequestSubmit} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="forgot-email"
+                    className="block text-sm font-medium text-gray-900 mb-1.5"
+                  >
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      size={16}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                    <input
+                      id="forgot-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white text-gray-900"
+                      placeholder="your@email.com"
+                      autoComplete="email"
+                      disabled={requestSubmitting}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={requestSubmitting}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {requestSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending Link…
+                    </>
+                  ) : (
+                    'Send Recovery Link'
+                  )}
+                </button>
+
+                <div className="pt-2 text-center">
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+                  >
+                    <ArrowLeft size={14} />
+                    Back to Sign In
+                  </Link>
+                </div>
+              </form>
+            )}
+          </>
+        ) : checkingSession ? (
+          <div className="py-10 flex flex-col items-center text-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="text-sm text-gray-600">Verifying your recovery link…</p>
+          </div>
+        ) : linkError ? (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <h1 className="text-base font-bold text-red-900">Recovery Link Expired</h1>
+                <p className="mt-1 text-sm text-red-700">{linkError}</p>
+              </div>
+            </div>
+            <Link
+              to="/forgot-password"
+              className="w-full inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 text-sm transition-colors"
+            >
+              Request a New Recovery Link
+            </Link>
+            <Link
+              to="/login"
+              className="w-full inline-flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium py-2.5 text-sm transition-colors"
+            >
+              Return to Sign In
+            </Link>
+          </div>
+        ) : resetSuccess ? (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+              <div>
+                <h1 className="text-base font-bold text-green-900">Password Updated</h1>
+                <p className="mt-1 text-sm text-green-800">
+                  Your password has been updated. You can now sign in with your new password.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/login', { replace: true })}
+              className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 text-sm transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">Choose a New Password</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Enter a new password for your account.
+              </p>
+            </div>
+
+            {resetError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{resetError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleResetSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="reset-password"
+                  className="block text-sm font-medium text-gray-900 mb-1.5"
+                >
+                  New Password
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    id="reset-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white text-gray-900"
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                    disabled={resetSubmitting}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={resetSubmitting}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="reset-confirm-password"
+                  className="block text-sm font-medium text-gray-900 mb-1.5"
+                >
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                  <input
+                    id="reset-confirm-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white text-gray-900"
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    disabled={resetSubmitting}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={resetSubmitting}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {resetSubmitting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Updating Password…
+                  </>
+                ) : (
+                  'Update Password'
+                )}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

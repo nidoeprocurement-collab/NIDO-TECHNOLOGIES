@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { getPlatformModuleForPath } from '@/lib/platformModuleCatalog';
-import { searchGlobalPlatform, type GlobalSearchResult } from '@/lib/globalSearch';
+import { getGlobalSearchResults, type GlobalSearchResult } from '@/lib/globalSearch';
 import SLANotificationPopup from '@/components/shared/SLANotificationPopup';
 
 // Route to label mapping for breadcrumbs
@@ -112,7 +112,7 @@ function generateBreadcrumbs(pathname: string) {
 export default function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isClientPortalUser } = useAuth();
+  const { user, logout, isClientPortalUser, hasClientPortalPermission } = useAuth();
   const { config } = useConfig();
   const { hasRoutePermission, isSuperAdmin } = usePermissions();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -177,9 +177,14 @@ export default function TopBar() {
   };
 
   const searchResults = useMemo<GlobalSearchResult[]>(() => {
-    if (isClientPortalUser) return [];
-    return searchGlobalPlatform(searchQuery).filter(result => canViewPath(result.path));
-  }, [isClientPortalUser, searchQuery, isSuperAdmin, hasRoutePermission]);
+    if (isClientPortalUser) {
+      return getGlobalSearchResults(searchQuery, {
+        isClientPortalUser: true,
+        hasClientPortalPermission,
+      });
+    }
+    return getGlobalSearchResults(searchQuery).filter(result => canViewPath(result.path));
+  }, [isClientPortalUser, hasClientPortalPermission, searchQuery, isSuperAdmin, hasRoutePermission]);
 
   const openSearchResult = (result: GlobalSearchResult) => {
     setSearchQuery('');
@@ -304,8 +309,8 @@ export default function TopBar() {
               <button
                 onClick={() => navigate(crumb.path)}
                 className={`text-sm px-2 py-1 rounded transition-colors ${crumb.isActive
-                    ? 'text-primary font-medium bg-primary/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'text-primary font-medium bg-primary/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
               >
                 {crumb.label}
@@ -316,8 +321,8 @@ export default function TopBar() {
                 <button
                   onClick={() => navigate(crumb.path)}
                   className={`text-sm px-2 py-1 rounded transition-colors ${crumb.isActive
-                      ? 'text-primary font-medium bg-primary/10'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    ? 'text-primary font-medium bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                 >
                   {crumb.label}

@@ -10,7 +10,6 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { hasPortalPermission } from "@/lib/portalUserStore";
 
 const SERVICE_CARDS = [
   {
@@ -103,8 +102,8 @@ const SERVICE_CARDS = [
 export default function ServicesPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isClientPortalUser, isImpersonating } = useAuth();
-  const isPortal = isClientPortalUser || isImpersonating || location.pathname.startsWith("/portal");
+  const { user, isClientPortalUser, hasClientPortalPermission } = useAuth();
+  const isPortal = isClientPortalUser || location.pathname.startsWith("/portal");
   const [, setPortalPermissionsTick] = useState(0);
 
   useEffect(() => {
@@ -122,7 +121,7 @@ export default function ServicesPage() {
   const canViewPortalModule = (moduleName: string) => {
     if (!isPortal || !isClientPortalUser) return true;
     if (!user?.clientId) return false;
-    return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
+    return hasClientPortalPermission(moduleName, "view");
   };
   const visibleCards = SERVICE_CARDS.filter((card) => canViewPortalModule(card.module));
   const canViewMyServices = canViewPortalModule("Services - My Services");
@@ -167,17 +166,16 @@ export default function ServicesPage() {
 
       {/* Service Cards */}
       <div
-        className={`grid gap-4 ${
-          visibleCards.length <= 1
-            ? "grid-cols-1"
-            : visibleCards.length === 2
-              ? "sm:grid-cols-2"
-              : visibleCards.length === 3
-                ? "sm:grid-cols-2 lg:grid-cols-3"
-                : visibleCards.length === 4
-                  ? "sm:grid-cols-2 lg:grid-cols-4"
-                  : "sm:grid-cols-2 lg:grid-cols-5"
-        }`}
+        className={`grid gap-4 ${visibleCards.length <= 1
+          ? "grid-cols-1"
+          : visibleCards.length === 2
+            ? "sm:grid-cols-2"
+            : visibleCards.length === 3
+              ? "sm:grid-cols-2 lg:grid-cols-3"
+              : visibleCards.length === 4
+                ? "sm:grid-cols-2 lg:grid-cols-4"
+                : "sm:grid-cols-2 lg:grid-cols-5"
+          }`}
       >
         {visibleCards.map((card) => {
           const Icon = card.icon;

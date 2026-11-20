@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { findPortalUser } from '@/lib/portalUserStore';
-import { authenticateNidoUser, unlockUser, getUsers, type LoginContext } from '@/lib/nidoUsersStore';
-import { consumeRecoveryCode } from '@/lib/recoveryCodeStore';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { Mail, Lock, Eye, EyeOff, Loader2, KeyRound, ShieldAlert, MapPin } from 'lucide-react';
 
 type LoginTab = 'password' | 'recovery';
 const DEFAULT_LOGIN_LOGO = '/attached_assets/image_1786602878335.png';
+
+interface LoginContext {
+  device?: string;
+  latitude?: number;
+  longitude?: number;
+  locationAccuracy?: number;
+}
 
 interface LoginContextResult {
   context: LoginContext;
@@ -59,7 +63,7 @@ async function captureLoginContext(): Promise<LoginContextResult> {
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signInWithPassword } = useAuth();
   const org = useOrgConfig();
   const displayNameParts = (org.displayName || 'Nido Tech').match(/^(.*?)\s*\(([^)]+)\)\s*$/);
   const mainDisplayName = displayNameParts ? displayNameParts[1].trim() : (org.displayName || 'Nido Tech');
@@ -88,47 +92,34 @@ export default function LoginPage() {
     setIsLocked(false);
   };
 
-  const handleUnlockSelf = () => {
-    const users = getUsers();
-    const match = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (match) {
-      unlockUser(match.id);
-      setError('');
-      setIsLocked(false);
-    } else {
-      setError('Enter your email above first, then click Unlock.');
-    }
-  };
-
   const completePasswordLogin = async (context: LoginContext) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      const result = await signInWithPassword(email.trim(), password, context.device);
 
-      // ── 1. Try NIDO internal users ────────────────────────────────────────
-      const result = authenticateNidoUser(email.trim(), password, context);
-
-      if ('user' in result && result.user) {
-        const u = result.user;
-        login({ id: u.id, email: u.email, name: u.name, role: u.role, userType: 'nido_admin' });
-        navigate('/dashboard', { replace: true });
+      if (result.ok) {
+        if (result.userScope === 'nido_internal') {
+          navigate('/dashboard', { replace: true });
+        } else {
+          navigate('/portal/dashboard', { replace: true });
+        }
         return;
       }
 
-      if ('error' in result) {
-        if (result.error === 'inactive') { setError('This account has been deactivated. Contact your administrator.'); return; }
-        if (result.error === 'suspended') { setError('This account is suspended. Contact your administrator.'); return; }
-        if (result.error === 'locked') {
-          setError('This account has been locked after too many failed sign-in attempts.');
-          setIsLocked(true);
-          return;
-        }
+      if (result.reason === 'inactive_or_suspended') {
+        setError('This account or organization is inactive or suspended. Contact your administrator.');
+        return;
       }
-
-      // ── 2. Try Client Portal users ────────────────────────────────────────
-      const portalUser = findPortalUser(email.trim(), password);
-      if (portalUser) {
-        login({ id: portalUser.id, email: portalUser.email, name: portalUser.name, role: portalUser.role, userType: portalUser.userType, clientId: portalUser.clientId, clientName: portalUser.clientName });
-        navigate('/portal/dashboard', { replace: true });
+      if (result.reason === 'email_mismatch_pending') {
+        setError('Your account email verification is pending. Contact your administrator.');
+        return;
+      }
+      if (result.reason === 'unprovisioned') {
+        setError('Your account is not provisioned for portal access. Contact your administrator.');
+        return;
+      }
+      if (result.error && /rate limit|too many requests|locked/i.test(result.error)) {
+        setError('Too many sign-in attempts. Please wait a moment or reset your password.');
+        setIsLocked(true);
         return;
       }
 
@@ -139,32 +130,9 @@ export default function LoginPage() {
   };
 
   const completeRecoveryLogin = async () => {
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-
-      const userId = consumeRecoveryCode(email.trim(), recoveryCode.trim());
-      if (!userId) {
-        setError('Invalid or already-used recovery code. Please check the code and try again.');
-        return;
-      }
-
-      // Find the user to build the auth payload
-      const nidoUsers = getUsers();
-      const nidoUser = nidoUsers.find(u => u.id === userId);
-
-      if (nidoUser) {
-        if (nidoUser.status === 'Inactive') { setError('This account has been deactivated. Contact your administrator.'); return; }
-        if (nidoUser.status === 'Suspended') { setError('This account is suspended. Contact your administrator.'); return; }
-        // Note: recovery login bypasses the account lock so users can regain access
-        login({ id: nidoUser.id, email: nidoUser.email, name: nidoUser.name, role: nidoUser.role, userType: 'nido_admin' });
-        navigate('/dashboard', { replace: true });
-        return;
-      }
-
-      setError('Account not found. Make sure the email matches your account.');
-    } catch {
-      setError('An error occurred. Please try again.');
-    }
+    setError(
+      'One-time local recovery codes are not available with server-managed authentication. Please use "Forgot Password?" to recover your account via email.',
+    );
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -334,19 +302,10 @@ export default function LoginPage() {
                       {isLocked && (
                         <button
                           type="button"
-                          onClick={handleUnlockSelf}
-                          className="mt-2 w-full text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg py-1.5 transition-colors"
-                        >
-                          🔓 Unlock My Account
-                        </button>
-                      )}
-                      {isLocked && (
-                        <button
-                          type="button"
-                          onClick={() => switchTab('recovery')}
+                          onClick={() => navigate('/forgot-password')}
                           className="mt-2 w-full text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg py-1.5 transition-colors flex items-center justify-center gap-1.5"
                         >
-                          <KeyRound size={13} /> Use a Recovery Code Instead
+                          <KeyRound size={13} /> Reset Password via Email
                         </button>
                       )}
                     </div>
@@ -436,7 +395,15 @@ export default function LoginPage() {
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
                     <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-amber-700 text-xs leading-relaxed">
-                      Recovery codes bypass your password and account lock. Keep them stored safely and never share them.
+                      One-time local recovery codes are not supported with server-managed authentication. Use{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/forgot-password')}
+                        className="font-semibold underline hover:text-amber-900"
+                      >
+                        Forgot Password
+                      </button>{' '}
+                      to receive a secure email reset link.
                     </p>
                   </div>
 

@@ -38,7 +38,7 @@ import {
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import { getSupportTickets, type SupportTicket } from "@/lib/supportTicketStore";
-import { getPortalUsersByClient, hasPortalPermission } from "@/lib/portalUserStore";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { belongsToPortalUser, invoiceBelongsToPortalUser } from "@/lib/clientDashboardScoping";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
@@ -314,14 +314,14 @@ interface ClientDetailProps {
 
 export default function ClientDetailPageRedesigned({ portalMode = false }: ClientDetailProps) {
   const params = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, hasClientPortalPermission } = useAuth();
   const { hasRoutePermission } = usePermissions();
   const navigate = useNavigate();
   const clientId = portalMode ? user?.clientId?.trim() ?? "" : params.id ?? "";
   const canViewOverviewModule = (moduleName: string) => {
     if (!portalMode) return true;
     if (!user?.clientId) return false;
-    return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
+    return hasClientPortalPermission(moduleName, "view");
   };
   const visibleKpiCount = [
     "Overview - Total Orders",
