@@ -90,3 +90,4 @@ src/
 - Transactions - Purchases (Expenses, Recurring, POs, Bills, Payments, Credits)
 - User Management (Users, Roles, Departments, Invitations, Audit Trail)
 - Configuration
+NIDO development branch – Preview deployment setup.
