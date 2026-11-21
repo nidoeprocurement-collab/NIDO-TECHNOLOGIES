@@ -214,7 +214,12 @@ function isUrlRecoveryFlow(): boolean {
   if (typeof window === 'undefined') return false;
   const hash = window.location.hash || '';
   const search = window.location.search || '';
-  return hash.includes('type=recovery') || search.includes('type=recovery');
+  const searchParams = new URLSearchParams(search);
+  return (
+    hash.includes('type=recovery') ||
+    search.includes('type=recovery') ||
+    (window.location.pathname === '/reset-password' && searchParams.has('code'))
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

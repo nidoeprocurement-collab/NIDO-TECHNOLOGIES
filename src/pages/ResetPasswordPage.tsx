@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -39,6 +39,21 @@ function extractRecoveryError(): string | null {
   return null;
 }
 
+function hasUrlRecoveryParams(): boolean {
+  if (typeof window === 'undefined') return false;
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashRaw = window.location.hash.startsWith('#')
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const hashParams = new URLSearchParams(hashRaw);
+  return (
+    hashParams.get('type') === 'recovery' ||
+    searchParams.get('type') === 'recovery' ||
+    (Boolean(searchParams.get('token_hash')) && searchParams.get('type') === 'recovery') ||
+    Boolean(searchParams.get('code'))
+  );
+}
+
 export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
   const navigate = useNavigate();
   const { logout, isPasswordRecovery } = useAuth();
@@ -60,33 +75,42 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
+  const recoveryEventSessionRef = useRef<Session | null>(null);
 
   useEffect(() => {
     if (mode !== 'reset') return;
     let mounted = true;
+    let recoveryEventReceived = isPasswordRecovery;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) return;
+      if (event === 'PASSWORD_RECOVERY' && nextSession) {
+        recoveryEventReceived = true;
+        recoveryEventSessionRef.current = nextSession;
+        setRecoverySession(nextSession);
+        setLinkError(null);
+        setCheckingSession(false);
+      }
+    });
 
     const verifyRecoverySession = async () => {
       const urlErr = extractRecoveryError();
       if (urlErr) {
-        if (mounted) {
+        if (mounted && !recoveryEventSessionRef.current) {
+          setRecoverySession(null);
           setLinkError(urlErr);
           setCheckingSession(false);
         }
         return;
       }
 
-      try {
-        if (isPasswordRecovery) {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            if (mounted) {
-              setRecoverySession(data.session);
-              setCheckingSession(false);
-            }
-            return;
-          }
-        }
+      if (mounted && !recoveryEventSessionRef.current) {
+        setCheckingSession(true);
+      }
 
+      try {
         const searchParams = new URLSearchParams(window.location.search);
         const tokenHash = searchParams.get('token_hash');
         const type = searchParams.get('type') as EmailOtpType | null;
@@ -97,26 +121,59 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
             type: 'recovery',
           });
           if (!mounted) return;
+          if (recoveryEventSessionRef.current) {
+            setRecoverySession(recoveryEventSessionRef.current);
+            setLinkError(null);
+            setCheckingSession(false);
+            return;
+          }
           if (verifyError || !verifyData.session) {
+            setRecoverySession(null);
             setLinkError(
               verifyError?.message ||
-              'This password recovery link is invalid or has expired.',
+                'This password recovery link is invalid or has expired.',
             );
           } else {
             setRecoverySession(verifyData.session);
+            setLinkError(null);
           }
           setCheckingSession(false);
           return;
         }
 
-        if (mounted) {
+        if (
+          isPasswordRecovery ||
+          recoveryEventReceived ||
+          recoveryEventSessionRef.current ||
+          hasUrlRecoveryParams()
+        ) {
+          const { data } = await supabase.auth.getSession();
+          if (!mounted) return;
+          const activeRecoverySession = data.session ?? recoveryEventSessionRef.current;
+          if (
+            activeRecoverySession &&
+            (isPasswordRecovery ||
+              recoveryEventReceived ||
+              recoveryEventSessionRef.current ||
+              hasUrlRecoveryParams())
+          ) {
+            setRecoverySession(activeRecoverySession);
+            setLinkError(null);
+            setCheckingSession(false);
+            return;
+          }
+        }
+
+        if (mounted && !recoveryEventSessionRef.current) {
+          setRecoverySession(null);
           setLinkError(
             'No active password recovery session found. Your recovery link may have expired.',
           );
           setCheckingSession(false);
         }
       } catch {
-        if (mounted) {
+        if (mounted && !recoveryEventSessionRef.current) {
+          setRecoverySession(null);
           setLinkError('Unable to verify your password recovery link.');
           setCheckingSession(false);
         }
@@ -124,17 +181,6 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
     };
 
     void verifyRecoverySession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (!mounted) return;
-      if (event === 'PASSWORD_RECOVERY' && nextSession) {
-        setRecoverySession(nextSession);
-        setLinkError(null);
-        setCheckingSession(false);
-      }
-    });
 
     return () => {
       mounted = false;
