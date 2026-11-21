@@ -218,3 +218,142 @@ describe("ResetPasswordPage recovery flow", () => {
     expect(unsubscribeSpy).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("ResetPasswordPage forgot-password request flow", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState({}, "", "/forgot-password");
+    vi.clearAllMocks();
+  });
+
+  it("displays generic success message on normal recovery request without rate-limit popup", async () => {
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValueOnce({
+      data: {},
+      error: null,
+    });
+
+    renderResetPage("/forgot-password");
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send Recovery Link" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/If an account exists for/i),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText("Password Reset Temporarily Limited")).toBeNull();
+  });
+
+  it("displays dedicated popup on HTTP 429 rate-limit error and does not show success message", async () => {
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValueOnce({
+      data: {},
+      error: {
+        status: 429,
+        code: "over_email_send_rate_limit",
+        message: "For security purposes, you can only request this after 60 seconds.",
+      } as never,
+    });
+
+    renderResetPage("/forgot-password");
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send Recovery Link" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Password Reset Temporarily Limited")).toBeTruthy();
+    });
+
+    expect(
+      screen.getByText(
+        "Too many password reset requests have been made in a short period. To protect your account and maintain email delivery security, password reset requests are temporarily restricted.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Please wait before requesting another reset link."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Check your Inbox and Spam folders for an earlier recovery email."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Contact NIDO Support if you need assistance."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/If an account exists for/i)).toBeNull();
+    expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    await waitFor(() => {
+      expect(screen.queryByText("Password Reset Temporarily Limited")).toBeNull();
+    });
+  });
+
+  it("preserves generic success message and does not show rate-limit popup on non-429 auth errors", async () => {
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValueOnce({
+      data: {},
+      error: {
+        status: 400,
+        code: "validation_failed",
+        message: "Internal auth provider detail should not leak",
+      } as never,
+    });
+
+    renderResetPage("/forgot-password");
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nonexistent@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send Recovery Link" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/If an account exists for/i)).toBeTruthy();
+    });
+    expect(screen.queryByText("Password Reset Temporarily Limited")).toBeNull();
+    expect(
+      screen.queryByText(/Internal auth provider detail should not leak/i),
+    ).toBeNull();
+  });
+
+  it("disables submit button, shows loading indicator, and prevents repeated clicks while processing", async () => {
+    let resolveRequest!: (value: { data: Record<string, never>; error: null }) => void;
+    const pendingRequest = new Promise<{
+      data: Record<string, never>;
+      error: null;
+    }>((resolve) => {
+      resolveRequest = resolve;
+    });
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockImplementationOnce(
+      () => pendingRequest as never,
+    );
+
+    renderResetPage("/forgot-password");
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "user@example.com" },
+    });
+
+    const submitButton = screen.getByRole("button", { name: "Send Recovery Link" });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Sending Link…")).toBeTruthy();
+    });
+    expect((submitButton as HTMLButtonElement).disabled).toBe(true);
+
+    // Attempt repeated click while request is still in flight
+    fireEvent.click(submitButton);
+    expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRequest({ data: {}, error: null });
+      await pendingRequest;
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/If an account exists for/i)).toBeTruthy();
+    });
+  });
+});

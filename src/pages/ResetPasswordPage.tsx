@@ -14,6 +14,14 @@ import type { EmailOtpType, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const DEFAULT_LOGIN_LOGO = '/attached_assets/image_1786602878335.png';
 
@@ -54,6 +62,34 @@ function hasUrlRecoveryParams(): boolean {
   );
 }
 
+function isRateLimitError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const candidate = err as { status?: unknown; code?: unknown; message?: unknown };
+  if (candidate.status === 429) return true;
+  if (typeof candidate.code === 'string') {
+    const code = candidate.code.toLowerCase();
+    if (
+      code === 'over_email_send_rate_limit' ||
+      code === 'over_request_rate_limit' ||
+      code === 'rate_limit_exceeded' ||
+      code === 'too_many_requests'
+    ) {
+      return true;
+    }
+  }
+  if (typeof candidate.message === 'string') {
+    const msg = candidate.message.toLowerCase();
+    if (
+      msg.includes('too many requests') ||
+      msg.includes('rate limit') ||
+      msg.includes('email rate limit exceeded')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
   const navigate = useNavigate();
   const { logout, isPasswordRecovery } = useAuth();
@@ -64,6 +100,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [requestError, setRequestError] = useState('');
+  const [rateLimitOpen, setRateLimitOpen] = useState(false);
 
   // Reset mode state
   const [checkingSession, setCheckingSession] = useState(mode === 'reset');
@@ -190,6 +227,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (requestSubmitting) return;
     setRequestError('');
     const trimmed = email.trim();
     if (!trimmed) {
@@ -199,12 +237,20 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
 
     setRequestSubmitting(true);
     try {
-      await supabase.auth.resetPasswordForEmail(trimmed, {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
+      if (error && isRateLimitError(error)) {
+        setRateLimitOpen(true);
+        return;
+      }
       // Never disclose whether an email belongs to a provisioned account.
       setRequestSent(true);
-    } catch {
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        setRateLimitOpen(true);
+        return;
+      }
       setRequestSent(true);
     } finally {
       setRequestSubmitting(false);
@@ -487,6 +533,49 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
           </>
         )}
       </div>
+
+      <Dialog open={rateLimitOpen} onOpenChange={setRateLimitOpen}>
+        <DialogContent className="sm:max-w-md p-6 bg-white text-gray-900 rounded-2xl border border-gray-200">
+          <DialogHeader>
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="text-left">
+                <DialogTitle className="text-lg font-bold text-gray-900">
+                  Password Reset Temporarily Limited
+                </DialogTitle>
+                <DialogDescription className="mt-2 text-sm text-gray-600 leading-relaxed">
+                  Too many password reset requests have been made in a short period. To protect your account and maintain email delivery security, password reset requests are temporarily restricted.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <ul className="mt-3 ml-13 pl-5 list-disc space-y-1.5 text-sm text-gray-700">
+            <li>Please wait before requesting another reset link.</li>
+            <li>Check your Inbox and Spam folders for an earlier recovery email.</li>
+            <li>Contact NIDO Support if you need assistance.</li>
+          </ul>
+
+          <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <Link
+              to="/login"
+              onClick={() => setRateLimitOpen(false)}
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 text-sm transition-colors"
+            >
+              Return to Sign In
+            </Link>
+            <button
+              type="button"
+              onClick={() => setRateLimitOpen(false)}
+              className="inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 text-sm transition-colors"
+            >
+              Close
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
