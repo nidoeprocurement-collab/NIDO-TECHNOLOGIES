@@ -16,26 +16,28 @@ interface AddEditUserDialogProps {
   onOpenChange: (open: boolean) => void
   user: NidoUser | null
   roles: NidoRole[]
-  onSave: (values: Omit<NidoUser, "id">) => void
+  onSave: (values: Omit<NidoUser, "id">, options?: { sendInvitation: boolean }) => Promise<boolean | void> | boolean | void
   fullScreen?: boolean
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function AddEditUserDialog({ open, onOpenChange, user, roles, onSave, fullScreen = false }: AddEditUserDialogProps) {
-  const [employeeId, setEmployeeId]   = useState("")
-  const [name, setName]               = useState("")
-  const [email, setEmail]             = useState("")
-  const [phone, setPhone]             = useState("")
-  const [password, setPassword]       = useState("")
-  const [role, setRole]               = useState("")
-  const [jobTitle, setJobTitle]       = useState("")
+  const [employeeId, setEmployeeId] = useState("")
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [password, setPassword] = useState("")
+  const [sendInvitation, setSendInvitation] = useState(true)
+  const [role, setRole] = useState("")
+  const [jobTitle, setJobTitle] = useState("")
   const [designation, setDesignation] = useState("")
   const [reportingManager, setReportingManager] = useState("")
-  const [department, setDepartment]   = useState("")
+  const [department, setDepartment] = useState("")
   const [dateOfJoining, setDateOfJoining] = useState("")
-  const [status, setStatus]           = useState<NidoUser["status"]>("Active")
-  const [error, setError]             = useState("")
+  const [status, setStatus] = useState<NidoUser["status"]>("Active")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
   const isEdit = !!user
 
@@ -44,52 +46,70 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       const assignableRole = roles.find(
         r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE,
       )?.name ?? ""
-      setEmployeeId(user?.employeeId   ?? getNextEmployeeId())
-      setName(      user?.name         ?? "")
-      setEmail(     user?.email        ?? "")
-      setPhone(     user?.phone        ?? "")
-      setPassword(  "")           // never pre-fill password
-      setRole(      user?.role         ?? assignableRole)
-      setJobTitle(  user?.jobTitle     ?? "")
+      setEmployeeId(user?.employeeId ?? getNextEmployeeId())
+      setName(user?.name ?? "")
+      setEmail(user?.email ?? "")
+      setPhone(user?.phone ?? "")
+      setPassword("")           // never pre-fill password
+      setSendInvitation(true)
+      setRole(user?.role ?? assignableRole)
+      setJobTitle(user?.jobTitle ?? "")
       setDesignation(user?.designation ?? "")
       setReportingManager(user?.reportingManager ?? "")
-      setDepartment(user?.department   ?? "")
+      setDepartment(user?.department ?? "")
       setDateOfJoining(user?.dateOfJoining ?? user?.createdAt?.slice(0, 10) ?? new Date().toISOString().split("T")[0])
-      setStatus(    user?.status       ?? "Active")
+      setStatus(user?.status ?? "Active")
+      setSubmitting(false)
       setError("")
     }
   }, [open, user, roles])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (submitting) return
     if (!name.trim() || !email.trim()) { setError("Name and email are required."); return; }
-    if (!EMAIL_RE.test(email.trim()))  { setError("Enter a valid email address.");  return; }
-    if (!role)                         { setError("Select a role for this user.");  return; }
-    if (!isEdit && !password.trim())   { setError("Password is required for new users."); return; }
-    if (role === SYSTEM_OWNER_ROLE)    { setError("The System Owner role is reserved."); return; }
+    if (!EMAIL_RE.test(email.trim())) { setError("Enter a valid email address."); return; }
+    if (!role) { setError("Select a role for this user."); return; }
+    if (!isEdit && !sendInvitation) { setError("Send Invitation Email must be enabled for new internal users."); return; }
+    if (role === SYSTEM_OWNER_ROLE) { setError("The System Owner role is reserved."); return; }
     if (phone && !isValidPhoneNumber(phone)) { setError("Phone number must contain exactly 10 digits."); return; }
 
     const now = new Date().toISOString().split("T")[0]
 
-    onSave({
-      employeeId:          employeeId.trim(),
-      name:                name.trim(),
-      email:               email.trim(),
-      phone:               phone.trim(),
-      // For edits: keep existing password if field left blank
-      password:            password.trim() || user?.password || "Password@123",
-      role,
-      jobTitle:            jobTitle.trim(),
-      designation:         designation.trim() || jobTitle.trim(),
-      reportingManager:    reportingManager.trim(),
-      department:          department.trim(),
-      dateOfJoining:       dateOfJoining || now,
-      status,
-      lastLogin:           user?.lastLogin,
-      createdAt:           user?.createdAt ?? now,
-      updatedAt:           now,
-      forcePasswordChange: user?.forcePasswordChange ?? false,
-    })
-    onOpenChange(false)
+    setSubmitting(true)
+    setError("")
+    try {
+      const result = await onSave(
+        {
+          employeeId: employeeId.trim(),
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          // New users set their own password via onboarding; edits keep existing password if blank.
+          password: isEdit ? (password.trim() || user?.password || "") : "",
+          role,
+          jobTitle: jobTitle.trim(),
+          designation: designation.trim() || jobTitle.trim(),
+          reportingManager: reportingManager.trim(),
+          department: department.trim(),
+          dateOfJoining: dateOfJoining || now,
+          status,
+          lastLogin: user?.lastLogin,
+          createdAt: user?.createdAt ?? now,
+          updatedAt: now,
+          forcePasswordChange: isEdit ? (user?.forcePasswordChange ?? false) : true,
+          invitationStatus: isEdit ? user?.invitationStatus : "sent",
+          invitationSentAt: isEdit ? user?.invitationSentAt : new Date().toISOString(),
+        },
+        { sendInvitation },
+      )
+      if (result !== false) {
+        onOpenChange(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save user.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -102,7 +122,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           <DialogDescription>
             {isEdit
               ? "Update this user's details. Leave the password field blank to keep the current password."
-              : "Create a new NIDO platform employee. They can log in immediately with the password you set."}
+              : "Create a new NIDO platform employee. An invitation email will be sent so they can set their own password."}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,17 +140,36 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </div>
 
           {/* Row 2 */}
-          <div>
-            <Label className="mb-2 block text-sm font-medium">
-              Password {isEdit ? <span className="text-xs text-muted-foreground">(blank = keep current)</span> : <span className="text-red-500">*</span>}
-            </Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={isEdit ? "Leave blank to keep current" : "Min 6 characters"}
-            />
-          </div>
+          {isEdit ? (
+            <div>
+              <Label className="mb-2 block text-sm font-medium">
+                Password <span className="text-xs text-muted-foreground">(blank = keep current)</span>
+              </Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Leave blank to keep current"
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col justify-center rounded-lg border border-border bg-muted/30 px-4 py-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sendInvitation}
+                  onChange={e => setSendInvitation(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Send Invitation Email</span>
+                  <span className="block text-xs text-muted-foreground">
+                    User will set their own password via NIDO onboarding.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
           <div>
             <Label className="mb-2 block text-sm font-medium">Phone</Label>
             <Input type="tel" inputMode="numeric" maxLength={10} value={phone} onChange={e => setPhone(sanitizePhoneNumber(e.target.value))} placeholder="10-digit phone number" />
@@ -139,13 +178,13 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           {/* Row 3 */}
           <div>
             <Label className="mb-2 block text-sm font-medium">Employee ID</Label>
-             <Input
-               value={employeeId}
-               onChange={e => setEmployeeId(e.target.value)}
-                placeholder="EMP-00001"
-               disabled={!isEdit}
-             />
-             {!isEdit && <p className="mt-1 text-xs text-muted-foreground">Generated automatically from the next serial number.</p>}
+            <Input
+              value={employeeId}
+              onChange={e => setEmployeeId(e.target.value)}
+              placeholder="EMP-00001"
+              disabled={!isEdit}
+            />
+            {!isEdit && <p className="mt-1 text-xs text-muted-foreground">Generated automatically from the next serial number.</p>}
           </div>
           <div>
             <Label className="mb-2 block text-sm font-medium">Role <span className="text-red-500">*</span></Label>
@@ -205,8 +244,12 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
         {error && <p className="px-6 text-sm text-red-600">{error}</p>}
 
         <DialogFooter className={fullScreen ? "shrink-0 border-t px-6 py-4" : undefined}>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>{isEdit ? "Save Changes" : "Add User"}</Button>
+          <Button variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={submitting} onClick={() => void handleSubmit()}>
+            {submitting
+              ? (isEdit ? "Saving..." : "Sending Invitation...")
+              : (isEdit ? "Save Changes" : "Send Invitation & Add User")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

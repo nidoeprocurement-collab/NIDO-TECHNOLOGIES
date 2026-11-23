@@ -47,6 +47,8 @@ export interface NidoUser {
   createdAt: string;
   updatedAt: string;
   forcePasswordChange?: boolean;
+  invitationStatus?: "sent" | "pending" | "accepted";
+  invitationSentAt?: string;
   locked?: boolean;
   failedLoginAttempts?: number;
   loginHistory?: LoginHistoryEntry[];

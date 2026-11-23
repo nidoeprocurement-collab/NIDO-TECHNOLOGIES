@@ -10,6 +10,7 @@ import {
   MailPlus, AlertTriangle, Lock, Unlock, History, Eye, EyeOff,
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/lib/supabase"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,9 +44,9 @@ function StatusBadge({ status, locked }: { status: NidoUser["status"]; locked?: 
     return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Locked</Badge>;
   }
   const cls =
-    status === "Active"   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-    status === "Suspended"? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                            "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400";
+    status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+      status === "Suspended" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+        "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400";
   return <Badge className={cls}>{status}</Badge>;
 }
 
@@ -153,6 +154,7 @@ export function ActionsMenu({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [invitationSentOpen, setInvitationSentOpen] = useState(false);
+  const [resending, setResending] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -202,8 +204,31 @@ export function ActionsMenu({
     toast.success("Force password change set", { description: `${user.name} will be prompted to change their password on next login.` });
   };
 
-  const handleSendInvitation = () => {
-    setInvitationSentOpen(true);
+  const handleSendInvitation = async () => {
+    setResending(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/onboarding`,
+      });
+      if (error) {
+        const msg =
+          error.status === 429 || /rate limit|too many/i.test(error.message ?? "")
+            ? "Too many invitation emails were sent recently. Please wait before trying again."
+            : error.message || "Unable to resend invitation email.";
+        toast.error("Resend failed", { description: msg });
+        return;
+      }
+      updateUser(user.id, {
+        invitationStatus: "sent",
+        invitationSentAt: new Date().toISOString(),
+      });
+      onRefresh();
+      setInvitationSentOpen(true);
+    } catch {
+      toast.error("Resend failed", { description: "Unable to resend invitation email." });
+    } finally {
+      setResending(false);
+    }
   };
 
   const handleUnlock = () => {
@@ -280,8 +305,13 @@ export function ActionsMenu({
             <button className={itemCls} onClick={() => act(handleForcePasswordChange)}>
               <AlertTriangle size={14} className="text-amber-600" /> Force Password Change
             </button>
-            <button className={itemCls} onClick={() => act(handleSendInvitation)}>
-              <MailPlus size={14} className="text-muted-foreground" /> Send Invitation
+            <button
+              className={itemCls}
+              disabled={resending}
+              onClick={() => act(() => void handleSendInvitation())}
+            >
+              <MailPlus size={14} className="text-muted-foreground" />
+              {resending ? "Sending Invitation..." : user.invitationStatus === "sent" ? "Resend Invitation" : "Send Invitation"}
             </button>
             <div className="my-1 border-t border-border" />
             <button data-confirmation-skip className={`${itemCls} text-red-600`} onClick={() => act(handleDelete)}>
@@ -344,6 +374,38 @@ function ProtectedOwnerBadge() {
 /** Roles that are allowed to view passwords in the user table. */
 const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
 
+interface ProvisionedInviteBanner {
+  name: string;
+  email: string;
+  employeeId: string;
+  profileId?: string;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function extractEdgeFunctionErrorMessage(
+  error: unknown,
+  data: unknown,
+  fallback: string,
+): Promise<string> {
+  if (data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string") {
+    return (data as { error: string }).error
+  }
+  if (error && typeof error === "object" && "context" in error) {
+    const ctx = (error as { context?: Response }).context
+    if (ctx && typeof ctx.json === "function") {
+      try {
+        const body = await ctx.clone().json()
+        if (body && typeof body.error === "string") return body.error
+      } catch {
+        // Ignore parse failure and fall back below.
+      }
+    }
+  }
+  if (error instanceof Error && error.message) return error.message
+  return fallback
+}
+
 export default function ManageUsersPanel() {
   const { user: currentUser } = useAuth()
   const navigate = useNavigate()
@@ -356,6 +418,8 @@ export default function ManageUsersPanel() {
   const [editingUser, setEditingUser] = useState<NidoUser | null>(null)
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
   const [currentPage, setCurrentPage] = useState(1)
+  const [lastProvisionedInvite, setLastProvisionedInvite] = useState<ProvisionedInviteBanner | null>(null)
+  const [resendingBanner, setResendingBanner] = useState(false)
   const pageSize = 10
 
   const togglePassword = (id: string) =>
@@ -365,10 +429,45 @@ export default function ManageUsersPanel() {
       return next;
     })
 
-  const refresh = () => { setUsers(getUsers()); setRoles(getRoles()); }
+  const refresh = () => {
+    setUsers(getUsers());
+    setRoles(prev => {
+      const local = getRoles();
+      const dbRoles = prev.filter(r => UUID_RE.test(r.id));
+      if (dbRoles.length === 0) return local;
+      const seenNames = new Set(dbRoles.map(r => r.name.toLowerCase()));
+      return [...dbRoles, ...local.filter(r => !seenNames.has(r.name.toLowerCase()))];
+    });
+  }
 
   useEffect(() => {
     refresh()
+    let mounted = true;
+    const loadRemoteRoles = async () => {
+      try {
+        const fromFn = (supabase as unknown as { from?: (table: string) => unknown }).from;
+        if (typeof fromFn !== "function") return;
+        const { data, error } = await supabase
+          .from("nido_roles")
+          .select("id, name, department, description, status, is_system_owner");
+        if (!mounted || error || !Array.isArray(data) || data.length === 0) return;
+        const mapped: NidoRole[] = data
+          .filter(r => !r.is_system_owner)
+          .map(r => ({
+            id: String(r.id),
+            name: String(r.name ?? ""),
+            department: String(r.department ?? ""),
+            description: String(r.description ?? ""),
+            status: r.status === "Inactive" ? "Inactive" : "Active",
+          }));
+        if (mapped.length > 0) {
+          setRoles(mapped);
+        }
+      } catch {
+        // Keep local roles fallback when Supabase table lookup is unavailable.
+      }
+    };
+    void loadRemoteRoles();
     const handler = () => refresh()
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "nido_config_users" || event.key === "nido_config_roles") handler()
@@ -377,6 +476,7 @@ export default function ManageUsersPanel() {
     window.addEventListener(NIDO_USERS_EVENT, handler)
     window.addEventListener("storage", handleStorage)
     return () => {
+      mounted = false;
       window.removeEventListener(NIDO_ROLES_EVENT, handler)
       window.removeEventListener(NIDO_USERS_EVENT, handler)
       window.removeEventListener("storage", handleStorage)
@@ -411,29 +511,135 @@ export default function ManageUsersPanel() {
     setUserDialogOpen(true)
   }
 
-  const handleSaveUser = (values: Omit<NidoUser, "id">) => {
+  const handleSaveUser = async (values: Omit<NidoUser, "id">): Promise<boolean> => {
     try {
       if (editingUser) {
         if (isSystemOwner(editingUser)) {
           toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
-          return
+          return false
         }
         const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
-        if (duplicate) { toast.error("Email already in use"); return; }
+        if (duplicate) { toast.error("Email already in use"); return false; }
         updateUser(editingUser.id, values)
         toast.success("User updated", { description: `${values.name}'s details have been saved.` })
-      } else {
-        const duplicate = users.some(u => u.email.toLowerCase() === values.email.toLowerCase())
-        if (duplicate) { toast.error("Email already in use"); return; }
-        addUser(values)
-        toast.success("User added", { description: `${values.name} can now access the platform.` })
+        refresh()
+        return true
       }
+
+      const duplicate = users.some(u => u.email.toLowerCase() === values.email.toLowerCase())
+      if (duplicate) {
+        toast.error("Email already in use")
+        return false
+      }
+
+      let resolvedRoleId = roles.find(
+        r => r.name.toLowerCase() === values.role.toLowerCase() && UUID_RE.test(r.id),
+      )?.id
+
+      if (!resolvedRoleId) {
+        const fromFn = (supabase as unknown as { from?: (table: string) => unknown }).from;
+        if (typeof fromFn === "function") {
+          const { data: dbRole, error: roleLookupError } = await supabase
+            .from("nido_roles")
+            .select("id, status, is_system_owner")
+            .eq("name", values.role)
+            .maybeSingle();
+          if (roleLookupError) {
+            toast.error("Unable to verify selected role", { description: roleLookupError.message })
+            return false
+          }
+          if (dbRole?.is_system_owner) {
+            toast.error("The System Owner role is reserved.")
+            return false
+          }
+          if (dbRole?.id && dbRole.status === "Active") {
+            resolvedRoleId = String(dbRole.id)
+          }
+        }
+      }
+
+      if (!resolvedRoleId) {
+        toast.error("Selected role is unavailable for provisioning", {
+          description: "Please ensure the role exists and is active in Supabase.",
+        })
+        return false
+      }
+
+      const { data, error } = await supabase.functions.invoke("provision-internal-user", {
+        body: {
+          email: values.email,
+          name: values.name,
+          employee_id: values.employeeId,
+          role_id: resolvedRoleId,
+          phone: values.phone || undefined,
+          department: values.department || undefined,
+          designation: values.designation || undefined,
+          job_title: values.jobTitle || undefined,
+        },
+      })
+
+      if (error || !data?.success) {
+        const msg = await extractEdgeFunctionErrorMessage(
+          error,
+          data,
+          "Unable to provision internal user.",
+        )
+        toast.error("User provisioning failed", { description: msg })
+        return false
+      }
+
+      const createdEmployeeId = String(data.employee_id || values.employeeId)
+      addUser({
+        ...values,
+        employeeId: createdEmployeeId,
+        password: "",
+        forcePasswordChange: true,
+        invitationStatus: "sent",
+        invitationSentAt: new Date().toISOString(),
+      })
+
+      setLastProvisionedInvite({
+        name: values.name,
+        email: values.email,
+        employeeId: createdEmployeeId,
+        profileId: typeof data.profile_id === "string" ? data.profile_id : undefined,
+      })
+
+      toast.success("Invitation sent", {
+        description: `${values.name} (${values.email}) has been invited and must set a password via onboarding.`,
+      })
+      refresh()
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to save this user."
       toast.error("User could not be saved", { description: message })
-      return
+      return false
     }
-    refresh()
+  }
+
+  const handleResendBannerInvitation = async () => {
+    if (!lastProvisionedInvite || resendingBanner) return
+    setResendingBanner(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(lastProvisionedInvite.email, {
+        redirectTo: `${window.location.origin}/onboarding`,
+      })
+      if (error) {
+        const msg =
+          error.status === 429 || /rate limit|too many/i.test(error.message ?? "")
+            ? "Too many invitation emails were sent recently. Please wait before trying again."
+            : error.message || "Unable to resend invitation email."
+        toast.error("Resend failed", { description: msg })
+        return
+      }
+      toast.success("Invitation resent", {
+        description: `A fresh invitation link has been sent to ${lastProvisionedInvite.email}.`,
+      })
+    } catch {
+      toast.error("Resend failed", { description: "Unable to resend invitation email." })
+    } finally {
+      setResendingBanner(false)
+    }
   }
 
   return (
@@ -457,6 +663,44 @@ export default function ManageUsersPanel() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input placeholder="Search users…" className="pl-10" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+
+      {lastProvisionedInvite && (
+        <div
+          role="status"
+          className="flex flex-col gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="bg-green-100 text-green-800 border border-green-300">Invitation Sent</Badge>
+              <span className="font-semibold">{lastProvisionedInvite.name}</span>
+              <span className="text-xs text-green-800">({lastProvisionedInvite.email})</span>
+            </div>
+            <p className="text-xs text-green-800">
+              Employee ID {lastProvisionedInvite.employeeId} has been provisioned with forced password setup via NIDO onboarding.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={resendingBanner}
+              onClick={() => void handleResendBannerInvitation()}
+            >
+              <MailPlus className="mr-1.5 h-3.5 w-3.5" />
+              {resendingBanner ? "Resending..." : "Resend Invitation"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setLastProvisionedInvite(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <Card>
@@ -487,6 +731,11 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3">
                     <div className="font-medium text-sm">{user.name}</div>
                     {user.designation && <div className="text-xs text-muted-foreground">{user.designation}</div>}
+                    {user.invitationStatus === "sent" && (
+                      <span className="inline-flex items-center gap-1 text-xs text-blue-600 mt-0.5 mr-2">
+                        <MailPlus size={10} /> Invitation Sent
+                      </span>
+                    )}
                     {user.forcePasswordChange && (
                       <span className="inline-flex items-center gap-1 text-xs text-amber-600 mt-0.5">
                         <AlertTriangle size={10} /> Password change required
@@ -502,7 +751,9 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3 text-sm">{user.role}</td>
                   <td className="px-4 py-3 text-sm">{user.department}</td>
                   <td className="px-4 py-3 text-sm">
-                    {canViewPasswords ? (
+                    {!user.password ? (
+                      <span className="text-xs text-muted-foreground">Invited (onboarding)</span>
+                    ) : canViewPasswords ? (
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs text-gray-700">
                           {visiblePasswords.has(user.id) ? user.password : "••••••••"}
@@ -523,11 +774,11 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3"><StatusBadge status={user.status} locked={isUserLocked(user)} /></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{user.lastLogin ?? "Never"}</td>
                   <td className="px-4 py-3">
-                     {isSystemOwner(user) ? (
-                       <ProtectedOwnerBadge />
-                     ) : (
-                       <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
-                     )}
+                    {isSystemOwner(user) ? (
+                      <ProtectedOwnerBadge />
+                    ) : (
+                      <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
+                    )}
                   </td>
                 </tr>
               ))}
