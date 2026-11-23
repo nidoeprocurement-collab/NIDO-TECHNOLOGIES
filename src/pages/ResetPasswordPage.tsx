@@ -113,16 +113,17 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   const recoveryEventSessionRef = useRef<Session | null>(null);
+  const resetSuccessRef = useRef(false);
 
   useEffect(() => {
-    if (mode !== 'reset') return;
+    if (mode !== 'reset' || resetSuccessRef.current) return;
     let mounted = true;
     let recoveryEventReceived = isPasswordRecovery;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (!mounted) return;
+      if (!mounted || resetSuccessRef.current) return;
       if (event === 'PASSWORD_RECOVERY' && nextSession) {
         recoveryEventReceived = true;
         recoveryEventSessionRef.current = nextSession;
@@ -133,9 +134,10 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
     });
 
     const verifyRecoverySession = async () => {
+      if (!mounted || resetSuccessRef.current) return;
       const urlErr = extractRecoveryError();
       if (urlErr) {
-        if (mounted && !recoveryEventSessionRef.current) {
+        if (mounted && !recoveryEventSessionRef.current && !resetSuccessRef.current) {
           setRecoverySession(null);
           setLinkError(urlErr);
           setCheckingSession(false);
@@ -143,7 +145,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
         return;
       }
 
-      if (mounted && !recoveryEventSessionRef.current) {
+      if (mounted && !recoveryEventSessionRef.current && !resetSuccessRef.current) {
         setCheckingSession(true);
       }
 
@@ -157,7 +159,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
             token_hash: tokenHash,
             type: 'recovery',
           });
-          if (!mounted) return;
+          if (!mounted || resetSuccessRef.current) return;
           if (recoveryEventSessionRef.current) {
             setRecoverySession(recoveryEventSessionRef.current);
             setLinkError(null);
@@ -168,7 +170,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
             setRecoverySession(null);
             setLinkError(
               verifyError?.message ||
-                'This password recovery link is invalid or has expired.',
+              'This password recovery link is invalid or has expired.',
             );
           } else {
             setRecoverySession(verifyData.session);
@@ -185,7 +187,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
           hasUrlRecoveryParams()
         ) {
           const { data } = await supabase.auth.getSession();
-          if (!mounted) return;
+          if (!mounted || resetSuccessRef.current) return;
           const activeRecoverySession = data.session ?? recoveryEventSessionRef.current;
           if (
             activeRecoverySession &&
@@ -201,7 +203,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
           }
         }
 
-        if (mounted && !recoveryEventSessionRef.current) {
+        if (mounted && !recoveryEventSessionRef.current && !resetSuccessRef.current) {
           setRecoverySession(null);
           setLinkError(
             'No active password recovery session found. Your recovery link may have expired.',
@@ -209,7 +211,7 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
           setCheckingSession(false);
         }
       } catch {
-        if (mounted && !recoveryEventSessionRef.current) {
+        if (mounted && !recoveryEventSessionRef.current && !resetSuccessRef.current) {
           setRecoverySession(null);
           setLinkError('Unable to verify your password recovery link.');
           setCheckingSession(false);
@@ -285,8 +287,9 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
         return;
       }
 
-      await logout();
+      resetSuccessRef.current = true;
       setResetSuccess(true);
+      await logout();
     } catch {
       setResetError('An unexpected error occurred. Please try again.');
     } finally {
@@ -393,6 +396,25 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
               </form>
             )}
           </>
+        ) : resetSuccess ? (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+              <div>
+                <h1 className="text-base font-bold text-green-900">Password Updated</h1>
+                <p className="mt-1 text-sm text-green-800">
+                  Your password has been updated. You can now sign in with your new password.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/login', { replace: true })}
+              className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 text-sm transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
         ) : checkingSession ? (
           <div className="py-10 flex flex-col items-center text-center gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -419,25 +441,6 @@ export default function ResetPasswordPage({ mode }: ResetPasswordPageProps) {
             >
               Return to Sign In
             </Link>
-          </div>
-        ) : resetSuccess ? (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-green-50 border border-green-200 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-              <div>
-                <h1 className="text-base font-bold text-green-900">Password Updated</h1>
-                <p className="mt-1 text-sm text-green-800">
-                  Your password has been updated. You can now sign in with your new password.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate('/login', { replace: true })}
-              className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 text-sm transition-colors"
-            >
-              Sign In
-            </button>
           </div>
         ) : (
           <>

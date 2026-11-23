@@ -217,6 +217,61 @@ describe("ResetPasswordPage recovery flow", () => {
     unmount();
     expect(unsubscribeSpy).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps Password Updated visible after PKCE getSession + logout clears isPasswordRecovery and emits SIGNED_OUT", async () => {
+    window.history.replaceState({}, "", "/reset-password?code=test-code");
+    const authCallbacks: Array<(event: string, session: Session | null) => void> = [];
+    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation((cb) => {
+      authCallbacks.push(cb as (event: string, session: Session | null) => void);
+      return {
+        data: { subscription: { unsubscribe: vi.fn() } },
+      } as never;
+    });
+
+    const pkceSession = { user: { id: "u-pkce-submit" } } as Session;
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: { session: pkceSession },
+      error: null,
+    });
+    vi.mocked(supabase.auth.updateUser).mockResolvedValueOnce({
+      data: { user: { id: "u-pkce-submit" } as never },
+      error: null,
+    });
+    vi.mocked(supabase.auth.signOut).mockImplementationOnce(async () => {
+      vi.mocked(supabase.auth.getSession).mockResolvedValue({
+        data: { session: null },
+        error: null,
+      });
+      authCallbacks.forEach((cb) => cb("SIGNED_OUT", null));
+      return { error: null };
+    });
+
+    renderResetPage("/reset-password?code=test-code");
+
+    await waitFor(() => {
+      expect(screen.getByText("Choose a New Password")).toBeTruthy();
+    });
+
+    // Simulate GoTrueClient having stripped ?code= from the URL after exchange.
+    window.history.replaceState({}, "", "/reset-password");
+
+    fireEvent.change(screen.getByLabelText("New Password"), {
+      target: { value: "NewSecurePass123!" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm Password"), {
+      target: { value: "NewSecurePass123!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update Password" }));
+
+    await waitFor(() => {
+      expect(supabase.auth.updateUser).toHaveBeenCalledWith({
+        password: "NewSecurePass123!",
+      });
+      expect(supabase.auth.signOut).toHaveBeenCalled();
+      expect(screen.getByText("Password Updated")).toBeTruthy();
+    });
+    expect(screen.queryByText("Recovery Link Expired")).toBeNull();
+  });
 });
 
 describe("ResetPasswordPage forgot-password request flow", () => {
