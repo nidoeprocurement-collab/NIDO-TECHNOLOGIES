@@ -431,7 +431,8 @@ export function isSharedClient(_clientId: string): boolean {
 
 function currentUserScope(): string {
   try {
-    const rawUser = localStorage.getItem('nido_user');
+    const rawUser =
+      localStorage.getItem('nido_auth_user') || localStorage.getItem('nido_user');
     if (rawUser) {
       const user = JSON.parse(rawUser) as { id?: string; email?: string };
       const identity = user.id || user.email;

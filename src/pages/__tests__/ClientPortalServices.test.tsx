@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { PORTAL_MODULES, getPortalModuleForPath, savePortalRoles, createPortalRolePermission } from "@/lib/portalUserStore";
+import { supabase } from "@/lib/supabase";
+import { PORTAL_MODULES, getPortalModuleForPath } from "@/lib/portalUserStore";
 import ServicesPage from "../ServicesPage";
 
 function LocationDisplay() {
@@ -122,31 +123,32 @@ describe("Client Portal Services Hub", () => {
     expect(getPortalModuleForPath("/portal/services/rental/new")).toBe("Services - Rental Service");
   });
 
-  it("hides individual service cards and My Services button when the client role lacks permission", () => {
-    savePortalRoles("client-1", [
-      {
-        id: "r-svc",
-        name: "Limited Service User",
-        description: "Only AMC",
-        status: "active",
-        permissions: [
-          createPortalRolePermission("Services", { view: true }),
-          createPortalRolePermission("Services - AMC", { view: true }),
-        ],
+  it("hides individual service cards and My Services button when the client role lacks permission", async () => {
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+      data: { session: { user: { id: "auth-u-1" } } as never },
+      error: null,
+    });
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: {
+        authenticated: true,
+        user_scope: "client_portal",
+        effective_admin_scope: false,
+        profile: {
+          id: "u-1",
+          client_id: "client-1",
+          client_name: "Acme",
+          user_type: "client_user",
+          name: "Limited User",
+          email: "limited@acme.com",
+        },
+        role: { id: "r-svc", name: "Limited Service User" },
+        permissions: {
+          Services: { view: true },
+          "Services - AMC": { view: true },
+        },
       },
-    ]);
-    localStorage.setItem(
-      "nido_user",
-      JSON.stringify({
-        id: "u-1",
-        email: "limited@acme.com",
-        name: "Limited User",
-        role: "Limited Service User",
-        userType: "client_user",
-        clientId: "client-1",
-        clientName: "Acme",
-      }),
-    );
+      error: null,
+    } as never);
 
     render(
       <MemoryRouter initialEntries={["/portal/services"]}>
@@ -158,8 +160,10 @@ describe("Client Portal Services Hub", () => {
       </MemoryRouter>,
     );
 
+    await waitFor(() => {
+      expect(screen.queryByText("Rental Service")).toBeNull();
+    });
     expect(screen.getByText("AMC")).toBeTruthy();
-    expect(screen.queryByText("Rental Service")).toBeNull();
     expect(screen.queryByRole("button", { name: /My Services/i })).toBeNull();
   });
 });

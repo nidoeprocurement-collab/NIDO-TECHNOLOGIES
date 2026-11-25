@@ -28,8 +28,16 @@ import {
   exportUsersCsv, exportUsersPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
   MAX_FAILED_LOGIN_ATTEMPTS,
-  isSystemOwner,
+  isSystemOwner, SYSTEM_OWNER_ROLE,
 } from "@/lib/nidoUsersStore"
+import { loadNidoRolesAndPermissionsFromSupabase } from "@/lib/nidoRolesApi"
+import {
+  deactivateNidoUserInSupabase,
+  loadNidoUsersFromSupabase,
+  setNidoUserStatusInSupabase,
+  unlockNidoUserInSupabase,
+  updateNidoUserInSupabase,
+} from "@/lib/nidoUsersApi"
 
 /** Returns true when a user should be treated as locked — covers both the explicit
  *  `locked` boolean and the case where failedLoginAttempts hit the threshold but
@@ -191,11 +199,20 @@ export function ActionsMenu({
 
   const act = (fn: () => void) => { fn(); setOpen(false); };
 
-  const handleStatus = (status: NidoUser["status"]) => {
-    updateUser(user.id, { status });
-    onRefresh();
-    toast.success(`User ${status === "Active" ? "enabled" : status === "Inactive" ? "disabled" : "suspended"}`,
-      { description: `${user.name} is now ${status}.` });
+  const handleStatus = async (status: NidoUser["status"]) => {
+    try {
+      if (UUID_RE.test(user.id)) {
+        await setNidoUserStatusInSupabase(user.id, status);
+      }
+      updateUser(user.id, { status });
+      onRefresh();
+      toast.success(`User ${status === "Active" ? "enabled" : status === "Inactive" ? "disabled" : "suspended"}`,
+        { description: `${user.name} is now ${status}.` });
+    } catch (err) {
+      toast.error("Status update failed", {
+        description: err instanceof Error ? err.message : "Unable to update user status in Supabase.",
+      });
+    }
   };
 
   const handleForcePasswordChange = () => {
@@ -208,7 +225,7 @@ export function ActionsMenu({
     setResending(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/onboarding`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) {
         const msg =
@@ -231,21 +248,42 @@ export function ActionsMenu({
     }
   };
 
-  const handleUnlock = () => {
-    unlockUser(user.id);
-    onRefresh();
-    toast.success("Account unlocked", { description: `${user.name} can now sign in again.` });
+  const handleUnlock = async () => {
+    try {
+      if (UUID_RE.test(user.id)) {
+        await unlockNidoUserInSupabase(user.id);
+      }
+      unlockUser(user.id);
+      onRefresh();
+      toast.success("Account unlocked", { description: `${user.name} can now sign in again.` });
+    } catch (err) {
+      toast.error("Unlock failed", {
+        description: err instanceof Error ? err.message : "Unable to unlock user.",
+      });
+    }
   };
 
   const handleDelete = () => {
     setDeleteOpen(true);
   };
 
-  const confirmDelete = () => {
-    deleteUser(user.id);
-    onRefresh();
-    setDeleteOpen(false);
-    toast.success("User removed");
+  const confirmDelete = async () => {
+    try {
+      if (UUID_RE.test(user.id)) {
+        await deactivateNidoUserInSupabase(user.id);
+        updateUser(user.id, { status: "Inactive" });
+        toast.success("User deactivated", { description: `${user.name} has been deactivated in Supabase.` });
+      } else {
+        deleteUser(user.id);
+        toast.success("User removed");
+      }
+      onRefresh();
+      setDeleteOpen(false);
+    } catch (err) {
+      toast.error("Could not deactivate user", {
+        description: err instanceof Error ? err.message : "Unable to deactivate user.",
+      });
+    }
   };
 
   const itemCls = "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-foreground hover:bg-muted rounded transition-colors cursor-pointer";
@@ -445,29 +483,29 @@ export default function ManageUsersPanel() {
     let mounted = true;
     const loadRemoteRoles = async () => {
       try {
-        const fromFn = (supabase as unknown as { from?: (table: string) => unknown }).from;
-        if (typeof fromFn !== "function") return;
-        const { data, error } = await supabase
-          .from("nido_roles")
-          .select("id, name, department, description, status, is_system_owner");
-        if (!mounted || error || !Array.isArray(data) || data.length === 0) return;
-        const mapped: NidoRole[] = data
-          .filter(r => !r.is_system_owner)
-          .map(r => ({
-            id: String(r.id),
-            name: String(r.name ?? ""),
-            department: String(r.department ?? ""),
-            description: String(r.description ?? ""),
-            status: r.status === "Inactive" ? "Inactive" : "Active",
-          }));
-        if (mapped.length > 0) {
-          setRoles(mapped);
+        const result = await loadNidoRolesAndPermissionsFromSupabase({ autoSyncIfMissing: "if_empty" });
+        if (!mounted) return;
+        const assignable = result.roles.filter(
+          (r) => r.name !== SYSTEM_OWNER_ROLE && UUID_RE.test(r.id),
+        );
+        if (assignable.length > 0) {
+          setRoles(assignable);
         }
       } catch {
         // Keep local roles fallback when Supabase table lookup is unavailable.
       }
     };
     void loadRemoteRoles();
+    void (async () => {
+      try {
+        const remoteUsers = await loadNidoUsersFromSupabase();
+        if (mounted && remoteUsers.length > 0) {
+          setUsers(remoteUsers);
+        }
+      } catch {
+        // Keep local users fallback when Supabase nido_users lookup is unavailable.
+      }
+    })();
     const handler = () => refresh()
     const handleStorage = (event: StorageEvent) => {
       if (event.key === "nido_config_users" || event.key === "nido_config_roles") handler()
@@ -520,6 +558,19 @@ export default function ManageUsersPanel() {
         }
         const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
         if (duplicate) { toast.error("Email already in use"); return false; }
+        if (UUID_RE.test(editingUser.id)) {
+          const matchedRoleId = roles.find(
+            r => r.name.toLowerCase() === values.role.toLowerCase() && UUID_RE.test(r.id),
+          )?.id;
+          await updateNidoUserInSupabase(editingUser.id, {
+            name: values.name,
+            role_id: matchedRoleId,
+            department: values.department || "",
+            designation: values.designation || undefined,
+            job_title: values.jobTitle || undefined,
+            phone: values.phone || undefined,
+          });
+        }
         updateUser(editingUser.id, values)
         toast.success("User updated", { description: `${values.name}'s details have been saved.` })
         refresh()
@@ -533,28 +584,30 @@ export default function ManageUsersPanel() {
       }
 
       let resolvedRoleId = roles.find(
-        r => r.name.toLowerCase() === values.role.toLowerCase() && UUID_RE.test(r.id),
+        r => r.name.toLowerCase() === values.role.toLowerCase() && r.status === "Active" && UUID_RE.test(r.id),
       )?.id
 
       if (!resolvedRoleId) {
-        const fromFn = (supabase as unknown as { from?: (table: string) => unknown }).from;
-        if (typeof fromFn === "function") {
-          const { data: dbRole, error: roleLookupError } = await supabase
-            .from("nido_roles")
-            .select("id, status, is_system_owner")
-            .eq("name", values.role)
-            .maybeSingle();
-          if (roleLookupError) {
-            toast.error("Unable to verify selected role", { description: roleLookupError.message })
-            return false
+        try {
+          const synced = await loadNidoRolesAndPermissionsFromSupabase({ autoSyncIfMissing: true });
+          const matched = synced.roles.find(
+            r => r.name.toLowerCase() === values.role.toLowerCase() && r.name !== SYSTEM_OWNER_ROLE && UUID_RE.test(r.id),
+          );
+          if (matched) {
+            if (matched.status !== "Active") {
+              toast.error("Selected role is inactive", {
+                description: "Please activate the role before assigning it to a user.",
+              });
+              return false;
+            }
+            resolvedRoleId = matched.id;
+            setRoles(synced.roles.filter(r => r.name !== SYSTEM_OWNER_ROLE && UUID_RE.test(r.id)));
           }
-          if (dbRole?.is_system_owner) {
-            toast.error("The System Owner role is reserved.")
-            return false
-          }
-          if (dbRole?.id && dbRole.status === "Active") {
-            resolvedRoleId = String(dbRole.id)
-          }
+        } catch (syncErr) {
+          toast.error("Unable to synchronize roles with Supabase", {
+            description: syncErr instanceof Error ? syncErr.message : "Role lookup failed.",
+          });
+          return false;
         }
       }
 
@@ -622,7 +675,7 @@ export default function ManageUsersPanel() {
     setResendingBanner(true)
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(lastProvisionedInvite.email, {
-        redirectTo: `${window.location.origin}/onboarding`,
+        redirectTo: `${window.location.origin}/reset-password`,
       })
       if (error) {
         const msg =

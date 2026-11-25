@@ -8,6 +8,12 @@ import {
   clientFromImportRow,
   parseClientCsv,
 } from "@/lib/clientStore";
+import {
+  createClientOrganizationWithAdminInSupabase,
+  loadClientOrganizationsFromSupabase,
+  updateClientOrganizationInSupabase,
+} from "@/lib/clientOrganizationsApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
 import { saveClientDocument } from "@/lib/clientDataStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
@@ -306,7 +312,7 @@ export default function AddClient() {
         }));
         setIsLoading(false);
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [clientIdToEdit]);
@@ -731,10 +737,75 @@ export default function AddClient() {
         status: existingClient?.status || "active",
       };
 
-      // Save to shared client store
+      let persistedClientId = formData.client_id;
+
+      if (clientIdToEdit && isSupabaseUuid(clientIdToEdit)) {
+        await updateClientOrganizationInSupabase(clientIdToEdit, {
+          name: clientData.company_name || clientIdToEdit,
+          category: clientData.category || null,
+          tier: clientData.client_tier || null,
+          rep_name: clientData.contact_person || null,
+          email: clientData.email || null,
+          phone: clientData.phone || null,
+          mobile: clientData.mobile || null,
+          website: clientData.website || null,
+          tax_id: clientData.gstin || null,
+          pan: clientData.pan_number || null,
+          billing_address: clientData.billing_address || null,
+          billing_city: clientData.billing_city || null,
+          billing_state: clientData.billing_state || null,
+          billing_pincode: clientData.billing_pincode || null,
+          contract_start_date: clientData.contract_start_date || null,
+          contract_end_date: clientData.contract_end_date || null,
+          metadata: clientData,
+        });
+        persistedClientId = clientIdToEdit;
+      } else if (!clientIdToEdit && formData.email.trim() && formData.contact_person.trim()) {
+        try {
+          const existingRemote = await loadClientOrganizationsFromSupabase();
+          if (
+            existingRemote.some(
+              (c) => c.name.trim().toLowerCase() === clientData.company_name.trim().toLowerCase(),
+            )
+          ) {
+            throw new Error(`A client named "${clientData.company_name}" already exists in Supabase.`);
+          }
+        } catch (dupErr) {
+          if (dupErr instanceof Error && dupErr.message.includes("already exists")) {
+            throw dupErr;
+          }
+        }
+
+        const provisioned = await createClientOrganizationWithAdminInSupabase({
+          clientName: clientData.company_name,
+          adminName: formData.contact_person.trim(),
+          adminEmail: formData.email.trim(),
+          phone: formData.phone || formData.mobile || undefined,
+          category: formData.category || undefined,
+          tier: formData.client_tier || undefined,
+          repName: formData.contact_person || undefined,
+        });
+        persistedClientId = provisioned.client_id;
+
+        await updateClientOrganizationInSupabase(persistedClientId, {
+          mobile: clientData.mobile || null,
+          website: clientData.website || null,
+          tax_id: clientData.gstin || null,
+          pan: clientData.pan_number || null,
+          billing_address: clientData.billing_address || null,
+          billing_city: clientData.billing_city || null,
+          billing_state: clientData.billing_state || null,
+          billing_pincode: clientData.billing_pincode || null,
+          contract_start_date: clientData.contract_start_date || null,
+          contract_end_date: clientData.contract_end_date || null,
+          metadata: clientData,
+        });
+      }
+
+      // Save to shared client store cache with canonical Supabase UUID when available
       addStoredClient({
-        id: formData.client_id,
-        name: clientData.company_name || formData.client_id,
+        id: persistedClientId,
+        name: clientData.company_name || persistedClientId,
         ...clientData,
       });
 
@@ -770,7 +841,7 @@ export default function AddClient() {
           );
         }
       }
-      const savedClient = getClients().find((client) => client.id === formData.client_id);
+      const savedClient = getClients().find((client) => client.id === persistedClientId);
       if (!savedClient || savedClient.company_name !== clientData.company_name) {
         throw new Error("The client could not be confirmed in local storage.");
       }
@@ -832,824 +903,821 @@ export default function AddClient() {
               <div className="flex items-center justify-between">
                 {STEPS.map((s, idx) => (
                   <div key={idx} className="flex items-center flex-1">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                    step === idx
-                      ? "bg-[#4A6CF7] text-white"
-                      : step > idx
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  {step > idx ? <Check className="h-5 w-5" /> : s.icon}
-                </div>
-                <p
-                  className={`ml-2 text-sm font-medium ${
-                    step === idx
-                      ? "text-[#4A6CF7]"
-                      : step > idx
-                        ? "text-green-500"
-                        : "text-gray-600"
-                  }`}
-                >
-                  {s.label}
-                </p>
-                {idx < STEPS.length - 1 && (
-                  <div
-                    className={`flex-1 h-1 mx-2 transition-colors ${
-                      step > idx ? "bg-green-500" : "bg-gray-200"
-                    }`}
-                  />
-                )}
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${step === idx
+                          ? "bg-[#4A6CF7] text-white"
+                          : step > idx
+                            ? "bg-green-500 text-white"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                    >
+                      {step > idx ? <Check className="h-5 w-5" /> : s.icon}
+                    </div>
+                    <p
+                      className={`ml-2 text-sm font-medium ${step === idx
+                          ? "text-[#4A6CF7]"
+                          : step > idx
+                            ? "text-green-500"
+                            : "text-gray-600"
+                        }`}
+                    >
+                      {s.label}
+                    </p>
+                    {idx < STEPS.length - 1 && (
+                      <div
+                        className={`flex-1 h-1 mx-2 transition-colors ${step > idx ? "bg-green-500" : "bg-gray-200"
+                          }`}
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Magic Upload Section */}
-        <div
-          className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-2 mb-6 cursor-pointer hover:bg-blue-100 transition-colors"
-          onClick={() => setShowMagicUpload(true)}
-        >
-          <div className="flex items-center gap-2 text-blue-600">
-            <Upload className="h-5 w-5" />
-            <span className="font-medium">Magic Upload</span>
-          </div>
-          <p className="text-xs text-gray-600 mt-1">
-            Upload a template file to auto-fill client details
-          </p>
-        </div>
+            {/* Magic Upload Section */}
+            <div
+              className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-2 mb-6 cursor-pointer hover:bg-blue-100 transition-colors"
+              onClick={() => setShowMagicUpload(true)}
+            >
+              <div className="flex items-center gap-2 text-blue-600">
+                <Upload className="h-5 w-5" />
+                <span className="font-medium">Magic Upload</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Upload a template file to auto-fill client details
+              </p>
+            </div>
 
-        {/* Step Content */}
-        <Card className="bg-white">
-          <CardContent className="p-4 md:p-6 lg:p-8">
-            {/* Step 1: Basic Info */}
-            {step === 0 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold mb-1">Step 1: Basic Info</h2>
-                </div>
+            {/* Step Content */}
+            <Card className="bg-white">
+              <CardContent className="p-4 md:p-6 lg:p-8">
+                {/* Step 1: Basic Info */}
+                {step === 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-bold mb-1">Step 1: Basic Info</h2>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Client ID
-                    </label>
-                    <Input
-                      placeholder="Auto-generated"
-                      value={formData.client_id}
-                      disabled
-                      className="bg-gray-100 cursor-not-allowed"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Auto-generated</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Company Name *
-                    </label>
-                    <Input
-                      placeholder="Legal company name"
-                      value={formData.company_name}
-                      onChange={(e) =>
-                        handleInputChange("company_name", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Category *
-                    </label>
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) => {
-                        if (value === "add_new") {
-                          setShowAddCategory(true);
-                        } else {
-                          handleInputChange("category", value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoriesList.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="add_new" className="text-[#4A6CF7]">
-                          + Add New Category
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {showAddCategory && (
-                      <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter new category name"
-                            value={newCategory}
-                            onChange={(e) => setNewCategory(e.target.value)}
-                          />
-                          <Button
-                            size="sm"
-                            className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                            onClick={() => {
-                              if (newCategory.trim()) {
-                                setCategoriesList([...categoriesList, newCategory]);
-                                handleInputChange("category", newCategory);
-                                setNewCategory("");
-                                setShowAddCategory(false);
-                                toast.success("Category added successfully");
-                              }
-                            }}
-                          >
-                            Add
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setShowAddCategory(false);
-                              setNewCategory("");
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Client ID
+                        </label>
+                        <Input
+                          placeholder="Auto-generated"
+                          value={formData.client_id}
+                          disabled
+                          className="bg-gray-100 cursor-not-allowed"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Auto-generated</p>
                       </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Client Tier *
-                    </label>
-                    <Select
-                      value={formData.client_tier}
-                      onValueChange={(value) => {
-                        if (value === "add_new") {
-                          setShowAddTier(true);
-                        } else {
-                          handleInputChange("client_tier", value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select tier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clientTiers.map((tier) => (
-                          <SelectItem key={tier} value={tier}>
-                            {tier}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="add_new" className="text-[#4A6CF7]">
-                          + Add New Tier
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {showAddTier && (
-                      <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter new tier name"
-                            value={newTier}
-                            onChange={(e) => setNewTier(e.target.value)}
-                          />
-                          <Button
-                            size="sm"
-                            className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                            onClick={() => {
-                              if (newTier.trim()) {
-                                setClientTiers([...clientTiers, newTier]);
-                                handleInputChange("client_tier", newTier);
-                                setNewTier("");
-                                setShowAddTier(false);
-                                toast.success("Tier added successfully");
-                              }
-                            }}
-                          >
-                            Add
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setShowAddTier(false);
-                              setNewTier("");
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Client Logo (PNG)
-                    </label>
-                    <input
-                      type="file"
-                      accept=".png"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) {
-                          const file = e.target.files[0];
-                          if (file.type === "image/png") {
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              handleInputChange("client_logo", file);
-                              handleInputChange("client_logo_url", event.target?.result);
-                            };
-                            reader.readAsDataURL(file);
-                          } else {
-                            toast.error("Please upload a PNG file");
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Company Name *
+                        </label>
+                        <Input
+                          placeholder="Legal company name"
+                          value={formData.company_name}
+                          onChange={(e) =>
+                            handleInputChange("company_name", e.target.value)
                           }
-                        }
-                      }}
-                      className="block w-full text-sm text-gray-500 border border-gray-300 rounded-md cursor-pointer focus:outline-none"
-                    />
-                    {formData.client_logo_url && (
-                      <div className="mt-2">
-                        <img
-                          src={formData.client_logo_url}
-                          alt="Logo preview"
-                          className="h-16 w-16 rounded object-cover"
                         />
                       </div>
-                    )}
-                  </div>
-                  <div></div>
-                </div>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Contact Person *
-                    </label>
-                    <Input
-                      placeholder="Primary contact name"
-                      value={formData.contact_person}
-                      onChange={(e) =>
-                        handleInputChange("contact_person", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Email *
-                    </label>
-                    <Input
-                      type="email"
-                      placeholder="contact@company.com"
-                      value={formData.email}
-                      onChange={(e) =>
-                        handleInputChange("email", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Phone
-                    </label>
-                    <Input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="10-digit phone number"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        handleInputChange("phone", sanitizePhoneNumber(e.target.value))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Mobile
-                    </label>
-                    <Input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      placeholder="Alternate mobile number"
-                      value={formData.mobile}
-                      onChange={(e) =>
-                        handleInputChange("mobile", sanitizePhoneNumber(e.target.value))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Website
-                  </label>
-                  <Input
-                    placeholder="www.example.com"
-                    value={formData.website}
-                    onChange={(e) =>
-                      handleInputChange("website", e.target.value)
-                    }
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Contract Start Date *
-                    </label>
-                    <Input
-                      type="date"
-                      value={formData.contract_start_date}
-                      onChange={(e) => {
-                        const newStart = e.target.value;
-                        setFormData((prev) => ({
-                          ...prev,
-                          contract_start_date: newStart,
-                          contract_end_date:
-                            prev.contract_end_date && newStart && prev.contract_end_date <= newStart
-                              ? ""
-                              : prev.contract_end_date,
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Contract End Date *
-                    </label>
-                    <Input
-                      type="date"
-                      value={formData.contract_end_date}
-                      min={
-                        formData.contract_start_date
-                          ? new Date(
-                              new Date(formData.contract_start_date).getTime() + 86400000
-                            )
-                              .toISOString()
-                              .split("T")[0]
-                          : undefined
-                      }
-                      disabled={!formData.contract_start_date}
-                      onChange={(e) => {
-                        if (
-                          formData.contract_start_date &&
-                          e.target.value <= formData.contract_start_date
-                        ) {
-                          toast.error(
-                            "Contract End Date must be after the Contract Start Date"
-                          );
-                          return;
-                        }
-                        handleInputChange("contract_end_date", e.target.value);
-                      }}
-                    />
-                    {!formData.contract_start_date && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Select a Contract Start Date first
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Business */}
-            {step === 1 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold mb-1">Step 2: Business</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      GST Treatment *
-                    </label>
-                    <Select
-                      value={formData.gst_treatment}
-                      onValueChange={(value) =>
-                        handleInputChange("gst_treatment", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select treatment" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GST_TREATMENTS.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Source of Supply
-                    </label>
-                    <Input
-                      placeholder="State/UT"
-                      value={formData.source_of_supply}
-                      onChange={(e) => {
-                        if (isAlphaOnly(e.target.value)) {
-                          handleInputChange("source_of_supply", e.target.value);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      GSTIN {formData.gst_treatment === "Registered Business" ? "*" : ""}
-                    </label>
-                    <Input
-                      placeholder="27AABCT1234A1Z5"
-                      value={formData.gstin}
-                      maxLength={15}
-                      pattern="[A-Za-z0-9]{15}"
-                      onChange={(e) =>
-                        handleInputChange("gstin", normalizeGstInput(e.target.value))
-                      }
-                      className={
-                        formData.gstin && !isValidGst(formData.gstin)
-                          ? "border-red-400 focus-visible:ring-red-400"
-                          : ""
-                      }
-                    />
-                    <p className={`mt-1 text-xs ${formData.gstin.length === 15 ? "text-green-600" : "text-gray-500"}`}>
-                      {formData.gstin.length}/15 characters
-                    </p>
-                    {formData.gstin && !isValidGst(formData.gstin) && (
-                      <p className="text-xs text-red-500 mt-1">
-                        GSTIN must contain exactly 15 letters and numbers.
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      PAN Number *
-                    </label>
-                    <Input
-                      placeholder="AAAAA0000A"
-                      value={formData.pan_number}
-                      maxLength={10}
-                      pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
-                      onChange={(e) =>
-                        handleInputChange("pan_number", normalizePanInput(e.target.value))
-                      }
-                    />
-                    <p className={`mt-1 text-xs ${isValidPan(formData.pan_number) ? "text-green-600" : "text-gray-500"}`}>
-                      {formData.pan_number.length}/10 characters · 5 letters, 4 numbers, 1 letter
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      ID/Reference Number
-                    </label>
-                    <Input
-                      placeholder="Enter ID or reference number"
-                      value={formData.id_reference_number}
-                      onChange={(e) =>
-                        handleInputChange("id_reference_number", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Currency
-                    </label>
-                    <Select
-                      value={formData.currency}
-                      onValueChange={(value) => {
-                        if (value === "add_new") {
-                          setShowAddCurrency(true);
-                        } else {
-                          handleInputChange("currency", value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currenciesList.map((curr) => (
-                          <SelectItem key={curr} value={curr}>
-                            {curr}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="add_new" className="text-[#4A6CF7]">
-                          + Add New Currency
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {showAddCurrency && (
-                      <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Enter new currency code (e.g., AUD)"
-                            value={newCurrency}
-                            onChange={(e) => setNewCurrency(e.target.value.toUpperCase())}
-                          />
-                          <Button
-                            size="sm"
-                            className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                            onClick={() => {
-                              if (newCurrency.trim()) {
-                                setCurrenciesList([...currenciesList, newCurrency]);
-                                handleInputChange("currency", newCurrency);
-                                setNewCurrency("");
-                                setShowAddCurrency(false);
-                                toast.success("Currency added successfully");
-                              }
-                            }}
-                          >
-                            Add
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setShowAddCurrency(false);
-                              setNewCurrency("");
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Category *
+                        </label>
+                        <Select
+                          value={formData.category}
+                          onValueChange={(value) => {
+                            if (value === "add_new") {
+                              setShowAddCategory(true);
+                            } else {
+                              handleInputChange("category", value);
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categoriesList.map((cat) => (
+                              <SelectItem key={cat} value={cat}>
+                                {cat}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="add_new" className="text-[#4A6CF7]">
+                              + Add New Category
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {showAddCategory && (
+                          <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter new category name"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                              />
+                              <Button
+                                size="sm"
+                                className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
+                                onClick={() => {
+                                  if (newCategory.trim()) {
+                                    setCategoriesList([...categoriesList, newCategory]);
+                                    handleInputChange("category", newCategory);
+                                    setNewCategory("");
+                                    setShowAddCategory(false);
+                                    toast.success("Category added successfully");
+                                  }
+                                }}
+                              >
+                                Add
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setShowAddCategory(false);
+                                  setNewCategory("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Client Tier *
+                        </label>
+                        <Select
+                          value={formData.client_tier}
+                          onValueChange={(value) => {
+                            if (value === "add_new") {
+                              setShowAddTier(true);
+                            } else {
+                              handleInputChange("client_tier", value);
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select tier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clientTiers.map((tier) => (
+                              <SelectItem key={tier} value={tier}>
+                                {tier}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="add_new" className="text-[#4A6CF7]">
+                              + Add New Tier
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {showAddTier && (
+                          <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter new tier name"
+                                value={newTier}
+                                onChange={(e) => setNewTier(e.target.value)}
+                              />
+                              <Button
+                                size="sm"
+                                className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
+                                onClick={() => {
+                                  if (newTier.trim()) {
+                                    setClientTiers([...clientTiers, newTier]);
+                                    handleInputChange("client_tier", newTier);
+                                    setNewTier("");
+                                    setShowAddTier(false);
+                                    toast.success("Tier added successfully");
+                                  }
+                                }}
+                              >
+                                Add
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setShowAddTier(false);
+                                  setNewTier("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Client Logo (PNG)
+                        </label>
+                        <input
+                          type="file"
+                          accept=".png"
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                              const file = e.target.files[0];
+                              if (file.type === "image/png") {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  handleInputChange("client_logo", file);
+                                  handleInputChange("client_logo_url", event.target?.result);
+                                };
+                                reader.readAsDataURL(file);
+                              } else {
+                                toast.error("Please upload a PNG file");
+                              }
+                            }
+                          }}
+                          className="block w-full text-sm text-gray-500 border border-gray-300 rounded-md cursor-pointer focus:outline-none"
+                        />
+                        {formData.client_logo_url && (
+                          <div className="mt-2">
+                            <img
+                              src={formData.client_logo_url}
+                              alt="Logo preview"
+                              className="h-16 w-16 rounded object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Contact Person *
+                        </label>
+                        <Input
+                          placeholder="Primary contact name"
+                          value={formData.contact_person}
+                          onChange={(e) =>
+                            handleInputChange("contact_person", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Email *
+                        </label>
+                        <Input
+                          type="email"
+                          placeholder="contact@company.com"
+                          value={formData.email}
+                          onChange={(e) =>
+                            handleInputChange("email", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Phone
+                        </label>
+                        <Input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={10}
+                          placeholder="10-digit phone number"
+                          value={formData.phone}
+                          onChange={(e) =>
+                            handleInputChange("phone", sanitizePhoneNumber(e.target.value))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Mobile
+                        </label>
+                        <Input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={10}
+                          placeholder="Alternate mobile number"
+                          value={formData.mobile}
+                          onChange={(e) =>
+                            handleInputChange("mobile", sanitizePhoneNumber(e.target.value))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Website
+                      </label>
+                      <Input
+                        placeholder="www.example.com"
+                        value={formData.website}
+                        onChange={(e) =>
+                          handleInputChange("website", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Contract Start Date *
+                        </label>
+                        <Input
+                          type="date"
+                          value={formData.contract_start_date}
+                          onChange={(e) => {
+                            const newStart = e.target.value;
+                            setFormData((prev) => ({
+                              ...prev,
+                              contract_start_date: newStart,
+                              contract_end_date:
+                                prev.contract_end_date && newStart && prev.contract_end_date <= newStart
+                                  ? ""
+                                  : prev.contract_end_date,
+                            }));
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Contract End Date *
+                        </label>
+                        <Input
+                          type="date"
+                          value={formData.contract_end_date}
+                          min={
+                            formData.contract_start_date
+                              ? new Date(
+                                new Date(formData.contract_start_date).getTime() + 86400000
+                              )
+                                .toISOString()
+                                .split("T")[0]
+                              : undefined
+                          }
+                          disabled={!formData.contract_start_date}
+                          onChange={(e) => {
+                            if (
+                              formData.contract_start_date &&
+                              e.target.value <= formData.contract_start_date
+                            ) {
+                              toast.error(
+                                "Contract End Date must be after the Contract Start Date"
+                              );
+                              return;
+                            }
+                            handleInputChange("contract_end_date", e.target.value);
+                          }}
+                        />
+                        {!formData.contract_start_date && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Select a Contract Start Date first
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Opening Balance
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      value={formData.opening_balance}
-                      onChange={(e) =>
-                        handleInputChange("opening_balance", e.target.value)
-                      }
+                )}
+
+                {/* Step 2: Business */}
+                {step === 1 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-bold mb-1">Step 2: Business</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          GST Treatment *
+                        </label>
+                        <Select
+                          value={formData.gst_treatment}
+                          onValueChange={(value) =>
+                            handleInputChange("gst_treatment", value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select treatment" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GST_TREATMENTS.map((t) => (
+                              <SelectItem key={t} value={t}>
+                                {t}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Source of Supply
+                        </label>
+                        <Input
+                          placeholder="State/UT"
+                          value={formData.source_of_supply}
+                          onChange={(e) => {
+                            if (isAlphaOnly(e.target.value)) {
+                              handleInputChange("source_of_supply", e.target.value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          GSTIN {formData.gst_treatment === "Registered Business" ? "*" : ""}
+                        </label>
+                        <Input
+                          placeholder="27AABCT1234A1Z5"
+                          value={formData.gstin}
+                          maxLength={15}
+                          pattern="[A-Za-z0-9]{15}"
+                          onChange={(e) =>
+                            handleInputChange("gstin", normalizeGstInput(e.target.value))
+                          }
+                          className={
+                            formData.gstin && !isValidGst(formData.gstin)
+                              ? "border-red-400 focus-visible:ring-red-400"
+                              : ""
+                          }
+                        />
+                        <p className={`mt-1 text-xs ${formData.gstin.length === 15 ? "text-green-600" : "text-gray-500"}`}>
+                          {formData.gstin.length}/15 characters
+                        </p>
+                        {formData.gstin && !isValidGst(formData.gstin) && (
+                          <p className="text-xs text-red-500 mt-1">
+                            GSTIN must contain exactly 15 letters and numbers.
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          PAN Number *
+                        </label>
+                        <Input
+                          placeholder="AAAAA0000A"
+                          value={formData.pan_number}
+                          maxLength={10}
+                          pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
+                          onChange={(e) =>
+                            handleInputChange("pan_number", normalizePanInput(e.target.value))
+                          }
+                        />
+                        <p className={`mt-1 text-xs ${isValidPan(formData.pan_number) ? "text-green-600" : "text-gray-500"}`}>
+                          {formData.pan_number.length}/10 characters · 5 letters, 4 numbers, 1 letter
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          ID/Reference Number
+                        </label>
+                        <Input
+                          placeholder="Enter ID or reference number"
+                          value={formData.id_reference_number}
+                          onChange={(e) =>
+                            handleInputChange("id_reference_number", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Currency
+                        </label>
+                        <Select
+                          value={formData.currency}
+                          onValueChange={(value) => {
+                            if (value === "add_new") {
+                              setShowAddCurrency(true);
+                            } else {
+                              handleInputChange("currency", value);
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {currenciesList.map((curr) => (
+                              <SelectItem key={curr} value={curr}>
+                                {curr}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="add_new" className="text-[#4A6CF7]">
+                              + Add New Currency
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {showAddCurrency && (
+                          <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter new currency code (e.g., AUD)"
+                                value={newCurrency}
+                                onChange={(e) => setNewCurrency(e.target.value.toUpperCase())}
+                              />
+                              <Button
+                                size="sm"
+                                className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
+                                onClick={() => {
+                                  if (newCurrency.trim()) {
+                                    setCurrenciesList([...currenciesList, newCurrency]);
+                                    handleInputChange("currency", newCurrency);
+                                    setNewCurrency("");
+                                    setShowAddCurrency(false);
+                                    toast.success("Currency added successfully");
+                                  }
+                                }}
+                              >
+                                Add
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setShowAddCurrency(false);
+                                  setNewCurrency("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Opening Balance
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={formData.opening_balance}
+                          onChange={(e) =>
+                            handleInputChange("opening_balance", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Financial */}
+                {step === 2 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-bold mb-1">Step 3: Financial</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Payment Terms *
+                        </label>
+                        <Select
+                          value={formData.payment_terms}
+                          onValueChange={(value) =>
+                            handleInputChange("payment_terms", value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Net 30" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PAYMENT_TERMS.map((term) => (
+                              <SelectItem key={term} value={term}>
+                                {term}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          TDS Rate (%)
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={formData.tds_rate}
+                          onChange={(e) =>
+                            handleInputChange("tds_rate", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Bank Name *
+                        </label>
+                        <Input
+                          placeholder="Bank name"
+                          value={formData.bank_name}
+                          onChange={(e) =>
+                            handleInputChange("bank_name", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Account Number *
+                        </label>
+                        <Input
+                          placeholder="Account number"
+                          value={formData.account_number}
+                          onChange={(e) =>
+                            handleInputChange("account_number", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          IFSC Code *
+                        </label>
+                        <Input
+                          placeholder="SBIN0001234"
+                          value={formData.ifsc_code}
+                          onChange={(e) =>
+                            handleInputChange("ifsc_code", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Branch *
+                        </label>
+                        <Input
+                          placeholder="Branch name"
+                          value={formData.branch}
+                          onChange={(e) =>
+                            handleInputChange("branch", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Address */}
+                {step === 3 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-bold mb-1">Step 4: Address</h2>
+                    </div>
+                    <AddressPairFields
+                      billing={billingAddressDetails}
+                      shipping={shippingAddressDetails}
+                      states={INDIAN_STATES}
+                      onBillingChange={(patch) => updateAddressDetails("billing", patch)}
+                      onShippingChange={(patch) => {
+                        updateAddressDetails("shipping", patch);
+                        handleInputChange("same_address", false);
+                      }}
+                      onCopyBilling={() => handleInputChange("same_address", true)}
                     />
                   </div>
-                </div>
+                )}
+
+                {/* Step 5: Documents */}
+                {step === 4 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-bold mb-1">
+                        Step 5: Documents
+                      </h2>
+                      <p className="text-sm text-gray-600">
+                        Enter the document type (GST Certificate, PAN Card, etc.) and upload its file.
+                        Use "Add Another Document" or "Select Multiple Files" to upload more than one.
+                      </p>
+                    </div>
+
+                    <LabeledDocumentUploader
+                      documents={formData.documents}
+                      onChange={handleDocumentsChange}
+                      onError={(message) => toast.error(message)}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Navigation Buttons */}
+            <div className="flex items-center justify-between mt-6">
+              <div>
+                {step > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep(step - 1)}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Previous
+                  </Button>
+                )}
+                {step === 0 && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate("/clients")}
+                  >
+                    Cancel
+                  </Button>
+                )}
               </div>
-            )}
 
-            {/* Step 3: Financial */}
-            {step === 2 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold mb-1">Step 3: Financial</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Payment Terms *
-                    </label>
-                    <Select
-                      value={formData.payment_terms}
-                      onValueChange={(value) =>
-                        handleInputChange("payment_terms", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Net 30" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_TERMS.map((term) => (
-                          <SelectItem key={term} value={term}>
-                            {term}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      TDS Rate (%)
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="0"
-                      value={formData.tds_rate}
-                      onChange={(e) =>
-                        handleInputChange("tds_rate", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Bank Name *
-                    </label>
-                    <Input
-                      placeholder="Bank name"
-                      value={formData.bank_name}
-                      onChange={(e) =>
-                        handleInputChange("bank_name", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Account Number *
-                    </label>
-                    <Input
-                      placeholder="Account number"
-                      value={formData.account_number}
-                      onChange={(e) =>
-                        handleInputChange("account_number", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      IFSC Code *
-                    </label>
-                    <Input
-                      placeholder="SBIN0001234"
-                      value={formData.ifsc_code}
-                      onChange={(e) =>
-                        handleInputChange("ifsc_code", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Branch *
-                    </label>
-                    <Input
-                      placeholder="Branch name"
-                      value={formData.branch}
-                      onChange={(e) =>
-                        handleInputChange("branch", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
+              <div className="flex gap-3">
+                {step === STEPS.length - 1 && (
+                  <Button
+                    variant="outline"
+                    onClick={downloadTemplate}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" /> Download Template
+                  </Button>
+                )}
+                {step < STEPS.length - 1 && (
+                  <Button
+                    onClick={() => setStep(step + 1)}
+                    disabled={!canProceed()}
+                    className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white flex items-center gap-2"
+                  >
+                    Next <ArrowRight className="h-4 w-4" />
+                  </Button>
+                )}
+                {step === STEPS.length - 1 && (
+                  <Button
+                    onClick={handleSave}
+                    className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                  >
+                    <Check className="h-4 w-4" /> {clientIdToEdit ? "Save Changes" : "Register Client"}
+                  </Button>
+                )}
               </div>
-            )}
-
-            {/* Step 4: Address */}
-            {step === 3 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold mb-1">Step 4: Address</h2>
-                </div>
-                <AddressPairFields
-                  billing={billingAddressDetails}
-                  shipping={shippingAddressDetails}
-                  states={INDIAN_STATES}
-                  onBillingChange={(patch) => updateAddressDetails("billing", patch)}
-                  onShippingChange={(patch) => {
-                    updateAddressDetails("shipping", patch);
-                    handleInputChange("same_address", false);
-                  }}
-                  onCopyBilling={() => handleInputChange("same_address", true)}
-                />
-              </div>
-            )}
-
-            {/* Step 5: Documents */}
-            {step === 4 && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold mb-1">
-                    Step 5: Documents
-                  </h2>
-                  <p className="text-sm text-gray-600">
-                    Enter the document type (GST Certificate, PAN Card, etc.) and upload its file.
-                    Use "Add Another Document" or "Select Multiple Files" to upload more than one.
-                  </p>
-                </div>
-
-                <LabeledDocumentUploader
-                  documents={formData.documents}
-                  onChange={handleDocumentsChange}
-                  onError={(message) => toast.error(message)}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between mt-6">
-          <div>
-            {step > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => setStep(step - 1)}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" /> Previous
-              </Button>
-            )}
-            {step === 0 && (
-              <Button
-                variant="ghost"
-                onClick={() => navigate("/clients")}
-              >
-                Cancel
-              </Button>
-            )}
+            </div>
           </div>
-
-          <div className="flex gap-3">
-            {step === STEPS.length - 1 && (
-              <Button
-                variant="outline"
-                onClick={downloadTemplate}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" /> Download Template
-              </Button>
-            )}
-            {step < STEPS.length - 1 && (
-              <Button
-                onClick={() => setStep(step + 1)}
-                disabled={!canProceed()}
-                className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white flex items-center gap-2"
-              >
-                Next <ArrowRight className="h-4 w-4" />
-              </Button>
-            )}
-            {step === STEPS.length - 1 && (
-              <Button
-                onClick={handleSave}
-                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-              >
-                <Check className="h-4 w-4" /> {clientIdToEdit ? "Save Changes" : "Register Client"}
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
         )}
 
         {/* Magic Upload Modal */}
         {showMagicUpload && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-96">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="text-lg font-bold">Magic Upload</h2>
-              <p className="text-sm text-gray-600">
-                Upload a CSV file to auto-fill client details
-              </p>
-              <input
-                type="file"
-                accept=".csv"
-                className="block w-full border border-gray-300 rounded-lg p-3"
-                onChange={(event) =>
-                  handleMagicUpload(event.target.files?.[0])
-                }
-              />
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowMagicUpload(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                  onClick={() =>
-                    toast.success(
-                      "Choose a CSV file above to fill all client fields",
-                    )
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-96">
+              <CardContent className="p-6 space-y-4">
+                <h2 className="text-lg font-bold">Magic Upload</h2>
+                <p className="text-sm text-gray-600">
+                  Upload a CSV file to auto-fill client details
+                </p>
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="block w-full border border-gray-300 rounded-lg p-3"
+                  onChange={(event) =>
+                    handleMagicUpload(event.target.files?.[0])
                   }
-                >
-                  Upload
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                />
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowMagicUpload(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
+                    onClick={() =>
+                      toast.success(
+                        "Choose a CSV file above to fill all client fields",
+                      )
+                    }
+                  >
+                    Upload
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>

@@ -17,9 +17,10 @@ import AddEditRoleDialog from "./AddEditRoleDialog"
 import RolePermissionsDialog from "./RolePermissionsDialog"
 import {
   type NidoRole,
-  getRoles, addRole, updateRole, deleteRole,
+  getRoles, updateRole, deleteRole,
   getRoleUserCount, exportRolesCsv, exportRolesPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
+  replaceRolesFromBackend,
 } from "@/lib/nidoUsersStore"
 import {
   ACTIONS,
@@ -28,6 +29,14 @@ import {
   saveRolePermissions,
   type ModulePermissions,
 } from "@/lib/permissionsStore"
+import {
+  createNidoRoleInSupabase,
+  deleteNidoRoleInSupabase,
+  isSupabaseUuid,
+  loadNidoRolesAndPermissionsFromSupabase,
+  saveNidoRolePermissionsInSupabase,
+  updateNidoRoleInSupabase,
+} from "@/lib/nidoRolesApi"
 import { ROLE_PERMISSION_MODULE_OPTIONS } from "@/lib/platformModuleCatalog"
 
 const NIDO_PERMISSION_CSV_COLUMNS = [
@@ -149,11 +158,30 @@ export default function NidoUsersPage() {
   const [permDialogOpen, setPermDialogOpen]     = useState(false)
   const [permRole, setPermRole]                 = useState<NidoRole | null>(null)
   const [showRoleActionsMenu, setShowRoleActionsMenu] = useState(false)
+  const [rolesLoading, setRolesLoading]         = useState(true)
+  const [rolesSyncError, setRolesSyncError]     = useState<string | null>(null)
+  const [deletingRoleId, setDeletingRoleId]     = useState<string | null>(null)
   const [, forceRefresh]                        = useState(0)
   const [currentRolePage, setCurrentRolePage]   = useState(1)
   const rolePageSize = 10
 
   const refreshRoles = () => { setRoles(getRoles()); forceRefresh(n => n + 1); }
+
+  const loadRolesFromBackend = async (autoSyncIfMissing = false) => {
+    setRolesLoading(true)
+    setRolesSyncError(null)
+    try {
+      const result = await loadNidoRolesAndPermissionsFromSupabase({ autoSyncIfMissing })
+      setRoles(result.roles)
+      forceRefresh(n => n + 1)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unable to load roles from Supabase."
+      setRolesSyncError(msg)
+      refreshRoles()
+    } finally {
+      setRolesLoading(false)
+    }
+  }
 
   useEffect(() => {
     const tab = searchParams.get("tab") === "users" ? "users" : "roles"
@@ -161,7 +189,7 @@ export default function NidoUsersPage() {
   }, [searchParams])
 
   useEffect(() => {
-    refreshRoles()
+    void loadRolesFromBackend(true)
     const handler = () => refreshRoles()
     window.addEventListener(NIDO_ROLES_EVENT, handler)
     window.addEventListener(NIDO_USERS_EVENT, handler)
@@ -190,29 +218,74 @@ export default function NidoUsersPage() {
   }, [totalRolePages])
 
   const handleAddRole = () => { setEditingRole(null); setRoleDialogOpen(true); }
-  const handleEditRole = (role: NidoRole) => { setEditingRole(role); setRoleDialogOpen(true); }
-
-  const handleSaveRole = (values: { department: string; name: string; description: string; status: "Active" | "Inactive" }) => {
-    if (editingRole) {
-      updateRole(editingRole.id, values)
-      toast.success("Role updated", { description: `"${values.name}" has been saved.` })
-    } else {
-      addRole(values)
-      toast.success("Role added", { description: `"${values.name}" is now available to assign to users.` })
+  const handleEditRole = (role: NidoRole) => {
+    if (isSuperAdmin(role.name)) {
+      toast.error("System Owner is protected", { description: "The System Owner role cannot be modified." })
+      return
     }
-    refreshRoles()
+    setEditingRole(role)
+    setRoleDialogOpen(true)
   }
 
-  const handleDeleteRole = (role: NidoRole) => {
+  const handleSaveRole = async (values: { department: string; name: string; description: string; status: "Active" | "Inactive" }): Promise<boolean> => {
+    if (values.name.trim().toLowerCase() === "system owner") {
+      toast.error("System Owner is protected", { description: "The System Owner role cannot be created or modified." })
+      return false
+    }
+
+    if (editingRole) {
+      if (isSuperAdmin(editingRole.name)) {
+        toast.error("System Owner is protected", { description: "The System Owner role cannot be modified." })
+        return false
+      }
+      const updated = await updateNidoRoleInSupabase(editingRole.id, values)
+      updateRole(editingRole.id, updated)
+      setRoles(prev => replaceRolesFromBackend(prev.map(r => (r.id === editingRole.id ? updated : r))))
+      toast.success("Role updated", { description: `"${updated.name}" has been saved in Supabase.` })
+      return true
+    }
+
+    const created = await createNidoRoleInSupabase(values)
+    setRoles(prev => replaceRolesFromBackend([...prev.filter(r => r.id !== created.id), created]))
+    toast.success("Role added", { description: `"${created.name}" has been created in Supabase.` })
+    return true
+  }
+
+  const handleDeleteRole = async (role: NidoRole) => {
+    if (deletingRoleId) return
+    if (isSuperAdmin(role.name)) {
+      toast.error("System Owner is protected", { description: "The System Owner role cannot be deleted." })
+      return
+    }
     const assigned = getRoleUserCount(role.name)
     if (assigned > 0) {
       toast.error("Can't delete role", { description: `${assigned} user(s) still have this role. Reassign them first.` })
       return
     }
     if (!window.confirm(`Delete the role "${role.name}"? This cannot be undone.`)) return
-    deleteRole(role.id)
-    toast.success("Role deleted")
-    refreshRoles()
+
+    setDeletingRoleId(role.id)
+    try {
+      await deleteNidoRoleInSupabase(role.id)
+      deleteRole(role.id)
+      setRoles(prev => replaceRolesFromBackend(prev.filter(r => r.id !== role.id)))
+      toast.success("Role deleted")
+    } catch (err) {
+      toast.error("Could not delete role", {
+        description: err instanceof Error ? err.message : "Unable to delete role in Supabase.",
+      })
+    } finally {
+      setDeletingRoleId(null)
+    }
+  }
+
+  const handleSaveRolePermissions = async (role: NidoRole, matrix: Record<string, ModulePermissions>) => {
+    if (isSuperAdmin(role.name)) return
+    if (isSupabaseUuid(role.id)) {
+      await saveNidoRolePermissionsInSupabase(role.id, matrix)
+    }
+    saveRolePermissions(role.name, matrix)
+    forceRefresh(n => n + 1)
   }
 
   const handleOpenPermissions = (role: NidoRole) => {
@@ -354,26 +427,31 @@ export default function NidoUsersPage() {
       const existingByName = new Map(roles.map(role => [role.name.toLowerCase(), role]))
       const importedRoles = Array.from(imported.values())
 
-      importedRoles.forEach(incoming => {
+      let syncedCount = 0
+      for (const incoming of importedRoles) {
+        if (incoming.name.trim().toLowerCase() === "system owner") continue
         const existing = existingByName.get(incoming.name.toLowerCase())
-        if (existing) {
-          updateRole(existing.id, {
+        let persistedRole: NidoRole
+        if (existing && isSupabaseUuid(existing.id)) {
+          persistedRole = await updateNidoRoleInSupabase(existing.id, {
+            department: existing.department ?? "",
             name: incoming.name,
             description: incoming.description,
             status: incoming.status,
           })
         } else {
-          addRole({
-            department: "",
+          persistedRole = await createNidoRoleInSupabase({
+            department: existing?.department ?? "",
             name: incoming.name,
             description: incoming.description,
             status: incoming.status,
           })
         }
-        saveRolePermissions(incoming.name, incoming.permissions)
-      })
-      refreshRoles()
-      toast.success(`Imported ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} successfully`)
+        await saveNidoRolePermissionsInSupabase(persistedRole.id, incoming.permissions)
+        syncedCount += 1
+      }
+      await loadRolesFromBackend(false)
+      toast.success(`Imported ${syncedCount} role${syncedCount === 1 ? "" : "s"} to Supabase`)
     } catch (error) {
       toast.error("Could not import CSV", {
         description: error instanceof Error ? error.message : "Please check the file format.",
@@ -498,7 +576,13 @@ export default function NidoUsersPage() {
 
             <div>
               <h2 className="text-lg font-semibold">User Roles</h2>
-              <p className="text-sm text-muted-foreground">Define roles and configure their module permissions.</p>
+              <p className="text-sm text-muted-foreground">
+                Define roles and configure their module permissions.
+                {rolesLoading && " Syncing with Supabase..."}
+              </p>
+              {rolesSyncError && (
+                <p className="mt-1 text-sm text-red-600">{rolesSyncError}</p>
+              )}
             </div>
 
             <Card>
@@ -548,10 +632,20 @@ export default function NidoUsersPage() {
                               <Shield className="mr-1.5 h-3.5 w-3.5 text-blue-500" />
                               Permissions
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleEditRole(role)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isSuperAdmin(role.name)}
+                              onClick={() => handleEditRole(role)}
+                            >
                               <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleDeleteRole(role)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isSuperAdmin(role.name) || deletingRoleId === role.id}
+                              onClick={() => void handleDeleteRole(role)}
+                            >
                               <Trash2 className="h-3.5 w-3.5 text-red-500" />
                             </Button>
                           </div>
@@ -613,6 +707,7 @@ export default function NidoUsersPage() {
         open={permDialogOpen}
         onOpenChange={setPermDialogOpen}
         role={permRole}
+        onSavePermissions={handleSaveRolePermissions}
       />
     </div>
   )

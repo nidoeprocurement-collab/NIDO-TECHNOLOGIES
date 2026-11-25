@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useRef, useEffect, useId, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import { PORTAL_MODULE_CATALOG } from "@/lib/portalUserStore";
 
@@ -24,22 +25,47 @@ export function ModuleMultiSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverCoords, setPopoverCoords] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
   const selectId = useId();
 
-  // Close when clicking outside
+  const updatePopoverPosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const popoverWidth = Math.min(384, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8));
+    setPopoverCoords({
+      top: rect.bottom + 6,
+      left,
+    });
+  }, []);
+
+  // Close when clicking outside and keep popover aligned on scroll/resize
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const inContainer = containerRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inContainer && !inPopover) {
         setIsOpen(false);
       }
     };
     if (isOpen) {
+      updatePopoverPosition();
       document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("scroll", updatePopoverPosition, true);
+      window.addEventListener("resize", updatePopoverPosition);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+      window.removeEventListener("resize", updatePopoverPosition);
     };
-  }, [isOpen]);
+  }, [isOpen, updatePopoverPosition]);
 
   const availableModules = PORTAL_MODULE_CATALOG.filter(
     (m) => !existingModules.includes(m.name)
@@ -121,6 +147,7 @@ export function ModuleMultiSelect({
       {/* Visual Multi-Select Trigger */}
       <div className="relative">
         <button
+          ref={triggerRef}
           type="button"
           onClick={handleTriggerClick}
           className={`flex items-center justify-between gap-2 px-3 py-1.5 text-xs border rounded-lg bg-white min-w-[220px] max-w-sm transition-all text-left ${
@@ -168,9 +195,14 @@ export function ModuleMultiSelect({
           </div>
         </button>
 
-        {/* Dropdown Popover */}
-        {isOpen && (
-          <div className="absolute left-0 top-full mt-1.5 w-80 sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+        {/* Dropdown Popover (portaled so overflow-hidden parents never clip it) */}
+        {isOpen &&
+          createPortal(
+            <div
+              ref={popoverRef}
+              style={{ top: popoverCoords.top, left: popoverCoords.left }}
+              className="fixed w-80 sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-[9999] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100"
+            >
             {/* Search filter */}
             <div className="p-2 border-b border-gray-100 bg-white">
               <div className="relative">
@@ -309,8 +341,9 @@ export function ModuleMultiSelect({
                 Add {selectedModules.length > 1 ? `${selectedModules.length} Modules` : "Module"}
               </button>
             </div>
-          </div>
-        )}
+          </div>,
+            document.body,
+          )}
       </div>
 
       {/* Main Add Module button next to trigger */}

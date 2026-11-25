@@ -42,7 +42,11 @@ export const RATE_LIMITS: Record<
   | 'resend_system_owner_invitation'
   | 'create_client_organization_admin'
   | 'create_client_user'
-  | 'create_internal_user',
+  | 'create_internal_user'
+  | 'manage_nido_roles'
+  | 'manage_nido_users'
+  | 'manage_client_access'
+  | 'manage_impersonation',
   RateLimitPolicy
 > = {
   bootstrap_system_owner: {
@@ -68,6 +72,26 @@ export const RATE_LIMITS: Record<
   create_internal_user: {
     scopeKey: 'create_internal_user',
     maxRequests: 10,
+    windowSeconds: 3600,
+  },
+  manage_nido_roles: {
+    scopeKey: 'manage_nido_roles',
+    maxRequests: 60,
+    windowSeconds: 3600,
+  },
+  manage_nido_users: {
+    scopeKey: 'manage_nido_users',
+    maxRequests: 60,
+    windowSeconds: 3600,
+  },
+  manage_client_access: {
+    scopeKey: 'manage_client_access',
+    maxRequests: 60,
+    windowSeconds: 3600,
+  },
+  manage_impersonation: {
+    scopeKey: 'manage_impersonation',
+    maxRequests: 30,
     windowSeconds: 3600,
   },
 };

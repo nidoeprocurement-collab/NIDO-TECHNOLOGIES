@@ -86,7 +86,7 @@ export interface LoginContext {
 const NOW = new Date().toISOString().split("T")[0];
 
 const DEFAULT_ROLES: NidoRole[] = [
-  { id: "role-system-owner",       department: "All Departments", name: "System Owner", description: "Full system access — all permissions always granted", status: "Active" },
+  { id: "role-system-owner", department: "All Departments", name: "System Owner", description: "Full system access — all permissions always granted", status: "Active" },
 ];
 
 // These identify only the seeded role records from the previous version.
@@ -161,33 +161,35 @@ function genId(prefix: string): string {
 /** Fill any fields that may be missing in data stored before the schema extension. */
 function migrateUser(raw: any): NidoUser {
   return {
-    id:                  raw.id ?? genId("user"),
-    employeeId:          raw.employeeId          ?? "",
-    name:                raw.name                ?? "",
-    email:               raw.email               ?? "",
-    password:            raw.password            ?? "Password@123",
-    phone:               raw.phone               ?? "",
-    role:                raw.role                ?? "",
-    jobTitle:            raw.jobTitle            ?? "",
-    designation:         raw.designation         ?? raw.jobTitle ?? "",
-    reportingManager:    raw.reportingManager    ?? "",
-    department:          raw.department          ?? "",
-    status:              raw.status              ?? "Active",
-    dateOfJoining:       raw.dateOfJoining       ?? raw.createdAt ?? NOW,
-    lastLogin:           raw.lastLogin,
-    createdAt:           raw.createdAt           ?? NOW,
-    updatedAt:           raw.updatedAt           ?? NOW,
+    id: raw.id ?? genId("user"),
+    employeeId: raw.employeeId ?? "",
+    name: raw.name ?? "",
+    email: raw.email ?? "",
+    password: raw.password ?? "Password@123",
+    phone: raw.phone ?? "",
+    role: raw.role ?? "",
+    jobTitle: raw.jobTitle ?? "",
+    designation: raw.designation ?? raw.jobTitle ?? "",
+    reportingManager: raw.reportingManager ?? "",
+    department: raw.department ?? "",
+    status: raw.status ?? "Active",
+    dateOfJoining: raw.dateOfJoining ?? raw.createdAt ?? NOW,
+    lastLogin: raw.lastLogin,
+    createdAt: raw.createdAt ?? NOW,
+    updatedAt: raw.updatedAt ?? NOW,
     forcePasswordChange: raw.forcePasswordChange ?? false,
-    locked:              raw.locked              ?? false,
+    locked: raw.locked ?? false,
     failedLoginAttempts: raw.failedLoginAttempts ?? 0,
-    loginHistory:        raw.loginHistory         ?? [],
+    loginHistory: raw.loginHistory ?? [],
   };
 }
 
 // ── Roles CRUD ─────────────────────────────────────────────────────────────────
 
 export function getRoles(): NidoRole[] {
-  importFrontendRbacData();
+  if (typeof window !== "undefined" && localStorage.getItem("nido_roles_backend_synced") !== "1") {
+    importFrontendRbacData();
+  }
   try {
     const raw = localStorage.getItem(ROLES_KEY);
     if (!raw) {
@@ -216,6 +218,22 @@ export function saveRoles(roles: NidoRole[]): void {
     : [DEFAULT_ROLES[0], ...roles];
   localStorage.setItem(ROLES_KEY, JSON.stringify(normalized));
   window.dispatchEvent(new Event(NIDO_ROLES_EVENT));
+}
+
+export function replaceRolesFromBackend(backendRoles: NidoRole[]): NidoRole[] {
+  const normalized = backendRoles.map((role) => ({
+    ...role,
+    department: role.department ?? "",
+    description: role.description ?? "",
+    status: role.status === "Inactive" ? ("Inactive" as const) : ("Active" as const),
+  }));
+  const withSystemOwner = normalized.some((role) => role.name === SYSTEM_OWNER_ROLE)
+    ? normalized
+    : [DEFAULT_ROLES[0], ...normalized];
+  localStorage.setItem("nido_roles_backend_synced", "1");
+  localStorage.setItem(ROLES_KEY, JSON.stringify(withSystemOwner));
+  window.dispatchEvent(new Event(NIDO_ROLES_EVENT));
+  return withSystemOwner;
 }
 
 export function addRole(role: Omit<NidoRole, "id">): NidoRole {

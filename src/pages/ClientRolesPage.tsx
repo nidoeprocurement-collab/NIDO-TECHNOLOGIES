@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams } from "react-router-dom";
 import { MoreVertical, X } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,14 @@ import {
   type PortalRolePermission,
   type PortalUser,
 } from "@/lib/portalUserStore";
+import {
+  createClientRoleInSupabase,
+  loadClientAccessDataFromSupabase,
+  saveClientRolePermissionsInSupabase,
+  updateClientRoleInSupabase,
+  type SupabaseClientModule,
+} from "@/lib/clientAccessApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
 
 const CLIENT_ACTIONS: Array<keyof Omit<PortalRolePermission, "module">> = [
   "view", "create", "edit", "delete", "approve", "export", "import", "manage", "configure",
@@ -197,8 +205,14 @@ function downloadCsv(filename: string, rows: string[][]): void {
 export default function ClientRolesPage() {
   const { id: routeClientId } = useParams<{ id: string }>();
   const clientId = routeClientId || localStorage.getItem("nido_shop_selected_client") || "";
-  const [roles, setRoles] = useState<PortalRole[]>(() => getPortalRoles(clientId));
-  const [portalUsers, setPortalUsers] = useState<PortalUser[]>(() => getPortalUsersByClient(clientId));
+  const isRemoteClient = isSupabaseUuid(clientId);
+  const [roles, setRoles] = useState<PortalRole[]>(() =>
+    isRemoteClient ? [] : getPortalRoles(clientId),
+  );
+  const [portalUsers, setPortalUsers] = useState<PortalUser[]>(() =>
+    isRemoteClient ? [] : getPortalUsersByClient(clientId),
+  );
+  const [remoteModules, setRemoteModules] = useState<SupabaseClientModule[]>([]);
   const [selectedId, setSelectedId] = useState(roles[0]?.id || "");
   const [showAddRole, setShowAddRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
@@ -206,8 +220,84 @@ export default function ClientRolesPage() {
   const [modulesToAdd, setModulesToAdd] = useState<string[]>([]);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [draftRole, setDraftRole] = useState<PortalRole | null>(null);
+  const [loadingRemote, setLoadingRemote] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [creatingRole, setCreatingRole] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
+
+  const mountedRef = useRef(true);
+  const syncInFlightRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const loadRemoteClientRoles = useCallback(async () => {
+    if (!isSupabaseUuid(clientId) || syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+    const requestId = ++requestIdRef.current;
+    setLoadingRemote(true);
+    setRemoteError(null);
+    try {
+      const data = await loadClientAccessDataFromSupabase(clientId);
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
+
+      const moduleLabelByKey = new Map(data.modules.map((m) => [m.module_key, m.label]));
+      const mappedRoles: PortalRole[] = data.roles.map((r) => {
+        const modMap = data.permissionsByRoleId[r.id] ?? {};
+        const permissions: PortalRolePermission[] = Object.entries(modMap).map(
+          ([moduleKey, flags]) =>
+            createPortalRolePermission(moduleLabelByKey.get(moduleKey) || moduleKey, flags),
+        );
+        return {
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          status: r.status === "Inactive" ? "inactive" : "active",
+          permissions,
+        };
+      });
+      const mappedUsers: PortalUser[] = data.users.map((u) => ({
+        id: u.id,
+        clientId: u.client_id,
+        clientName: "",
+        email: u.email,
+        password: "",
+        name: u.name,
+        role: u.role_name,
+        userType: u.user_type,
+        status: u.status === "Inactive" ? "inactive" : "active",
+        phone: u.phone,
+        createdAt: u.created_at || new Date().toISOString(),
+      }));
+      setRemoteModules(data.modules);
+      setRoles(mappedRoles);
+      setPortalUsers(mappedUsers);
+      setSelectedId((current) =>
+        mappedRoles.some((role) => role.id === current) ? current : mappedRoles[0]?.id || "",
+      );
+    } catch (err) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
+      setRemoteError(err instanceof Error ? err.message : "Unable to load client roles from Supabase.");
+    } finally {
+      syncInFlightRef.current = false;
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoadingRemote(false);
+      }
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    if (isSupabaseUuid(clientId)) {
+      syncInFlightRef.current = false;
+      void loadRemoteClientRoles();
+      return;
+    }
+
     const refresh = () => {
       const nextRoles = getPortalRoles(clientId);
       setRoles(nextRoles);
@@ -233,7 +323,7 @@ export default function ClientRolesPage() {
       window.removeEventListener("nidoPortalUsersUpdated", refresh);
       window.removeEventListener("storage", handleStorage);
     };
-  }, [clientId]);
+  }, [clientId, loadRemoteClientRoles]);
 
   const selected = roles.find(role => role.id === selectedId) || null;
   const displayedRole = draftRole || selected;
@@ -241,7 +331,9 @@ export default function ClientRolesPage() {
 
   const persist = (next: PortalRole[]) => {
     setRoles(next);
-    savePortalRoles(clientId, next);
+    if (!isSupabaseUuid(clientId)) {
+      savePortalRoles(clientId, next);
+    }
   };
 
   const togglePermission = (
@@ -301,24 +393,50 @@ export default function ClientRolesPage() {
     });
   };
 
-  const addRole = () => {
+  const addRole = async () => {
+    if (creatingRole) return;
     const name = newRoleName.trim();
     if (!name || roles.some(role => role.name.toLowerCase() === name.toLowerCase())) {
       if (name) window.alert("A role with this name already exists for this client.");
       return;
     }
-    const role: PortalRole = {
-      id: `client-role-${Date.now()}`,
-      name,
-      description: newRoleDescription.trim(),
-      status: "active",
-      permissions: [],
-    };
-    persist([...roles, role]);
-    setSelectedId(role.id);
-    setNewRoleName("");
-    setNewRoleDescription("");
-    setShowAddRole(false);
+    setCreatingRole(true);
+    try {
+      let role: PortalRole;
+      if (isSupabaseUuid(clientId)) {
+        const created = await createClientRoleInSupabase(clientId, {
+          name,
+          description: newRoleDescription.trim(),
+          status: "Active",
+        });
+        role = {
+          id: created.id,
+          name: created.name,
+          description: created.description,
+          status: String(created.status ?? "").toLowerCase() === "inactive" ? "inactive" : "active",
+          permissions: [],
+        };
+      } else {
+        role = {
+          id: `client-role-${Date.now()}`,
+          name,
+          description: newRoleDescription.trim(),
+          status: "active",
+          permissions: [],
+        };
+      }
+      persist([...roles, role]);
+      setSelectedId(role.id);
+      setNewRoleName("");
+      setNewRoleDescription("");
+      setShowAddRole(false);
+    } catch (err) {
+      toast.error("Could not create client role", {
+        description: err instanceof Error ? err.message : "Failed to save role in Supabase.",
+      });
+    } finally {
+      setCreatingRole(false);
+    }
   };
 
   const beginEditing = (role: PortalRole) => {
@@ -328,8 +446,8 @@ export default function ClientRolesPage() {
     });
   };
 
-  const saveDraftRole = () => {
-    if (!draftRole || !draftRole.name.trim()) return;
+  const saveDraftRole = async () => {
+    if (savingRole || !draftRole || !draftRole.name.trim()) return;
     const normalizedDraft = {
       ...draftRole,
       name: draftRole.name.trim(),
@@ -346,13 +464,61 @@ export default function ClientRolesPage() {
 
     const previous = roles.find(role => role.id === normalizedDraft.id);
     if (!previous) return;
-    persist(roles.map(role => role.id === normalizedDraft.id ? normalizedDraft : role));
-    if (previous.name !== normalizedDraft.name) {
-      portalUsers
-        .filter(user => user.role === previous.name)
-        .forEach(user => updatePortalUser(user.id, { role: normalizedDraft.name }));
+
+    setSavingRole(true);
+    try {
+      if (isSupabaseUuid(clientId) && isSupabaseUuid(normalizedDraft.id)) {
+        await updateClientRoleInSupabase(clientId, normalizedDraft.id, {
+          name: normalizedDraft.name,
+          description: normalizedDraft.description,
+          status: normalizedDraft.status === "inactive" ? "Inactive" : "Active",
+        });
+        const modulesForLookup =
+          remoteModules.length > 0
+            ? remoteModules
+            : (await loadClientAccessDataFromSupabase(clientId)).modules;
+        const keyByLabel = new Map<string, string>();
+        for (const m of modulesForLookup) {
+          keyByLabel.set(m.label.trim().toLowerCase(), m.module_key);
+          keyByLabel.set(m.module_key.trim().toLowerCase(), m.module_key);
+        }
+        const permMap: Record<string, Record<string, boolean>> = {};
+        for (const perm of normalizedDraft.permissions) {
+          const moduleKey =
+            keyByLabel.get(perm.module.trim().toLowerCase()) ||
+            perm.module.trim();
+          permMap[moduleKey] = {
+            view: Boolean(perm.view),
+            create: Boolean(perm.create),
+            edit: Boolean(perm.edit),
+            delete: Boolean(perm.delete),
+            approve: Boolean(perm.approve),
+            export: Boolean(perm.export),
+            import: Boolean(perm.import),
+            manage: Boolean(perm.manage),
+            configure: Boolean(perm.configure),
+          };
+        }
+        await saveClientRolePermissionsInSupabase(clientId, normalizedDraft.id, permMap);
+      }
+
+      persist(roles.map(role => role.id === normalizedDraft.id ? normalizedDraft : role));
+      if (!isSupabaseUuid(clientId) && previous.name !== normalizedDraft.name) {
+        portalUsers
+          .filter(user => user.role === previous.name)
+          .forEach(user => updatePortalUser(user.id, { role: normalizedDraft.name }));
+      }
+      setDraftRole(null);
+      if (isSupabaseUuid(clientId)) {
+        toast.success("Client role saved to Supabase");
+      }
+    } catch (err) {
+      toast.error("Could not save client role", {
+        description: err instanceof Error ? err.message : "Failed to save role in Supabase.",
+      });
+    } finally {
+      setSavingRole(false);
     }
-    setDraftRole(null);
   };
 
   const discardDraftRole = () => {
@@ -501,7 +667,20 @@ export default function ClientRolesPage() {
           <h2 className="text-base font-semibold text-gray-900">Roles &amp; Permissions</h2>
           <p className="text-xs text-gray-500 mt-1">
             Saved roles and currently assigned users for this client account.
+            {loadingRemote && " Syncing with Supabase..."}
           </p>
+          {remoteError && (
+            <div className="mt-1.5 flex items-center gap-2 text-xs text-red-600">
+              <span>{remoteError}</span>
+              <button
+                type="button"
+                onClick={() => void loadRemoteClientRoles()}
+                className="rounded border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700 hover:bg-red-100"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
         <div className="relative">
           <button
@@ -588,7 +767,7 @@ export default function ClientRolesPage() {
         </div>
 
         {displayedRole ? (
-          <div className="min-w-0 border border-gray-200 rounded-xl overflow-hidden">
+          <div className="min-w-0 border border-gray-200 rounded-xl overflow-visible">
             <div className="px-4 py-3 border-b border-gray-200 flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -625,10 +804,10 @@ export default function ClientRolesPage() {
                     <button
                       type="button"
                       onClick={saveDraftRole}
-                      disabled={!displayedRole.name.trim()}
+                      disabled={savingRole || !displayedRole.name.trim()}
                       className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40"
                     >
-                      Save Changes
+                      {savingRole ? "Saving..." : "Save Changes"}
                     </button>
                   </>
                 ) : (
@@ -751,10 +930,10 @@ export default function ClientRolesPage() {
               <button
                 type="button"
                 onClick={addRole}
-                disabled={!newRoleName.trim()}
+                disabled={creatingRole || !newRoleName.trim()}
                 className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40"
               >
-                Create Role
+                {creatingRole ? "Creating..." : "Create Role"}
               </button>
             </div>
           </div>

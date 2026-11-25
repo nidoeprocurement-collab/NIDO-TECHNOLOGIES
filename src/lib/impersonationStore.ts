@@ -1,6 +1,4 @@
 import type { User } from "@/contexts/AuthContext";
-import { getPortalUsers, type PortalUser } from "@/lib/portalUserStore";
-import { hasPermission } from "@/lib/permissionsStore";
 
 export type ImpersonationMode = "VIEW_ONLY" | "FULL_ACCESS";
 
@@ -43,90 +41,53 @@ function notify() {
 }
 
 function saveAudit(entry: ImpersonationAuditEntry) {
-  let entries: ImpersonationAuditEntry[] = [];
-  try { entries = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"); } catch { /* ignore */ }
-  localStorage.setItem(AUDIT_KEY, JSON.stringify([entry, ...entries].slice(0, 500)));
+  try {
+    let entries: ImpersonationAuditEntry[] = [];
+    try { entries = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"); } catch { /* ignore */ }
+    localStorage.setItem(AUDIT_KEY, JSON.stringify([entry, ...entries].slice(0, 500)));
+  } catch {
+    // Ignore storage errors so audit logging cannot break logout/cleanup.
+  }
 }
 
 export function getImpersonationSession(): ImpersonationSession | null {
   try {
-    const session = JSON.parse(getSessionStorage().getItem(SESSION_KEY) || "null") as ImpersonationSession | null;
-    if (!session) return null;
-    if (session.status !== "active" || session.expiresAt <= new Date().toISOString()) {
-      endImpersonation("expired");
-      return null;
-    }
-    const target = getPortalUsers().find((u) =>
-      u.id === session.impersonatedUser.id &&
-      u.clientId === session.clientId,
-    );
-    if (!target || target.status !== "active" || !canStartImpersonation(session.originalUser, toAuthUser(target))) {
-      endImpersonation("revoked");
-      return null;
-    }
-    return session;
+    const raw = getSessionStorage().getItem(SESSION_KEY);
+    if (!raw) return null;
+    // Browser-only impersonation is temporarily disabled until server-side
+    // impersonation is implemented; invalidate any leftover session safely
+    // while preserving audit history.
+    endImpersonation("revoked");
+    return null;
   } catch {
-    localStorage.removeItem(SESSION_KEY);
+    try {
+      getSessionStorage().removeItem(SESSION_KEY);
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
     return null;
   }
 }
 
-export function canStartImpersonation(originalUser: User, targetUser: User): boolean {
+export function canStartImpersonation(
+  originalUser: User,
+  targetUser: User,
+  hasServerImpersonationPermission = false,
+): boolean {
   return originalUser.userType === "nido_admin" &&
     (targetUser.userType === "client_admin" || targetUser.userType === "client_user") &&
     Boolean(targetUser.clientId) &&
-    hasPermission(originalUser.role || "", "client_user_impersonation", "manage");
+    hasServerImpersonationPermission;
 }
 
-function toAuthUser(target: PortalUser): User {
-  return {
-    id: target.id,
-    email: target.email,
-    name: target.name,
-    role: target.role,
-    userType: target.userType,
-    clientId: target.clientId,
-    clientName: target.clientName,
-  };
-}
-
-export function startImpersonation(originalUser: User, targetUser: User): ImpersonationSession | null {
-  // Resolve the target from the portal-user store instead of trusting the
-  // row/object supplied by the browser. This is the authoritative local
-  // equivalent of a server-side lookup.
-  const target = getPortalUsers().find((candidate) =>
-    candidate.id === targetUser.id &&
-    candidate.status === "active" &&
-    candidate.clientId === targetUser.clientId,
-  );
-  if (!target) return null;
-  const effectiveTarget = toAuthUser(target);
-  if (!canStartImpersonation(originalUser, effectiveTarget)) return null;
-  const now = new Date();
-  const session: ImpersonationSession = {
-    id: `imp-${crypto.randomUUID()}`,
-    originalUser,
-    impersonatedUser: effectiveTarget,
-    clientId: target.clientId,
-    mode: "VIEW_ONLY",
-    startedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + ONE_HOUR_MS).toISOString(),
-    status: "active",
-  };
-  getSessionStorage().setItem(SESSION_KEY, JSON.stringify(session));
-  saveAudit({
-    eventType: "IMPERSONATION_STARTED",
-    originalUserId: originalUser.id,
-    impersonatedUserId: targetUser.id,
-    clientId: session.clientId,
-    impersonationSessionId: session.id,
-    timestamp: now.toISOString(),
-    startedAt: session.startedAt,
-    mode: session.mode,
-    status: session.status,
-  });
-  notify();
-  return session;
+export function startImpersonation(
+  _originalUser: User,
+  _targetUser: User,
+  _hasServerImpersonationPermission = false,
+): ImpersonationSession | null {
+  // Temporarily disabled: browser-only impersonation does not establish a
+  // real client-user Supabase session or enforce target RLS permissions.
+  return null;
 }
 
 export function endImpersonation(reason: "ended" | "expired" | "revoked" = "ended"): void {
@@ -151,8 +112,14 @@ export function endImpersonation(reason: "ended" | "expired" | "revoked" = "ende
         status: reason,
       });
     }
+  } catch {
+    // Never allow sessionStorage unavailability to interrupt logout or cleanup.
   } finally {
-    getSessionStorage().removeItem(SESSION_KEY);
+    try {
+      getSessionStorage().removeItem(SESSION_KEY);
+    } catch {
+      // Ignore unavailable sessionStorage.
+    }
     notify();
   }
 }

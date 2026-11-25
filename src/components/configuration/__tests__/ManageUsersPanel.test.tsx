@@ -120,7 +120,7 @@ describe("ManageUsersPanel invitation-based internal Add User flow", () => {
     await waitFor(() => {
       expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
         "alice@nidotech.com",
-        { redirectTo: `${window.location.origin}/onboarding` },
+        { redirectTo: `${window.location.origin}/reset-password` },
       );
     });
 

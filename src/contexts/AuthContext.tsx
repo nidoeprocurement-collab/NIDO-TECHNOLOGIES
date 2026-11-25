@@ -15,8 +15,14 @@ import type { ActionKey, ModulePermissions } from '@/lib/permissionsStore';
 import {
   getImpersonationSession,
   endImpersonation as clearImpersonationSession,
+  type ImpersonationMode,
   type ImpersonationSession,
 } from '@/lib/impersonationStore';
+import {
+  fetchActiveImpersonationSessionFromSupabase,
+  startImpersonationInSupabase,
+  stopImpersonationInSupabase,
+} from '@/lib/impersonationApi';
 
 export type UserType = 'nido_admin' | 'client_admin' | 'client_user';
 export type UserScope = 'nido_internal' | 'client_portal';
@@ -103,7 +109,7 @@ interface AuthContextType {
   effectiveUser: User | null;
   isImpersonating: boolean;
   impersonationSession: ImpersonationSession | null;
-  startImpersonation: (target: User) => boolean;
+  startImpersonation: (target: User, mode?: ImpersonationMode) => Promise<boolean>;
   endImpersonation: () => void;
 }
 
@@ -233,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [impersonationSession, setImpersonationSession] =
     useState<ImpersonationSession | null>(null);
+  const serverImpersonationIdRef = useRef<string | null>(null);
 
   const requestCounterRef = useRef(0);
   const explicitSignInInFlightRef = useRef(false);
@@ -399,10 +406,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearAuthState, fetchAuthoritativeAuthContext]);
 
   useEffect(() => {
-    // Browser-only impersonation is temporarily disabled; safely invalidate any
-    // existing impersonation session on initialization or account change.
     if (getImpersonationSession()) clearImpersonationSession();
+    serverImpersonationIdRef.current = null;
     setImpersonationSession(null);
+
+    if (
+      !authenticatedProfile ||
+      authContext?.user_scope !== 'nido_internal'
+    ) {
+      return;
+    }
+
+    const canViewImpersonation =
+      authContext.role?.is_system_owner === true ||
+      authContext.permissions?.client_user_impersonation?.view === true ||
+      authContext.permissions?.client_user_impersonation?.manage === true;
+    if (!canViewImpersonation) return;
+
+    let mounted = true;
+    void fetchActiveImpersonationSessionFromSupabase()
+      .then((active) => {
+        if (!mounted || !active) return;
+        serverImpersonationIdRef.current = active.id;
+        setImpersonationSession({
+          originalUser: authenticatedProfile,
+          impersonatedUser: {
+            id: active.target_client_user_id,
+            email: active.client_users?.email ?? '',
+            name: active.client_users?.name ?? 'Client User',
+            userType:
+              active.client_users?.user_type === 'client_admin'
+                ? 'client_admin'
+                : 'client_user',
+            clientId: active.target_client_id,
+            clientName: active.client_organizations?.name ?? undefined,
+          },
+          mode: active.mode,
+          startedAt: active.started_at,
+          expiresAt: active.expires_at,
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
   }, [authenticatedProfile?.id, authContext?.user_scope]);
 
   // Deprecated stub: local objects can never authenticate a user.
@@ -499,23 +547,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     effectiveUser?.userType === 'client_user';
 
   const beginImpersonation = useCallback(
-    (_target: User) => {
-      // Temporarily disabled until server-side impersonation is implemented.
-      // Only System Owners or internal users with `client_user_impersonation.manage`
-      // will be permitted to use server-backed impersonation once available.
-      return false;
+    async (target: User, mode: ImpersonationMode = 'VIEW_ONLY'): Promise<boolean> => {
+      if (!authenticatedProfile || authContext?.user_scope !== 'nido_internal') {
+        return false;
+      }
+      const created = await startImpersonationInSupabase(target.id, mode);
+      serverImpersonationIdRef.current = created.id;
+      setImpersonationSession({
+        originalUser: authenticatedProfile,
+        impersonatedUser: {
+          ...target,
+          userType:
+            target.userType === 'client_admin' ? 'client_admin' : 'client_user',
+          clientId: created.target_client_id || target.clientId,
+        },
+        mode: created.mode,
+        startedAt: created.started_at,
+        expiresAt: created.expires_at,
+      });
+      return true;
     },
-    [],
+    [authenticatedProfile, authContext?.user_scope],
   );
 
   const endImpersonation = useCallback(() => {
+    const activeId = serverImpersonationIdRef.current ?? undefined;
+    serverImpersonationIdRef.current = null;
     clearImpersonationSession();
     setImpersonationSession(null);
+    if (activeId) {
+      void stopImpersonationInSupabase(activeId, 'manual').catch(() => undefined);
+    }
   }, []);
 
   const hasClientPortalPermission = useCallback(
     (moduleKey: string, action: ActionKey = 'view'): boolean => {
-      if (isLoading || !authenticatedProfile || isImpersonating) return false;
+      if (isLoading || !authenticatedProfile) return false;
+      if (isImpersonating) {
+        return action === 'view';
+      }
       if (!authContext || authContext.user_scope !== 'client_portal') {
         return false;
       }

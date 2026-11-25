@@ -49,6 +49,10 @@ const REFERENCE_ROLES = [
   ["Catalog & Pricing", "Catalog & Pricing Analyst", "Maintains products, vendor prices, MOQ, stock and client pricing"],
 ] as const;
 
+export const BUILTIN_REFERENCE_ROLE_NAMES: readonly string[] = REFERENCE_ROLES
+  .map(([, name]) => name)
+  .filter((name) => name.toLowerCase() !== "system owner");
+
 const LEGACY_ROLE_DEPARTMENTS: Record<string, string> = {
   "Super Admin": "Executive Management",
   "Platform Admin": "Platform / IT Administration",

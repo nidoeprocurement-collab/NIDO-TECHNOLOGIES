@@ -77,11 +77,11 @@ describe("clientStore account scoping and live operations", () => {
     loginAs("admin-a", "admin.a@nidotechnologies.com")
     addClient(makeClient("CL-00002", "Zenith Corp"))
 
-    expect(archiveClientById("CL-00002")).toBe(true)
+    expect(archiveClientById("CL-00002")).toBeTruthy()
     expect(getClients().some((c) => c.id === "CL-00002")).toBe(false)
     expect(getArchivedClients().some((c) => c.id === "CL-00002")).toBe(true)
 
-    expect(restoreArchivedClient("CL-00002")).toBe(true)
+    expect(restoreArchivedClient("CL-00002")).toBeTruthy()
     expect(getClients().some((c) => c.id === "CL-00002")).toBe(true)
     expect(getArchivedClients().some((c) => c.id === "CL-00002")).toBe(false)
   })

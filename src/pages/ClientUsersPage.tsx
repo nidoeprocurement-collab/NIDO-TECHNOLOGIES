@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Mail,
   Phone,
@@ -28,8 +29,16 @@ import {
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { getPortalUsersByClient, getPortalRoles, PORTAL_MODULES, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
+import { getPortalUsersByClient, getPortalRoles, createPortalRolePermission, PORTAL_MODULES, provisionPortalUser, updatePortalUser, type PortalRole } from "@/lib/portalUserStore";
 import { getClients, addClient } from "@/lib/clientStore";
+import {
+  loadClientAccessDataFromSupabase,
+  provisionClientUserInSupabase,
+  updateClientUserInSupabase,
+  type SupabaseClientRole,
+} from "@/lib/clientAccessApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
+import type { ImpersonationMode } from "@/lib/impersonationStore";
 import {
   getClientActivities,
   getClientOrders,
@@ -119,7 +128,8 @@ function getCurrentOrganizationName(clientId?: string, clientName?: string) {
     || "";
 }
 
-function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: string; clientName?: string; onClose: () => void; onCreate: (user: UserRecord) => void }) {
+function AddUserModal({ clientId, clientName, availableRoles, onClose, onCreate }: { clientId?: string; clientName?: string; availableRoles?: PortalRole[]; onClose: () => void; onCreate: (user: UserRecord) => void }) {
+  const roleOptions = availableRoles ?? getPortalRoles(clientId || "");
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [notification, setNotification] = useState("");
@@ -135,12 +145,21 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
     reportingManager: "",
     gender: "",
     joiningDate: "",
-    role: getPortalRoles(clientId || "").find(item => item.status === "active")?.name || "",
+    role: roleOptions.find(item => item.status === "active")?.name || "",
     orgAccess: organizationAccess,
     dataVisibility: "All Data",
     locationAccess: "All Locations",
     status: "Active",
   });
+
+  useEffect(() => {
+    if (!form.role && roleOptions.length > 0) {
+      const firstActive = roleOptions.find(item => item.status === "active")?.name || "";
+      if (firstActive) {
+        setForm((p) => (p.role ? p : { ...p, role: firstActive }));
+      }
+    }
+  }, [form.role, roleOptions]);
 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -151,7 +170,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   // client portal, never the internal NIDO platform modules.
   const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"] as const;
-  const inheritedPermissions = getPortalRoles(clientId || "")
+  const inheritedPermissions = roleOptions
     .find(role => role.name === form.role)?.permissions ?? [];
 
   // Expenses
@@ -221,7 +240,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
       setNotification("Please enter a valid email address.");
       return;
     }
-    if (!getPortalRoles(clientId || "").some(role => role.name === form.role && role.status === "active")) {
+    if (!roleOptions.some(role => role.name === form.role && role.status === "active")) {
       setNotification("Create and activate a client role before creating a portal user.");
       return;
     }
@@ -418,7 +437,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                       <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                       <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-600"}>
                         <option value="">Select role</option>
-                        {getPortalRoles(clientId || "")
+                        {roleOptions
                           .filter(role => role.status === "active" || role.name === form.role)
                           .map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                       </select>
@@ -1095,7 +1114,8 @@ function getDisplayedUserId(user: UserRecord, rowIndex: number) {
   return `UI-${String(displayIndex).padStart(5, "0")}`;
 }
 
-function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId?: string; clientName?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
+function EditUserPage({ clientId, clientName, availableRoles, user, onBack, onSave }: { clientId?: string; clientName?: string; availableRoles?: PortalRole[]; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
+  const roleOptions = availableRoles ?? getPortalRoles(clientId || "");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [activeTab, setActiveTab] = useState("Overview");
   const savedDetails = user.details ?? {};
@@ -1179,7 +1199,7 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
 
   const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"] as const;
-  const inheritedPermissions = getPortalRoles(clientId || "")
+  const inheritedPermissions = roleOptions
     .find(role => role.name === form.role)?.permissions ?? [];
 
   const [expenseForm, setExpenseForm] = useState({
@@ -1346,7 +1366,7 @@ function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId
                   <div>
                     <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                     <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-700"}>
-                      {getPortalRoles(clientId || "")
+                      {roleOptions
                         .filter(role => role.status === "active" || role.name === form.role)
                         .map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                     </select>
@@ -3189,9 +3209,13 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
 }
 
 export default function ClientUsersPage({ clientId, clientName }: { clientId?: string; clientName?: string } = {}) {
+  const navigate = useNavigate();
   const { user: authenticatedUser, startImpersonation } = useAuth();
   const { hasPermission } = usePermissions();
   const [impersonationTarget, setImpersonationTarget] = useState<UserRecord | null>(null);
+  const [impersonationMode, setImpersonationMode] = useState<ImpersonationMode>("VIEW_ONLY");
+  const [impersonationBusy, setImpersonationBusy] = useState(false);
+  const [impersonationError, setImpersonationError] = useState<string | null>(null);
   const [users, setUsers] = useState<UserRecord[]>(() =>
     clientId ? getPortalUsersByClient(clientId).map(portalUserToRecord) : []
   );
@@ -3227,11 +3251,68 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     document.addEventListener("pointerdown", closeOnOutsidePointerDown);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
   }, [rowMenu]);
+  const [remoteClientRoles, setRemoteClientRoles] = useState<SupabaseClientRole[]>([]);
+  const [remotePortalRoles, setRemotePortalRoles] = useState<PortalRole[]>([]);
+
+  const loadRemoteClientUsers = async () => {
+    if (!isSupabaseUuid(clientId)) return;
+    try {
+      const data = await loadClientAccessDataFromSupabase(clientId);
+      setRemoteClientRoles(data.roles);
+      const moduleLabelByKey = new Map(data.modules.map((m) => [m.module_key, m.label]));
+      setRemotePortalRoles(
+        data.roles.map((r) => {
+          const modMap = data.permissionsByRoleId[r.id] ?? {};
+          const permissions = Object.entries(modMap).map(([moduleKey, flags]) =>
+            createPortalRolePermission(moduleLabelByKey.get(moduleKey) || moduleKey, flags),
+          );
+          return {
+            id: r.id,
+            name: r.name,
+            description: r.description,
+            status: r.status === "Inactive" ? "inactive" : "active",
+            permissions,
+          };
+        }),
+      );
+      setUsers(
+        data.users.map((u) => {
+          const initials =
+            u.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
+          return {
+            id: u.id,
+            name: u.name,
+            role: u.role_name,
+            email: u.email,
+            phone: u.phone || "",
+            lastActive: u.last_login_at || u.created_at || new Date().toISOString(),
+            status: u.status === "Inactive" ? "Inactive" : "Active",
+            initials,
+            color: "bg-blue-500",
+            userType: u.user_type,
+            clientId: u.client_id,
+            clientName: clientName || "",
+            createdAt: u.created_at,
+            details: {
+              department: u.department,
+              designation: u.designation,
+            },
+          };
+        }),
+      );
+    } catch {
+      // Keep local fallback if Supabase lookup is unavailable.
+    }
+  };
+
   useEffect(() => {
     const refreshUsers = () => {
-      if (clientId) setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
+      if (clientId && !isSupabaseUuid(clientId)) {
+        setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
+      }
     };
     refreshUsers();
+    void loadRemoteClientUsers();
     window.addEventListener("nidoPortalUsersUpdated", refreshUsers);
     window.addEventListener("nidoPortalRolesUpdated", refreshUsers);
     return () => {
@@ -3245,6 +3326,18 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     hasPermission("client_user_impersonation", "manage"),
   );
   const getPortalTarget = (row: UserRecord) => {
+    if (clientId && isSupabaseUuid(clientId)) {
+      if (!isSupabaseUuid(row.id) || row.status !== "Active") return null;
+      return {
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        role: row.role,
+        userType: row.role === "Client Admin" ? ("client_admin" as const) : ("client_user" as const),
+        clientId,
+        clientName: clientName || undefined,
+      };
+    }
     const portalUser = getPortalUsersByClient(clientId || "").find(
       (candidate) =>
         candidate.email.toLowerCase() === row.email.toLowerCase() &&
@@ -3284,7 +3377,33 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     }
   };
 
-  const createUser = (user: UserRecord) => {
+  const createUser = async (user: UserRecord) => {
+    if (clientId && isSupabaseUuid(clientId)) {
+      try {
+        const matchedRoleId = remoteClientRoles.find(
+          (r) => r.name.trim().toLowerCase() === user.role.trim().toLowerCase(),
+        )?.id;
+        await provisionClientUserInSupabase({
+          client_id: clientId,
+          name: user.name,
+          email: user.email,
+          phone: user.phone || undefined,
+          department: (user.details as { department?: string } | undefined)?.department || undefined,
+          designation: (user.details as { designation?: string } | undefined)?.designation || undefined,
+          client_role_id: matchedRoleId ?? null,
+          user_type: user.role === "Client Admin" ? "client_admin" : "client_user",
+        });
+        await loadRemoteClientUsers();
+        window.alert(
+          `Invitation sent to ${user.email}. The user must accept the invitation and set their password via onboarding.`,
+        );
+        return;
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Could not provision client user in Supabase.");
+        return;
+      }
+    }
+
     if (clientId) {
       let credentials: ReturnType<typeof provisionPortalUser>;
       try {
@@ -3316,9 +3435,25 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     setUsers((prev) => [user, ...prev]);
   };
 
-  const archiveUser = (id: string) => {
+  const archiveUser = async (id: string) => {
     const u = users.find((u) => u.id === id);
     if (!u) return;
+    if (clientId && isSupabaseUuid(clientId) && isSupabaseUuid(id)) {
+      try {
+        const matchedRoleId = remoteClientRoles.find(
+          (r) => r.name.trim().toLowerCase() === u.role.trim().toLowerCase(),
+        )?.id;
+        await updateClientUserInSupabase(clientId, id, {
+          name: u.name,
+          phone: u.phone || undefined,
+          status: "Inactive",
+          client_role_id: matchedRoleId ?? null,
+        });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Could not deactivate client user in Supabase.");
+        return;
+      }
+    }
     const portalUser = getPortalUsersByClient(clientId || "").find((item) => item.id === id);
     if (portalUser) {
       updatePortalUser(id, { status: "inactive" });
@@ -3340,17 +3475,53 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     if (selectedUser?.id === id) setSelectedUser(null);
   };
 
-  const deactivateUser = (id: string) => {
+  const deactivateUser = async (id: string) => {
+    const current = users.find((u) => u.id === id);
+    const nextStatus = current?.status === "Inactive" ? "Active" : "Inactive";
+    if (clientId && isSupabaseUuid(clientId) && isSupabaseUuid(id) && current) {
+      try {
+        const matchedRoleId = remoteClientRoles.find(
+          (r) => r.name.trim().toLowerCase() === current.role.trim().toLowerCase(),
+        )?.id;
+        await updateClientUserInSupabase(clientId, id, {
+          name: current.name,
+          phone: current.phone || undefined,
+          status: nextStatus,
+          client_role_id: matchedRoleId ?? null,
+        });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Could not update user status in Supabase.");
+        return;
+      }
+    }
     const portalUser = getPortalUsersByClient(clientId || "").find(item => item.id === id);
     if (portalUser) {
       updatePortalUser(id, { status: portalUser.status === "active" ? "inactive" : "active" });
     }
-    setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: u.status === "Inactive" ? "Active" : "Inactive" } : u));
-    if (selectedUser?.id === id) setSelectedUser((prev) => prev ? { ...prev, status: prev.status === "Inactive" ? "Active" : "Inactive" } : prev);
+    setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: nextStatus } : u));
+    if (selectedUser?.id === id) setSelectedUser((prev) => prev ? { ...prev, status: nextStatus } : prev);
     setRowMenu(null);
   };
 
-  const saveEditedUser = (updated: UserRecord) => {
+  const saveEditedUser = async (updated: UserRecord) => {
+    if (clientId && isSupabaseUuid(clientId) && isSupabaseUuid(updated.id)) {
+      try {
+        const matchedRoleId = remoteClientRoles.find(
+          (r) => r.name.trim().toLowerCase() === updated.role.trim().toLowerCase(),
+        )?.id;
+        await updateClientUserInSupabase(clientId, updated.id, {
+          name: updated.name,
+          phone: updated.phone || undefined,
+          department: (updated.details as { department?: string } | undefined)?.department || undefined,
+          designation: (updated.details as { designation?: string } | undefined)?.designation || undefined,
+          status: updated.status === "Active" ? "Active" : "Inactive",
+          client_role_id: matchedRoleId ?? null,
+        });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Could not update client user in Supabase.");
+        return;
+      }
+    }
     const portalUser = getPortalUsersByClient(clientId || "").find(item => item.id === updated.id);
     if (portalUser) {
       updatePortalUser(updated.id, {
@@ -3368,8 +3539,12 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
 
   const liveSelectedUser = selectedUser ? (users.find((u) => u.id === selectedUser.id) ?? selectedUser) : null;
 
+  const activeRoleOptions: PortalRole[] = isSupabaseUuid(clientId)
+    ? remotePortalRoles
+    : getPortalRoles(clientId || "");
+
   if (showArchivedUsers) return <ArchivedUsersPage onBack={() => setShowArchivedUsers(false)} archivedUsers={archived} />;
-  if (editingUser) return <EditUserPage clientId={clientId} clientName={clientName} user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
+  if (editingUser) return <EditUserPage clientId={clientId} clientName={clientName} availableRoles={activeRoleOptions} user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
   if (assigningDeviceFor) return (
     <AssignDevicePage
       userName={assigningDeviceFor.name}
@@ -3436,6 +3611,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         <AddUserModal
           clientId={clientId}
           clientName={clientName}
+          availableRoles={activeRoleOptions}
           onClose={() => setShowAddUser(false)}
           onCreate={createUser}
         />
@@ -3490,7 +3666,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
               };
             }
 
-            const activePortalRoles = getPortalRoles(clientId).filter((r) => r.status === "active");
+            const activePortalRoles = activeRoleOptions.filter((r) => r.status === "active");
             if (activePortalRoles.length === 0) {
               return {
                 importedCount: 0,
@@ -3631,7 +3807,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
           {headerMenuOpen && (
             <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
               {[
-                { icon: <UserPlus size={13} />, label: "Add Users", action: () => { setShowAddUser(true); setHeaderMenuOpen(false); } },
+                { icon: <UserPlus size={13} />, label: "Add Users", action: () => { void loadRemoteClientUsers(); setShowAddUser(true); setHeaderMenuOpen(false); } },
                 { icon: <Download size={13} />, label: "Export Users", action: () => { exportUsersCSV(users); setHeaderMenuOpen(false); } },
                 { icon: <Upload size={13} />, label: "Import Users", action: () => { setShowImportUsers(true); setHeaderMenuOpen(false); } },
                 { icon: <FileText size={13} />, label: "Download Template", action: () => { downloadUserTemplate(); setHeaderMenuOpen(false); } },
@@ -3815,27 +3991,73 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         </table>
       </div>
       {impersonationTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => setImpersonationTarget(null)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => { if (!impersonationBusy) { setImpersonationTarget(null); setImpersonationError(null); } }}>
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-gray-900">Impersonate Client User?</h2>
-            <p className="mt-3 text-sm text-gray-600">You are about to enter the NIDO Client Portal as:</p>
+            <h2 className="text-base font-semibold text-gray-900">Impersonate Client User</h2>
+            <p className="mt-3 text-sm text-gray-600">Selected client user:</p>
             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
               <p className="text-sm font-semibold text-gray-900">{impersonationTarget.name}</p>
               <p className="text-xs text-gray-500">{impersonationTarget.email}</p>
               <p className="text-xs text-gray-500">{clientName || "Client portal"}</p>
             </div>
-            <p className="mt-3 text-xs text-amber-700">The session is view-only and expires automatically after one hour.</p>
+            {clientId && isSupabaseUuid(clientId) ? (
+              <>
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Impersonation Mode</label>
+                  <select
+                    value={impersonationMode}
+                    onChange={(e) => setImpersonationMode(e.target.value as ImpersonationMode)}
+                    disabled={impersonationBusy}
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-800"
+                  >
+                    <option value="VIEW_ONLY">View Only (Recommended)</option>
+                    <option value="FULL_ACCESS">Full Access</option>
+                  </select>
+                </div>
+                {impersonationError && (
+                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+                    {impersonationError}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                Server-backed impersonation is only available for Supabase-provisioned client organizations.
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setImpersonationTarget(null)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600">Cancel</button>
               <button
-                onClick={() => {
-                  const target = getPortalTarget(impersonationTarget);
-                  if (target && startImpersonation(target)) window.location.assign("/portal/dashboard");
-                  else setImpersonationTarget(null);
-                }}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
+                onClick={() => { setImpersonationTarget(null); setImpersonationError(null); }}
+                disabled={impersonationBusy}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600"
               >
-                Start Impersonation
+                Close
+              </button>
+              <button
+                type="button"
+                disabled={impersonationBusy || !(clientId && isSupabaseUuid(clientId))}
+                onClick={async () => {
+                  const target = getPortalTarget(impersonationTarget);
+                  if (!target) return;
+                  setImpersonationBusy(true);
+                  setImpersonationError(null);
+                  try {
+                    const ok = await startImpersonation(target, impersonationMode);
+                    if (!ok) {
+                      setImpersonationError("Unable to start impersonation session.");
+                      return;
+                    }
+                    setImpersonationTarget(null);
+                    navigate("/portal/dashboard");
+                  } catch (err) {
+                    setImpersonationError(err instanceof Error ? err.message : "Unable to start impersonation session.");
+                  } finally {
+                    setImpersonationBusy(false);
+                  }
+                }}
+                className={`rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white ${impersonationBusy || !(clientId && isSupabaseUuid(clientId)) ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"}`}
+              >
+                {impersonationBusy ? "Starting..." : "Start Impersonation"}
               </button>
             </div>
           </div>
