@@ -11,6 +11,17 @@ import {
   reserveClientProductCodes,
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
+import {
+  assignClientCatalogItemsInSupabase,
+  loadClientCatalogFromSupabase,
+  migrateLocalClientCatalogToSupabaseIfNeeded,
+  updateClientCatalogItemInSupabase,
+} from "@/lib/clientCatalogApi";
+import { loadMasterCatalogueFromSupabase } from "@/lib/masterCatalogueApi";
+import { loadVendorProductsFromSupabase } from "@/lib/vendorProductsApi";
+import { loadClientPricingSettingsFromSupabase } from "@/lib/clientPriceEngineApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
+import { toast } from "sonner";
 import { syncClientPrices } from "@/lib/priceEngineStore";
 import { getPortalRoleNames } from "@/lib/portalUserStore";
 import {
@@ -1452,13 +1463,40 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const [viewProduct, setViewProduct] = useState<CatalogEntry | null>(null);
   const [editProduct, setEditProduct] = useState<CatalogEntry | null>(null);
   const [products, setProducts] = useState<CatalogEntry[]>(() => getClientCatalog(clientId));
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   // When prices are refreshed externally (price engine rules changed) we update
   // state directly from the store without triggering the save-back effect.
   const skipNextSave = useRef(false);
 
-  // Reload from store when clientId changes
+  const syncFromSupabase = async () => {
+    if (!isSupabaseUuid(clientId)) {
+      setProducts(getClientCatalog(clientId));
+      return;
+    }
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      await loadMasterCatalogueFromSupabase();
+      await migrateLocalClientCatalogToSupabaseIfNeeded(clientId);
+      const [loadedCatalog] = await Promise.all([
+        loadClientCatalogFromSupabase(clientId),
+        loadVendorProductsFromSupabase(),
+        loadClientPricingSettingsFromSupabase(clientId),
+      ]);
+      skipNextSave.current = true;
+      setProducts(loadedCatalog);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Failed to load client catalogue");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Reload from store & Supabase when clientId changes
   useEffect(() => {
     setProducts(getClientCatalog(clientId));
+    void syncFromSupabase();
   }, [clientId]);
 
   // Keep the shop page in sync: whenever this catalog is opened for a client,
@@ -1514,24 +1552,54 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const lowStock = products.filter((p) => p.availability === "Low Stock").length;
   const outOfStock = products.filter((p) => p.availability === "Out of Stock").length;
 
-  const removeRole = (entryKey: string, role: string) => {
+  const removeRole = async (entryKey: string, role: string) => {
+    const target = products.find((p) => getCatalogEntryKey(p) === entryKey);
+    const nextRoles = target ? target.roles.filter((r) => r !== role) : [];
     setProducts((prev) =>
       prev.map((p) => getCatalogEntryKey(p) === entryKey ? { ...p, roles: p.roles.filter((r) => r !== role) } : p)
     );
+    if (target && isSupabaseUuid(clientId)) {
+      try {
+        await updateClientCatalogItemInSupabase(clientId, target, { roles: nextRoles });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to update roles");
+      }
+    }
   };
 
-  const handleSaveEdit = (entryKey: string, updated: Partial<CatalogEntry>) => {
+  const handleSaveEdit = async (entryKey: string, updated: Partial<CatalogEntry>) => {
+    const target = products.find((p) => getCatalogEntryKey(p) === entryKey);
     setProducts((prev) => prev.map((p) => getCatalogEntryKey(p) === entryKey ? { ...p, ...updated } : p));
+    if (target && isSupabaseUuid(clientId)) {
+      try {
+        await updateClientCatalogItemInSupabase(clientId, target, updated);
+        toast.success("Client product updated.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to update client product");
+      }
+    }
   };
 
   // Merge new entries, persist, run price engine, then reload synced prices into state.
   // Side effects are kept outside the state updater so they run exactly once.
-  const handleAddProducts = (entries: CatalogEntry[]) => {
+  const handleAddProducts = async (entries: CatalogEntry[]) => {
     const existing = new Set(products.map((p) => normalizeMasterProductCode(p.productCode)));
     const toAdd = entries.filter(
       (entry) => !existing.has(normalizeMasterProductCode(entry.productCode))
     );
     if (toAdd.length === 0) return;
+    if (isSupabaseUuid(clientId)) {
+      try {
+        await assignClientCatalogItemsInSupabase(clientId, toAdd);
+        syncClientPrices(clientId);
+        skipNextSave.current = true;
+        setProducts(getClientCatalog(clientId));
+        toast.success(`${toAdd.length} product${toAdd.length === 1 ? "" : "s"} assigned to client.`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to assign products");
+      }
+      return;
+    }
     const merged = [...products, ...toAdd];
     saveClientCatalog(clientId, merged);
     syncClientPrices(clientId);
@@ -1561,6 +1629,23 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
         />
       )}
       {/* Stat cards */}
+      {syncError && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <span>Unable to sync client catalogue: {syncError}</span>
+          <button
+            type="button"
+            onClick={() => void syncFromSupabase()}
+            className="rounded border border-red-300 bg-white px-2.5 py-1 font-medium text-red-700 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {isSyncing && products.length === 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          Loading client catalogue…
+        </div>
+      )}
       <div className="grid grid-cols-4 gap-3">
         <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white">
           <p className="text-xs text-gray-500 mb-1">Total Items</p>

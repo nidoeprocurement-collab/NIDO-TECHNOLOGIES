@@ -3,6 +3,15 @@ import type { ProductCommercialTerms } from '@/lib/productCommercialTerms';
 import { formatConfigurationLabel } from '@/lib/productConfiguration';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
+import { isSupabaseUuid } from '@/lib/nidoRolesApi';
+import { getCatalogProducts } from '@/lib/catalogStore';
+import {
+  clearCartInSupabase,
+  loadCartFromSupabase,
+  removeCartItemInSupabase,
+  reserveAndAddToCartInSupabase,
+  updateCartItemQuantityInSupabase,
+} from '@/lib/cartAndStockApi';
 
 export interface StockAllocation {
   vendorId: string;
@@ -52,6 +61,8 @@ export type CartItem = {
   configurationPriceAdjustment?: number;
   /** Single-entry allocation record — kept for order-cancellation stock-release path. */
   vendorAllocations: StockAllocation[];
+  dbCartItemId?: string;
+  masterCatalogueItemId?: string;
 };
 
 export interface CartContextType {
@@ -121,10 +132,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Auth and impersonation can change after the provider first mounts. Load
   // that identity's cart rather than carrying another user's in-memory cart.
+  const activeClientId = (effectiveUser as { clientId?: string } | null)?.clientId;
   useEffect(() => {
     setItems(loadCart(storageKey));
     setHydratedStorageKey(storageKey);
-  }, [storageKey]);
+    if (activeClientId && isSupabaseUuid(activeClientId) && effectiveUser?.id && isSupabaseUuid(effectiveUser.id)) {
+      let cancelled = false;
+      void loadCartFromSupabase(activeClientId)
+        .then((remoteItems) => {
+          if (!cancelled && remoteItems.length > 0) {
+            setItems(remoteItems);
+          }
+        })
+        .catch(() => {
+          // Keep cached cart if offline/unavailable
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [storageKey, activeClientId, effectiveUser?.id]);
 
   // Persist every cart mutation so a browser refresh does not empty the cart.
   // The hydration guard prevents a user switch from saving the previous user's
@@ -195,19 +222,62 @@ export function CartProvider({ children }: { children: ReactNode }) {
         : [];
       return [...prev, { ...product, quantity, vendorAllocations: allocations }];
     });
+
+    const targetClientId = product.clientId || activeClientId;
+    if (
+      targetClientId &&
+      isSupabaseUuid(targetClientId) &&
+      product.selectedVendorId &&
+      isSupabaseUuid(product.selectedVendorId) &&
+      effectiveUser?.id &&
+      isSupabaseUuid(effectiveUser.id)
+    ) {
+      const catalog = getCatalogProducts();
+      const code = String(product.productCode || '').trim().toLowerCase();
+      const masterMatch = catalog.find(
+        (c) =>
+          isSupabaseUuid(c.id) &&
+          (c.id.toLowerCase() === code || c.masterProductCode.trim().toLowerCase() === code),
+      );
+      if (masterMatch) {
+        void reserveAndAddToCartInSupabase(targetClientId, masterMatch.id, product, quantity)
+          .then((saved) => {
+            setItems((prev) =>
+              prev.map((i) =>
+                i.id === product.id && i.selectedVendorId === product.selectedVendorId
+                  ? { ...i, dbCartItemId: saved.dbCartItemId, masterCatalogueItemId: saved.masterCatalogueItemId }
+                  : i,
+              ),
+            );
+          })
+          .catch((err) => {
+            setItems((prev) => prev.filter((i) => !(i.id === product.id && i.selectedVendorId === product.selectedVendorId)));
+            toast.error(err instanceof Error ? err.message : 'Unable to reserve stock for this item.');
+          });
+      }
+    }
   };
 
   const removeItem = (id: number) => {
+    const target = items.find((i) => i.id === id);
     setItems((prev) => prev.filter((i) => i.id !== id));
+    if (target?.dbCartItemId) {
+      void removeCartItemInSupabase(target.dbCartItemId).catch((err) => {
+        toast.error(err instanceof Error ? err.message : 'Unable to release reserved stock.');
+      });
+    }
   };
 
   const updateQuantity = (id: number, quantity: number) => {
     if (quantity <= 0) { removeItem(id); return; }
+    const existing = items.find((i) => i.id === id);
+    const moqFloor = existing && existing.moq > 0 ? existing.moq : 1;
+    const targetQty = Math.max(moqFloor, quantity);
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== id) return i;
-        const moqFloor = i.moq > 0 ? i.moq : 1;
-        const rawQty = Math.max(moqFloor, quantity);
+        const floor = i.moq > 0 ? i.moq : 1;
+        const rawQty = Math.max(floor, quantity);
         if (rawQty === i.quantity) return i;
         const newAlloc: StockAllocation[] = i.selectedVendorId
           ? [{ vendorId: i.selectedVendorId, vendorProductId: '', vendorName: i.selectedVendorName || '', allocated: rawQty }]
@@ -215,6 +285,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { ...i, quantity: rawQty, vendorAllocations: newAlloc };
       }),
     );
+    if (existing?.dbCartItemId && targetQty !== existing.quantity) {
+      void updateCartItemQuantityInSupabase(existing.dbCartItemId, targetQty).catch((err) => {
+        setItems((prev) => prev.map((i) => (i.id === id ? existing : i)));
+        toast.error(err instanceof Error ? err.message : 'Unable to update reserved stock quantity.');
+      });
+    }
   };
 
   const updateItem = (id: number, updates: Partial<CartItem>) => {
@@ -223,10 +299,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const clearCart = () => setItems([]);
+  const clearCart = () => {
+    const targetClientId = items.find((i) => i.clientId)?.clientId || activeClientId;
+    setItems([]);
+    if (targetClientId && isSupabaseUuid(targetClientId)) {
+      void clearCartInSupabase(targetClientId, false).catch(() => {});
+    }
+  };
 
   /** Clears the cart without restoring stock — call after a confirmed order. */
-  const consumeCart = () => setItems([]);
+  const consumeCart = () => {
+    const targetClientId = items.find((i) => i.clientId)?.clientId || activeClientId;
+    setItems([]);
+    if (targetClientId && isSupabaseUuid(targetClientId)) {
+      void clearCartInSupabase(targetClientId, true).catch(() => {});
+    }
+  };
 
   return (
     <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, updateItem, clearCart, consumeCart }}>

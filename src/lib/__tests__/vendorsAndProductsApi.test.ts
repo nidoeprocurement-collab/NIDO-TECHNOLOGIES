@@ -333,7 +333,7 @@ describe("vendorsApi, vendorProductsApi & Phase 3 Wave 1.2 RLS migration", () =>
       address: "Mumbai",
     };
     localStorage.setItem(
-      "nido_catalog_products_v1",
+      "nido_catalog_products",
       JSON.stringify([
         {
           id: masterUuid1,
