@@ -17,6 +17,13 @@ import {
   generateMasterProductCode, saveCatalogProduct, getCatalogProducts, findCatalogProductByName,
   type CatalogSpec, type GeneralSpec, type CatalogVariation, type CatalogVariationOption
 } from '@/lib/catalogStore';
+import {
+  addMasterCatalogueAuditLogInSupabase,
+  createMasterCatalogueItemInSupabase,
+  loadMasterCatalogueItemByIdFromSupabase,
+  updateMasterCatalogueItemInSupabase,
+} from '@/lib/masterCatalogueApi';
+import { isSupabaseUuid } from '@/lib/nidoRolesApi';
 
 export default function AddMasterCatalogueItemWrapper() {
   const navigate = useNavigate();
@@ -56,24 +63,56 @@ export default function AddMasterCatalogueItemWrapper() {
   // Load product data when in edit mode
   useEffect(() => {
     if (!isEditMode || !itemId) return;
-    const product = getCatalogProducts().find(p => String(p.id) === String(itemId));
-    if (!product) { toast.error('Product not found'); navigate('/configuration/master-catalogue'); return; }
-    setEditProductId(product.id);
-    setEditMasterCode(product.masterProductCode);
-    setSkuCode(product.skuCode || '');
-    setProductName(product.productName || '');
-    setPhysicalType(product.physicalType || 'Physical Product');
-    setCategory(product.category || '');
-    setSubcategory(product.subcategory || '');
-    setBrand(product.brand || '');
-    setTags(product.tags || []);
-    setDescription(product.description || '');
-    setSpecifications(product.specifications || []);
-    setGeneralSpecs(product.generalSpecs || []);
-    setVariations(product.variations || []);
-    setProductNotes(product.productNotes || '');
-    setVideoUrl(product.videoUrl || '');
-    setImages(product.images || []);
+    let active = true;
+    const applyLoadedProduct = (product: ReturnType<typeof getCatalogProducts>[number]) => {
+      setEditProductId(product.id);
+      setEditMasterCode(product.masterProductCode);
+      setSkuCode(product.skuCode || '');
+      setProductName(product.productName || '');
+      setPhysicalType(product.physicalType || 'Physical Product');
+      setCategory(product.category || '');
+      setSubcategory(product.subcategory || '');
+      setBrand(product.brand || '');
+      setTags(product.tags || []);
+      setDescription(product.description || '');
+      setSpecifications(product.specifications || []);
+      setGeneralSpecs(product.generalSpecs || []);
+      setVariations(product.variations || []);
+      setProductNotes(product.productNotes || '');
+      setVideoUrl(product.videoUrl || '');
+      setImages(product.images || []);
+    };
+
+    const cached = getCatalogProducts().find(p => String(p.id) === String(itemId));
+    if (cached) {
+      applyLoadedProduct(cached);
+      return;
+    }
+
+    if (isSupabaseUuid(itemId)) {
+      void loadMasterCatalogueItemByIdFromSupabase(itemId)
+        .then((remote) => {
+          if (!active) return;
+          if (!remote) {
+            toast.error('Product not found');
+            navigate('/configuration/master-catalogue');
+            return;
+          }
+          saveCatalogProduct(remote, { skipAudit: true });
+          applyLoadedProduct(remote);
+        })
+        .catch((err) => {
+          if (!active) return;
+          toast.error(err instanceof Error ? err.message : 'Unable to load product');
+          navigate('/configuration/master-catalogue');
+        });
+      return () => {
+        active = false;
+      };
+    }
+
+    toast.error('Product not found');
+    navigate('/configuration/master-catalogue');
   }, [itemId]);
 
   const currentMasterProductCode = isEditMode ? editMasterCode : masterProductCode;
@@ -354,7 +393,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const clearDraft = () => sessionStorage.removeItem('nido_preview_draft');
 
-  const saveProduct = (status: 'draft' | 'published') => {
+  const saveProduct = async (status: 'draft' | 'published'): Promise<boolean> => {
     const existingProduct = isEditMode
       ? getCatalogProducts().find(p => String(p.id) === String(currentEditProductId))
       : undefined;
@@ -371,23 +410,44 @@ export default function AddMasterCatalogueItemWrapper() {
         return false;
       }
     }
-    const saved = saveCatalogProduct(buildProduct(status, existingProduct), {
-      skipDuplicateCheck: isEditMode,
-    });
-    if (!saved) {
-      toast.error(
-        isEditMode
-          ? 'Unable to save changes because the product could not be found.'
-          : 'Product duplication found: a product with this name already exists in the master catalog.',
-      );
+
+    const candidate = buildProduct(status, existingProduct);
+    try {
+      const persisted =
+        isEditMode && isSupabaseUuid(candidate.id)
+          ? await updateMasterCatalogueItemInSupabase(candidate)
+          : await createMasterCatalogueItemInSupabase(candidate);
+
+      saveCatalogProduct(persisted, {
+        skipDuplicateCheck: isEditMode,
+        skipAudit: true,
+      });
+
+      void addMasterCatalogueAuditLogInSupabase({
+        itemId: persisted.id,
+        event: isEditMode
+          ? status === 'published' && existingProduct?.publishStatus !== 'published'
+            ? 'Item Approved'
+            : 'Item Details Updated'
+          : status === 'published'
+            ? 'New Item Added'
+            : 'Draft Created',
+        detail: `${persisted.productName} (${persisted.skuCode || persisted.masterProductCode || 'N/A'})`,
+        itemName: persisted.productName,
+        sku: persisted.skuCode || persisted.masterProductCode,
+        status: status === 'published' ? 'Approved' : isEditMode ? 'Updated' : 'Draft',
+      }).catch(() => undefined);
+
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to save product to Supabase.');
       return false;
     }
-    return true;
   };
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
-    if (!saveProduct('draft')) return;
+    if (!(await saveProduct('draft'))) return;
     clearDraft();
     toast.success('Saved as draft');
     navigate('/configuration/master-catalogue');
@@ -398,22 +458,22 @@ export default function AddMasterCatalogueItemWrapper() {
     setPublishConfirmOpen(true);
   };
 
-  const confirmPublish = () => {
-    if (!saveProduct('published')) return;
+  const confirmPublish = async () => {
+    if (!(await saveProduct('published'))) return;
     setPublishConfirmOpen(false);
     clearDraft();
     toast.success('Product published successfully!');
     navigate('/configuration/master-catalogue');
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
     const existing = getCatalogProducts().find(p => String(p.id) === String(currentEditProductId));
     if (!existing) {
       toast.error('Product could not be found. Please return to the master catalogue and try again.');
       return;
     }
-    if (!saveProduct(existing?.publishStatus || 'draft')) return;
+    if (!(await saveProduct(existing?.publishStatus || 'draft'))) return;
     clearDraft();
     toast.success('Changes saved successfully');
     navigate('/configuration/master-catalogue');

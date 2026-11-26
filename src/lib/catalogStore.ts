@@ -47,10 +47,23 @@ export interface CatalogProduct {
   videoUrl: string;
   images: string[];
   publishStatus: 'draft' | 'published' | 'pending' | 'archived';
+  hsnCode?: string;
+  gstPercentage?: number;
+  initialStock?: number;
+  minStockThreshold?: number;
   price: number;
   moq: number;
   leadTime: string;
   warranty: string;
+}
+
+export function setCatalogProductsCache(products: CatalogProduct[]): void {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(products));
+    window.dispatchEvent(new Event('catalogUpdated'));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 /** Product names are unique in the master catalog, regardless of case or extra spacing. */
