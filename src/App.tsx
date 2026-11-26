@@ -371,12 +371,6 @@ function AppRoutes() {
 
   return (
     <div className="flex flex-col h-screen h-[100dvh] w-full max-w-full overflow-hidden bg-background">
-      <div
-        role="note"
-        className="flex-shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-900 z-40"
-      >
-        Local-only prototype: sign-in and data stay in this browser and are not protected for production.
-      </div>
       <div className="flex-1 min-h-0 w-full overflow-hidden relative">
         <Suspense
           fallback={
