@@ -1,7 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MyOrdersProvider } from "@/contexts/MyOrdersContext";
 import MyRenewalsPage from "@/pages/MyRenewalsPage";
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    portalContext: null,
+  }),
+}));
 
 function renderRenewalsPage() {
   return render(
