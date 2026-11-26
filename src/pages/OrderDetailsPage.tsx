@@ -18,6 +18,8 @@ import {
 import { getInvoiceById, getInvoices } from "@/lib/invoiceStore";
 import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, getPOAggregateAfterLineCancellation, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { raisePOAndConsumeStockInSupabase, savePOToSupabase } from "@/lib/purchaseOrdersApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
 import { convertReservedToAllocated, releaseVendorReservation, restoreAllocatedPhysicalStock } from "@/lib/vendorStore";
 import { attachPOPdfToPO, downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -5361,6 +5363,11 @@ export default function MyOrderPage() {
       };
 
       savePO(po);
+      if (isSupabaseUuid(vendorId)) {
+        void savePOToSupabase(po)
+          .then(() => raisePOAndConsumeStockInSupabase(poNumber))
+          .catch(() => {});
+      }
       void attachPOPdfToPO(poNumber).catch((e) => {
         console.warn("PDF generation failed:", e);
       });

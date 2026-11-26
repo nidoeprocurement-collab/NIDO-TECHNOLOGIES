@@ -5,6 +5,21 @@
 import { getPrefix } from "./configService";
 import type { ProductCommercialTerms } from "./productCommercialTerms";
 import { syncMasterOrderFulfillmentStatus } from "./orderFulfillmentStatus";
+import { supabase } from "./supabase";
+import { savePOToSupabase, updatePOInSupabase } from "./purchaseOrdersApi";
+
+function syncPOAsync(fn: () => Promise<void>): void {
+  try {
+    if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession !== "function") return;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user?.id) {
+        void fn().catch(() => {});
+      }
+    });
+  } catch {
+    // ignore in offline/test mode
+  }
+}
 
 export interface PODocument {
   id: string;
@@ -277,6 +292,7 @@ export function savePO(po: StoredPO): void {
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
   syncPOIdentifiersToClientOrder(po);
+  syncPOAsync(() => savePOToSupabase(po));
   // Notify any listening page (e.g. PurchaseOrdersPage) to refresh
   try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber: po.poNumber } })); } catch { /* SSR safe */ }
 }
@@ -299,6 +315,7 @@ export function updatePO(
     ) return;
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    syncPOAsync(() => updatePOInSupabase(poNumber, changes));
 
     // A PO cancellation is recorded globally, but does not itself cancel the
     // customer sub-orders. Active lines return to Pending with the old vendor

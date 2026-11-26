@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getAllPOs, getPODisplayStatus, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore";
+import { loadPurchaseOrdersFromSupabase, migrateLocalPOsToSupabaseIfNeeded } from "@/lib/purchaseOrdersApi";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getVendorProducts, type VendorProduct } from "@/lib/vendorStore";
 import { loadConfig } from "@/lib/configService";
@@ -333,9 +334,20 @@ export default function PurchaseOrdersPage() {
   }, [search]);
 
   // Load system POs
+  const syncPOsFromSupabase = async () => {
+    try {
+      await migrateLocalPOsToSupabaseIfNeeded();
+      const loaded = await loadPurchaseOrdersFromSupabase();
+      setSystemOrders(loaded);
+    } catch {
+      // Keep cached POs if offline/unavailable
+    }
+  };
+
   useEffect(() => {
     const load = () => setSystemOrders(getAllPOs());
     load();
+    void syncPOsFromSupabase();
     window.addEventListener("storage", load);
     window.addEventListener("poCreated", load);
     return () => { window.removeEventListener("storage", load); window.removeEventListener("poCreated", load); };
@@ -1134,7 +1146,7 @@ export default function PurchaseOrdersPage() {
                   <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search PO, vendor…" className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-400 bg-white w-52" />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setSystemOrders(getAllPOs())} title="Refresh"><RefreshCw className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => { setSystemOrders(getAllPOs()); void syncPOsFromSupabase(); }} title="Refresh"><RefreshCw className="h-4 w-4" /></Button>
                 <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => navigate("/transactions/purchase/purchase-orders/create")}>
                   <Plus className="mr-2 h-4 w-4" /> New
                 </Button>
