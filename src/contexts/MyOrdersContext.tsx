@@ -9,6 +9,9 @@ import { assignOrderLocally } from "../lib/liveAssignmentStore";
 import { getRoles, getUsers } from "../lib/nidoUsersStore";
 import { getClientForPortal, getClients } from "../lib/clientStore";
 import { appendOrderActivityOnce, getActivityActor } from "../lib/orderActivityStore";
+import { useAuth } from "./AuthContext";
+import { isSupabaseUuid } from "../lib/nidoRolesApi";
+import { loadOrdersFromSupabase, updateOrderStatusInSupabase } from "../lib/ordersApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -229,6 +232,7 @@ function getAssignmentRoster() {
 }
 
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
+  const { effectiveUser } = useAuth();
   const [orders, setOrders] = useState<MyOrder[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(ORDERS_KEY) || "[]");
@@ -236,6 +240,27 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       return [];
     }
   });
+
+  useEffect(() => {
+    if (!effectiveUser?.id || !isSupabaseUuid(effectiveUser.id)) return;
+    const clientFilter = (effectiveUser as { clientId?: string }).clientId;
+    let cancelled = false;
+    void loadOrdersFromSupabase(clientFilter)
+      .then((remoteOrders) => {
+        if (cancelled) return;
+        setOrders((prev) => {
+          const remoteIds = new Set(remoteOrders.map((r) => r.id));
+          const localOnly = prev.filter((o) => !remoteIds.has(o.id) && !isSupabaseUuid((o as { dbOrderId?: string }).dbOrderId));
+          return [...remoteOrders, ...localOnly];
+        });
+      })
+      .catch(() => {
+        // Keep cached orders if offline/unavailable
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveUser?.id, (effectiveUser as { clientId?: string } | null)?.clientId]);
 
   // Persist every change to localStorage so orders survive page refresh
   useEffect(() => {
@@ -355,6 +380,10 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     const activityId = `activity_order_status_${orderId}_${status}_${Date.now()}`;
     const updatedBy = getActivityActor();
     const updatedAt = new Date().toISOString();
+    const currentTarget = orders.find((o) => o.id === orderId);
+    if (effectiveUser?.id && isSupabaseUuid(effectiveUser.id) && currentTarget && currentTarget.status !== "Cancelled" && currentTarget.status !== status) {
+      void updateOrderStatusInSupabase(orderId, status, cancelReason, (currentTarget as { dbOrderId?: string }).dbOrderId).catch(() => {});
+    }
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;

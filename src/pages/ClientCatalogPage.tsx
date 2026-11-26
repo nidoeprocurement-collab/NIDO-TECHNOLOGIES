@@ -15,6 +15,7 @@ import {
   assignClientCatalogItemsInSupabase,
   loadClientCatalogFromSupabase,
   migrateLocalClientCatalogToSupabaseIfNeeded,
+  removeClientCatalogItemInSupabase,
   updateClientCatalogItemInSupabase,
 } from "@/lib/clientCatalogApi";
 import { loadMasterCatalogueFromSupabase } from "@/lib/masterCatalogueApi";
@@ -1462,6 +1463,8 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [viewProduct, setViewProduct] = useState<CatalogEntry | null>(null);
   const [editProduct, setEditProduct] = useState<CatalogEntry | null>(null);
+  const [removeConfirmProduct, setRemoveConfirmProduct] = useState<CatalogEntry | null>(null);
+  const [isRemovingProduct, setIsRemovingProduct] = useState(false);
   const [products, setProducts] = useState<CatalogEntry[]>(() => getClientCatalog(clientId));
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -1606,6 +1609,26 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
     setProducts(getClientCatalog(clientId));
   };
 
+  const handleConfirmRemoveProduct = async () => {
+    if (!removeConfirmProduct) return;
+    const target = removeConfirmProduct;
+    if (isSupabaseUuid(clientId)) {
+      setIsRemovingProduct(true);
+      try {
+        await removeClientCatalogItemInSupabase(clientId, target);
+      } catch (err) {
+        setIsRemovingProduct(false);
+        toast.error(err instanceof Error ? err.message : "Failed to remove product from client catalogue");
+        return;
+      }
+      setIsRemovingProduct(false);
+    }
+    skipNextSave.current = isSupabaseUuid(clientId);
+    setProducts((prev) => prev.filter((p) => getCatalogEntryKey(p) !== getCatalogEntryKey(target)));
+    setRemoveConfirmProduct(null);
+    toast.success(`"${target.name}" removed from client catalogue.`);
+  };
+
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setHeaderMenu(false); }}>
       <>
@@ -1627,6 +1650,34 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           onClose={() => setEditProduct(null)}
           onSave={(updated) => handleSaveEdit(getCatalogEntryKey(editProduct), updated)}
         />
+      )}
+      {removeConfirmProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-900">Remove Product from Client Catalogue</h3>
+            <p className="mt-2 text-xs text-gray-600">
+              Are you sure you want to remove <span className="font-semibold text-gray-900">{removeConfirmProduct.name}</span> ({removeConfirmProduct.cpc || removeConfirmProduct.productCode}) from this client&apos;s catalogue?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isRemovingProduct}
+                onClick={() => setRemoveConfirmProduct(null)}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRemovingProduct}
+                onClick={() => void handleConfirmRemoveProduct()}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isRemovingProduct ? "Removing…" : "Remove Product"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {/* Stat cards */}
       {syncError && (
@@ -1844,7 +1895,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                         </button>
                         <div className="my-1 border-t border-gray-100" />
                         <button
-                          onClick={() => { setProducts((prev) => prev.filter((p) => getCatalogEntryKey(p) !== entryKey)); setRowMenu(null); }}
+                          onClick={() => { setRemoveConfirmProduct(product); setRowMenu(null); }}
                           className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500"
                         >
                           Remove Product

@@ -288,6 +288,27 @@ export async function saveClientPriceSlabsInSupabase(
   saveClientPriceSlabs(clientId, slabs);
 }
 
+export async function loadGlobalCategoryRulesFromSupabase(): Promise<CategoryPricingRule[]> {
+  assertSupabaseFrom();
+  const { data, error } = await supabase
+    .from('global_category_pricing_rules')
+    .select('*')
+    .order('category', { ascending: true });
+  if (error) {
+    throw new Error(error.message || 'Unable to load global category pricing rules.');
+  }
+  const rules: CategoryPricingRule[] = (
+    Array.isArray(data) ? (data as DbGlobalCategoryRuleRow[]) : []
+  ).map((r) => ({
+    id: r.id,
+    category: r.category,
+    marginPct: Number(r.margin_pct) || 0,
+    bufferPct: Number(r.buffer_pct) || 0,
+  }));
+  saveGlobalCategoryRules(rules);
+  return rules;
+}
+
 export async function saveGlobalCategoryRulesInSupabase(
   rules: CategoryPricingRule[],
 ): Promise<void> {
@@ -306,6 +327,17 @@ export async function saveGlobalCategoryRulesInSupabase(
     }
   }
   saveGlobalCategoryRules(rules);
+}
+
+export async function deleteGlobalCategoryRuleInSupabase(category: string): Promise<void> {
+  assertSupabaseFrom();
+  const { error } = await supabase
+    .from('global_category_pricing_rules')
+    .delete()
+    .eq('category', category);
+  if (error) {
+    throw new Error(error.message || 'Unable to delete global category pricing rule.');
+  }
 }
 
 export async function saveRetailMarketPricesInSupabase(

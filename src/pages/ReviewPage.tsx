@@ -1,5 +1,8 @@
-  import { useState, useEffect } from "react";
+  import { useState, useEffect, useRef } from "react";
   import { getPrefix } from "@/lib/configService";
+  import { toast } from "sonner";
+  import { isSupabaseUuid } from "@/lib/nidoRolesApi";
+  import { checkoutCartToOrderInSupabase } from "@/lib/ordersApi";
   import { Navigate, useLocation, useNavigate } from "react-router-dom";
   import { ChevronRight, ArrowLeft, Pencil, MapPin, CreditCard, Landmark, Wallet, Banknote, Building2, Lock } from "lucide-react";
   import CheckoutStepper from "./CheckoutStepper";
@@ -62,7 +65,13 @@ import ProductConfigurationSummary from "@/components/shared/ProductConfiguratio
     const location = useLocation();
     useI18n();
     const { items: cart, consumeCart } = useCart();
-    const { addOrder } = useMyOrders();
+    const { addOrder, setOrders } = useMyOrders();
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+    const idempotencyKeyRef = useRef<string>(
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `idem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    );
     const { user, isClientPortalUser } = useAuth();
     const isPortalFlow = location.pathname.startsWith("/portal/");
     const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
@@ -271,7 +280,63 @@ import ProductConfigurationSummary from "@/components/shared/ProductConfiguratio
         : getClients().find(candidate => candidate.id === selectedClientId);
       const clientName = selectedClient?.name || user?.clientName || selectedClientId || "—";
 
-      const orderNumber = addOrder({
+      const useSupabaseCheckout =
+        isSupabaseUuid(selectedClientId) &&
+        Boolean(user?.id && isSupabaseUuid(user.id)) &&
+        cart.some((i) => Boolean(i.dbCartItemId));
+
+      let orderNumber: string;
+      if (useSupabaseCheckout) {
+        if (isPlacingOrder) return;
+        setIsPlacingOrder(true);
+        try {
+          const createdOrder = await checkoutCartToOrderInSupabase({
+            idempotencyKey: idempotencyKeyRef.current,
+            clientId: selectedClientId,
+            orderedFor,
+            paymentMethod: paymentSummary.label,
+            paymentDetail: paymentSummary.detail,
+            paymentTerms: paymentTermsLabel,
+            orderNotes,
+            deliveryAddress: selectedAddr
+              ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
+                  .filter(Boolean).join(", ")
+              : "",
+            deliveryDetails: selectedAddr
+              ? {
+                  label: selectedAddr.label,
+                  attentionName: selectedAddr.attentionName || selectedAddr.attention || "",
+                  line1: selectedAddr.line1,
+                  line2: selectedAddr.line2,
+                  city: selectedAddr.city,
+                  state: selectedAddr.state,
+                  country: selectedAddr.country,
+                  zip: selectedAddr.zip,
+                  phone: selectedAddr.phone,
+                  instructions: deliveryInstructions,
+                }
+              : {},
+            checkoutPricingSnapshot: {
+              shippingDeliveryFee,
+              platformFee: cartPricing.platformFee,
+            },
+            subtotal,
+            totalGst,
+            totalDiscount: totalDiscountAmount,
+            shippingDeliveryFee,
+            platformFee: cartPricing.platformFee,
+            totalAmount,
+          });
+          orderNumber = createdOrder.id;
+          setOrders((prev) => [createdOrder, ...prev.filter((o) => o.id !== createdOrder.id)]);
+        } catch (err) {
+          setIsPlacingOrder(false);
+          toast.error(err instanceof Error ? err.message : "Unable to place order. Please try again.");
+          return;
+        }
+        setIsPlacingOrder(false);
+      } else {
+        orderNumber = addOrder({
         clientId: selectedClientId,
         client: clientName,
         clientColor: "#2563eb",
@@ -359,7 +424,8 @@ import ProductConfigurationSummary from "@/components/shared/ProductConfiguratio
           configurationPriceAdjustment: i.configurationPriceAdjustment,
           stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
         })) satisfies OrderCartItem[],
-      });
+        });
+      }
 
       // Evaluate the selected client's active portal workflow immediately after
       // the order is created. If no workflow matches, the existing order flow
