@@ -57,6 +57,7 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { getPlatformModuleForPath } from "@/lib/platformModuleCatalog";
 import { StoredDocumentList } from "@/components/shared/LabeledDocumentUploader";
 import TempViewerIsolationDiagnostic from "@/components/portal/TempViewerIsolationDiagnostic";
+import TempProcurementReverseIsolationDiagnostic from "@/components/portal/TempProcurementReverseIsolationDiagnostic";
 import { toast } from "sonner";
 
 const ADMIN_TABS = [
@@ -1122,6 +1123,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           )}
 
           {portalMode && <TempViewerIsolationDiagnostic />}
+          {portalMode && <TempProcurementReverseIsolationDiagnostic />}
         </main>
       )}
     </div>
