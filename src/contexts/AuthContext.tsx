@@ -34,6 +34,7 @@ export interface User {
   role?: string;
   userType: UserType;
   clientId?: string;
+  clientCode?: string;
   clientName?: string;
   department?: string;
 }
@@ -176,6 +177,7 @@ function mapAuthContextToUser(ctx: AuthContextData): User | null {
       role: typeof role?.name === 'string' ? role.name : '',
       userType: profile.user_type,
       clientId: profile.client_id,
+      clientCode: profile.client_code ?? undefined,
       clientName: profile.client_name ?? undefined,
       department: profile.department ?? undefined,
     };

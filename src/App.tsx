@@ -134,7 +134,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 /** Guards admin-only routes: redirects client portal users to /portal/dashboard */
-function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
+export function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isClientPortalUser } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (isClientPortalUser) return <Navigate to="/portal/dashboard" replace />;

@@ -441,7 +441,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               <p className="text-xs text-gray-900 font-medium truncate">
                 {portalClient?.name || user?.clientName}
               </p>
-              <p className="text-[10px] text-gray-500 truncate">Client ID: {user?.clientId}</p>
+              <p className="text-[10px] text-gray-500 truncate">Client ID: {portalClient?.clientCode || user?.clientCode || user?.clientId}</p>
             </div>
           </div>
         )}

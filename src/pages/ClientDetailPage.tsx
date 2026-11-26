@@ -320,7 +320,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
     doc.text(client.name, margin + 30, 18);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Client ID: ${client.id}`, margin + 30, 25);
+    doc.text(`Client ID: ${client.clientCode || client.id}`, margin + 30, 25);
     doc.text(`Status: ${(client.status || "N/A").toUpperCase()}`, margin + 30, 31);
     doc.text(`Generated: ${new Date().toLocaleDateString("en-IN")}`, margin + 30, 37);
 
@@ -588,7 +588,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
               </div>
               <div>
                 <p className="text-gray-500">Client ID</p>
-                <p className="font-medium text-gray-800">{client.id}</p>
+                <p className="font-medium text-gray-800">{client.clientCode || client.id}</p>
               </div>
             </div>
 

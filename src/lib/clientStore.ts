@@ -355,7 +355,7 @@ const exportValue = (value: unknown) => String(value ?? "");
 /** Return values in the same order as CLIENT_IMPORT_HEADERS for CSV export. */
 export function clientToImportValues(client: StoredClient): string[] {
   return [
-    client.id,
+    client.clientCode || client.id,
     client.company_name || client.name,
     client.category,
     client.client_tier || client.tier,

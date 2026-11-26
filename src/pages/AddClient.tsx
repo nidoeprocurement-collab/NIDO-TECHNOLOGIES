@@ -194,7 +194,7 @@ export default function AddClient() {
 
       if (existing) {
         const loadedClient = {
-          client_id: existing.id || clientIdToEdit,
+          client_id: existing.clientCode || existing.id || clientIdToEdit,
           company_name: existing.company_name || existing.name || "",
           category: existing.category || "",
           client_tier: existing.client_tier || existing.tier || "",
@@ -739,6 +739,7 @@ export default function AddClient() {
 
       let persistedClientId = formData.client_id;
 
+      let provisionedClientCode: string | undefined;
       if (clientIdToEdit && isSupabaseUuid(clientIdToEdit)) {
         await updateClientOrganizationInSupabase(clientIdToEdit, {
           name: clientData.company_name || clientIdToEdit,
@@ -786,6 +787,7 @@ export default function AddClient() {
           repName: formData.contact_person || undefined,
         });
         persistedClientId = provisioned.client_id;
+        provisionedClientCode = provisioned.client_code;
 
         await updateClientOrganizationInSupabase(persistedClientId, {
           mobile: clientData.mobile || null,
@@ -805,6 +807,9 @@ export default function AddClient() {
       // Save to shared client store cache with canonical Supabase UUID when available
       addStoredClient({
         id: persistedClientId,
+        clientCode:
+          provisionedClientCode ||
+          (clientIdToEdit ? getClients().find((c) => c.id === clientIdToEdit)?.clientCode : undefined),
         name: clientData.company_name || persistedClientId,
         ...clientData,
       });

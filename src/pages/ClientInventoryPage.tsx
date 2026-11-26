@@ -912,7 +912,7 @@ export default function ClientInventoryPage({ client }: Props) {
     }
   };
 
-  const clientCode = (client as unknown as { code?: string }).code || client.id.slice(0, 6).toUpperCase();
+  const clientCode = client.clientCode || (client as unknown as { code?: string }).code || client.id.slice(0, 6).toUpperCase();
 
   return (
     <div className="p-4 sm:p-6 space-y-4 bg-[#fcfcfd]">
@@ -1132,8 +1132,8 @@ export default function ClientInventoryPage({ client }: Props) {
                     type="button"
                     onClick={() => { setTypeFilter(pill.key); setPage(1); }}
                     className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active
-                        ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                       }`}
                   >
                     {pill.icon}
@@ -1156,8 +1156,8 @@ export default function ClientInventoryPage({ client }: Props) {
                     type="button"
                     onClick={() => { setRepairPill(pill.key); setPage(1); }}
                     className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active
-                        ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                       }`}
                   >
                     {pill.icon}
@@ -1182,8 +1182,8 @@ export default function ClientInventoryPage({ client }: Props) {
                     type="button"
                     onClick={() => { setActivityPill(pill.key); setPage(1); }}
                     className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active
-                        ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      ? "border-blue-300 bg-blue-50 text-blue-700 font-semibold"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                       }`}
                   >
                     {pill.icon}
@@ -1603,8 +1603,8 @@ export default function ClientInventoryPage({ client }: Props) {
                             <td className="px-4 py-2.5 text-gray-700">{item.reservedUntil}</td>
                             <td className="px-4 py-2.5">
                               <span className={`inline-flex rounded-md px-2.5 py-0.5 text-[11px] font-semibold ${item.reservationStatus === "Expiring Soon"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-purple-50 text-purple-700"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-purple-50 text-purple-700"
                                 }`}>
                                 {item.reservationStatus || "Reserved"}
                               </span>

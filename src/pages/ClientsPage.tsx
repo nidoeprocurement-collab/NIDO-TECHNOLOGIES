@@ -203,7 +203,7 @@ function ClientOverviewPopup({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 flex items-start justify-between">
           <div>
-            <p className="text-blue-200 text-xs font-medium mb-1">{client.id}</p>
+            <p className="text-blue-200 text-xs font-medium mb-1">{client.clientCode || client.id}</p>
             <h2 className="text-white text-xl font-semibold">{client.name}</h2>
             <p className="text-blue-200 text-sm mt-0.5">{client.category || "—"} · {client.billingCity || "—"}</p>
           </div>
@@ -312,7 +312,7 @@ function ArchivedModal({ clients, onClose, onClientClick, onRestore }: {
                 {clients.map(c => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-3 py-3">
-                      <button onClick={() => onClientClick(c)} className="text-blue-600 font-bold hover:underline text-xs">{c.id}</button>
+                      <button onClick={() => onClientClick(c)} className="text-blue-600 font-bold hover:underline text-xs">{c.clientCode || c.id}</button>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
@@ -858,7 +858,7 @@ export default function ClientsPageUI() {
                       className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm truncate"
                       onClick={() => navigate(`/clients/${c.id}`)}
                     >
-                      {c.id}
+                      {c.clientCode || c.id}
                     </td>
 
                     {/* Client Name + email */}

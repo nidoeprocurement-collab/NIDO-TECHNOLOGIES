@@ -784,7 +784,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
         <div className="p-3 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{client.id}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{client.clientCode || client.id}</p>
               <h1 className="text-xl font-bold">{client.name}</h1>
             </div>
             <button type="button" onClick={() => setActiveTab("Overview")} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800">
@@ -887,7 +887,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-gray-900">{client.company_name || client.name}</p>
-                      <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.id}</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.clientCode || client.id}</p>
                     </div>
                   </div>
                   <div className="mt-2 divide-y divide-gray-50">
