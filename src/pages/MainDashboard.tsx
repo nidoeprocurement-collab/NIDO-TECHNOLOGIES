@@ -1,4 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { isSupabaseUuid } from '@/lib/nidoRolesApi';
+import { loadDashboardSummaryFromSupabase } from '@/lib/dashboardApi';
+import { loadVendorsFromSupabase } from '@/lib/vendorsApi';
+import { loadPurchaseOrdersFromSupabase } from '@/lib/purchaseOrdersApi';
 import { ArrowUp, ArrowDown, TrendingUp, Package, DollarSign, ShoppingCart, AlertCircle, CheckCircle, Clock, Eye, Wrench } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Link } from 'react-router-dom';
@@ -263,9 +267,24 @@ export default function MainDashboard() {
   const displayName = user?.name?.trim() || 'there';
   const formatRupees = (v: number) => fmt(v, true);
   const { orders } = useMyOrders();
-  const vendors = useMemo(() => getVendors().filter(v => !v.archived), []);
-  const clients = useMemo(() => getClients(), []);
-  const pos = useMemo(() => getAllPOs(), []);
+  const [syncTick, setSyncTick] = useState(0);
+  useEffect(() => {
+    if (!user?.id || !isSupabaseUuid(user.id)) return;
+    let cancelled = false;
+    void Promise.all([
+      loadVendorsFromSupabase().catch(() => []),
+      loadPurchaseOrdersFromSupabase().catch(() => []),
+      loadDashboardSummaryFromSupabase(null, 'all').catch(() => null),
+    ]).then(() => {
+      if (!cancelled) setSyncTick((t) => t + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+  const vendors = useMemo(() => getVendors().filter(v => !v.archived), [syncTick]);
+  const clients = useMemo(() => getClients(), [syncTick]);
+  const pos = useMemo(() => getAllPOs(), [syncTick]);
   const serviceRequests = useMemo(() => getServiceRequests(), []);
   // Each pie chart has its own period selector so changing one chart does
   // not unexpectedly change the other chart's reporting window.

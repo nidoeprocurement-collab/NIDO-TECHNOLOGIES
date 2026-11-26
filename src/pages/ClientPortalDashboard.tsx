@@ -1,4 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isSupabaseUuid } from '@/lib/nidoRolesApi';
+import { loadDashboardSummaryFromSupabase, type DashboardSummaryMetrics } from '@/lib/dashboardApi';
+import { loadOrdersFromSupabase } from '@/lib/ordersApi';
+import { loadClientInvoicesFromSupabase } from '@/lib/financeApi';
 import { getPortalUsersByClient } from '@/lib/portalUserStore';
 import {
   ShoppingBag,
@@ -20,6 +25,22 @@ export default function ClientPortalDashboard() {
   const { user } = useAuth();
   const clientId = user?.clientId ?? '';
   const clientName = user?.clientName ?? 'Your Company';
+  const [summary, setSummary] = useState<DashboardSummaryMetrics | null>(null);
+
+  useEffect(() => {
+    if (!isSupabaseUuid(clientId)) return;
+    let cancelled = false;
+    void Promise.all([
+      loadDashboardSummaryFromSupabase(clientId).catch(() => null),
+      loadOrdersFromSupabase(clientId).catch(() => []),
+      loadClientInvoicesFromSupabase().catch(() => []),
+    ]).then(([metrics]) => {
+      if (!cancelled && metrics) setSummary(metrics);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
 
   const portalUsers = getPortalUsersByClient(clientId);
   const clientOrders = clientId ? getClientOrders(clientId, clientName) : [];
@@ -41,19 +62,19 @@ export default function ClientPortalDashboard() {
   const stats = [
     {
       label: 'Total Orders',
-      value: clientOrders.length,
+      value: summary ? summary.total_orders : clientOrders.length,
       icon: <ShoppingBag size={22} className="text-blue-600" />,
       bg: 'bg-blue-50',
     },
     {
       label: 'Pending Orders',
-      value: pendingOrders,
+      value: summary ? summary.pending_orders : pendingOrders,
       icon: <Clock size={22} className="text-orange-600" />,
       bg: 'bg-orange-50',
     },
     {
       label: 'Completed Orders',
-      value: clientOrders.filter(order => order.status === "Delivered").length,
+      value: summary ? summary.completed_orders : clientOrders.filter(order => order.status === "Delivered").length,
       icon: <CheckCircle2 size={22} className="text-green-600" />,
       bg: 'bg-green-50',
     },

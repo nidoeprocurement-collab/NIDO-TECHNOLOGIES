@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Save, Plus, Bell, Mail, MessageSquare, Smartphone } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { isSupabaseUuid } from '@/lib/nidoRolesApi';
+import {
+  loadNotificationPreferencesFromSupabase,
+  saveNotificationPreferencesInSupabase,
+} from '@/lib/notificationsApi';
 
 const notificationRules = [
   { id: 1, event: 'Order Created', email: true, sms: false, inApp: true, recipient: 'Admin, PM' },
@@ -21,9 +27,40 @@ const notificationRules = [
 ];
 
 export default function NotificationsTab() {
+  const { user } = useAuth();
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [smsEnabled, setSmsEnabled] = useState(true);
   const [inAppEnabled, setInAppEnabled] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id || !isSupabaseUuid(user.id)) return;
+    void loadNotificationPreferencesFromSupabase(user.id)
+      .then((prefs) => {
+        if (!prefs) return;
+        setEmailEnabled(prefs.email_enabled);
+        setSmsEnabled(prefs.sms_enabled);
+        setInAppEnabled(prefs.in_app_enabled);
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  const handleSave = async () => {
+    if (user?.id && isSupabaseUuid(user.id)) {
+      try {
+        await saveNotificationPreferencesInSupabase({
+          userId: user.id,
+          clientId: (user as { clientId?: string }).clientId,
+          emailEnabled,
+          smsEnabled,
+          inAppEnabled,
+        });
+      } catch (err) {
+        toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Unable to save preferences', variant: 'destructive' });
+        return;
+      }
+    }
+    toast({ title: 'Saved' });
+  };
 
   return (
     <div className="space-y-6">
@@ -34,7 +71,7 @@ export default function NotificationsTab() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline">Cancel</Button>
-          <Button className="gap-1.5" onClick={() => toast({ title: 'Saved' })}><Save size={14} /> Save</Button>
+          <Button className="gap-1.5" onClick={() => void handleSave()}><Save size={14} /> Save</Button>
         </div>
       </div>
 
