@@ -2441,7 +2441,13 @@ export default function ShopPage() {
           <ShoppingCart size={48} className=" mb-3 opacity-30" />
           <p className="font-medium text-gray-500">
             {catalogProducts.length === 0
-              ? `No products have been added to ${selectedClient?.name}'s catalog yet`
+              ? (() => {
+                  const emptyCatalogClientName =
+                    selectedClient?.name || (isClientPortalUser ? user?.clientName : undefined);
+                  return emptyCatalogClientName
+                    ? `No products have been added to ${emptyCatalogClientName}'s catalog yet`
+                    : "No products have been added to this catalog yet";
+                })()
               : selectedRequester
                 ? `No products are assigned to ${selectedRequester.name}`
               : "No products match your filters"}

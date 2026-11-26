@@ -291,11 +291,10 @@ function seedInvoices(): StoredInvoice[] {
         ...inv,
       }));
     }
-    localStorage.setItem(STORE_KEY, JSON.stringify(SEED_INVOICES));
   } catch {
     // The app also renders in environments without localStorage.
   }
-  return [...SEED_INVOICES];
+  return [];
 }
 
 export function getInvoices(): StoredInvoice[] {

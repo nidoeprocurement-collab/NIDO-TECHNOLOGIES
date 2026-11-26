@@ -321,13 +321,13 @@ const normalizeBill = (raw: Record<string, unknown>): BillEntry => {
 };
 
 const readBills = (): BillEntry[] => {
-  const parsed = safeReadJson<unknown>(BILLS_STORAGE_KEY, DEFAULT_BILLS);
-  if (!Array.isArray(parsed)) return DEFAULT_BILLS;
+  const parsed = safeReadJson<unknown>(BILLS_STORAGE_KEY, []);
+  if (!Array.isArray(parsed)) return [];
   const normalized = parsed
     .filter((entry) => !!entry && typeof entry === "object")
     .map((entry) => normalizeBill(entry as Record<string, unknown>))
     .filter((entry) => entry.id && entry.billNumber !== undefined);
-  return normalized.length ? normalized : DEFAULT_BILLS;
+  return normalized;
 };
 
 const blankForm = (): BillForm => ({
