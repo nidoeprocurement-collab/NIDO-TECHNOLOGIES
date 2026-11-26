@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { downloadPaymentMadePdf, generatePaymentMadePdfBase64 } from "@/lib/paymentMadePdf";
+import { supabase } from "@/lib/supabase";
+import { recordFinancialPaymentInSupabase } from "@/lib/financeApi";
 import { getPOByNumber, updatePO } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
@@ -307,8 +309,8 @@ export default function PaymentsMadePage() {
     const title = isCreateMode
       ? "New Payment"
       : detailId
-      ? payments.find((p) => p.id === detailId)?.paymentNumber || "Payment"
-      : "Payments Made";
+        ? payments.find((p) => p.id === detailId)?.paymentNumber || "Payment"
+        : "Payments Made";
     setMeta({ title });
   }, [isCreateMode, detailId, payments]);
 
@@ -366,6 +368,29 @@ export default function PaymentsMadePage() {
   const persist = (next: PaymentEntry[]) => {
     setPayments(next);
     localStorage.setItem(PAYMENTS_STORAGE_KEY, JSON.stringify(next));
+    try {
+      if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession === "function") {
+        void supabase.auth.getSession().then(({ data }) => {
+          if (data?.session?.user?.id && next[0] && next[0].amountPaid > 0) {
+            const latest = next[0];
+            void recordFinancialPaymentInSupabase({
+              ledgerType: "payable",
+              paymentMethod: latest.paymentMode || "Bank Transfer",
+              amount: latest.amountPaid,
+              partyName: latest.vendorName,
+              status: "paid",
+              idempotencyKey: `pmt_made_${latest.id}`,
+              vendorId: latest.vendorId,
+              utrReference: latest.reference,
+              paymentDate: latest.paymentDate,
+              notes: latest.notes,
+            }).catch(() => { });
+          }
+        });
+      }
+    } catch {
+      // ignore in offline/test mode
+    }
     window.dispatchEvent(new Event("nidoPurchasePaymentsUpdated"));
   };
 
