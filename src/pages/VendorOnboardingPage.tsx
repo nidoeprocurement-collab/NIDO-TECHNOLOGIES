@@ -7,6 +7,7 @@ import { Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react
 import { useAuth } from '@/contexts/AuthContext';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors, type StoredVendor } from '@/lib/vendorDataStore';
+import { createVendorInSupabase } from '@/lib/vendorsApi';
 import { getPrefix } from '@/lib/configService';
 import { getVendorCreationAuditFields } from '@/lib/vendorAudit';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
@@ -478,14 +479,15 @@ export default function AddVendorPage() {
       performanceCompliance: formData.complianceRating * 20,
     };
 
+    let createdVendor: StoredVendor;
     try {
-      addVendor(vendorRecord);
-    } catch {
-      toast.error('Related documents are too large to store in the browser. Please upload smaller files and try again.');
+      createdVendor = await createVendorInSupabase(vendorRecord);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to onboard vendor. Please try again.');
       return;
     }
 
-    toast.success(`Vendor "${formData.vendorName}" (${newId}) onboarded successfully`);
+    toast.success(`Vendor "${formData.vendorName}" (${createdVendor.vendorCode || createdVendor.id}) onboarded successfully`);
     navigate('/vendors');
   };
 

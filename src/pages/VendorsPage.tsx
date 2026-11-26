@@ -39,12 +39,17 @@ import { Button } from "@/components/ui/button";
 import {
   getVendors,
   saveVendors,
-  archiveVendorById,
-  restoreArchivedVendor,
-  deleteVendorById,
   type StoredVendor,
   type VendorStatus,
 } from "@/lib/vendorDataStore";
+import {
+  archiveVendorInSupabase,
+  deleteVendorInSupabase,
+  loadVendorsFromSupabase,
+  migrateLocalVendorsToSupabaseIfNeeded,
+  updateVendorInSupabase,
+} from "@/lib/vendorsApi";
+import { migrateLocalVendorProductsToSupabaseIfNeeded } from "@/lib/vendorProductsApi";
 import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { getVendorUpdateAuditFields } from "@/lib/vendorAudit";
@@ -404,6 +409,26 @@ export default function App() {
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
   const [archiveConfirmVendor, setArchiveConfirmVendor] = useState<Vendor | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const syncFromSupabase = async () => {
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const { idMap } = await migrateLocalVendorsToSupabaseIfNeeded();
+      if (Object.keys(idMap).length > 0) {
+        await migrateLocalVendorProductsToSupabaseIfNeeded(idMap);
+      }
+      const loaded = await loadVendorsFromSupabase();
+      setRawVendors(loaded);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load vendors from database";
+      setSyncError(msg);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const refresh = () => {
@@ -411,6 +436,7 @@ export default function App() {
       setPurchaseOrders(getAllPOs());
     };
     refresh();
+    void syncFromSupabase();
     window.addEventListener("nidoVendorsUpdated", refresh);
     window.addEventListener("poCreated", refresh);
     window.addEventListener("poActivityUpdated", refresh);
@@ -483,31 +509,47 @@ export default function App() {
     const vendor = vendors.find(v => v.id === id);
     if (vendor) setArchiveConfirmVendor(vendor);
   };
-  const confirmArchiveVendor = () => {
+  const confirmArchiveVendor = async () => {
     if (!archiveConfirmVendor) return;
+    const target = archiveConfirmVendor;
     const auditFields = getVendorUpdateAuditFields(currentAuthenticatedUser);
-    archiveVendorById(archiveConfirmVendor.id, auditFields);
-    setRawVendors(getVendors());
-    toast.success(`"${archiveConfirmVendor.name}" moved to Archived Vendors.`);
-    setArchiveConfirmVendor(null);
+    try {
+      await archiveVendorInSupabase(target.id, true, auditFields);
+      setRawVendors(getVendors());
+      toast.success(`"${target.name}" moved to Archived Vendors.`);
+      setArchiveConfirmVendor(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to archive vendor");
+    }
   };
-  const handleRestoreVendor = (vendor: Vendor) => {
+  const handleRestoreVendor = async (vendor: Vendor) => {
     const auditFields = getVendorUpdateAuditFields(currentAuthenticatedUser);
-    restoreArchivedVendor(vendor.id, auditFields);
-    setRawVendors(getVendors());
-    toast.success(`"${vendor.name}" restored to Active Vendors.`);
+    try {
+      await archiveVendorInSupabase(vendor.id, false, auditFields);
+      setRawVendors(getVendors());
+      toast.success(`"${vendor.name}" restored to Active Vendors.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to restore vendor");
+    }
   };
-  const handleDeleteArchivedVendor = (vendor: Vendor) => {
-    deleteVendorById(vendor.id);
-    setRawVendors(getVendors());
-    toast.success(`"${vendor.name}" permanently deleted.`);
+  const handleDeleteArchivedVendor = async (vendor: Vendor) => {
+    try {
+      await deleteVendorInSupabase(vendor.id);
+      setRawVendors(getVendors());
+      toast.success(`"${vendor.name}" permanently deleted.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete vendor");
+    }
   };
-  const setVendorStatus = (id: string, status: VendorStatus) => {
+  const setVendorStatus = async (id: string, status: VendorStatus) => {
     const auditFields = getVendorUpdateAuditFields(currentAuthenticatedUser);
-    const updated = rawVendors.map(v => v.id === id ? { ...v, ...auditFields, status } : v);
-    saveVendors(updated);
-    setRawVendors(updated);
-    toast.success(`Vendor status updated to ${status}.`);
+    try {
+      await updateVendorInSupabase(id, { ...auditFields, status });
+      setRawVendors(getVendors());
+      toast.success(`Vendor status updated to ${status}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update vendor status");
+    }
   };
   const exportVendors = () => {
     if (activeVendors.length === 0) {
@@ -593,6 +635,19 @@ export default function App() {
       </div>
 
       <div className="w-full px-2 py-2">
+        {syncError && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <span>Unable to sync vendors from database: {syncError}</span>
+            <Button variant="outline" size="sm" onClick={() => void syncFromSupabase()}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {isSyncing && rawVendors.length === 0 && (
+          <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            Loading vendors…
+          </div>
+        )}
         {/* Stats tiles — each acts as a filter */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
           {stats.map(s => {

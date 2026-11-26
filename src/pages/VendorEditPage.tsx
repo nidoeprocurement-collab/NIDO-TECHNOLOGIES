@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Cloud, Star, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { getVendorById, updateVendor } from '@/lib/vendorDataStore';
+import { getVendorById } from '@/lib/vendorDataStore';
 import type { StoredVendor, VendorStatus } from '@/lib/vendorDataStore';
+import { loadVendorByIdFromSupabase, updateVendorInSupabase } from '@/lib/vendorsApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { getVendorUpdateAuditFields } from '@/lib/vendorAudit';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
@@ -200,14 +201,33 @@ export default function VendorEditPage() {
   );
 
   useEffect(() => {
-    const currentVendor = getVendorById(id!);
-    const nextFormData = createEditFormData(currentVendor);
-    setFormData(nextFormData);
-    setSubCategoryOptions(
-      nextFormData.category
-        ? withCurrentValue(subCategoriesMap[nextFormData.category] ?? [], nextFormData.subCategory)
-        : []
-    );
+    const applyVendor = (currentVendor: StoredVendor | undefined) => {
+      const nextFormData = createEditFormData(currentVendor);
+      setFormData(nextFormData);
+      setSubCategoryOptions(
+        nextFormData.category
+          ? withCurrentValue(subCategoriesMap[nextFormData.category] ?? [], nextFormData.subCategory)
+          : []
+      );
+    };
+
+    const currentVendor = id ? getVendorById(id) : undefined;
+    applyVendor(currentVendor);
+
+    if (!id) return;
+    let cancelled = false;
+    void loadVendorByIdFromSupabase(id)
+      .then((loaded) => {
+        if (!cancelled && loaded) {
+          applyVendor(loaded);
+        }
+      })
+      .catch(() => {
+        // Keep cached vendor if offline/unavailable
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -236,7 +256,7 @@ export default function VendorEditPage() {
     setFormData(prev => ({ ...prev, [fieldName]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!vendor) return;
     if (!isValidPhoneNumber(formData.phoneNumber)) {
       toast.error('Phone number must contain exactly 10 digits.');
@@ -257,70 +277,75 @@ export default function VendorEditPage() {
     const rating = ratedValues.length > 0
       ? parseFloat((ratedValues.reduce((a, b) => a + b, 0) / ratedValues.length).toFixed(1))
       : vendor.rating;
-    updateVendor(vendor.id, {
-      ...getVendorUpdateAuditFields(currentAuthenticatedUser),
-      lastUpdatedFormData: { ...formData },
-      vendorCode: formData.vendorCode,
-      name: formData.vendorName,
-      category: formData.category,
-      subCategory: formData.subCategory,
-      vendorType: formData.vendorType,
-      legalEntityName: formData.legalEntityName,
-      primaryContact: formData.contactPerson,
-      designation: formData.designation,
-      email: formData.email,
-      phone,
-      mobile,
-      alternateEmail: formData.alternateEmail,
-      pan: formData.pan,
-      website: formData.website,
-      address: formData.registeredAddress,
-      addressLine1: formData.registeredAddress,
-      addressLine2: '',
-      country: formData.country,
-      state: formData.state,
-      city: formData.city,
-      zipCode: formData.pincode,
-      billingAddressLine1: formData.billingAddress,
-      billingAddressLine2: '',
-      paymentTerms: formData.paymentTerms,
-      currency: formData.currency,
-      creditLimit: formData.creditLimit,
-      bankName: formData.bankName,
-      bankAccount: formData.accountNumber,
-      ifscCode: formData.ifscCode,
-      accountType: formData.accountType,
-      msmeStatus: formData.msmeStatus,
-      isoStatus: formData.isoStatus,
-      qualityCertification: formData.qualityCertification,
-      environmentalCertification: formData.environmentalCertification,
-      rating,
-      score: rating,
-      // Convert 1-5 stars back to 0-100 scale
-      performanceQuality: starsToScore(formData.qualityRating),
-      performanceDelivery: starsToScore(formData.deliveryRating),
-      performanceResponsiveness: starsToScore(formData.serviceRating),
-      performanceCompliance: starsToScore(formData.complianceRating),
-      onboardedDate: formData.onboardingDate,
-      onboardingDate: formData.onboardingDate,
-      founded: formData.yearOfEstablishment,
-      blacklisted: formData.blacklisted,
-      preferredVendor: formData.preferredVendor,
-      tags: formData.tags,
-      internalNotes: formData.internalNotes,
-      visibility: formData.visibility,
-      gstCertificate: formData.gstCertificate,
-      panCard: formData.panCard,
-      businessRegistration: formData.businessRegistration,
-      bankDetails: formData.bankDetails,
-      isoCertificate: formData.isoCertificate,
-      otherDocuments: formData.otherDocuments,
-      // Map contract status → vendor status
-      ...(formData.contractStatus && {
-        status: formData.contractStatus as VendorStatus,
-      }),
-    });
-    navigate('/vendors');
+    try {
+      await updateVendorInSupabase(vendor.id, {
+        ...getVendorUpdateAuditFields(currentAuthenticatedUser),
+        lastUpdatedFormData: { ...formData },
+        vendorCode: formData.vendorCode,
+        name: formData.vendorName,
+        category: formData.category,
+        subCategory: formData.subCategory,
+        vendorType: formData.vendorType,
+        legalEntityName: formData.legalEntityName,
+        primaryContact: formData.contactPerson,
+        designation: formData.designation,
+        email: formData.email,
+        phone,
+        mobile,
+        alternateEmail: formData.alternateEmail,
+        pan: formData.pan,
+        website: formData.website,
+        address: formData.registeredAddress,
+        addressLine1: formData.registeredAddress,
+        addressLine2: '',
+        country: formData.country,
+        state: formData.state,
+        city: formData.city,
+        zipCode: formData.pincode,
+        billingAddressLine1: formData.billingAddress,
+        billingAddressLine2: '',
+        paymentTerms: formData.paymentTerms,
+        currency: formData.currency,
+        creditLimit: formData.creditLimit,
+        bankName: formData.bankName,
+        bankAccount: formData.accountNumber,
+        ifscCode: formData.ifscCode,
+        accountType: formData.accountType,
+        msmeStatus: formData.msmeStatus,
+        isoStatus: formData.isoStatus,
+        qualityCertification: formData.qualityCertification,
+        environmentalCertification: formData.environmentalCertification,
+        rating,
+        score: rating,
+        // Convert 1-5 stars back to 0-100 scale
+        performanceQuality: starsToScore(formData.qualityRating),
+        performanceDelivery: starsToScore(formData.deliveryRating),
+        performanceResponsiveness: starsToScore(formData.serviceRating),
+        performanceCompliance: starsToScore(formData.complianceRating),
+        onboardedDate: formData.onboardingDate,
+        onboardingDate: formData.onboardingDate,
+        founded: formData.yearOfEstablishment,
+        blacklisted: formData.blacklisted,
+        preferredVendor: formData.preferredVendor,
+        tags: formData.tags,
+        internalNotes: formData.internalNotes,
+        visibility: formData.visibility,
+        gstCertificate: formData.gstCertificate,
+        panCard: formData.panCard,
+        businessRegistration: formData.businessRegistration,
+        bankDetails: formData.bankDetails,
+        isoCertificate: formData.isoCertificate,
+        otherDocuments: formData.otherDocuments,
+        // Map contract status → vendor status
+        ...(formData.contractStatus && {
+          status: formData.contractStatus as VendorStatus,
+        }),
+      });
+      toast.success(`Vendor "${formData.vendorName}" updated.`);
+      navigate('/vendors');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update vendor.');
+    }
   };
 
   const StarRatingInput = ({
