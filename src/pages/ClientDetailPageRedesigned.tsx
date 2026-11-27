@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -24,6 +24,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientForPortal, getClients, type StoredClient } from "@/lib/clientStore";
+import { loadClientOrganizationByIdFromSupabase } from "@/lib/clientOrganizationsApi";
+import { loadClientAccessDataFromSupabase } from "@/lib/clientAccessApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
 import {
   getClientActivities,
   getClientContracts,
@@ -38,7 +41,7 @@ import {
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import { getSupportTickets, type SupportTicket } from "@/lib/supportTicketStore";
-import { getPortalUsersByClient, hasPortalPermission } from "@/lib/portalUserStore";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { belongsToPortalUser, invoiceBelongsToPortalUser } from "@/lib/clientDashboardScoping";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
@@ -314,14 +317,14 @@ interface ClientDetailProps {
 
 export default function ClientDetailPageRedesigned({ portalMode = false }: ClientDetailProps) {
   const params = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, hasClientPortalPermission } = useAuth();
   const { hasRoutePermission } = usePermissions();
   const navigate = useNavigate();
   const clientId = portalMode ? user?.clientId?.trim() ?? "" : params.id ?? "";
   const canViewOverviewModule = (moduleName: string) => {
     if (!portalMode) return true;
     if (!user?.clientId) return false;
-    return hasPortalPermission(user.clientId, user.role ?? "", moduleName, "view");
+    return hasClientPortalPermission(moduleName, "view");
   };
   const visibleKpiCount = [
     "Overview - Total Orders",
@@ -352,22 +355,130 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const client = portalMode
-    ? getClientForPortal(clientId)
-    : getClients().find((item) => item.id === clientId);
-  const [orders, setOrders] = useState<ClientOrderRecord[]>(() => getClientOrders(clientId, client?.name));
-  const [services, setServices] = useState<ClientServiceRecord[]>(() => getClientServices(clientId));
-  const [activities, setActivities] = useState<ClientActivityRecord[]>(() => getClientActivities(clientId));
-  const [documents, setDocuments] = useState<ClientDocumentRecord[]>(() => getClientDocuments(clientId));
-  const [catalog, setCatalog] = useState<ClientCatalogEntry[]>(() => getClientCatalog(clientId));
-  const [contracts, setContracts] = useState(() => getClientContracts(clientId));
-  const [invoices, setInvoices] = useState<StoredInvoice[]>(() => getInvoices());
-  const [tickets, setTickets] = useState<SupportTicket[]>(() => getSupportTickets());
-  const [portalUsers, setPortalUsers] = useState(() => getPortalUsersByClient(clientId));
+  const isRemoteClient = isSupabaseUuid(clientId);
+  const [remoteClient, setRemoteClient] = useState<StoredClient | null>(null);
+  const [loadingClient, setLoadingClient] = useState<boolean>(() => isSupabaseUuid(clientId));
+  const [clientLoadError, setClientLoadError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const clientFetchInFlightRef = useRef(false);
+  const clientRequestIdRef = useRef(0);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const fetchRemoteClientContext = useCallback(async () => {
+    if (!isSupabaseUuid(clientId) || clientFetchInFlightRef.current) return;
+    clientFetchInFlightRef.current = true;
+    const requestId = ++clientRequestIdRef.current;
+    setLoadingClient(true);
+    setClientLoadError(null);
+    try {
+      const org = await loadClientOrganizationByIdFromSupabase(clientId);
+      if (!mountedRef.current || requestId !== clientRequestIdRef.current) return;
+      setRemoteClient(org);
+
+      if (org) {
+        try {
+          const access = await loadClientAccessDataFromSupabase(clientId);
+          if (!mountedRef.current || requestId !== clientRequestIdRef.current) return;
+          setPortalUsers(
+            access.users.map((u) => ({
+              id: u.id,
+              clientId: u.client_id,
+              clientName: org.name,
+              email: u.email,
+              password: "",
+              name: u.name,
+              role: u.role_name,
+              userType: u.user_type,
+              status: u.status === "Inactive" ? "inactive" : "active",
+              phone: u.phone,
+              createdAt: u.created_at || new Date().toISOString(),
+            })),
+          );
+        } catch {
+          if (!mountedRef.current || requestId !== clientRequestIdRef.current) return;
+          setPortalUsers([]);
+        }
+      } else {
+        setPortalUsers([]);
+      }
+    } catch (err) {
+      if (!mountedRef.current || requestId !== clientRequestIdRef.current) return;
+      setRemoteClient(null);
+      setClientLoadError(
+        err instanceof Error ? err.message : "Unable to load client organization from Supabase.",
+      );
+    } finally {
+      clientFetchInFlightRef.current = false;
+      if (mountedRef.current && requestId === clientRequestIdRef.current) {
+        setLoadingClient(false);
+      }
+    }
+  }, [clientId]);
+
+  const localClient = isRemoteClient
+    ? undefined
+    : portalMode
+      ? getClientForPortal(clientId)
+      : getClients().find((item) => item.id === clientId);
+  const client: StoredClient | undefined = isRemoteClient
+    ? remoteClient ?? undefined
+    : localClient;
+
+  const [orders, setOrders] = useState<ClientOrderRecord[]>(() =>
+    isRemoteClient ? [] : getClientOrders(clientId, localClient?.name),
+  );
+  const [services, setServices] = useState<ClientServiceRecord[]>(() =>
+    isRemoteClient ? [] : getClientServices(clientId),
+  );
+  const [activities, setActivities] = useState<ClientActivityRecord[]>(() =>
+    isRemoteClient ? [] : getClientActivities(clientId),
+  );
+  const [documents, setDocuments] = useState<ClientDocumentRecord[]>(() =>
+    isRemoteClient ? [] : getClientDocuments(clientId),
+  );
+  const [catalog, setCatalog] = useState<ClientCatalogEntry[]>(() =>
+    isRemoteClient ? [] : getClientCatalog(clientId),
+  );
+  const [contracts, setContracts] = useState(() =>
+    isRemoteClient ? [] : getClientContracts(clientId),
+  );
+  const [invoices, setInvoices] = useState<StoredInvoice[]>(() =>
+    isRemoteClient ? [] : getInvoices(),
+  );
+  const [tickets, setTickets] = useState<SupportTicket[]>(() =>
+    isRemoteClient ? [] : getSupportTickets(),
+  );
+  const [portalUsers, setPortalUsers] = useState(() =>
+    isRemoteClient ? [] : getPortalUsersByClient(clientId),
+  );
+
+  useEffect(() => {
+    if (isRemoteClient) {
+      clientFetchInFlightRef.current = false;
+      setRemoteClient(null);
+      setOrders([]);
+      setServices([]);
+      setActivities([]);
+      setDocuments([]);
+      setCatalog([]);
+      setContracts([]);
+      setInvoices([]);
+      setTickets([]);
+      setPortalUsers([]);
+      void fetchRemoteClientContext();
+      return;
+    }
+
+    setLoadingClient(false);
+    setClientLoadError(null);
     const reload = () => {
-      setOrders(getClientOrders(clientId, client?.name));
+      setOrders(getClientOrders(clientId, localClient?.name));
       setServices(getClientServices(clientId));
       setActivities(getClientActivities(clientId));
       setDocuments(getClientDocuments(clientId));
@@ -416,7 +527,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       events.forEach((event) => window.removeEventListener(event, reload));
       window.removeEventListener("storage", onStorage);
     };
-  }, [clientId, client?.name]);
+  }, [clientId, isRemoteClient, localClient?.name, fetchRemoteClientContext]);
 
   const selectedDateRange = useMemo(
     () => getPeriodRange(period, customStartDate, customEndDate),
@@ -438,6 +549,33 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     [dashboardOrders, selectedDateRange, validDateRange],
   );
 
+  if (loadingClient) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <RefreshCw size={16} className="animate-spin text-blue-600" />
+          <span>Loading client dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+  if (clientLoadError) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <div className="max-w-md rounded-xl border border-red-200 bg-red-50 p-5 text-center">
+          <p className="text-sm font-semibold text-red-800">Unable to load client dashboard</p>
+          <p className="mt-1 text-xs text-red-700">{clientLoadError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchRemoteClientContext()}
+            className="mt-3 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (!client) return <NotFound id={clientId} />;
 
   const currency = client.currency;
@@ -646,7 +784,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
         <div className="p-3 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{client.id}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{client.clientCode || client.id}</p>
               <h1 className="text-xl font-bold">{client.name}</h1>
             </div>
             <button type="button" onClick={() => setActiveTab("Overview")} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800">
@@ -749,7 +887,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-gray-900">{client.company_name || client.name}</p>
-                      <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.id}</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-blue-600">Client ID: {client.clientCode || client.id}</p>
                     </div>
                   </div>
                   <div className="mt-2 divide-y divide-gray-50">

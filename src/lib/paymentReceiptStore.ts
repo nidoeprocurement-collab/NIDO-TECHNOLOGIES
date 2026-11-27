@@ -1,6 +1,8 @@
 const STORE_KEY = "nido_payment_receipts_v3";
 const COUNTER_KEY = "nido_payment_receipt_counter";
 import { getPrefix } from "./configService";
+import { supabase } from "./supabase";
+import { recordFinancialPaymentInSupabase } from "./financeApi";
 
 /** Returns the next configured payment number and increments the counter. */
 export function getNextReceiptNumber(): string {
@@ -90,6 +92,27 @@ export function saveReceipt(receipt: PaymentReceipt): void {
   if (idx >= 0) all[idx] = receipt;
   else all.unshift(receipt);
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
+  try {
+    if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession === "function") {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data?.session?.user?.id && receipt.amountReceived > 0) {
+          void recordFinancialPaymentInSupabase({
+            ledgerType: "receivable",
+            paymentMethod: receipt.paymentMode || "Bank Transfer",
+            amount: receipt.amountReceived,
+            partyName: receipt.customerName,
+            status: receipt.status === "paid" ? "paid" : "draft",
+            idempotencyKey: `rcpt_${receipt.id}_${receipt.status}`,
+            utrReference: receipt.reference,
+            paymentDate: receipt.paymentDate,
+            notes: receipt.note,
+          }).catch(() => { });
+        }
+      });
+    }
+  } catch {
+    // ignore in offline/test mode
+  }
   window.dispatchEvent(new Event("nidoPaymentReceiptsUpdated"));
 }
 

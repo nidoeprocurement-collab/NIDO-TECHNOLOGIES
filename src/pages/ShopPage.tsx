@@ -5,6 +5,12 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { loadClientCatalogFromSupabase } from "@/lib/clientCatalogApi";
+import { loadMasterCatalogueFromSupabase } from "@/lib/masterCatalogueApi";
+import { loadVendorsFromSupabase } from "@/lib/vendorsApi";
+import { loadVendorProductsFromSupabase } from "@/lib/vendorProductsApi";
+import { loadClientPricingSettingsFromSupabase } from "@/lib/clientPriceEngineApi";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
 import { getCatalogProducts, type CatalogVariation } from "@/lib/catalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
 import {
@@ -2024,6 +2030,21 @@ export default function ShopPage() {
 
   useEffect(() => {
     loadClientProducts();
+    if (selectedClientId && isSupabaseUuid(selectedClientId)) {
+      void Promise.all([
+        loadMasterCatalogueFromSupabase(),
+        loadVendorsFromSupabase(),
+        loadVendorProductsFromSupabase(),
+        loadClientPricingSettingsFromSupabase(selectedClientId),
+        loadClientCatalogFromSupabase(selectedClientId),
+      ])
+        .then(() => {
+          loadClientProducts();
+        })
+        .catch(() => {
+          // Keep cached catalog if offline/unavailable
+        });
+    }
     const events = ['clientCatalogUpdated', 'vendorProductsUpdated', 'nidoVendorsUpdated', 'catalogUpdated', 'priceEngineSettingsUpdated'];
     events.forEach(ev => window.addEventListener(ev, loadClientProducts));
     return () => {
@@ -2420,7 +2441,13 @@ export default function ShopPage() {
           <ShoppingCart size={48} className=" mb-3 opacity-30" />
           <p className="font-medium text-gray-500">
             {catalogProducts.length === 0
-              ? `No products have been added to ${selectedClient?.name}'s catalog yet`
+              ? (() => {
+                  const emptyCatalogClientName =
+                    selectedClient?.name || (isClientPortalUser ? user?.clientName : undefined);
+                  return emptyCatalogClientName
+                    ? `No products have been added to ${emptyCatalogClientName}'s catalog yet`
+                    : "No products have been added to this catalog yet";
+                })()
               : selectedRequester
                 ? `No products are assigned to ${selectedRequester.name}`
               : "No products match your filters"}

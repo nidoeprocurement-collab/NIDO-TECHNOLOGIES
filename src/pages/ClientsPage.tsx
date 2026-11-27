@@ -27,6 +27,11 @@ import {
   type ProvisionResult,
 } from "@/lib/portalUserStore"
 import {
+  loadClientOrganizationsFromSupabase,
+  updateClientOrganizationInSupabase,
+} from "@/lib/clientOrganizationsApi"
+import { isSupabaseUuid } from "@/lib/nidoRolesApi"
+import {
   Users, Building2, ChevronDown, ChevronRight, X, Mail, MapPin, Calendar,
   Archive, MoreVertical, CheckCircle, Clock, XCircle, Edit,
   Plus, Download, Upload, FileDown, Zap, Copy, Check,
@@ -198,7 +203,7 @@ function ClientOverviewPopup({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 flex items-start justify-between">
           <div>
-            <p className="text-blue-200 text-xs font-medium mb-1">{client.id}</p>
+            <p className="text-blue-200 text-xs font-medium mb-1">{client.clientCode || client.id}</p>
             <h2 className="text-white text-xl font-semibold">{client.name}</h2>
             <p className="text-blue-200 text-sm mt-0.5">{client.category || "—"} · {client.billingCity || "—"}</p>
           </div>
@@ -307,7 +312,7 @@ function ArchivedModal({ clients, onClose, onClientClick, onRestore }: {
                 {clients.map(c => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-3 py-3">
-                      <button onClick={() => onClientClick(c)} className="text-blue-600 font-bold hover:underline text-xs">{c.id}</button>
+                      <button onClick={() => onClientClick(c)} className="text-blue-600 font-bold hover:underline text-xs">{c.clientCode || c.id}</button>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
@@ -502,6 +507,24 @@ export default function ClientsPageUI() {
   useEffect(() => {
     setClientsState(getStoredClients())
     setArchivedClientsState(getArchivedClients())
+    let mounted = true
+    void (async () => {
+      try {
+        const remote = await loadClientOrganizationsFromSupabase()
+        if (!mounted) return
+        const active = remote.filter(c => (c.status || "").toLowerCase() !== "archived")
+        const archived = remote
+          .filter(c => (c.status || "").toLowerCase() === "archived")
+          .map(c => ({
+            ...c,
+            archivedOn: (c.archivedAt ? String(c.archivedAt).split("T")[0] : new Date().toISOString().split("T")[0]),
+          }))
+        persistClients(active)
+        persistArchived(archived)
+      } catch {
+        // Keep local cache fallback when Supabase client_organizations lookup is unavailable.
+      }
+    })()
     const onUpdate = () => {
       setClientsState(getStoredClients())
       setArchivedClientsState(getArchivedClients())
@@ -515,6 +538,7 @@ export default function ClientsPageUI() {
     window.addEventListener("nidoClientsUpdated", onUpdate)
     window.addEventListener("storage", onStorage)
     return () => {
+      mounted = false
       window.removeEventListener("nidoClientsUpdated", onUpdate)
       window.removeEventListener("storage", onStorage)
     }
@@ -550,23 +574,52 @@ export default function ClientsPageUI() {
   }
 
   // Actions
-  const archiveClient = (client: StoredClient) => {
-    persistClients(clients.filter(c => c.id !== client.id))
-    persistArchived([...archivedClients, { ...client, status: "archived", archivedOn: new Date().toISOString().split("T")[0] }])
-    toast.success(`${client.name} archived`)
-  }
-
-  const handleRestoreArchived = (client: ArchivedClient) => {
-    if (restoreArchivedClient(client.id)) {
-      setClientsState(getStoredClients())
-      setArchivedClientsState(getArchivedClients())
-      toast.success(`${client.name} restored to active clients`)
+  const archiveClient = async (client: StoredClient) => {
+    try {
+      const archivedAt = new Date().toISOString()
+      if (isSupabaseUuid(client.id)) {
+        await updateClientOrganizationInSupabase(client.id, {
+          status: "Archived",
+          archived_at: archivedAt,
+        })
+      }
+      persistClients(clients.filter(c => c.id !== client.id))
+      persistArchived([...archivedClients, { ...client, status: "archived", archivedOn: archivedAt.split("T")[0] }])
+      toast.success(`${client.name} archived`)
+    } catch (err) {
+      toast.error("Archive failed", { description: err instanceof Error ? err.message : "Unable to archive client." })
     }
   }
 
-  const setClientStatus = (id: string, status: ClientStatus) => {
-    persistClients(clients.map(c => c.id === id ? { ...c, status } : c))
-    toast.success(`Client status updated to ${status}`)
+  const handleRestoreArchived = async (client: ArchivedClient) => {
+    try {
+      if (isSupabaseUuid(client.id)) {
+        await updateClientOrganizationInSupabase(client.id, {
+          status: "Active",
+          archived_at: null,
+        })
+      }
+      if (restoreArchivedClient(client.id)) {
+        setClientsState(getStoredClients())
+        setArchivedClientsState(getArchivedClients())
+        toast.success(`${client.name} restored to active clients`)
+      }
+    } catch (err) {
+      toast.error("Restore failed", { description: err instanceof Error ? err.message : "Unable to restore client." })
+    }
+  }
+
+  const setClientStatus = async (id: string, status: ClientStatus) => {
+    try {
+      if (isSupabaseUuid(id)) {
+        const dbStatus = status === "inactive" ? "Inactive" : "Active"
+        await updateClientOrganizationInSupabase(id, { status: dbStatus })
+      }
+      persistClients(clients.map(c => c.id === id ? { ...c, status } : c))
+      toast.success(`Client status updated to ${status}`)
+    } catch (err) {
+      toast.error("Status update failed", { description: err instanceof Error ? err.message : "Unable to update status." })
+    }
   }
 
   const handleProvision = (c: StoredClient) => {
@@ -805,7 +858,7 @@ export default function ClientsPageUI() {
                       className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm truncate"
                       onClick={() => navigate(`/clients/${c.id}`)}
                     >
-                      {c.id}
+                      {c.clientCode || c.id}
                     </td>
 
                     {/* Client Name + email */}

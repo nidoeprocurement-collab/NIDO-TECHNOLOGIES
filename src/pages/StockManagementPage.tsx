@@ -18,6 +18,11 @@ import {
 import { getAllVendorProducts, manualStockAdjustment, getAvailableStock } from "@/lib/vendorStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import { getVendors } from "@/lib/vendorDataStore";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
+import {
+  adjustVendorInventoryInSupabase,
+  loadInventoryTransactionsFromSupabase,
+} from "@/lib/inventoryTransactionsApi";
 import {
   getStockHistory,
   recordStockEvent,
@@ -616,6 +621,22 @@ function AdjustStockModal({
 
     const reference = `Manual: ${reason}${remarks ? ` — ${remarks}` : ""}`;
     manualStockAdjustment(vendorId, productCode, adjustType, qty, reference);
+    if (isSupabaseUuid(vendorId)) {
+      const master = getCatalogProducts().find(
+        (c) => c.masterProductCode === productCode || c.id === productCode,
+      );
+      if (master && isSupabaseUuid(master.id)) {
+        const delta = adjustType === "Stock Out" ? -qty : qty;
+        void adjustVendorInventoryInSupabase({
+          vendorId,
+          masterCatalogueItemId: master.id,
+          adjustmentType: adjustType,
+          quantityDelta: delta,
+          reason: reference,
+          performedBy: "Admin",
+        }).catch(() => {});
+      }
+    }
     onDone();
     onClose();
   };
@@ -1328,6 +1349,11 @@ function MovementHistoryTab({ refreshKey }: { refreshKey: number }) {
 
   useEffect(() => {
     setHistory(getStockHistory());
+    void loadInventoryTransactionsFromSupabase()
+      .then((txns) => {
+        if (txns.length > 0) setHistory(txns);
+      })
+      .catch(() => {});
   }, [refreshKey]);
 
   useEffect(() => {

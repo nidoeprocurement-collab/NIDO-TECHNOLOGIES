@@ -5,8 +5,6 @@ import {
   getImpersonationSession,
   startImpersonation,
 } from "@/lib/impersonationStore";
-import { addPortalUser } from "@/lib/portalUserStore";
-import { hasPermission } from "@/lib/permissionsStore";
 import type { User } from "@/contexts/AuthContext";
 
 const admin: User = {
@@ -38,61 +36,58 @@ beforeEach(() => {
   sessionStorage.clear();
 });
 
-function seedTarget(overrides: Partial<User> = {}) {
-  addPortalUser({
-    id: portalUser.id,
-    email: portalUser.email,
-    password: "not-used-by-impersonation",
-    name: portalUser.name,
-    userType: portalUser.userType,
-    clientId: portalUser.clientId!,
-    clientName: portalUser.clientName!,
-    role: portalUser.role!,
-    status: "active",
-    createdAt: new Date().toISOString(),
-    ...overrides,
-  });
-}
-
 describe("impersonationStore", () => {
-  it("uses the dedicated permission and denies unauthorized internal roles", () => {
-    expect(hasPermission("System Admin", "client_user_impersonation", "manage")).toBe(true);
-    expect(hasPermission("System Owner", "client_user_impersonation", "manage")).toBe(true);
-    expect(hasPermission("Procurement Manager", "client_user_impersonation", "manage")).toBe(false);
+  it("requires explicit server permission and denies unauthorized internal roles or non-client targets", () => {
+    expect(canStartImpersonation(admin, portalUser, true)).toBe(true);
+    expect(canStartImpersonation(admin, portalUser, false)).toBe(false);
     expect(canStartImpersonation(procurementManager, portalUser)).toBe(false);
-    expect(canStartImpersonation(admin, { ...portalUser, userType: "nido_admin" })).toBe(false);
+    expect(canStartImpersonation(admin, { ...portalUser, userType: "nido_admin" }, true)).toBe(false);
   });
 
-  it("re-resolves the active target, stores only the temporary session in sessionStorage, and audits start/end", () => {
-    seedTarget();
+  it("keeps browser-only impersonation disabled and creates no session in sessionStorage", () => {
+    const session = startImpersonation(admin, portalUser, true);
 
-    const session = startImpersonation(admin, portalUser);
-
-    expect(session).not.toBeNull();
-    expect(session?.originalUser.id).toBe(admin.id);
-    expect(session?.impersonatedUser.id).toBe(portalUser.id);
-    expect(session?.impersonatedUser.userType).toBe("client_user");
-    expect(sessionStorage.getItem("nido_impersonation_session")).toBeTruthy();
+    expect(session).toBeNull();
+    expect(sessionStorage.getItem("nido_impersonation_session")).toBeNull();
     expect(localStorage.getItem("nido_impersonation_session")).toBeNull();
-    expect(getImpersonationSession()?.clientId).toBe("client-a");
+    expect(getImpersonationSession()).toBeNull();
+  });
+
+  it("invalidates leftover browser impersonation sessions while preserving existing audit history", () => {
+    const existingAudit = [
+      {
+        eventType: "IMPERSONATION_STARTED",
+        originalUserId: admin.id,
+        impersonatedUserId: portalUser.id,
+        clientId: "client-a",
+        impersonationSessionId: "imp-legacy-1",
+        timestamp: "2026-11-18T00:00:00.000Z",
+        startedAt: "2026-11-18T00:00:00.000Z",
+        mode: "VIEW_ONLY",
+        status: "active",
+      },
+    ];
+    localStorage.setItem("nido_impersonation_audit", JSON.stringify(existingAudit));
+    sessionStorage.setItem(
+      "nido_impersonation_session",
+      JSON.stringify({
+        id: "imp-legacy-1",
+        originalUser: admin,
+        impersonatedUser: portalUser,
+        clientId: "client-a",
+        mode: "VIEW_ONLY",
+        startedAt: "2026-11-18T00:00:00.000Z",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        status: "active",
+      }),
+    );
+
+    expect(getImpersonationSession()).toBeNull();
+    expect(sessionStorage.getItem("nido_impersonation_session")).toBeNull();
 
     endImpersonation();
     const audit = getImpersonationAudit();
-    expect(audit.map((entry) => entry.eventType)).toEqual([
-      "IMPERSONATION_ENDED",
-      "IMPERSONATION_STARTED",
-    ]);
-    expect(audit[0].originalUserId).toBe(admin.id);
-    expect(audit[0].impersonatedUserId).toBe(portalUser.id);
-  });
-
-  it("rejects a target whose authoritative client or status does not match", () => {
-    seedTarget({ clientId: "client-b" });
-    expect(startImpersonation(admin, portalUser)).toBeNull();
-
-    sessionStorage.clear();
-    localStorage.clear();
-    seedTarget({ status: "inactive" });
-    expect(startImpersonation(admin, portalUser)).toBeNull();
+    expect(audit.some((entry) => entry.impersonationSessionId === "imp-legacy-1" && entry.eventType === "IMPERSONATION_STARTED")).toBe(true);
+    expect(audit.some((entry) => entry.impersonationSessionId === "imp-legacy-1" && entry.eventType === "IMPERSONATION_ENDED")).toBe(true);
   });
 });

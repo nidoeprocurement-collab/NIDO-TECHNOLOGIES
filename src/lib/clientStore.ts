@@ -355,7 +355,7 @@ const exportValue = (value: unknown) => String(value ?? "");
 /** Return values in the same order as CLIENT_IMPORT_HEADERS for CSV export. */
 export function clientToImportValues(client: StoredClient): string[] {
   return [
-    client.id,
+    client.clientCode || client.id,
     client.company_name || client.name,
     client.category,
     client.client_tier || client.tier,
@@ -431,7 +431,8 @@ export function isSharedClient(_clientId: string): boolean {
 
 function currentUserScope(): string {
   try {
-    const rawUser = localStorage.getItem('nido_user');
+    const rawUser =
+      localStorage.getItem('nido_auth_user') || localStorage.getItem('nido_user');
     if (rawUser) {
       const user = JSON.parse(rawUser) as { id?: string; email?: string };
       const identity = user.id || user.email;

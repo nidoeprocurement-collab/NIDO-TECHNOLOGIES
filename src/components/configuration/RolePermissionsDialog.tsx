@@ -34,12 +34,17 @@ import {
 import {
   ROLE_PERMISSION_MODULE_OPTIONS,
 } from '@/lib/platformModuleCatalog';
+import {
+  isSupabaseUuid,
+  saveNidoRolePermissionsInSupabase,
+} from '@/lib/nidoRolesApi';
 import type { NidoRole } from '@/lib/nidoUsersStore';
 
 interface RolePermissionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   role: NidoRole | null;
+  onSavePermissions?: (role: NidoRole, matrix: PermMatrix) => Promise<void> | void;
 }
 
 type PermMatrix = Record<string, ModulePermissions>;
@@ -57,13 +62,15 @@ function uniqueModules<T extends { key: string; label: string }>(modules: T[]): 
   });
 }
 
-export default function RolePermissionsDialog({ open, onOpenChange, role }: RolePermissionsDialogProps) {
+export default function RolePermissionsDialog({ open, onOpenChange, role, onSavePermissions }: RolePermissionsDialogProps) {
   const [matrix, setMatrix] = useState<PermMatrix>({});
   const [modules, setModules] = useState(getAllModules());
   const [removedModuleKeys, setRemovedModuleKeys] = useState<Set<string>>(new Set());
   const [showAddModule, setShowAddModule] = useState(false);
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [addError, setAddError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const superAdmin = !!(role && isSuperAdmin(role.name));
 
@@ -111,8 +118,8 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       const allRoleModules = superAdmin
         ? uniqueModules([...allPlatformModules, ...builtInsAndCustom])
         : hasConfiguredModules
-        ? uniqueModules([...selectedPlatformModules, ...configuredLegacyModules])
-        : uniqueModules([...allPlatformModules, ...builtInsAndCustom]);
+          ? uniqueModules([...selectedPlatformModules, ...configuredLegacyModules])
+          : uniqueModules([...allPlatformModules, ...builtInsAndCustom]);
       setModules(allRoleModules);
       const full: PermMatrix = {};
       for (const m of allRoleModules) {
@@ -182,11 +189,28 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
     toast.info('Module removed from role', { description: `"${label}" has been removed from this role's permissions.` });
   };
 
-  const handleSave = () => {
-    if (!role) return;
-    saveRolePermissions(role.name, matrix);
-    toast.success('Permissions saved', { description: `Permissions for "${role.name}" have been updated.` });
-    onOpenChange(false);
+  const handleSave = async () => {
+    if (!role || saving) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (onSavePermissions) {
+        await onSavePermissions(role, matrix);
+      } else {
+        if (isSupabaseUuid(role.id)) {
+          await saveNidoRolePermissionsInSupabase(role.id, matrix);
+        }
+        saveRolePermissions(role.name, matrix);
+      }
+      toast.success('Permissions saved', { description: `Permissions for "${role.name}" have been updated.` });
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unable to save permissions.';
+      setSaveError(msg);
+      toast.error('Failed to save permissions', { description: msg });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!role) return null;
@@ -311,13 +335,12 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                       return (
                         <td key={a.key} className="py-2.5 px-2 text-center border-b border-border">
                           <button
-                            className={`mx-auto flex items-center justify-center w-5 h-5 transition-colors ${
-                              superAdmin
-                                ? 'cursor-default text-primary'
-                                : enabled
-                                  ? 'text-primary hover:text-primary/80 cursor-pointer'
-                                  : 'text-muted-foreground/30 hover:text-muted-foreground cursor-pointer'
-                            }`}
+                            className={`mx-auto flex items-center justify-center w-5 h-5 transition-colors ${superAdmin
+                              ? 'cursor-default text-primary'
+                              : enabled
+                                ? 'text-primary hover:text-primary/80 cursor-pointer'
+                                : 'text-muted-foreground/30 hover:text-muted-foreground cursor-pointer'
+                              }`}
                             onClick={() => toggle(m.key, a.key)}
                             disabled={superAdmin}
                           >
@@ -355,7 +378,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-[360px] max-h-80 overflow-y-auto">
-                           {availablePlatformModules.length > 0 ? (
+                          {availablePlatformModules.length > 0 ? (
                             availablePlatformModules.map(module => (
                               <DropdownMenuCheckboxItem
                                 key={module.key}
@@ -427,12 +450,15 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
           )}
 
           {/* Right side: action buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex items-center gap-3 shrink-0">
+            {saveError && <span className="text-xs text-red-600 max-w-xs truncate">{saveError}</span>}
+            <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
               {superAdmin ? 'Close' : 'Cancel'}
             </Button>
             {!superAdmin && (
-              <Button onClick={handleSave}>Save Permissions</Button>
+              <Button disabled={saving} onClick={() => void handleSave()}>
+                {saving ? 'Saving...' : 'Save Permissions'}
+              </Button>
             )}
           </div>
         </div>

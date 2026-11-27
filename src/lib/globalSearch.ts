@@ -24,7 +24,7 @@ export type GlobalSearchResult = {
 };
 
 const SENSITIVE_KEY = /password|secret|token|cvv|card(number)?|account(number)?|ifsc|session/i;
-const IGNORED_STORAGE_KEY = /^(nido_user|nido_role_permissions|nido_rbac_|nido_custom_modules|sidebar|theme|preferences|checkout)/i;
+const IGNORED_STORAGE_KEY = /^(nido_user|nido_auth_user|nido_role_permissions|nido_rbac_|nido_custom_modules|sidebar|theme|preferences|checkout)/i;
 
 const routeHints: Array<[RegExp, string]> = [
   [/quote/, "/sales/quotes"],
@@ -344,4 +344,84 @@ export function searchGlobalPlatform(query: string): GlobalSearchResult[] {
         || first.title.localeCompare(second.title);
     })
     .slice(0, 40);
+}
+
+const CLIENT_PORTAL_PAGES: Array<{
+  title: string;
+  description: string;
+  path: string;
+  moduleKey: string;
+}> = [
+  { title: "Portal Dashboard", description: "Client portal overview and KPIs", path: "/portal/dashboard", moduleKey: "Dashboard" },
+  { title: "Catalog", description: "Browse client product catalog", path: "/portal/catalog", moduleKey: "Catalog" },
+  { title: "Services", description: "Request AMC, repair, rental, or disposal services", path: "/portal/services", moduleKey: "Services" },
+  { title: "My Services", description: "Track submitted service requests", path: "/portal/my-services", moduleKey: "Services - My Services" },
+  { title: "Orders", description: "View client portal orders", path: "/portal/orders", moduleKey: "Orders" },
+  { title: "Invoices", description: "View invoices, balances, and payment status", path: "/portal/invoices", moduleKey: "Invoices" },
+  { title: "Contracts", description: "View current client contracts and terms", path: "/portal/contracts", moduleKey: "Contracts" },
+  { title: "Support", description: "Open and track support tickets", path: "/portal/support", moduleKey: "Support" },
+  { title: "Approvals", description: "Review pending approval requests", path: "/portal/approvals", moduleKey: "Approvals" },
+  { title: "Reports", description: "View client portal reports", path: "/portal/reports", moduleKey: "Reports" },
+  { title: "Notifications", description: "View account and order notifications", path: "/portal/notifications", moduleKey: "Notifications" },
+  { title: "Addresses", description: "Manage delivery and billing addresses", path: "/portal/addresses", moduleKey: "Addresses" },
+  { title: "My Profile", description: "View and manage your client profile", path: "/portal/profile", moduleKey: "My Profile" },
+];
+
+export type GlobalSearchOptions = {
+  isClientPortalUser?: boolean;
+  permissions?: Record<string, { view?: boolean }>;
+  hasClientPortalPermission?: (moduleKey: string, action?: "view") => boolean;
+};
+
+function hasPortalPageViewPermission(
+  moduleKey: string,
+  options: GlobalSearchOptions,
+): boolean {
+  const trimmed = moduleKey.trim();
+  if (!trimmed) return false;
+
+  if (options.hasClientPortalPermission) {
+    return options.hasClientPortalPermission(trimmed, "view");
+  }
+
+  const perms = options.permissions;
+  if (!perms) return false;
+
+  if (Object.prototype.hasOwnProperty.call(perms, trimmed)) {
+    return Boolean(perms[trimmed]?.view);
+  }
+
+  const normalized = trimmed.toLowerCase();
+  for (const key of Object.keys(perms)) {
+    if (key.trim().toLowerCase() === normalized) {
+      return Boolean(perms[key]?.view);
+    }
+  }
+
+  return false;
+}
+
+export function getGlobalSearchResults(
+  query: string,
+  options?: GlobalSearchOptions,
+): GlobalSearchResult[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  if (options?.isClientPortalUser) {
+    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+    return CLIENT_PORTAL_PAGES
+      .filter(page => hasPortalPageViewPermission(page.moduleKey, options))
+      .map(page => ({
+        id: `portal-page:${page.path}`,
+        title: page.title,
+        subtitle: "Client portal page",
+        type: "page" as const,
+        path: page.path,
+        searchText: `${page.title} ${page.description} ${page.path}`.toLowerCase(),
+      }))
+      .filter(result => terms.every(term => result.searchText.includes(term)));
+  }
+
+  return searchGlobalPlatform(query);
 }

@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { getPlatformModuleKey } from '@/lib/platformModuleCatalog';
-import { hasPortalPermission } from '@/lib/portalUserStore';
 import { getClientForPortal } from '@/lib/clientStore';
 import {
   LayoutDashboard, ShoppingCart, Wrench, Headphones, Users,
@@ -30,28 +29,28 @@ interface NavItem {
 
 // ── Admin (NIDO) navigation ───────────────────────────────────────────────────
 const adminNavigationItems: NavItem[] = [
-  { label: 'Dashboard',     icon: <LayoutDashboard size={20} />, path: '/dashboard',   moduleKey: 'dashboard' },
-  { label: 'Shop',          icon: <ShoppingCart size={20} />,    path: '/shop',        moduleKey: 'shop' },
-  { label: 'Services',      icon: <Wrench size={20} />,          path: '/services',    moduleKey: 'services' },
-  { label: 'Support',       icon: <Headphones size={20} />,      path: '/support',     moduleKey: 'support' },
-  { label: 'Clients',       icon: <Users size={20} />,           path: '/clients',     moduleKey: 'clients' },
+  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard', moduleKey: 'dashboard' },
+  { label: 'Shop', icon: <ShoppingCart size={20} />, path: '/shop', moduleKey: 'shop' },
+  { label: 'Services', icon: <Wrench size={20} />, path: '/services', moduleKey: 'services' },
+  { label: 'Support', icon: <Headphones size={20} />, path: '/support', moduleKey: 'support' },
+  { label: 'Clients', icon: <Users size={20} />, path: '/clients', moduleKey: 'clients' },
   {
     label: 'Vendors',
     icon: <Package size={20} />,
     children: [
-      { label: 'Vendor List',      icon: <List size={16} />,         path: '/vendors',           moduleKey: 'vendors' },
-      { label: 'Vendor Orders',    icon: <ClipboardList size={16} />,path: '/vendors/orders',    moduleKey: 'vendors' },
-      { label: 'Vendor Dashboard', icon: <LayoutDashboard size={16}/>,path: '/vendors/dashboard',moduleKey: 'vendors' },
-      { label: 'Categories',       icon: <Tags size={16} />,         path: '/vendors/categories',moduleKey: 'vendors' },
+      { label: 'Vendor List', icon: <List size={16} />, path: '/vendors', moduleKey: 'vendors' },
+      { label: 'Vendor Orders', icon: <ClipboardList size={16} />, path: '/vendors/orders', moduleKey: 'vendors' },
+      { label: 'Vendor Dashboard', icon: <LayoutDashboard size={16} />, path: '/vendors/dashboard', moduleKey: 'vendors' },
+      { label: 'Categories', icon: <Tags size={16} />, path: '/vendors/categories', moduleKey: 'vendors' },
     ],
   },
   {
     label: 'MY Requests',
     icon: <TrendingUp size={20} />,
     children: [
-      { label: 'My Orders',   icon: <ShoppingBag size={16} />, path: '/orders',      moduleKey: 'orders' },
-      { label: 'My Services', icon: <Wrench size={16} />,      path: '/my-services', moduleKey: 'services' },
-      { label: 'My Renewals',  icon: <Repeat size={16} />,      path: '/my-renewals', moduleKey: 'orders' },
+      { label: 'My Orders', icon: <ShoppingBag size={16} />, path: '/orders', moduleKey: 'orders' },
+      { label: 'My Services', icon: <Wrench size={16} />, path: '/my-services', moduleKey: 'services' },
+      { label: 'My Renewals', icon: <Repeat size={16} />, path: '/my-renewals', moduleKey: 'orders' },
     ],
   },
   { label: 'Reports', icon: <TrendingUp size={20} />, path: '/reports', moduleKey: 'reports' },
@@ -63,28 +62,28 @@ const adminNavigationItems: NavItem[] = [
         label: 'Sales',
         icon: <TrendingUp size={16} />,
         children: [
-          { label: 'Quotes',             icon: <FileText size={16} />,   path: '/sales/quotes',        moduleKey: 'sales' },
-          { label: 'Sales Orders',       icon: <ClipboardList size={16}/>,path: '/sales/orders',       moduleKey: 'sales' },
-          { label: 'Invoices',           icon: <Receipt size={16} />,    path: '/invoices',            moduleKey: 'invoices' },
-          { label: 'Recurring Invoices', icon: <Repeat size={16} />,     path: '/recurring-invoices',  moduleKey: 'invoices' },
-          { label: 'Delivery Challans',  icon: <Truck size={16} />,      path: '/delivery-challans',   moduleKey: 'sales' },
-          { label: 'Payment Receipts',   icon: <Receipt size={16} />,    path: '/payment-receipts',    moduleKey: 'sales' },
-          { label: 'Client Credit Notes', icon: <FileMinus size={16} />,  path: '/credit-notes',        moduleKey: 'sales' },
-          { label: 'Client Debit Note',   icon: <FilePlus2 size={16} />,  path: '/client-debit-notes',  moduleKey: 'sales' },
-          { label: 'e-Way Bills',         icon: <FileCheck size={16} />,  path: '/eway-bills',          moduleKey: 'sales' },
+          { label: 'Quotes', icon: <FileText size={16} />, path: '/sales/quotes', moduleKey: 'sales' },
+          { label: 'Sales Orders', icon: <ClipboardList size={16} />, path: '/sales/orders', moduleKey: 'sales' },
+          { label: 'Invoices', icon: <Receipt size={16} />, path: '/invoices', moduleKey: 'invoices' },
+          { label: 'Recurring Invoices', icon: <Repeat size={16} />, path: '/recurring-invoices', moduleKey: 'invoices' },
+          { label: 'Delivery Challans', icon: <Truck size={16} />, path: '/delivery-challans', moduleKey: 'sales' },
+          { label: 'Payment Receipts', icon: <Receipt size={16} />, path: '/payment-receipts', moduleKey: 'sales' },
+          { label: 'Client Credit Notes', icon: <FileMinus size={16} />, path: '/credit-notes', moduleKey: 'sales' },
+          { label: 'Client Debit Note', icon: <FilePlus2 size={16} />, path: '/client-debit-notes', moduleKey: 'sales' },
+          { label: 'e-Way Bills', icon: <FileCheck size={16} />, path: '/eway-bills', moduleKey: 'sales' },
         ],
       },
       {
         label: 'Purchases',
         icon: <ShoppingCart size={16} />,
         children: [
-          { label: 'Expenses',           icon: <Wallet size={16} />,     path: '/expenses',            moduleKey: 'expenses' },
-          { label: 'Recurring Expenses', icon: <Repeat size={16} />,     path: '/recurring-expenses',  moduleKey: 'expenses' },
-          { label: 'Purchase Orders',    icon: <ClipboardList size={16}/>,path: '/purchase-orders',    moduleKey: 'purchase_orders' },
-          { label: 'Bills',              icon: <FileText size={16} />,   path: '/bills',               moduleKey: 'bills' },
-          { label: 'Payments Made',      icon: <CreditCard size={16} />, path: '/payments-made',       moduleKey: 'purchases' },
-          { label: 'Vendor Credit Note', icon: <Banknote size={16} />,   path: '/vendor-credits',      moduleKey: 'purchases' },
-          { label: 'Vendor Debit Note',  icon: <FilePlus2 size={16} />,  path: '/vendor-debit-notes',  moduleKey: 'purchases' },
+          { label: 'Expenses', icon: <Wallet size={16} />, path: '/expenses', moduleKey: 'expenses' },
+          { label: 'Recurring Expenses', icon: <Repeat size={16} />, path: '/recurring-expenses', moduleKey: 'expenses' },
+          { label: 'Purchase Orders', icon: <ClipboardList size={16} />, path: '/purchase-orders', moduleKey: 'purchase_orders' },
+          { label: 'Bills', icon: <FileText size={16} />, path: '/bills', moduleKey: 'bills' },
+          { label: 'Payments Made', icon: <CreditCard size={16} />, path: '/payments-made', moduleKey: 'purchases' },
+          { label: 'Vendor Credit Note', icon: <Banknote size={16} />, path: '/vendor-credits', moduleKey: 'purchases' },
+          { label: 'Vendor Debit Note', icon: <FilePlus2 size={16} />, path: '/vendor-debit-notes', moduleKey: 'purchases' },
         ],
       },
     ],
@@ -94,16 +93,16 @@ const adminNavigationItems: NavItem[] = [
 
 // ── Client Portal navigation ──────────────────────────────────────────────────
 const clientNavigationItems: NavItem[] = [
-  { label: 'Dashboard',   icon: <LayoutDashboard size={20} />, path: '/portal/dashboard', moduleKey: 'Dashboard' },
-  { label: 'Shop',        icon: <ShoppingCart size={20} />,    path: '/portal/catalog', moduleKey: 'Catalog' },
-  { label: 'My Requests', icon: <ClipboardList size={20} />,   path: '/portal/orders', moduleKey: 'Orders' },
-  { label: 'My Invoices', icon: <Receipt size={20} />,         path: '/portal/invoices', moduleKey: 'Invoices' },
-  { label: 'Services',    icon: <Wrench size={20} />,          path: '/portal/services', moduleKey: 'Services' },
-  { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support', moduleKey: 'Support' },
-  { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts', moduleKey: 'Contracts' },
-  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals', moduleKey: 'Approvals' },
-  { label: 'Reports',     icon: <TrendingUp size={20} />,      path: '/portal/reports', moduleKey: 'Reports' },
-  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile', moduleKey: 'My Profile' },
+  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/portal/dashboard', moduleKey: 'Dashboard' },
+  { label: 'Shop', icon: <ShoppingCart size={20} />, path: '/portal/catalog', moduleKey: 'Catalog' },
+  { label: 'My Requests', icon: <ClipboardList size={20} />, path: '/portal/orders', moduleKey: 'Orders' },
+  { label: 'My Invoices', icon: <Receipt size={20} />, path: '/portal/invoices', moduleKey: 'Invoices' },
+  { label: 'Services', icon: <Wrench size={20} />, path: '/portal/services', moduleKey: 'Services' },
+  { label: 'Support', icon: <Headphones size={20} />, path: '/portal/support', moduleKey: 'Support' },
+  { label: 'Contracts', icon: <FileText size={20} />, path: '/portal/contracts', moduleKey: 'Contracts' },
+  { label: 'Approvals', icon: <FileCheck size={20} />, path: '/portal/approvals', moduleKey: 'Approvals' },
+  { label: 'Reports', icon: <TrendingUp size={20} />, path: '/portal/reports', moduleKey: 'Reports' },
+  { label: 'My Profile', icon: <User size={20} />, path: '/portal/profile', moduleKey: 'My Profile' },
 ];
 
 // ── Permission-based nav filtering ────────────────────────────────────────────
@@ -187,9 +186,8 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
     return (
       <div ref={triggerRef} className="relative" onMouseEnter={openFlyout} onMouseLeave={() => setFlyoutOpen(false)}>
         <button
-          className={`relative w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
-            hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
-          }`}
+          className={`relative w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
+            }`}
           title={item.label}
         >
           {item.icon}
@@ -218,9 +216,8 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
       <div className="space-y-1">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
-          }`}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
+            }`}
         >
           <span className="flex items-center gap-3">{item.icon}{item.label}</span>
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -241,9 +238,8 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
       <Link
         to={item.path || '#'}
         title={item.label}
-        className={`flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
-          isActive ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
-        }`}
+        className={`flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${isActive ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
+          }`}
       >
         {item.icon}
       </Link>
@@ -253,9 +249,8 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
   return (
     <Link
       to={item.path || '#'}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-        isActive ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
-      }`}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
+        }`}
     >
       {item.icon}{item.label}
     </Link>
@@ -269,7 +264,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
-  const { user, logout, isClientPortalUser } = useAuth();
+  const { user, logout, isClientPortalUser, hasClientPortalPermission } = useAuth();
   const { hasPermission, hasRoutePermission, isSuperAdmin } = usePermissions();
   const org = useOrgConfig();
   const portalClient = isClientPortalUser && user?.clientId
@@ -298,16 +293,16 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const rawNavItems = isClientPortalUser ? clientNavigationItems : adminNavigationItems;
   const navItems = isClientPortalUser
     ? rawNavItems.filter(item =>
-        !item.moduleKey ||
-        hasPortalPermission(user?.clientId ?? '', user?.role ?? '', item.moduleKey, 'view')
-      )
-     : filterNavItems(
-       rawNavItems,
-       (key, legacyKey) => legacyKey
-         ? hasRoutePermission(key, legacyKey, 'view')
-         : hasPermission(key, 'view'),
-       isSuperAdmin,
-     );
+      !item.moduleKey ||
+      hasClientPortalPermission(item.moduleKey, 'view')
+    )
+    : filterNavItems(
+      rawNavItems,
+      (key, legacyKey) => legacyKey
+        ? hasRoutePermission(key, legacyKey, 'view')
+        : hasPermission(key, 'view'),
+      isSuperAdmin,
+    );
 
   const activePath = findActivePath(location.pathname, navItems);
 
@@ -344,8 +339,8 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
 
   const showRecoveryCodes = !isClientPortalUser && RECOVERY_CODE_ROLES.includes(user?.role ?? '');
 
-  const displayName  = user?.name ?? 'Unknown User';
-  const displayRole  = isClientPortalUser
+  const displayName = user?.name ?? 'Unknown User';
+  const displayRole = isClientPortalUser
     ? `${user?.clientName ?? 'Client'} — ${user?.role ?? 'User'}`
     : user?.role ?? 'Owner';
   const avatarInitial = displayName.charAt(0).toUpperCase();
@@ -362,9 +357,8 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
 
       <aside
         data-navigation
-        className={`fixed left-0 top-0 h-full bg-sidebar flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${
-          effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
-        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed left-0 top-0 h-full bg-sidebar flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
+          } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Header */}
         <div className="relative shrink-0 bg-sidebar h-16 px-2 z-10 flex items-center justify-between gap-2 border-b border-sidebar-border">
@@ -384,7 +378,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
                   const raw = org.displayName || 'NIDO';
                   const match = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
                   const mainName = match ? match[1].trim() : raw;
-                  const subName  = match ? match[2].trim() : null;
+                  const subName = match ? match[2].trim() : null;
                   return (
                     <div className="min-w-0 flex flex-col justify-center leading-none">
                       <span className="font-extrabold text-sidebar-foreground tracking-tight truncate leading-none"
@@ -400,11 +394,10 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               </div>
             ) : (
               <div className="flex items-center gap-2 min-w-0">
-                <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${
-                  isClientPortalUser
+                <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${isClientPortalUser
                     ? 'bg-gradient-to-br from-purple-500 to-purple-700'
                     : 'bg-gradient-to-br from-blue-600 to-blue-700'
-                }`}>
+                  }`}>
                   <Zap size={20} className="text-white" />
                 </div>
                 {!effectiveCollapsed && (
@@ -448,7 +441,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               <p className="text-xs text-gray-900 font-medium truncate">
                 {portalClient?.name || user?.clientName}
               </p>
-              <p className="text-[10px] text-gray-500 truncate">Client ID: {user?.clientId}</p>
+              <p className="text-[10px] text-gray-500 truncate">Client ID: {portalClient?.clientCode || user?.clientCode || user?.clientId}</p>
             </div>
           </div>
         )}
@@ -518,11 +511,10 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               <button
                 onClick={() => setUserMenuOpen(v => !v)}
                 title={`${displayName} — ${displayRole}`}
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-transform hover:scale-105 ${
-                  isClientPortalUser
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-transform hover:scale-105 ${isClientPortalUser
                     ? 'bg-gradient-to-br from-purple-500 to-purple-700'
                     : 'bg-gradient-to-br from-blue-600 to-blue-700'
-                }`}
+                  }`}
               >
                 {avatarInitial}
               </button>
@@ -533,11 +525,10 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               onClick={() => setUserMenuOpen(v => !v)}
               className="w-full p-4 flex items-center gap-3 hover:bg-sidebar-accent/50 transition-colors group"
             >
-              <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                isClientPortalUser
+              <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold ${isClientPortalUser
                   ? 'bg-gradient-to-br from-purple-500 to-purple-700'
                   : 'bg-gradient-to-br from-blue-600 to-blue-700'
-              }`}>
+                }`}>
                 {avatarInitial}
               </div>
               <div className="min-w-0 flex-1 text-left">

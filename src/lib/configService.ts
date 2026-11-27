@@ -1,5 +1,9 @@
 import type { AddressDetails } from "@/lib/addressTypes";
 import { createEmptyAddress, formatAddressDetails } from "@/lib/addressTypes";
+import {
+  loadDefaultNidoOrgSettingsFromSupabase,
+  saveDefaultNidoOrgSettingsToSupabase,
+} from "@/lib/settingsApi";
 
 // ── Centralized Configuration Service ─────────────────────────────────────────
 // Shared platform settings are stored in PostgreSQL. localStorage is the
@@ -293,6 +297,44 @@ export function saveConfig(settings: GeneralSettings): void {
   localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(settings));
   // Notify same-tab subscribers
   window.dispatchEvent(new CustomEvent(CONFIG_CHANGED_EVENT, { detail: settings }));
+}
+
+export async function syncConfigFromSupabase(): Promise<GeneralSettings> {
+  const { organization, settings } = await loadDefaultNidoOrgSettingsFromSupabase();
+  const current = loadConfig();
+  const merged: GeneralSettings = {
+    ...current,
+    ...(settings as Partial<GeneralSettings> | null),
+    organization: {
+      ...current.organization,
+      ...((settings as Partial<GeneralSettings> | null)?.organization ?? {}),
+      ...(organization
+        ? {
+            companyName: organization.name || current.organization.companyName,
+            gstNumber: organization.tax_id ?? current.organization.gstNumber,
+          }
+        : {}),
+    },
+  };
+  saveConfig(merged);
+  return merged;
+}
+
+export async function saveConfigToSupabase(settings: GeneralSettings): Promise<void> {
+  saveConfig(settings);
+  const { organization } = await loadDefaultNidoOrgSettingsFromSupabase();
+  if (!organization?.id) {
+    throw new Error("Default NIDO organization was not found in Supabase.");
+  }
+  await saveDefaultNidoOrgSettingsToSupabase(
+    organization.id,
+    settings as unknown as Record<string, unknown>,
+    {
+      name: settings.organization.companyName || organization.name,
+      legal_name: settings.organization.displayName || null,
+      tax_id: settings.organization.gstNumber || null,
+    },
+  );
 }
 
 /** Get current config synchronously (alias for loadConfig). */

@@ -9,6 +9,8 @@ import { getAllPOs, getPOByNumber, updatePO } from "@/lib/purchaseOrderStore";
 import { getPrefix } from "@/lib/configService";
 import { safeReadJson } from "@/lib/utils";
 import { generateBillPdf, generateBillPdfBase64 } from "@/lib/billPdf";
+import { supabase } from "@/lib/supabase";
+import { saveVendorBillInSupabase } from "@/lib/financeApi";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
@@ -319,13 +321,13 @@ const normalizeBill = (raw: Record<string, unknown>): BillEntry => {
 };
 
 const readBills = (): BillEntry[] => {
-  const parsed = safeReadJson<unknown>(BILLS_STORAGE_KEY, DEFAULT_BILLS);
-  if (!Array.isArray(parsed)) return DEFAULT_BILLS;
+  const parsed = safeReadJson<unknown>(BILLS_STORAGE_KEY, []);
+  if (!Array.isArray(parsed)) return [];
   const normalized = parsed
     .filter((entry) => !!entry && typeof entry === "object")
     .map((entry) => normalizeBill(entry as Record<string, unknown>))
     .filter((entry) => entry.id && entry.billNumber !== undefined);
-  return normalized.length ? normalized : DEFAULT_BILLS;
+  return normalized;
 };
 
 const blankForm = (): BillForm => ({
@@ -560,6 +562,27 @@ export default function BillsPage() {
   const persist = (next: BillEntry[]) => {
     setBills(next);
     localStorage.setItem(BILLS_STORAGE_KEY, JSON.stringify(next));
+    try {
+      if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession === "function") {
+        void supabase.auth.getSession().then(({ data }) => {
+          if (data?.session?.user?.id && next[0]) {
+            const latest = next[0];
+            void saveVendorBillInSupabase({
+              bill_number: latest.billNumber || latest.id,
+              vendor_id: latest.vendorId,
+              vendor_name: latest.vendorName,
+              vendor_invoice_number: latest.referenceNumber || undefined,
+              po_number: latest.sourcePurchaseOrderId || undefined,
+              notes: latest.notes,
+              status: latest.status === "PAID" ? "Paid" : latest.status === "DRAFT" ? "Draft" : "Approved",
+              grand_total: Number((latest as unknown as { total?: number }).total) || 0,
+            }).catch(() => {});
+          }
+        });
+      }
+    } catch {
+      // ignore in offline/test mode
+    }
   };
 
   const backToList = () => navigate("/transactions/purchase/bills", { replace: true });

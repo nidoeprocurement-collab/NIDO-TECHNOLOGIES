@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Building2,
@@ -21,6 +21,10 @@ import {
   loadTransactionSettings,
   saveTransactionSettings,
 } from '@/lib/transactionSettings/service';
+import {
+  loadPlatformSettingsFromSupabase,
+  savePlatformSettingToSupabase,
+} from '@/lib/settingsApi';
 import type { TransactionSettingsStoreState } from '@/lib/transactionSettings/types';
 
 type TabKey = 'terms' | 'bank' | 'signatures' | 'email';
@@ -37,6 +41,25 @@ export default function TransactionSettingsPage() {
   const [store, setStore] = useState<TransactionSettingsStoreState>(() =>
     loadTransactionSettings(),
   );
+
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      try {
+        const remote = await loadPlatformSettingsFromSupabase('transaction');
+        const saved = remote.transaction_settings_v1 as TransactionSettingsStoreState | undefined;
+        if (mounted && saved && typeof saved === 'object') {
+          saveTransactionSettings(saved);
+          setStore(saved);
+        }
+      } catch {
+        // Keep local cache fallback when Supabase platform_settings is unavailable.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const [pdfPreviewState, setPdfPreviewState] = useState<{
     open: boolean;
@@ -55,6 +78,16 @@ export default function TransactionSettingsPage() {
     setStore((prev) => {
       const next = updater(prev);
       saveTransactionSettings(next);
+      void savePlatformSettingToSupabase(
+        'transaction_settings_v1',
+        'transaction',
+        next,
+        'NIDO transaction templates, bank details, and signatures',
+      ).catch((err) => {
+        toast.error('Failed to sync transaction settings to Supabase', {
+          description: err instanceof Error ? err.message : 'Saved locally only.',
+        });
+      });
       return next;
     });
   };

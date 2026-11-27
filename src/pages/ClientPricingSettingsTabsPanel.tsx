@@ -19,6 +19,14 @@ import { getClientCatalog } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
 import { toast } from "sonner";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
+import {
+  loadClientPricingSettingsFromSupabase,
+  migrateLocalClientPricingToSupabaseIfNeeded,
+  saveClientPriceSlabsInSupabase,
+  saveClientPricingSettingsInSupabase,
+  saveRetailMarketPricesInSupabase,
+} from "@/lib/clientPriceEngineApi";
 
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -72,6 +80,27 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
         category: product?.category || entry.category || "",
       };
     }));
+
+    if (isSupabaseUuid(clientId)) {
+      let cancelled = false;
+      void migrateLocalClientPricingToSupabaseIfNeeded(clientId)
+        .then(() => loadClientPricingSettingsFromSupabase(clientId))
+        .then((loaded) => {
+          if (cancelled) return;
+          setSettings(loaded.settings);
+          setSavedSettings(loaded.settings);
+          setRetailPrices(loaded.retailMarketPrices);
+          setSavedRetailPrices(loaded.retailMarketPrices);
+          setSlabs(loaded.slabs);
+          setSavedSlabs(loaded.slabs);
+        })
+        .catch(() => {
+          // Keep cached settings if offline/unavailable
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
   }, [clientId]);
 
   const updateField = <K extends keyof ClientCommonSettings>(
@@ -86,7 +115,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
     JSON.stringify(retailPrices) !== JSON.stringify(savedRetailPrices) ||
     JSON.stringify(slabs) !== JSON.stringify(savedSlabs);
 
-  const saveChanges = () => {
+  const saveChanges = async () => {
     const slabsChanged = JSON.stringify(slabs) !== JSON.stringify(savedSlabs);
     const hasInvalidSlab = slabsChanged && slabs.some((slab) =>
       !slab.name.trim() ||
@@ -100,19 +129,23 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
       return;
     }
 
-    if (JSON.stringify(settings) !== JSON.stringify(savedSettings)) {
-      saveClientCommonSettings(clientId, settings);
-      setSavedSettings(settings);
+    try {
+      if (JSON.stringify(settings) !== JSON.stringify(savedSettings)) {
+        await saveClientPricingSettingsInSupabase(clientId, settings);
+        setSavedSettings(settings);
+      }
+      if (JSON.stringify(retailPrices) !== JSON.stringify(savedRetailPrices)) {
+        await saveRetailMarketPricesInSupabase(retailPrices);
+        setSavedRetailPrices(retailPrices);
+      }
+      if (slabsChanged) {
+        await saveClientPriceSlabsInSupabase(clientId, slabs);
+        setSavedSlabs(slabs);
+      }
+      toast.success("Price settings saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save price settings");
     }
-    if (JSON.stringify(retailPrices) !== JSON.stringify(savedRetailPrices)) {
-      saveRetailMarketPrices(retailPrices);
-      setSavedRetailPrices(retailPrices);
-    }
-    if (slabsChanged) {
-      saveClientPriceSlabs(clientId, slabs);
-      setSavedSlabs(slabs);
-    }
-    toast.success("Price settings saved");
   };
 
   const marketRows = useMemo<MarketRow[]>(() => {

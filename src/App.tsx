@@ -100,7 +100,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
 import { I18nProvider } from "./i18n/I18nProvider";
-import { getPortalModuleForPath, hasPortalPermission } from "@/lib/portalUserStore";
+import { getPortalModuleForPath } from "@/lib/portalUserStore";
 import { observeNativeSelects } from "@/lib/alphabeticalDropdowns";
 
 const queryClient = new QueryClient();
@@ -134,7 +134,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 /** Guards admin-only routes: redirects client portal users to /portal/dashboard */
-function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
+export function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isClientPortalUser } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (isClientPortalUser) return <Navigate to="/portal/dashboard" replace />;
@@ -143,7 +143,13 @@ function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
 
 /** Guards client portal routes: redirects NIDO admins to /dashboard */
 function ClientPortalRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isClientPortalUser, isImpersonating, user } = useAuth();
+  const {
+    isAuthenticated,
+    isClientPortalUser,
+    isImpersonating,
+    user,
+    hasClientPortalPermission,
+  } = useAuth();
   const location = useLocation();
   const [, refreshPermissions] = useState(0);
   useEffect(() => {
@@ -158,14 +164,14 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
     };
   }, []);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
+  if (!isClientPortalUser) return <Navigate to="/dashboard" replace />;
   const adminOnly = /\/(users|roles|addresses)(\/|$)/.test(location.pathname);
   const portalModule = getPortalModuleForPath(location.pathname);
   const permitted =
     !!user?.clientId &&
     (adminOnly
       ? user.userType === "client_admin"
-      : !portalModule || hasPortalPermission(user.clientId, user.role ?? "", portalModule, "view"));
+      : !portalModule || hasClientPortalPermission(portalModule, "view"));
   if (!permitted) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-6">
@@ -202,6 +208,7 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
 
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const EmailUnavailablePage = lazy(() => import("@/pages/EmailUnavailablePage"));
 const ClientPortalReportsPage = lazy(() => import("@/pages/ClientPortalReportsPage"));
 const ClientPortalApprovalsPage = lazy(() => import("@/pages/ClientPortalApprovalsPage"));
@@ -337,7 +344,7 @@ function RootRedirect() {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, isLoading, accessDenied } = useAuth();
+  const { isAuthenticated, isLoading, accessDenied, isPasswordRecovery } = useAuth();
   const { isLoading: settingsLoading } = useConfig();
   const location = useLocation();
 
@@ -349,18 +356,21 @@ function AppRoutes() {
     );
   }
 
-  if (accessDenied) {
+  if (isPasswordRecovery && location.pathname !== "/reset-password") {
+    return <Navigate to="/reset-password" replace />;
+  }
+
+  const isAuthFlowRoute =
+    location.pathname.startsWith("/onboarding") ||
+    location.pathname === "/reset-password" ||
+    location.pathname === "/forgot-password";
+
+  if (accessDenied && !isAuthFlowRoute) {
     return <AccessDeniedPage />;
   }
 
   return (
     <div className="flex flex-col h-screen h-[100dvh] w-full max-w-full overflow-hidden bg-background">
-      <div
-        role="note"
-        className="flex-shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-center text-xs font-medium text-amber-900 z-40"
-      >
-        Local-only prototype: sign-in and data stay in this browser and are not protected for production.
-      </div>
       <div className="flex-1 min-h-0 w-full overflow-hidden relative">
         <Suspense
           fallback={
@@ -379,8 +389,15 @@ function AppRoutes() {
               path="/login"
               element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
             />
-            <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
-            <Route path="/reset-password" element={<Navigate to="/login" replace />} />
+            <Route
+              path="/forgot-password"
+              element={<ResetPasswordPage mode="request" />}
+            />
+            <Route
+              path="/reset-password"
+              element={<ResetPasswordPage mode="reset" />}
+            />
+            <Route path="/onboarding" element={<UserOnboardingPage />} />
             <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
             <Route path="/preview-product" element={<ProductPreviewPage />} />
             <Route

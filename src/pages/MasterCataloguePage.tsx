@@ -1,7 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CATEGORY_SUBCATEGORIES } from '@/lib/categories';
-import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode, removeArchivedProductFromDownstream, findCatalogProductByName, normalizeCatalogProductName } from '@/lib/catalogStore';
+import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, setCatalogProductsCache, generateMasterProductCode, removeArchivedProductFromDownstream, findCatalogProductByName, normalizeCatalogProductName } from '@/lib/catalogStore';
+import {
+  addMasterCatalogueAuditLogInSupabase,
+  archiveMasterCatalogueItemInSupabase,
+  createMasterCatalogueItemInSupabase,
+  deleteMasterCatalogueItemInSupabase,
+  loadMasterCatalogueAuditLogsFromSupabase,
+  loadMasterCatalogueFromSupabase,
+  migrateLocalCatalogToSupabaseIfNeeded,
+  updateMasterCatalogueItemInSupabase,
+} from '@/lib/masterCatalogueApi';
+import { isSupabaseUuid } from '@/lib/nidoRolesApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -322,12 +333,12 @@ export default function CatalogUpdatesTab() {
       price: Number(p.price) || 0,
       status: 'In Stock' as const,
       tags: Array.isArray(p.tags) ? p.tags : [],
-      initialStock: 0,
-      minStockThreshold: 0,
+      initialStock: Number(p.initialStock) || 0,
+      minStockThreshold: Number(p.minStockThreshold) || 0,
       description: p.description || '',
       specification: '',
       warranty: p.warranty || '',
-      hsnCode: '',
+      hsnCode: p.hsnCode || '',
       dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
       customsDeclaration: 'Exempt',
       primaryVendor: '', vendorSku: '', leadTime: p.leadTime || '',
@@ -359,6 +370,8 @@ export default function CatalogUpdatesTab() {
   const AUDIT_PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState<'catalogue' | 'approvals-audit'>('catalogue');
   const [clearAuditDialogOpen, setClearAuditDialogOpen] = useState(false);
+  const [loadingCatalogue, setLoadingCatalogue] = useState(true);
+  const [catalogueError, setCatalogueError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleAuditUpdate = () => {
@@ -407,12 +420,12 @@ export default function CatalogUpdatesTab() {
       price: Number(p.price) || 0,
       status: 'In Stock' as const,
       tags: Array.isArray(p.tags) ? p.tags : [],
-      initialStock: 0,
-      minStockThreshold: 0,
+      initialStock: Number(p.initialStock) || 0,
+      minStockThreshold: Number(p.minStockThreshold) || 0,
       description: p.description || '',
       specification: '',
       warranty: p.warranty || '',
-      hsnCode: '',
+      hsnCode: p.hsnCode || '',
       dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
       customsDeclaration: 'Exempt',
       primaryVendor: '', vendorSku: '', leadTime: p.leadTime || '',
@@ -455,8 +468,34 @@ export default function CatalogUpdatesTab() {
     navigate('/preview-product');
   };
 
+  const syncFromSupabase = async () => {
+    setLoadingCatalogue(true);
+    setCatalogueError(null);
+    try {
+      await migrateLocalCatalogToSupabaseIfNeeded().catch(() => undefined);
+      const [remoteProducts, remoteLogs] = await Promise.all([
+        loadMasterCatalogueFromSupabase(),
+        loadMasterCatalogueAuditLogsFromSupabase().catch(() => null),
+      ]);
+      if (Array.isArray(remoteProducts)) {
+        setCatalogProductsCache(remoteProducts);
+      }
+      loadFromStore();
+      if (Array.isArray(remoteLogs)) {
+        setAuditLogs(remoteLogs);
+      }
+    } catch (err) {
+      setCatalogueError(
+        err instanceof Error ? err.message : 'Unable to load Master Catalogue from Supabase.',
+      );
+    } finally {
+      setLoadingCatalogue(false);
+    }
+  };
+
   useEffect(() => {
     loadFromStore();
+    void syncFromSupabase();
     window.addEventListener('catalogUpdated', loadFromStore);
     return () => window.removeEventListener('catalogUpdated', loadFromStore);
   }, []);
@@ -570,27 +609,61 @@ export default function CatalogUpdatesTab() {
     if (item) setArchiveConfirmItem(item);
   };
 
-  const confirmArchiveItem = () => {
+  const confirmArchiveItem = async () => {
     if (!archiveConfirmItem) return;
     const products = getCatalogProducts();
     const product = products.find(p => p.id === archiveConfirmItem.id);
     if (!product) return;
-    saveCatalogProduct({ ...product, publishStatus: 'archived' });
-    removeArchivedProductFromDownstream(product.id, product.masterProductCode);
-    setItems(prev => prev.map(i => i.id === archiveConfirmItem.id ? { ...i, publishStatus: 'archived' as const } : i));
-    toast.success(`"${archiveConfirmItem.name}" archived and removed from vendor & client lists`);
-    setArchiveConfirmItem(null);
+    try {
+      const updated = isSupabaseUuid(product.id)
+        ? await archiveMasterCatalogueItemInSupabase(product.id)
+        : { ...product, publishStatus: 'archived' as const };
+      saveCatalogProduct(updated, { skipAudit: true });
+      void addMasterCatalogueAuditLogInSupabase({
+        itemId: updated.id,
+        event: 'Item Archived',
+        detail: `Archived product: ${updated.productName}`,
+        itemName: updated.productName,
+        sku: updated.skuCode || updated.masterProductCode,
+        status: 'Archived',
+        previousValue: product.publishStatus,
+        newValue: 'archived',
+      }).catch(() => undefined);
+      removeArchivedProductFromDownstream(product.id, product.masterProductCode);
+      setItems(prev => prev.map(i => i.id === archiveConfirmItem.id ? { ...i, publishStatus: 'archived' as const } : i));
+      toast.success(`"${archiveConfirmItem.name}" archived and removed from vendor & client lists`);
+      setArchiveConfirmItem(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to archive product');
+    }
   };
 
-  const applyItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
+  const applyItemStatus = async (id: string, newStatus: 'draft' | 'published' | 'pending') => {
     const products = getCatalogProducts();
     const product = products.find(p => p.id === id);
     if (!product) return;
-    const updated = { ...product, publishStatus: newStatus };
-    saveCatalogProduct(updated);
-    setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: newStatus } : i));
-    const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-    toast.success(newStatus === 'published' ? `"${product.productName}" published successfully` : `Status updated to ${label}`);
+    try {
+      const candidate = { ...product, publishStatus: newStatus };
+      const updated = isSupabaseUuid(product.id)
+        ? await updateMasterCatalogueItemInSupabase(candidate)
+        : candidate;
+      saveCatalogProduct(updated, { skipAudit: true });
+      void addMasterCatalogueAuditLogInSupabase({
+        itemId: updated.id,
+        event: newStatus === 'published' ? 'Item Approved' : 'Status Changed',
+        detail: `${updated.productName} status updated from ${product.publishStatus} to ${newStatus}`,
+        itemName: updated.productName,
+        sku: updated.skuCode || updated.masterProductCode,
+        status: newStatus === 'published' ? 'Approved' : newStatus === 'pending' ? 'Pending' : 'Draft',
+        previousValue: product.publishStatus,
+        newValue: newStatus,
+      }).catch(() => undefined);
+      setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: newStatus } : i));
+      const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+      toast.success(newStatus === 'published' ? `"${product.productName}" published successfully` : `Status updated to ${label}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to update status');
+    }
   };
 
   const updateItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
@@ -600,26 +673,35 @@ export default function CatalogUpdatesTab() {
       setPublishConfirmItem(item);
       return;
     }
-    applyItemStatus(id, newStatus);
+    void applyItemStatus(id, newStatus);
   };
 
   const confirmPublishItem = () => {
     if (!publishConfirmItem) return;
-    applyItemStatus(publishConfirmItem.id, 'published');
+    void applyItemStatus(publishConfirmItem.id, 'published');
     setPublishConfirmItem(null);
   };
 
-  const bulkUpdateStatus = (newStatus: 'draft' | 'published' | 'pending', ids = selectedIds) => {
+  const bulkUpdateStatus = async (newStatus: 'draft' | 'published' | 'pending', ids = selectedIds) => {
     if (ids.length === 0) return;
     const products = getCatalogProducts();
-    ids.forEach(id => {
-      const product = products.find(p => p.id === id);
-      if (product) saveCatalogProduct({ ...product, publishStatus: newStatus });
-    });
-    setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, publishStatus: newStatus } : i));
-    const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-    toast.success(`${ids.length} item${ids.length > 1 ? 's' : ''} updated to ${label}`);
-    setSelectedIds(prev => prev.filter(id => !ids.includes(id)));
+    try {
+      for (const id of ids) {
+        const product = products.find(p => p.id === id);
+        if (!product) continue;
+        const candidate = { ...product, publishStatus: newStatus };
+        const updated = isSupabaseUuid(product.id)
+          ? await updateMasterCatalogueItemInSupabase(candidate)
+          : candidate;
+        saveCatalogProduct(updated, { skipAudit: true });
+      }
+      setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, publishStatus: newStatus } : i));
+      const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+      toast.success(`${ids.length} item${ids.length > 1 ? 's' : ''} updated to ${label}`);
+      setSelectedIds(prev => prev.filter(id => !ids.includes(id)));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to update selected items');
+    }
   };
 
   const requestBulkPublish = () => {
@@ -630,7 +712,7 @@ export default function CatalogUpdatesTab() {
 
   const confirmBulkPublish = () => {
     if (bulkPublishConfirmIds.length === 0) return;
-    bulkUpdateStatus('published', bulkPublishConfirmIds);
+    void bulkUpdateStatus('published', bulkPublishConfirmIds);
     setBulkPublishConfirmIds([]);
   };
 
@@ -640,50 +722,80 @@ export default function CatalogUpdatesTab() {
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<CatalogItem | null>(null);
   const [deleteAllArchivedConfirmOpen, setDeleteAllArchivedConfirmOpen] = useState(false);
 
-  const bulkArchiveItems = () => {
+  const bulkArchiveItems = async () => {
     if (selectedIds.length === 0) return;
     const products = getCatalogProducts();
-    selectedIds.forEach(id => {
-      const product = products.find(p => p.id === id);
-      if (product) {
-        saveCatalogProduct({ ...product, publishStatus: 'archived' });
+    try {
+      for (const id of selectedIds) {
+        const product = products.find(p => p.id === id);
+        if (!product) continue;
+        const updated = isSupabaseUuid(product.id)
+          ? await archiveMasterCatalogueItemInSupabase(product.id)
+          : { ...product, publishStatus: 'archived' as const };
+        saveCatalogProduct(updated, { skipAudit: true });
         removeArchivedProductFromDownstream(product.id, product.masterProductCode);
       }
-    });
-    setItems(prev => prev.map(i => selectedIds.includes(i.id) ? { ...i, publishStatus: 'archived' as const } : i));
-    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} archived and removed from vendor & client lists`);
-    setSelectedIds([]);
-    setBulkArchiveConfirmOpen(false);
+      setItems(prev => prev.map(i => selectedIds.includes(i.id) ? { ...i, publishStatus: 'archived' as const } : i));
+      toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} archived and removed from vendor & client lists`);
+      setSelectedIds([]);
+      setBulkArchiveConfirmOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to archive selected items');
+    }
   };
 
-  const unarchiveItem = (id: string) => {
+  const unarchiveItem = async (id: string) => {
     const products = getCatalogProducts();
     const product = products.find(p => p.id === id);
     if (!product) return;
-    saveCatalogProduct({ ...product, publishStatus: 'draft' });
-    setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: 'draft' as const } : i));
-    toast.success('Product restored to Draft');
+    try {
+      const candidate = { ...product, publishStatus: 'draft' as const };
+      const updated = isSupabaseUuid(product.id)
+        ? await updateMasterCatalogueItemInSupabase(candidate)
+        : candidate;
+      saveCatalogProduct(updated, { skipAudit: true });
+      setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: 'draft' as const } : i));
+      toast.success('Product restored to Draft');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to restore product');
+    }
   };
 
-  const confirmPermanentDeleteArchivedItem = () => {
+  const confirmPermanentDeleteArchivedItem = async () => {
     if (!deleteConfirmItem) return;
-    deleteCatalogProduct(deleteConfirmItem.id);
-    setItems(prev => prev.filter(i => i.id !== deleteConfirmItem.id));
-    setSelectedIds(prev => prev.filter(id => id !== deleteConfirmItem.id));
-    toast.success(`"${deleteConfirmItem.name}" permanently removed from Master Catalogue`);
-    setDeleteConfirmItem(null);
+    try {
+      if (isSupabaseUuid(deleteConfirmItem.id)) {
+        await deleteMasterCatalogueItemInSupabase(deleteConfirmItem.id);
+      }
+      deleteCatalogProduct(deleteConfirmItem.id);
+      setItems(prev => prev.filter(i => i.id !== deleteConfirmItem.id));
+      setSelectedIds(prev => prev.filter(id => id !== deleteConfirmItem.id));
+      toast.success(`"${deleteConfirmItem.name}" permanently removed from Master Catalogue`);
+      setDeleteConfirmItem(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to delete archived product');
+    }
   };
 
-  const confirmPermanentDeleteAllArchived = () => {
+  const confirmPermanentDeleteAllArchived = async () => {
     const archivedItems = items.filter(i => i.publishStatus === 'archived');
     if (archivedItems.length === 0) {
       setDeleteAllArchivedConfirmOpen(false);
       return;
     }
-    archivedItems.forEach(item => deleteCatalogProduct(item.id));
-    setItems(prev => prev.filter(i => i.publishStatus !== 'archived'));
-    toast.success(`${archivedItems.length} archived product${archivedItems.length > 1 ? 's' : ''} permanently removed`);
-    setDeleteAllArchivedConfirmOpen(false);
+    try {
+      for (const item of archivedItems) {
+        if (isSupabaseUuid(item.id)) {
+          await deleteMasterCatalogueItemInSupabase(item.id);
+        }
+        deleteCatalogProduct(item.id);
+      }
+      setItems(prev => prev.filter(i => i.publishStatus !== 'archived'));
+      toast.success(`${archivedItems.length} archived product${archivedItems.length > 1 ? 's' : ''} permanently removed`);
+      setDeleteAllArchivedConfirmOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to delete archived products');
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -725,7 +837,7 @@ export default function CatalogUpdatesTab() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const text = ev.target?.result as string;
         // Split preserving quoted newlines — simple approach: split on \n then re-join quoted blocks
@@ -834,15 +946,18 @@ export default function CatalogUpdatesTab() {
             warranty: col(row, 'warranty'),
           };
 
-          if (saveCatalogProduct(product)) {
-             added++;
-            existingNames.add(normalizedName);
-           } else {
-            // A concurrent update or a legacy record can still be caught by
-            // the store-level guard; report it as a duplicate without
+          try {
+            const created = await createMasterCatalogueItemInSupabase(product);
+            if (saveCatalogProduct(created, { skipAudit: true })) {
+              added++;
+              existingNames.add(normalizedName);
+            }
+          } catch {
+            // A concurrent update or a legacy/duplicate record can still be caught by
+            // the DB unique constraint; report it as a duplicate without
             // affecting the classification of other rows.
-             skippedDuplicates++;
-           }
+            skippedDuplicates++;
+          }
         }
 
         if (added > 0) {
@@ -1110,6 +1225,22 @@ export default function CatalogUpdatesTab() {
         <p className="text-sm text-gray-600 mt-1">Manage and register all products/services available for client contracts and downstream client-specific mapping.</p>
         <p className="text-xs text-gray-500 mt-1">Add items via "Add New Item" — drafts and published products appear here.</p>
       </div>
+
+      {loadingCatalogue && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          <RefreshCw size={14} className="animate-spin" />
+          <span>Syncing Master Catalogue from Supabase...</span>
+        </div>
+      )}
+
+      {catalogueError && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <span>{catalogueError}</span>
+          <Button size="sm" variant="outline" onClick={() => void syncFromSupabase()}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

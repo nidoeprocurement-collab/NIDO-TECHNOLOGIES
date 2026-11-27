@@ -7,7 +7,13 @@ import {
   saveGlobalCategoryRules,
   type CategoryPricingRule,
 } from "@/lib/priceEngineStore";
+import {
+  deleteGlobalCategoryRuleInSupabase,
+  loadGlobalCategoryRulesFromSupabase,
+  saveGlobalCategoryRulesInSupabase,
+} from "@/lib/clientPriceEngineApi";
 import { getMasterCatalogCategories } from "@/lib/catalogStore";
+import { toast } from "sonner";
 
 function loadCatalogCategories(): string[] {
   return getMasterCatalogCategories();
@@ -108,12 +114,27 @@ export default function GlobalCategoryPricingPanel() {
   useEffect(() => {
     const refresh = () => setCatalogCategories(loadCatalogCategories());
     window.addEventListener("catalogUpdated", refresh);
+    void loadGlobalCategoryRulesFromSupabase()
+      .then((loaded) => setRules(loaded))
+      .catch(() => {
+        // Keep cached rules if offline/unavailable
+      });
     return () => window.removeEventListener("catalogUpdated", refresh);
   }, []);
 
-  const persist = (next: CategoryPricingRule[]) => {
+  const persist = (next: CategoryPricingRule[], removedCategory?: string) => {
     setRules(next);
     saveGlobalCategoryRules(next);
+    void (async () => {
+      try {
+        if (removedCategory) {
+          await deleteGlobalCategoryRuleInSupabase(removedCategory);
+        }
+        await saveGlobalCategoryRulesInSupabase(next);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to save global category pricing rule");
+      }
+    })();
   };
 
   const allCategories = Array.from(new Set([
@@ -149,7 +170,10 @@ export default function GlobalCategoryPricingPanel() {
     cancelEdit();
   };
 
-  const removeRule = (id: string) => persist(rules.filter((rule) => rule.id !== id));
+  const removeRule = (id: string) => {
+    const removed = rules.find((rule) => rule.id === id);
+    persist(rules.filter((rule) => rule.id !== id), removed?.category);
+  };
 
   return (
     <div className="border border-gray-300 rounded-lg p-4">

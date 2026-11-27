@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { hydrateAllReportSourcesFromSupabase } from "@/lib/reportsApi";
 
 const REPORT_DATA_EVENTS = [
   "nidoClientsUpdated",
@@ -42,6 +44,18 @@ export function useLiveReportRevision(): number {
     window.addEventListener("storage", refresh);
     document.addEventListener("visibilitychange", onVisibilityChange);
     REPORT_DATA_EVENTS.forEach((eventName) => window.addEventListener(eventName, refresh));
+
+    try {
+      if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession === "function") {
+        void supabase.auth.getSession().then(({ data }) => {
+          if (data?.session?.user?.id) {
+            void hydrateAllReportSourcesFromSupabase().catch(() => {});
+          }
+        });
+      }
+    } catch {
+      // ignore in offline/test mode
+    }
 
     return () => {
       window.removeEventListener("storage", refresh);

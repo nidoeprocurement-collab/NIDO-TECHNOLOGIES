@@ -1,6 +1,21 @@
 import { getPrefix } from './configService';
 import type { ProductCommercialTerms } from './productCommercialTerms';
 import { isPhysicalOrHybridProduct } from './productTypeRules';
+import { supabase } from './supabase';
+import { saveClientInvoiceInSupabase } from './financeApi';
+
+function syncInvoiceToSupabase(invoice: StoredInvoice): void {
+  try {
+    if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession !== 'function') return;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user?.id) {
+        void saveClientInvoiceInSupabase(invoice).catch(() => {});
+      }
+    });
+  } catch {
+    // ignore in offline/test mode
+  }
+}
 
 export type InvoiceStatus = 'Draft' | 'Proforma Invoice' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
 
@@ -276,11 +291,10 @@ function seedInvoices(): StoredInvoice[] {
         ...inv,
       }));
     }
-    localStorage.setItem(STORE_KEY, JSON.stringify(SEED_INVOICES));
   } catch {
     // The app also renders in environments without localStorage.
   }
-  return [...SEED_INVOICES];
+  return [];
 }
 
 export function getInvoices(): StoredInvoice[] {
@@ -307,6 +321,7 @@ export function saveInvoice(invoice: StoredInvoice): boolean {
   if (index >= 0) invoices[index] = invoice;
   else invoices.unshift(invoice);
   localStorage.setItem(STORE_KEY, JSON.stringify(invoices));
+  syncInvoiceToSupabase(invoice);
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
   return true;
 }

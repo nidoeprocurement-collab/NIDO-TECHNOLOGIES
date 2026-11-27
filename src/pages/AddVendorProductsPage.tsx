@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle, Check } from "lucide-react";
 import { toast } from "sonner";
 import { getCatalogProducts, CatalogProduct, CatalogVariation, CatalogVariationOption } from "@/lib/catalogStore";
+import { loadMasterCatalogueFromSupabase } from "@/lib/masterCatalogueApi";
 import { getPrefix } from "@/lib/configService";
 import {
   addVendorProducts,
@@ -14,6 +15,11 @@ import {
   reserveVendorProductCodes,
   VendorProduct,
 } from "@/lib/vendorStore";
+import {
+  assignVendorProductsInSupabase,
+  loadVendorProductsFromSupabase,
+  updateVendorProductInSupabase,
+} from "@/lib/vendorProductsApi";
 import {
   formatLeadTimeByType,
   getAvailabilityByType,
@@ -509,12 +515,24 @@ export default function AddVendorProductsPage() {
     const loadPublished = () =>
       setCatalog(getCatalogProducts().filter((p) => p.publishStatus === "published"));
     loadPublished();
+    void loadMasterCatalogueFromSupabase()
+      .then((items) => setCatalog(items.filter((p) => p.publishStatus === "published")))
+      .catch(() => {
+        // Keep cached catalog if offline/unavailable
+      });
     window.addEventListener("catalogUpdated", loadPublished);
     return () => window.removeEventListener("catalogUpdated", loadPublished);
   }, []);
   useEffect(() => {
     const loadVendorProducts = () => setVendorProducts(getVendorProducts(vendorId));
     loadVendorProducts();
+    if (vendorId) {
+      void loadVendorProductsFromSupabase(vendorId)
+        .then((items) => setVendorProducts(items))
+        .catch(() => {
+          // Keep cached vendor products if offline/unavailable
+        });
+    }
     window.addEventListener("vendorProductsUpdated", loadVendorProducts);
     return () => window.removeEventListener("vendorProductsUpdated", loadVendorProducts);
   }, [vendorId]);
@@ -697,7 +715,7 @@ export default function AddVendorProductsPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   // ── Submit ───────────────────────────────────────────────────────────────
-  const commitProducts = () => {
+  const commitProducts = async () => {
     setSaveError("");
     const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -711,7 +729,7 @@ export default function AddVendorProductsPage() {
           toast.error(msg);
           return;
         }
-        updateVendorProduct(vendorId, editProductId, {
+        await updateVendorProductInSupabase(vendorId, editProductId, {
           price: isDigitalCatalogProduct(row.catalogProduct) ? "0" : row.price,
           moq: isDigitalCatalogProduct(row.catalogProduct) ? row.moq || "1" : row.moq,
           leadTime: row.leadTime,
@@ -747,7 +765,7 @@ export default function AddVendorProductsPage() {
           addedAt: now,
           status: "Active",
         }));
-        addVendorProducts(vendorId, products);
+        await assignVendorProductsInSupabase(vendorId, products);
         toast.success(`${products.length} product${products.length === 1 ? "" : "s"} added to vendor.`);
       }
       setShowConfirmation(false);

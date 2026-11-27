@@ -24,6 +24,9 @@ import { getProductSpecLines } from "@/lib/productConfiguration";
 import { useMyOrders, isOrderAssignmentCompleted } from "@/contexts/MyOrdersContext";
 import { appendOrderActivity, createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
 import { toast } from "sonner";
+import { isSupabaseUuid } from "@/lib/nidoRolesApi";
+import { recordDeliveryTrackingUpdateInSupabase } from "@/lib/deliveryTrackingApi";
+import { processGoodsReceiptInSupabase } from "@/lib/goodsReceiptsApi";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -1538,6 +1541,21 @@ export default function VendorOrderDetailPage() {
         ((!digital && savedStatus === "Delivered") || (digital && savedStatus === "Validated"))
       ) {
         const subId = po.items[itemIndex]?.subOrderId || po.subOrderIds?.[itemIndex] || po.subOrderId || "";
+        if (!digital && savedStatus === "Delivered" && isSupabaseUuid(po.vendorId) && subId) {
+          const deliveredQty = Number(po.items[itemIndex]?.qty || currentItem?.qty || 1);
+          void processGoodsReceiptInSupabase({
+            poNumber: po.poNumber,
+            receivedBy: getActivityActor("Warehouse Team"),
+            items: [{ sub_order_id: subId, received_qty: deliveredQty, accepted_qty: deliveredQty }],
+            idempotencyKey: `grn_${po.poNumber}_${subId}_${savedStatus}`,
+          }).catch(() => { });
+          void recordDeliveryTrackingUpdateInSupabase({
+            poNumber: po.poNumber,
+            deliveryStatus: derivedStatus === "Delivered" ? "Delivered" : "Partially Delivered",
+            receivedBy: getActivityActor("Warehouse Team"),
+            deliveryNotes: `Item ${currentItem?.name || subId} delivered.`,
+          }).catch(() => { });
+        }
         const itemLabel = currentItem?.name || "Product";
         const vendorLabel = po.vendorName || initialData.vendor?.name || initialData.vendorName || "Vendor";
         const orderNoteText =
@@ -1723,6 +1741,16 @@ export default function VendorOrderDetailPage() {
       ? (po.status === "Draft" ? "Draft" : "Processing")
       : trackedCount === activeLines.length ? "Shipped" : "Partially Shipped";
     updatePO(poKey, { items: updatedLines, status: shipmentStatus as StoredPO["status"] });
+    if (isSupabaseUuid(po.vendorId)) {
+      void recordDeliveryTrackingUpdateInSupabase({
+        poNumber: po.poNumber,
+        deliveryStatus: shipmentStatus as "Shipped" | "Partially Shipped",
+        carrier: normalizedTracking.carrier,
+        trackingNumber: normalizedTracking.number,
+        trackingLink: normalizedTracking.link,
+        deliveryNotes: normalizedTracking.note,
+      }).catch(() => { });
+    }
     setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
     const subOrderId = updatedLines[itemIndex]?.subOrderId || po.subOrderIds?.[itemIndex] || po.subOrderId;
     if (subOrderId && po.orderId) {
@@ -2547,35 +2575,35 @@ export default function VendorOrderDetailPage() {
                   )}
                 </div>
                 {docsDropdownOpen && (
-                <div style={{ padding: "20px 24px" }}>
-                  {documents.length === 0 ? (
-                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
-                      <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No documents</div>
-                    </div>
-                  ) : (
-                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                        {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
+                  <div style={{ padding: "20px 24px" }}>
+                    {documents.length === 0 ? (
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No documents</div>
                       </div>
-                      {documents.map((doc, idx) => (
-                        <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <DocIcon ext={doc.ext} />
-                            <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
-                          </div>
-                          <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
-                          <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
-                          <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
-                          <DocActionsMenu
-                            onDownload={() => handleDownloadDocument(doc)}
-                            onDelete={isDelivered ? undefined : () => handleDeleteDoc(doc.id)}
-                          />
+                    ) : (
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                          {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        {documents.map((doc, idx) => (
+                          <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <DocIcon ext={doc.ext} />
+                              <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
+                            </div>
+                            <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
+                            <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
+                            <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
+                            <DocActionsMenu
+                              onDownload={() => handleDownloadDocument(doc)}
+                              onDelete={isDelivered ? undefined : () => handleDeleteDoc(doc.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -2595,70 +2623,70 @@ export default function VendorOrderDetailPage() {
                   </div>
                 </div>
                 {notesDropdownOpen && (
-                <div style={{ padding: "20px 24px 28px" }}>
-                  {/* Inline Add Note composer */}
-                  {!isDelivered && (
-                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
-                        <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
-                          <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
-                          <textarea
-                            value={noteText}
-                            onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }}
-                            placeholder="Write your note here..."
-                            rows={4}
-                            style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }}
-                          />
-                          <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
-                        </div>
-                        <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
-                            {([["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]] as [string, string, string][]).map(([label, icon, sub]) => (
-                              <div key={label} onClick={() => setNoteVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
-                                <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${noteVisibility === label ? "#2563eb" : "#d1d5db"}`, background: noteVisibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
-                                  {noteVisibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
-                                </div>
-                                <div>
-                                  <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
-                                  <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
-                                </div>
-                              </div>
-                            ))}
+                  <div style={{ padding: "20px 24px 28px" }}>
+                    {/* Inline Add Note composer */}
+                    {!isDelivered && (
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
+                          <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
+                            <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
+                            <textarea
+                              value={noteText}
+                              onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }}
+                              placeholder="Write your note here..."
+                              rows={4}
+                              style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }}
+                            />
+                            <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                            <button
-                              onClick={handleAddNote}
-                              disabled={!noteText.trim()}
-                              style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
-                            >
-                              Add
-                            </button>
+                          <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                              {([["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]] as [string, string, string][]).map(([label, icon, sub]) => (
+                                <div key={label} onClick={() => setNoteVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                                  <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${noteVisibility === label ? "#2563eb" : "#d1d5db"}`, background: noteVisibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                                    {noteVisibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                                    <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <button
+                                onClick={handleAddNote}
+                                disabled={!noteText.trim()}
+                                style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+                              >
+                                Add
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  {/* Note list */}
-                  {notes.map((note, i) => (
-                    <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
-                      <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                          <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
-                          <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
-                          <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
-                            {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
-                          {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
-                          {note.text}
+                    )}
+                    {/* Note list */}
+                    {notes.map((note, i) => (
+                      <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
+                        <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
+                            <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
+                            <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                              {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                            {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
+                            {note.text}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
                 )}
               </div>
 

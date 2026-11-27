@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getCatalogProducts, type CatalogProduct } from "@/lib/catalogStore";
+import { loadMasterCatalogueFromSupabase } from "@/lib/masterCatalogueApi";
 import {
   getVendorProducts,
   removeVendorProduct,
@@ -37,6 +38,11 @@ import {
   reserveVendorProductCodes,
   VendorProduct,
 } from "@/lib/vendorStore";
+import {
+  loadVendorProductsFromSupabase,
+  removeVendorProductInSupabase,
+  updateVendorProductInSupabase,
+} from "@/lib/vendorProductsApi";
 import {
   formatLeadTimeByType,
   getAvailabilityByType,
@@ -744,6 +750,8 @@ export default function VendorProductsPage({ vendorId: propVendorId }: { vendorI
       : "physical";
   const [productTab, setProductTab] = useState<VendorProductTab>(initialProductTab);
   const [importing, setImporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -755,9 +763,30 @@ export default function VendorProductsPage({ vendorId: propVendorId }: { vendorI
     }
   }, [locationState?.productTab]);
 
-  // Load vendor products from store
+  const syncProducts = async () => {
+    if (!vendorId) return;
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const [loadedProducts, loadedCatalog] = await Promise.all([
+        loadVendorProductsFromSupabase(vendorId),
+        loadMasterCatalogueFromSupabase(),
+      ]);
+      setVendorProducts(loadedProducts);
+      setCatalogProducts(loadedCatalog);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : "Failed to load vendor products");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Load vendor products from store and hydrate from Supabase
   useEffect(() => {
-    if (vendorId) setVendorProducts(getVendorProducts(vendorId));
+    if (vendorId) {
+      setVendorProducts(getVendorProducts(vendorId));
+      void syncProducts();
+    }
   }, [vendorId]);
 
   useEffect(() => {
@@ -781,38 +810,55 @@ export default function VendorProductsPage({ vendorId: propVendorId }: { vendorI
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleSaveEdit = (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => {
-    updateVendorProduct(vendorId, id, { ...updates, lastStockUpdate: new Date().toISOString() });
-    setVendorProducts((prev) => prev.map((p) => p.id === id ? { ...p, ...updates } : p));
+  const handleSaveEdit = async (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => {
+    try {
+      const updated = await updateVendorProductInSupabase(vendorId, id, {
+        ...updates,
+        lastStockUpdate: new Date().toISOString(),
+      });
+      setVendorProducts((prev) => prev.map((p) => (p.id === id ? (updated ?? { ...p, ...updates }) : p)));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update product");
+    }
   };
 
-  const handleConfirmRemove = (productToRemove: VendorProduct) => {
+  const handleConfirmRemove = async (productToRemove: VendorProduct) => {
     const targetVendorId = productToRemove.vendorId || vendorId;
-    removeVendorProduct(targetVendorId, productToRemove.id);
-    setVendorProducts((prev) =>
-      prev.filter(
-        (p) =>
-          p.id !== productToRemove.id &&
-          (!productToRemove.masterProductCode || p.masterProductCode !== productToRemove.masterProductCode) &&
-          (!productToRemove.vendorProductCode || p.vendorProductCode !== productToRemove.vendorProductCode)
-      )
-    );
-    setRemoveProduct(null);
-    toast.success(`"${productToRemove.productName}" removed from this vendor.`);
+    try {
+      await removeVendorProductInSupabase(targetVendorId, productToRemove.id);
+      setVendorProducts((prev) =>
+        prev.filter(
+          (p) =>
+            p.id !== productToRemove.id &&
+            (!productToRemove.masterProductCode || p.masterProductCode !== productToRemove.masterProductCode) &&
+            (!productToRemove.vendorProductCode || p.vendorProductCode !== productToRemove.vendorProductCode)
+        )
+      );
+      setRemoveProduct(null);
+      toast.success(`"${productToRemove.productName}" removed from this vendor.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove product");
+    }
   };
 
-  const handleBulkPriceUpdate = (mode: BulkPriceMode, percentage: number) => {
+  const handleBulkPriceUpdate = async (mode: BulkPriceMode, percentage: number) => {
     const multiplier = mode === "increase" ? 1 + percentage / 100 : 1 - percentage / 100;
     let updatedCount = 0;
-    vendorProducts.forEach((product) => {
-      const currentPrice = Number(product.price);
-      if (!Number.isFinite(currentPrice) || currentPrice <= 0) return;
-      updateVendorProduct(vendorId, product.id, { price: (currentPrice * multiplier).toFixed(2) });
-      updatedCount += 1;
-    });
-    setVendorProducts(getVendorProducts(vendorId));
-    setToolDialog(null);
-    toast.success(`${updatedCount} vendor price${updatedCount === 1 ? "" : "s"} updated.`);
+    try {
+      for (const product of vendorProducts) {
+        const currentPrice = Number(product.price);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) continue;
+        await updateVendorProductInSupabase(vendorId, product.id, {
+          price: (currentPrice * multiplier).toFixed(2),
+        });
+        updatedCount += 1;
+      }
+      setVendorProducts(getVendorProducts(vendorId));
+      setToolDialog(null);
+      toast.success(`${updatedCount} vendor price${updatedCount === 1 ? "" : "s"} updated.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to bulk update prices");
+    }
   };
 
   const handleExportCatalog = (catalogType: VendorProductTab) => {
@@ -828,26 +874,30 @@ export default function VendorProductsPage({ vendorId: propVendorId }: { vendorI
     toast.success(`${products.length} ${catalogType} product${products.length === 1 ? "" : "s"} exported.`);
   };
 
-  const handleSyncVendorFeed = () => {
+  const handleSyncVendorFeed = async () => {
     const catalogById = new Map(catalogProducts.map((product) => [product.id, product]));
     const catalogByCode = new Map(catalogProducts.map((product) => [product.masterProductCode.toLowerCase(), product]));
     let syncedCount = 0;
     let unmatchedCount = 0;
 
-    vendorProducts.forEach((product) => {
-      const master = catalogById.get(product.id) || catalogByCode.get((product.masterProductCode || "").toLowerCase());
-      if (!master) {
-        unmatchedCount += 1;
-        return;
+    try {
+      for (const product of vendorProducts) {
+        const master = catalogById.get(product.id) || catalogByCode.get((product.masterProductCode || "").toLowerCase());
+        if (!master) {
+          unmatchedCount += 1;
+          return;
+        }
+        await updateVendorProductInSupabase(vendorId, product.id, masterSnapshot(master));
+        syncedCount += 1;
       }
-      updateVendorProduct(vendorId, product.id, masterSnapshot(master));
-      syncedCount += 1;
-    });
 
-    setVendorProducts(getVendorProducts(vendorId));
-    toast.success(
-      `${syncedCount} product${syncedCount === 1 ? "" : "s"} synced from the master catalog${unmatchedCount ? `; ${unmatchedCount} unmatched` : ""}.`,
-    );
+      setVendorProducts(getVendorProducts(vendorId));
+      toast.success(
+        `${syncedCount} product${syncedCount === 1 ? "" : "s"} synced from the master catalog${unmatchedCount ? `; ${unmatchedCount} unmatched` : ""}.`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to sync vendor feed");
+    }
   };
 
   const handleImportFile = async (file: File, catalogType: VendorProductTab) => {
@@ -1092,6 +1142,23 @@ export default function VendorProductsPage({ vendorId: propVendorId }: { vendorI
         />
       )}
       <div className="w-full px-2 py-4 space-y-4">
+        {syncError && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <span>Unable to sync vendor products from database: {syncError}</span>
+            <button
+              type="button"
+              onClick={() => void syncProducts()}
+              className="rounded border border-red-300 bg-white px-2.5 py-1 font-medium text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {isSyncing && vendorProducts.length === 0 && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            Loading vendor products…
+          </div>
+        )}
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           {STATS.map((stat) => (

@@ -12,7 +12,9 @@ import React, {
 import {
   loadConfig,
   saveConfig,
+  saveConfigToSupabase,
   subscribeToConfig,
+  syncConfigFromSupabase,
   type GeneralSettings,
   type OrgSettings,
   type ThemeSettings,
@@ -56,6 +58,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    if (!isAuthenticated || user?.userType !== "nido_admin") return;
+    let mounted = true;
+    void syncConfigFromSupabase()
+      .then((hydrated) => {
+        if (!mounted) return;
+        setConfig(hydrated);
+        setSavedConfig(hydrated);
+        setPersistenceError(null);
+      })
+      .catch(() => {
+        // Keep local cache fallback when Supabase organization_settings is unavailable.
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated, user?.userType]);
+
   const persistSettings = useCallback(
     async (settings: GeneralSettings) => {
       if (
@@ -66,12 +86,21 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         throw new Error("Only the System Owner can save platform settings.");
       }
 
-      saveConfig(settings);
-      const normalized = loadConfig();
-      setConfig(normalized);
-      setSavedConfig(normalized);
-      setPersistenceError(null);
-      return normalized;
+      setIsSaving(true);
+      try {
+        await saveConfigToSupabase(settings);
+        const normalized = loadConfig();
+        setConfig(normalized);
+        setSavedConfig(normalized);
+        setPersistenceError(null);
+        return normalized;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to save settings to Supabase.";
+        setPersistenceError(msg);
+        throw err;
+      } finally {
+        setIsSaving(false);
+      }
     },
     [isAuthenticated, user?.role, user?.userType],
   );

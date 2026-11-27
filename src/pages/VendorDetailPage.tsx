@@ -17,6 +17,8 @@ import VendorNewsActivityPage from "./VendorNewsActivityPage";
 import VendorPerformancePage from "./VendorPerformancePage";
 import VendorConfigurationTab from "./VendorConfigurationTab";
 import { getVendorById, type StoredVendor } from "@/lib/vendorDataStore";
+import { loadVendorByIdFromSupabase } from "@/lib/vendorsApi";
+import { loadVendorProductsFromSupabase } from "@/lib/vendorProductsApi";
 import { getAllPOs, getPODisplayStatus, type StoredPO } from "@/lib/purchaseOrderStore";
 import { StoredDocumentList } from "@/components/shared/LabeledDocumentUploader";
 import type { StoredLabeledDocument } from "@/lib/labeledDocuments";
@@ -595,8 +597,31 @@ export default function VendorDetailPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [dataVersion, setDataVersion] = useState(0);
+  const [isLoadingVendor, setIsLoadingVendor] = useState(false);
 
   const vendor = vendorId ? getVendorById(vendorId) : undefined;
+
+  useEffect(() => {
+    if (!vendorId) return;
+    let cancelled = false;
+    setIsLoadingVendor(true);
+    void Promise.all([
+      loadVendorByIdFromSupabase(vendorId),
+      loadVendorProductsFromSupabase(vendorId),
+    ])
+      .then(() => {
+        if (!cancelled) setDataVersion(version => version + 1);
+      })
+      .catch(() => {
+        // Keep cached vendor if offline/unavailable
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingVendor(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vendorId]);
 
   useEffect(() => {
     const refresh = () => setDataVersion(version => version + 1);
@@ -628,6 +653,13 @@ export default function VendorDetailPage() {
   }, [location.state]);
 
   if (!vendor) {
+    if (isLoadingVendor) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen gap-2 text-center text-sm text-gray-500">
+          Loading vendor details…
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-2 text-center">
         <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">

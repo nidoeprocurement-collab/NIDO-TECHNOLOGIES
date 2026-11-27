@@ -26,7 +26,7 @@ interface AddEditRoleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   role: NidoRole | null
-  onSave: (values: { department: string; name: string; description: string; status: "Active" | "Inactive" }) => void
+  onSave: (values: { department: string; name: string; description: string; status: "Active" | "Inactive" }) => Promise<boolean | void> | boolean | void
 }
 
 export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: AddEditRoleDialogProps) {
@@ -35,6 +35,7 @@ export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: 
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<"Active" | "Inactive">("Active")
   const [error, setError] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -43,16 +44,33 @@ export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: 
       setDescription(role?.description ?? "")
       setStatus(role?.status ?? "Active")
       setError("")
+      setSaving(false)
     }
   }, [open, role])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (saving) return
     if (!name.trim()) {
       setError("Role name is required.")
       return
     }
-    onSave({ department: department.trim(), name: name.trim(), description: description.trim(), status })
-    onOpenChange(false)
+    setSaving(true)
+    setError("")
+    try {
+      const ok = await onSave({
+        department: department.trim(),
+        name: name.trim(),
+        description: description.trim(),
+        status,
+      })
+      if (ok !== false) {
+        onOpenChange(false)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save role.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -96,8 +114,10 @@ export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>{role ? "Save Changes" : "Add Role"}</Button>
+          <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={saving} onClick={() => void handleSubmit()}>
+            {saving ? "Saving..." : role ? "Save Changes" : "Add Role"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

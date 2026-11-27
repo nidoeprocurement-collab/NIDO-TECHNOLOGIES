@@ -2,6 +2,28 @@ export type ApprovalStatus = "Pending" | "In Progress" | "Approved" | "Rejected"
 
 import { createDraftPOsForStoredOrder } from "./orderPurchaseOrderService";
 import { appendOrderActivity } from "./orderActivityStore";
+import { supabase } from "./supabase";
+import { isSupabaseUuid } from "./nidoRolesApi";
+import { updateOrderApprovalMetaInSupabase } from "./ordersApi";
+import {
+  deleteApprovalWorkflowInSupabase,
+  getApprovalWorkflowHistoryFromSupabase,
+  loadApprovalBootstrapFromSupabase,
+  saveApprovalWorkflowInSupabase,
+  setApprovalWorkflowStatusInSupabase,
+} from "./approvalsApi";
+
+async function hasAuthenticatedSupabaseSession(): Promise<boolean> {
+  try {
+    if (typeof (supabase as { auth?: { getSession?: unknown } })?.auth?.getSession !== "function") {
+      return false;
+    }
+    const { data } = await supabase.auth.getSession();
+    return Boolean(data?.session?.user?.id);
+  } catch {
+    return false;
+  }
+}
 
 export interface ApprovalCondition {
   joinOperator: "AND" | "OR";
@@ -494,22 +516,56 @@ async function localGetApprovalWorkflowHistory(id: string) {
 }
 
 export async function loadApprovalBootstrap() {
+  if (await hasAuthenticatedSupabaseSession()) {
+    try {
+      return await loadApprovalBootstrapFromSupabase();
+    } catch {
+      // Fallback to local store if offline/unavailable
+    }
+  }
   return localLoadApprovalBootstrap();
 }
 
 export async function saveApprovalWorkflow(workflow: Partial<ApprovalWorkflow> & { name: string; module: string }, editingId?: string) {
+  if (await hasAuthenticatedSupabaseSession()) {
+    try {
+      return await saveApprovalWorkflowInSupabase(workflow, editingId);
+    } catch (err) {
+      if (editingId && isSupabaseUuid(editingId)) throw err;
+    }
+  }
   return localSaveApprovalWorkflow(workflow, editingId);
 }
 
 export async function setApprovalWorkflowStatus(id: string, status: ApprovalWorkflow["status"], updatedBy: string) {
+  if (isSupabaseUuid(id) && (await hasAuthenticatedSupabaseSession())) {
+    return setApprovalWorkflowStatusInSupabase(id, status, updatedBy);
+  }
   return localSetApprovalWorkflowStatus(id, status, updatedBy);
 }
 
 export async function duplicateApprovalWorkflow(id: string, createdBy: string) {
+  if (isSupabaseUuid(id) && (await hasAuthenticatedSupabaseSession())) {
+    const boot = await loadApprovalBootstrapFromSupabase();
+    const existing = boot.workflows.find((w) => w.id === id);
+    if (existing) {
+      return saveApprovalWorkflowInSupabase({
+        ...existing,
+        id: undefined,
+        name: `${existing.name} (Copy)`,
+        status: "Draft",
+        createdBy,
+        updatedBy: createdBy,
+      });
+    }
+  }
   return localDuplicateApprovalWorkflow(id, createdBy);
 }
 
 export async function deleteApprovalWorkflow(id: string) {
+  if (isSupabaseUuid(id) && (await hasAuthenticatedSupabaseSession())) {
+    return deleteApprovalWorkflowInSupabase(id);
+  }
   return localDeleteApprovalWorkflow(id);
 }
 
@@ -534,6 +590,13 @@ export async function actOnApprovalRequest(id: string, payload: Record<string, u
   }
   if (request.status === "Approved" && request.module === "Order") {
     createDraftPOsForStoredOrder(request.reference);
+    if (await hasAuthenticatedSupabaseSession()) {
+      void updateOrderApprovalMetaInSupabase(request.reference, "Approved", false).catch(() => {});
+    }
+  } else if (["Rejected", "Cancelled"].includes(request.status) && request.module === "Order") {
+    if (await hasAuthenticatedSupabaseSession()) {
+      void updateOrderApprovalMetaInSupabase(request.reference, request.status, true).catch(() => {});
+    }
   }
   return request;
 }
@@ -568,5 +631,8 @@ export async function getApprovalRequest(id: string) {
 }
 
 export async function getApprovalWorkflowHistory(id: string) {
+  if (isSupabaseUuid(id) && (await hasAuthenticatedSupabaseSession())) {
+    return getApprovalWorkflowHistoryFromSupabase(id);
+  }
   return localGetApprovalWorkflowHistory(id);
 }
