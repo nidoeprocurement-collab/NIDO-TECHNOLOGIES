@@ -7,6 +7,10 @@ const REASON_MESSAGES: Record<string, string> = {
     "Your account email verification is pending or does not match your provisioned profile. Contact your administrator.",
   unprovisioned:
     "Your sign-in is valid, but your account has not been provisioned for portal access. Contact your organization administrator.",
+  auth_context_error:
+    "Your sign-in succeeded, but we could not load your authoritative account profile. Please try again or contact your administrator.",
+  invalid_profile:
+    "Your account profile is incomplete or missing an organization mapping. Contact your administrator.",
 };
 
 export function AccessDeniedPage() {

@@ -117,9 +117,25 @@ export default function LoginPage() {
         setError('Your account is not provisioned for portal access. Contact your administrator.');
         return;
       }
+      if (result.reason === 'auth_context_error') {
+        setError('Signed in, but failed to load your account profile. Please try again or contact your administrator.');
+        return;
+      }
+      if (result.reason === 'invalid_profile') {
+        setError('Your account profile is incomplete or missing tenant mapping. Contact your administrator.');
+        return;
+      }
+      if (result.reason === 'superseded') {
+        setError('A newer sign-in attempt replaced this request. Please wait a moment and try again.');
+        return;
+      }
       if (result.error && /rate limit|too many requests|locked/i.test(result.error)) {
         setError('Too many sign-in attempts. Please wait a moment or reset your password.');
         setIsLocked(true);
+        return;
+      }
+      if (result.error) {
+        setError(result.error);
         return;
       }
 
@@ -137,6 +153,7 @@ export default function LoginPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
     setIsLocked(false);
     setLocationPrompt('password');

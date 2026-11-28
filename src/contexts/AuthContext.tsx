@@ -208,14 +208,25 @@ function findNormalizedModulePermissions(
 }
 
 function mapSignInErrorMessage(message?: string): string {
-  if (!message) return 'Invalid email or password.';
+  if (!message) {
+    return 'Authentication failed. Please try again or contact your administrator.';
+  }
+  if (/invalid login credentials|invalid email or password/i.test(message)) {
+    return 'Invalid email or password.';
+  }
+  if (/email not confirmed/i.test(message)) {
+    return 'Your email address has not been confirmed. Please check your inbox or contact your administrator.';
+  }
+  if (/user is banned|banned/i.test(message)) {
+    return 'This account is temporarily disabled or banned. Contact your administrator.';
+  }
   if (/rate limit|too many requests|locked/i.test(message)) {
     return 'Too many sign-in attempts. Please wait a moment or reset your password.';
   }
   if (/network|fetch|timeout|failed to fetch/i.test(message)) {
     return 'Unable to reach the authentication service. Please check your connection and try again.';
   }
-  return 'Invalid email or password.';
+  return 'Authentication failed due to a service or configuration error. Please try again or contact your administrator.';
 }
 
 function isUrlRecoveryFlow(): boolean {
@@ -244,7 +255,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const serverImpersonationIdRef = useRef<string | null>(null);
 
   const requestCounterRef = useRef(0);
-  const explicitSignInInFlightRef = useRef(false);
+  const explicitSignInCounterRef = useRef(0);
+  const explicitSignInAttemptRef = useRef(0);
   const inFlightContextPromiseRef = useRef<Promise<AuthContextResult> | null>(null);
 
   const clearAuthState = useCallback((denied = false, reason: string | null = null) => {
@@ -383,7 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Avoid competing with an explicit signInWithPassword() call; it performs
       // the single authoritative context fetch for that sign-in.
-      if (event === 'SIGNED_IN' && explicitSignInInFlightRef.current) {
+      if (event === 'SIGNED_IN' && explicitSignInCounterRef.current > 0) {
         return;
       }
 
@@ -468,13 +480,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ): Promise<SignInResult> => {
       clearLegacyUserStorage();
       setIsPasswordRecovery(false);
-      explicitSignInInFlightRef.current = true;
+      explicitSignInCounterRef.current += 1;
+      const attemptId = ++explicitSignInAttemptRef.current;
 
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
+
+        if (attemptId !== explicitSignInAttemptRef.current) {
+          return { ok: false, reason: 'superseded' };
+        }
 
         if (error || !data.session) {
           return {
@@ -488,16 +505,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ctxResult = await inFlightContextPromiseRef.current;
         }
 
+        if (attemptId !== explicitSignInAttemptRef.current || ctxResult.superseded) {
+          return { ok: false, reason: 'superseded' };
+        }
+
         // Best-effort login history event; do not block sign-in if logging fails.
         void Promise.resolve(
           supabase.rpc('record_my_login_event', {
             p_client_reported_device: deviceInfo ?? null,
           }),
         ).catch(() => undefined);
-
-        if (ctxResult.superseded) {
-          return { ok: false, reason: 'superseded' };
-        }
 
         if (!ctxResult.authenticated || !ctxResult.user || !ctxResult.context) {
           await supabase.auth.signOut().catch(() => undefined);
@@ -514,6 +531,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userScope: ctxResult.context.user_scope,
         };
       } catch (err) {
+        if (attemptId !== explicitSignInAttemptRef.current) {
+          return { ok: false, reason: 'superseded' };
+        }
         await supabase.auth.signOut().catch(() => undefined);
         clearAuthState(false, null);
         const msg = err instanceof Error ? err.message : undefined;
@@ -522,7 +542,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error: mapSignInErrorMessage(msg),
         };
       } finally {
-        explicitSignInInFlightRef.current = false;
+        explicitSignInCounterRef.current = Math.max(0, explicitSignInCounterRef.current - 1);
       }
     },
     [clearAuthState, fetchAuthoritativeAuthContext],
@@ -530,7 +550,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     requestCounterRef.current += 1;
-    explicitSignInInFlightRef.current = false;
+    explicitSignInAttemptRef.current += 1;
+    explicitSignInCounterRef.current = 0;
     setIsPasswordRecovery(false);
     clearAuthState(false, null);
     try {
